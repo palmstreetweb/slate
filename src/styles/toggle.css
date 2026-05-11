@@ -1,0 +1,184 @@
+/* ============================================================
+   PSW Theme Toggle — VERBATIM port from palmstreetweb.com.
+   Source: BUILD_BRIEF.md §8.2.
+   Only adaptation: every selector is prefixed with [data-psw-forms]
+   to wrapper-scope (we don't own the host page <html>).
+   DO NOT redesign — match the PSW toggle exactly.
+   ============================================================ */
+
+[data-psw-forms] .theme-toggle {
+  position: relative;
+  width: 68px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border-md);
+  border-radius: 999px;
+  background: var(--bg-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: visible;
+  transition:
+    background 0.24s ease-out,
+    border-color 0.24s ease-out,
+    transform 0.18s ease-out,
+    box-shadow 0.24s ease-out;
+}
+
+[data-psw-forms] .theme-toggle:hover {
+  border-color: rgb(var(--accent-rgb) / 0.2);
+  box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.06);
+}
+
+[data-psw-forms] .theme-toggle:active {
+  transform: scale(0.97);
+}
+
+[data-psw-forms][data-theme='light'] .theme-toggle {
+  background: var(--accent);
+  border-color: transparent;
+}
+[data-psw-forms][data-theme='light'] .theme-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+[data-psw-forms][data-theme='dark'] .theme-toggle {
+  background: #101812;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+[data-psw-forms][data-theme='dark'] .theme-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 0 0 1px rgb(var(--accent-rgb) / 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Sliding thumb */
+[data-psw-forms] .theme-toggle::before {
+  content: '';
+  position: absolute;
+  top: calc(50% - 13px);
+  left: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+  z-index: 1;
+  transition:
+    transform 0.34s cubic-bezier(0.37, 0, 0.63, 1),
+    background 0.26s ease-out,
+    box-shadow 0.24s ease-out;
+}
+[data-psw-forms][data-theme='dark'] .theme-toggle::before {
+  background: var(--accent);
+  box-shadow:
+    0 1px 6px rgba(0, 0, 0, 0.38),
+    0 1px 4px rgb(var(--accent-rgb) / 0.22);
+}
+[data-psw-forms][data-theme='light']
+  .theme-toggle:not(.is-morphing-to-light):not(.is-morphing-to-dark)::before {
+  transform: translateX(32px);
+  background: #fff;
+  box-shadow:
+    0 1px 5px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.32);
+}
+
+@keyframes psw-morph-thumb-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(32px);
+  }
+}
+@keyframes psw-morph-thumb-left {
+  from {
+    transform: translateX(32px);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+[data-psw-forms] .theme-toggle.is-morphing-to-light::before {
+  transition:
+    background 0.28s ease-out,
+    box-shadow 0.24s ease-out;
+  animation: psw-morph-thumb-right 0.62s cubic-bezier(0.37, 0, 0.63, 1) forwards;
+}
+[data-psw-forms] .theme-toggle.is-morphing-to-dark::before {
+  transition:
+    background 0.28s ease-out,
+    box-shadow 0.24s ease-out;
+  animation: psw-morph-thumb-left 0.62s cubic-bezier(0.37, 0, 0.63, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-psw-forms] .theme-toggle,
+  [data-psw-forms] .theme-toggle::before {
+    transition: none;
+  }
+  [data-psw-forms] .theme-toggle:active {
+    transform: none;
+  }
+  [data-psw-forms] .theme-toggle:hover {
+    box-shadow: none;
+  }
+  [data-psw-forms] .theme-toggle.is-morphing-to-light::before,
+  [data-psw-forms] .theme-toggle.is-morphing-to-dark::before {
+    animation: none;
+  }
+}
+
+[data-psw-forms] .theme-ico {
+  display: block !important;
+  position: absolute;
+  top: 50%;
+  width: 17px;
+  height: 17px;
+  z-index: 2;
+  pointer-events: none;
+  filter: none;
+  shape-rendering: geometricPrecision;
+  transition:
+    opacity 0.32s ease-out,
+    transform 0.32s cubic-bezier(0.33, 1, 0.68, 1),
+    color 0.24s ease-out;
+}
+[data-psw-forms] .theme-toggle:hover .theme-ico--moon,
+[data-psw-forms] .theme-toggle:hover .theme-ico--sun {
+  transform: translate(-50%, -50%) scale(1.06);
+}
+[data-psw-forms] .theme-ico--moon {
+  left: calc(4px + 13px);
+  transform: translate(-50%, -50%);
+  color: var(--text);
+  opacity: 1;
+}
+[data-psw-forms] .theme-ico--sun {
+  left: calc(4px + 32px + 13px);
+  transform: translate(-50%, -50%);
+  color: var(--muted);
+  opacity: 0.45;
+}
+[data-psw-forms][data-theme='dark'] .theme-toggle .theme-ico--moon {
+  color: #0a0a0e;
+  opacity: 1;
+}
+[data-psw-forms][data-theme='dark'] .theme-toggle .theme-ico--sun {
+  color: rgba(255, 255, 255, 0.5);
+  opacity: 1;
+}
+[data-psw-forms][data-theme='light'] .theme-ico--moon {
+  color: #0a0a0e;
+  opacity: 0.98;
+}
+[data-psw-forms][data-theme='light'] .theme-ico--sun {
+  color: #0a0a0e;
+  opacity: 1;
+}
