@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: lint · typecheck · test · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify pack contents
+        if: matrix.node-version == '22.x'
+        run: |
+          npm pack --dry-run --json > pack.json
+          node -e '
+            const p = require("./pack.json")[0];
+            const required = ["LICENSE", "README.md", "MIGRATION_NOTES.md", "package.json", "dist/index.js", "dist/index.cjs", "dist/index.d.ts", "dist/index.d.cts", "dist/styles.css"];
+            const have = new Set(p.files.map(f => f.path));
+            const missing = required.filter(r => !have.has(r));
+            if (missing.length) { console.error("Missing from tarball:", missing); process.exit(1); }
+            const banned = p.files.filter(f => /^(src|tests|examples|scripts|\.changeset|\.github)\//.test(f.path) || /BUILD_BRIEF|intake-form|AGENTS|CLAUDE|DECISIONS/.test(f.path));
+            if (banned.length) { console.error("Files that should NOT be in tarball:", banned.map(f => f.path)); process.exit(1); }
+            console.log("Tarball contents OK:", p.files.length, "files,", p.size, "bytes");
+          '

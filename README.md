@@ -2,15 +2,23 @@
 
 > Conversational form-rendering library for Palm Street Web client projects. Schema in → Typeform-quality form out.
 
-**Status:** `1.0.0-beta.1` — under active build. API stable per [`BUILD_BRIEF.md`](./BUILD_BRIEF.md). Public docs below get fleshed out at the end of the build.
+**Status:** `1.0.0-beta.1`. Internal Palm Street Web tooling — restricted npm scope.
 
 ---
 
-## Quickstart
+## Install
 
 ```bash
 npm install @palmstreetweb/forms
 ```
+
+You also need React ≥ 18 (the package declares it as a peer dep) and the bundled stylesheet:
+
+```ts
+import '@palmstreetweb/forms/styles.css';
+```
+
+## 30-second quickstart
 
 ```tsx
 'use client';
@@ -19,12 +27,19 @@ import '@palmstreetweb/forms/styles.css';
 
 const schema = defineSchema({
   brand: { name: '805 Sealcoating' },
-  theme: 'swiss',
+  theme: 'editorial',
   themeMode: 'toggle',
   questions: [
     { id: 'welcome', type: 'welcome', title: 'Hey there.', cta: 'Start' },
-    { id: 'name', type: 'short_text', title: "What's your first name?", required: true },
-    { id: 'email', type: 'email', title: 'Best email?', required: true },
+    { id: 'name',    type: 'short_text', title: "What's your first name?", required: true },
+    { id: 'email',   type: 'email', title: 'Best email?', required: true },
+    {
+      id: 'service', type: 'single_choice', title: 'Which service?',
+      options: [
+        { label: 'Sealcoating', value: 'sealcoat' },
+        { label: 'Striping',    value: 'striping' },
+      ],
+    },
     { id: 'done', type: 'thanks', title: "You're all set." },
   ],
 });
@@ -33,45 +48,180 @@ export default function QuotePage() {
   return (
     <Form
       schema={schema}
-      onSubmit={async (answers) => {
-        await fetch('/api/quote', { method: 'POST', body: JSON.stringify(answers) });
+      onSubmit={async (answers, meta) => {
+        await fetch('/api/quote', {
+          method: 'POST',
+          body: JSON.stringify({ answers, meta }),
+        });
       }}
     />
   );
 }
 ```
 
-## API outline (placeholder — full reference at v1.0.0)
+`defineSchema` preserves literal types — inside `onSubmit`, autocomplete on `answers.` reveals `name`, `email`, and `service: 'sealcoat' | 'striping'` typed correctly.
 
-- `Form` — main component. Props: `schema`, `onSubmit`, `onQuestionChange?`, `hiddenFields?`, `errorMessage?`.
-- `defineSchema(schema)` — identity helper for full TypeScript inference.
-- `themes` — registry. Currently: `editorial`, `swiss`. Each ships `light` + `dark` token sets.
-- Types: `Schema`, `Question`, `Answers`, `Theme`, `Option`, `Condition`, `FormProps`, `SubmitMeta`.
+## API reference
 
-## Question types
+### `<Form>` props
 
-`welcome`, `statement`, `short_text`, `long_text`, `email`, `phone`, `number`, `single_choice`, `multi_choice`, `scale`, `thanks`. Full schema per type lives in [`BUILD_BRIEF.md`](./BUILD_BRIEF.md) §5.
+| Prop | Type | Required | Notes |
+|---|---|---|---|
+| `schema` | `Schema` | ✓ | Wrap with `defineSchema` for full type inference. |
+| `onSubmit` | `(answers, meta) => void \| Promise<void>` | ✓ | Fires exactly once on entering `thanks`. Async errors flip the thanks screen to a Retry state. |
+| `onQuestionChange` | `(questionId, answers) => void` |  | Fires on every step transition. Good for analytics. |
+| `hiddenFields` | `Record<string, unknown>` |  | Passed through to `meta.hiddenFields`. Never rendered. |
+| `errorMessage` | `string` |  | Fallback shown when `onSubmit` rejects (default: "Something went wrong submitting your form. Please try again."). |
+
+### `defineSchema(schema)`
+
+Identity helper — returns the schema unchanged but freezes literal types via TypeScript 5.x `const` type parameters. Use it on every schema; it has zero runtime cost.
+
+### `Schema` shape
+
+```ts
+type Schema = {
+  brand: { name: string; logo?: string };
+  theme: 'editorial' | 'swiss' | (string & {});
+  themeMode: 'auto' | 'light' | 'dark' | 'toggle';
+  questions: ReadonlyArray<Question>;
+};
+```
+
+`themeMode` decides whether to render the toggle UI:
+
+| Mode | Behavior |
+|---|---|
+| `'auto'` | Reactively follows `prefers-color-scheme`. No toggle. |
+| `'light'` \| `'dark'` | Forced. No toggle. |
+| `'toggle'` | Reads `localStorage['psw-forms-theme']` → host page `<html data-theme>` → `prefers-color-scheme` → `'dark'`. Renders the PSW pill toggle. |
+
+### Question types
+
+Every question has `id: string` and (where applicable) an optional `visibleIf?: Condition`. Stored answer types per the brief:
+
+| `type` | Schema additions | Validation | Stored as |
+|---|---|---|---|
+| `welcome` | `title`, `subtitle?`, `cta?` (default `'Start'`) | — | _not stored_ |
+| `statement` | `title`, `body?`, `cta?` (default `'Continue'`) | — | _not stored_ |
+| `short_text` | `title`, `placeholder?`, `required?`, `maxLength?`, `pattern?`, `patternError?` | required + pattern | `string` |
+| `long_text` | `title`, `placeholder?`, `required?`, `maxLength?` | required + maxLength | `string` |
+| `email` | `title`, `placeholder?`, `required?` | RFC-lite regex | `string` |
+| `phone` | `title`, `placeholder?`, `required?`, `defaultCountry?` (default `'US'`) | E.164 normalization via `libphonenumber-js` | `string` (E.164) |
+| `number` | `title`, `placeholder?`, `min?`, `max?`, `step?`, `required?` | range | `number` |
+| `single_choice` | `title`, `options: Option[]`, `required?` (default `true`) | required | `string` |
+| `multi_choice` | `title`, `options: Option[]`, `min?`, `max?` | min/max selections | `string[]` |
+| `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?` | range | `number` |
+| `thanks` | `title`, `subtitle?`, `cta?` | — | _not stored; fires `onSubmit`_ |
+
+`Option` is `{ label: string; value: string; description?: string }`.
+
+`title` accepts a function for personalization on `short_text`, `long_text`, `email`, `phone`, `single_choice`, `multi_choice`:
+
+```ts
+title: (answers) => `Nice to meet you, ${answers.name}. What's your email?`
+```
+
+### Conditional logic (`visibleIf`)
+
+```ts
+type Condition =
+  | { field: string; op: 'equals' | 'not_equals'; value: string | number }
+  | { field: string; op: 'in' | 'not_in'; value: ReadonlyArray<string | number> }
+  | { field: string; op: 'gt' | 'lt' | 'gte' | 'lte'; value: number }
+  | { field: string; op: 'is_empty' | 'is_not_empty' }
+  | { all: ReadonlyArray<Condition> }
+  | { any: ReadonlyArray<Condition> };
+```
+
+Composable infinitely. Unknown fields are treated as empty. For `multi_choice` (array) answers, `equals` checks membership and `in` checks any-of-overlap.
+
+**Retain-but-exclude semantics:** if a question's `visibleIf` later evaluates false, its previously-collected answer is _retained in internal state_ (so toggling back doesn't lose data) but _excluded from the `onSubmit` payload_. See [`DECISIONS.md`](./DECISIONS.md) ADR-005.
+
+### `SubmitMeta`
+
+```ts
+type SubmitMeta = {
+  startedAt: Date;
+  completedAt: Date;
+  durationMs: number;
+  /** Ordered IDs of questions actually shown. */
+  questionsVisited: string[];
+  /** The hiddenFields prop, passed through unchanged. */
+  hiddenFields: Record<string, unknown>;
+};
+```
+
+### Keyboard
+
+| Key | Action |
+|---|---|
+| `Enter` | Advance from welcome / statement; submit text-type fields |
+| `Shift + Enter` | New line in `long_text` |
+| `A`–`F` | Select choice option |
+| `0`–`9` | Select scale value (within the question's `[min, max]`) |
+| `Tab` / `Shift+Tab` | Standard browser focus order |
+
+`Esc → back` is opt-out by default to prevent accidental loss; not currently exposed as a `<Form>` prop (planned for V1.1).
 
 ## Theme system
 
-Themes are config objects. Light + dark tokens per theme. PSW theme toggle (1:1 match to palmstreetweb.com) ships built-in. Wrapper-scoped, never touches `<html>` of the host page.
+Two themes ship built-in, each with light and dark token sets:
+
+| Theme | Vibe | Display font | Body font | Accent (light → dark) |
+|---|---|---|---|---|
+| `editorial` | Refined serif, warm cream | Fraunces | Fraunces | `#2D5BFF` → `#6E8FFF` |
+| `swiss` | Bold geometric, lowercase | Archivo Black | Archivo | `#DC2626` → `#F87171` |
+
+Both are wrapper-scoped on `[data-psw-forms]` — the package never writes to your host page's `<html>`. The PSW theme toggle is a 1:1 visual port of palmstreetweb.com (same morph, same easing).
+
+### Customizing tokens
+
+Override per-token via CSS specificity at the wrapper level:
+
+```css
+[data-psw-forms][data-theme-name='editorial'] {
+  --psw-accent: #ff5500;
+  --psw-radius: 8px;
+}
+```
+
+A custom-theme registry API ships in V1.1 (`themes.register()`).
 
 ## Examples
 
-See [`examples/`](./examples/) once implemented:
+The `examples/` folder isn't published, but you can browse the source on the repo:
 
-- `theme-toggle-demo.tsx` — minimal toggle on a wrapper
-- `basic-quote-form.tsx` — full 8-question schema
-- `conditional-logic.tsx` — branching with `visibleIf`
-- `with-host-theme.tsx` — host-page theme inheritance
+- `examples/basic-quote-form.tsx` — full 8-question schema covering every common type.
+- `examples/conditional-logic.tsx` — branching with `visibleIf` (homeowner → lot_size OR business → company).
+- `examples/theme-toggle-demo.tsx` — minimal page rendering just the PSW toggle on a sample wrapper.
+
+Run `npm run dev` to serve them locally with hot reload.
 
 ## Coming in V2
 
-See [`DECISIONS.md`](./DECISIONS.md) "Deferred to V2" section. Includes file upload, date picker, calculator/scoring, save-and-resume, iframe embed, i18n, visual builder.
+Per [`DECISIONS.md`](./DECISIONS.md), the V1 scope intentionally excludes:
 
-## Contributing
+- File upload question type
+- Date picker question type
+- Calculator / scoring logic
+- Save-and-resume from URL token
+- iframe / HTML script-tag embed
+- Built-in analytics event bus (use `onQuestionChange` for V1)
+- Translation / i18n system
+- Visual form-builder UI
+- Multi-tenant form-storage backend
+- Client-facing admin dashboard
 
-This is internal tooling. See [`AGENTS.md`](./AGENTS.md) for repo structure and conventions, [`CLAUDE.md`](./CLAUDE.md) for AI-agent guidance, [`DECISIONS.md`](./DECISIONS.md) for the architecture log, and [`MIGRATION_NOTES.md`](./MIGRATION_NOTES.md) for semver protocol.
+Each will get a dedicated ADR when scheduled.
+
+## Bundle
+
+The engine is **<55kb gzipped** before `libphonenumber-js`, which is dynamically imported only inside `PhoneField.tsx` (~16kb gz extra, paid only when a phone question renders). React is a peer dependency, not bundled.
+
+## Repo
+
+Internal contributors should read [`AGENTS.md`](./AGENTS.md) for repo conventions and [`CLAUDE.md`](./CLAUDE.md) for AI-agent guidance. Architectural changes go through ADRs in [`DECISIONS.md`](./DECISIONS.md). Versioning protocol lives in [`MIGRATION_NOTES.md`](./MIGRATION_NOTES.md).
 
 ## License
 

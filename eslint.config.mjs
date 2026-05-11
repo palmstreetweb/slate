@@ -44,7 +44,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['*.config.{ts,mjs,js}', 'vitest.config.ts', 'vite.config.ts', 'tsup.config.ts'],
+    files: ['*.config.{ts,mjs,js}', 'vitest.config.ts', 'vite.config.ts', 'tsup.config.ts', 'scripts/**/*.{js,mjs,cjs}'],
     languageOptions: {
       globals: { ...globals.node },
     },
