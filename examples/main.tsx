@@ -3,18 +3,25 @@ import { createRoot } from 'react-dom/client';
 import { ThemeToggleDemo } from './theme-toggle-demo.js';
 import { BasicQuoteForm } from './basic-quote-form.js';
 import { ConditionalLogicDemo } from './conditional-logic.js';
+import { PSWContact } from './psw-contact.js';
+import { PSWInbox } from './psw-inbox.js';
 
-type DemoKey = 'form' | 'branching' | 'toggle';
+type DemoKey = 'psw' | 'inbox' | 'form' | 'branching' | 'toggle';
 
-const DEMOS: Record<DemoKey, { label: string; render: () => React.ReactNode }> = {
-  form: { label: 'Basic quote form', render: () => <BasicQuoteForm /> },
-  branching: { label: 'Conditional logic', render: () => <ConditionalLogicDemo /> },
-  toggle: { label: 'Theme toggle demo', render: () => <ThemeToggleDemo /> },
+const DEMOS: Record<
+  DemoKey,
+  { label: string; render: () => React.ReactNode; group: 'psw' | 'lib' }
+> = {
+  psw: { label: 'PSW contact', render: () => <PSWContact />, group: 'psw' },
+  inbox: { label: 'PSW inbox', render: () => <PSWInbox />, group: 'psw' },
+  form: { label: 'Basic quote form', render: () => <BasicQuoteForm />, group: 'lib' },
+  branching: { label: 'Conditional logic', render: () => <ConditionalLogicDemo />, group: 'lib' },
+  toggle: { label: 'Theme toggle demo', render: () => <ThemeToggleDemo />, group: 'lib' },
 };
 
 function readDemoFromHash(): DemoKey {
   const v = window.location.hash.replace('#', '');
-  return v in DEMOS ? (v as DemoKey) : 'form';
+  return v in DEMOS ? (v as DemoKey) : 'psw';
 }
 
 function App() {
@@ -58,30 +65,41 @@ function DemoSwitcher({
         fontFamily: 'system-ui, sans-serif',
       }}
     >
-      {(Object.keys(DEMOS) as DemoKey[]).map((k) => (
-        <button
-          key={k}
-          type="button"
-          onClick={() => {
-            window.location.hash = k;
-            onChange(k);
-          }}
-          style={{
-            padding: '6px 12px',
-            fontSize: 11,
-            border: 'none',
-            background: value === k ? '#fff' : 'transparent',
-            color: value === k ? '#000' : '#fff',
-            cursor: 'pointer',
-            borderRadius: 999,
-            letterSpacing: '0.05em',
-            fontWeight: 600,
-            textTransform: 'uppercase',
-          }}
-        >
-          {DEMOS[k].label}
-        </button>
-      ))}
+      {(Object.keys(DEMOS) as DemoKey[]).map((k, i, arr) => {
+        const prev = i > 0 ? arr[i - 1] : null;
+        const showDivider = prev && DEMOS[prev].group !== DEMOS[k].group;
+        return (
+          <span key={k} style={{ display: 'contents' }}>
+            {showDivider && (
+              <span
+                aria-hidden
+                style={{ width: 1, background: 'rgba(255,255,255,0.18)', margin: '4px 2px' }}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                window.location.hash = k;
+                onChange(k);
+              }}
+              style={{
+                padding: '6px 12px',
+                fontSize: 11,
+                border: 'none',
+                background: value === k ? '#fff' : 'transparent',
+                color: value === k ? '#000' : '#fff',
+                cursor: 'pointer',
+                borderRadius: 999,
+                letterSpacing: '0.05em',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+              }}
+            >
+              {DEMOS[k].label}
+            </button>
+          </span>
+        );
+      })}
     </div>
   );
 }
