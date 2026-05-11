@@ -2,11 +2,13 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThemeToggleDemo } from './theme-toggle-demo.js';
 import { BasicQuoteForm } from './basic-quote-form.js';
+import { ConditionalLogicDemo } from './conditional-logic.js';
 
-type DemoKey = 'form' | 'toggle';
+type DemoKey = 'form' | 'branching' | 'toggle';
 
 const DEMOS: Record<DemoKey, { label: string; render: () => React.ReactNode }> = {
   form: { label: 'Basic quote form', render: () => <BasicQuoteForm /> },
+  branching: { label: 'Conditional logic', render: () => <ConditionalLogicDemo /> },
   toggle: { label: 'Theme toggle demo', render: () => <ThemeToggleDemo /> },
 };
 

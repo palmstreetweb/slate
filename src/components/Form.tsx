@@ -6,9 +6,9 @@
  *   - useKeyboardNav  (global Enter / A–F / 0–9 / Esc)
  *   - chrome          (TopBar, ProgressBar, FooterCounter, ThemeToggle)
  *
- * Question rendering itself is delegated to `QuestionRenderer`, which is a
- * placeholder shim in STEP 5 — STEP 6 swaps in the real per-type Field
- * components without changing this file.
+ * Question rendering is dispatched by QuestionRenderer to per-type Field
+ * components in src/components/questions/. New types only need an entry
+ * there — this file doesn't change.
  *
  * onSubmit fires exactly once on entering the `thanks` step (per ADR-005).
  */
@@ -16,8 +16,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { LooseAnswers } from '@/types/Answers.js';
-import type { Question } from '@/types/Question.js';
 import type { FormProps, Schema, SubmitMeta } from '@/types/Schema.js';
 import { useFormState } from '@/hooks/useFormState.js';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
@@ -59,6 +57,7 @@ export function Form<S extends Schema>({
     back,
     getSubmitAnswers,
     animationEnd,
+    restart,
   } = useFormState(schema);
 
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>(
@@ -163,6 +162,13 @@ export function Form<S extends Schema>({
     setSubmitErrorMsg(null);
   }, []);
 
+  const restartForm = useCallback(() => {
+    submittedRef.current = false;
+    setSubmitStatus('idle');
+    setSubmitErrorMsg(null);
+    restart();
+  }, [restart]);
+
   /* ---------- derived UI counts ---------- */
 
   const counted = state.visible.filter(
@@ -216,6 +222,7 @@ export function Form<S extends Schema>({
               submitStatus={currentQuestion.type === 'thanks' ? submitStatus : 'idle'}
               submitError={submitErrorMsg}
               onRetrySubmit={retrySubmit}
+              onRestart={restartForm}
             />
           ) : null}
         </div>
@@ -228,16 +235,3 @@ export function Form<S extends Schema>({
   );
 }
 
-/* Re-export the placeholder API surface so STEP 6 can adopt it without
-   changing this file. */
-export type QuestionRendererProps = {
-  question: Question;
-  answers: LooseAnswers;
-  setAnswer: (id: string, value: LooseAnswers[string]) => void;
-  advance: () => void;
-  stepNumber: number;
-  totalSteps: number;
-  submitStatus: 'idle' | 'submitting' | 'success' | 'error';
-  submitError: string | null;
-  onRetrySubmit: () => void;
-};

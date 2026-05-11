@@ -127,7 +127,8 @@
   transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Bottom-right footer counter "n / m". */
+/* Bottom-right footer counter "n / m". opacity bumped from 0.4 → 0.6 to clear
+   WCAG AA 4.5:1 contrast against both light and dark theme backgrounds. */
 [data-psw-forms] .psw-footer {
   position: absolute;
   bottom: 20px;
@@ -135,7 +136,7 @@
   font-size: 11px;
   letter-spacing: 0.15em;
   font-family: var(--psw-font-mono);
-  opacity: 0.4;
+  opacity: 0.6;
   color: var(--psw-text);
   z-index: 10;
 }

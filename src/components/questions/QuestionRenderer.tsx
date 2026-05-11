@@ -23,16 +23,22 @@ import { MultiChoiceField } from './MultiChoiceField.js';
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
+type SetAnswerValue = LooseAnswers[string];
+type SetAnswerUpdater = (prev: SetAnswerValue) => SetAnswerValue;
+
 export type QuestionRendererProps = {
   question: Question;
   answers: LooseAnswers;
-  setAnswer: (id: string, value: LooseAnswers[string]) => void;
+  setAnswer: (id: string, value: SetAnswerValue | SetAnswerUpdater) => void;
   advance: () => void;
   stepNumber: number;
   totalSteps: number;
   submitStatus: SubmitStatus;
   submitError: string | null;
+  /** Called when user clicks "Retry" after a submit error. */
   onRetrySubmit: () => void;
+  /** Called when user clicks the thanks-screen restart CTA. */
+  onRestart: () => void;
 };
 
 function StepBadge({ step, total }: { step: number; total: number }) {
@@ -55,6 +61,7 @@ export function QuestionRenderer({
   submitStatus,
   submitError,
   onRetrySubmit,
+  onRestart,
 }: QuestionRendererProps) {
   // Auto-advance helper for single_choice — fire after a brief pause so
   // the selected highlight is visible before the transition starts.
@@ -84,6 +91,7 @@ export function QuestionRenderer({
           status={submitStatus}
           error={submitError}
           onRetry={onRetrySubmit}
+          onRestart={onRestart}
         />
       );
 

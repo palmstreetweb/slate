@@ -62,6 +62,11 @@ export type UseFormStateApi = {
   animationEnd: () => void;
   /** Per ADR-005 — answers payload for `onSubmit` (excludes hidden). */
   getSubmitAnswers: () => LooseAnswers;
+  /**
+   * Reset to step 0 with no answers, no history, fresh startedAt. Used by
+   * the thanks-screen "Submit another" CTA.
+   */
+  restart: () => void;
 };
 
 type RawState = {
@@ -79,7 +84,8 @@ type Action =
   | { type: 'go_back' }
   | { type: 'go_to'; step: number; direction: AnimDirection }
   | { type: 'animation_end' }
-  | { type: 'record_visited'; id: string };
+  | { type: 'record_visited'; id: string }
+  | { type: 'reset' };
 
 function makeReducer(allQuestions: ReadonlyArray<Question>) {
   return function reducer(s: RawState, a: Action): RawState {
@@ -133,6 +139,8 @@ function makeReducer(allQuestions: ReadonlyArray<Question>) {
         if (s.visitedIds.includes(a.id)) return s;
         return { ...s, visitedIds: [...s.visitedIds, a.id] };
       }
+      case 'reset':
+        return { ...INITIAL_RAW };
     }
   };
 }
@@ -180,6 +188,11 @@ export function useFormState(schema: Schema): UseFormStateApi {
 
   const animationEnd = useCallback(() => dispatch({ type: 'animation_end' }), []);
 
+  const restart = useCallback(() => {
+    startedAtRef.current = new Date();
+    dispatch({ type: 'reset' });
+  }, []);
+
   const getSubmitAnswers = useCallback(
     () => visibleAnswersForSubmit(visible, raw.answers),
     [visible, raw.answers],
@@ -205,5 +218,6 @@ export function useFormState(schema: Schema): UseFormStateApi {
     goTo,
     animationEnd,
     getSubmitAnswers,
+    restart,
   };
 }

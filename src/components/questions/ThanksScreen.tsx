@@ -9,9 +9,10 @@ type Props = {
   status: SubmitStatus;
   error: string | null;
   onRetry: () => void;
+  onRestart: () => void;
 };
 
-export function ThanksScreen({ question, status, error, onRetry }: Props) {
+export function ThanksScreen({ question, status, error, onRetry, onRestart }: Props) {
   return (
     <div>
       <h1 className="psw-title">{question.title}</h1>
@@ -46,7 +47,7 @@ export function ThanksScreen({ question, status, error, onRetry }: Props) {
         {question.cta && status === 'success' && (
           <button
             type="button"
-            onClick={onRetry}
+            onClick={onRestart}
             style={{
               display: 'block',
               marginTop: 24,

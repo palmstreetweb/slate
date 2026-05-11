@@ -10,6 +10,7 @@ export function ProgressBar({ value }: Props) {
     <div
       className="psw-progress"
       role="progressbar"
+      aria-label="Form progress"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(clamped)}
