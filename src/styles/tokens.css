@@ -92,13 +92,15 @@
    ============================================================ */
 
 [data-psw-forms][data-theme-name='swiss'] {
-  --psw-font-display: 'Archivo Black', sans-serif;
-  --psw-font-body: 'Archivo', sans-serif;
-  --psw-font-mono: 'Archivo', sans-serif;
+  /* Inter as Akzidenz-Grotesk substitute — see DECISIONS.md ADR-009.
+     Mirror of src/themes/swiss.ts; keep in sync. */
+  --psw-font-display: 'Inter', system-ui, sans-serif;
+  --psw-font-body: 'Inter', system-ui, sans-serif;
+  --psw-font-mono: 'Inter', system-ui, sans-serif;
   --psw-radius: 0px;
   --psw-border-width: 2.5px;
   --psw-title-weight: 900;
-  --psw-title-tracking: -0.04em;
+  --psw-title-tracking: -0.035em;
   --psw-title-line-height: 0.95;
   --psw-title-size: clamp(2.5rem, 6.2vw, 4.2rem);
   --psw-transform: lowercase;

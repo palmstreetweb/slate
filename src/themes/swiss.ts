@@ -14,13 +14,17 @@ export const swiss: Theme = {
   tagline: 'Bold geometric · poster energy',
   decoration: 'shapes',
   static: {
-    fontDisplay: "'Archivo Black', sans-serif",
-    fontBody: "'Archivo', sans-serif",
-    fontMono: "'Archivo', sans-serif",
+    // Inter (variable, opsz axis) as a free Akzidenz-Grotesk substitute —
+    // see DECISIONS.md ADR-009. Closer poster-grade letterforms than the
+    // beta's Archivo Black; not the real Berthold typeface but the most
+    // honest free approximation we can ship.
+    fontDisplay: "'Inter', system-ui, sans-serif",
+    fontBody: "'Inter', system-ui, sans-serif",
+    fontMono: "'Inter', system-ui, sans-serif",
     radius: '0px',
     borderWidth: '2.5px',
     titleWeight: 900,
-    titleTracking: '-0.04em',
+    titleTracking: '-0.035em',
     titleLineHeight: 0.95,
     titleSize: 'clamp(2.5rem, 6.2vw, 4.2rem)',
     transform: 'lowercase',
