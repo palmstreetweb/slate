@@ -11,6 +11,8 @@ import type { Schema } from './types/Schema.js';
 export type * from './types/index.js';
 export { isQuestionType } from './types/index.js';
 
+export { themes, editorial, swiss } from './themes/index.js';
+
 /**
  * Identity helper that captures the literal types of a schema for downstream
  * inference. Wrap your schema in `defineSchema({ ... })` to get strongly-typed

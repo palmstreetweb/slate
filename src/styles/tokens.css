@@ -1,0 +1,157 @@
+/* ============================================================
+   @palmstreetweb/forms — design tokens
+   ============================================================
+   All tokens are wrapper-scoped on `[data-psw-forms]`. We never
+   write to <html> (see DECISIONS.md ADR-004). Theme + mode are
+   driven by two data attributes:
+     data-theme-name = 'editorial' | 'swiss' | <custom>
+     data-theme      = 'light' | 'dark'
+   The wrapper holds both. CSS handles the rest. For custom
+   themes registered at runtime, the engine writes inline style
+   properties via utils/tokens.ts.
+   ============================================================ */
+
+[data-psw-forms] {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern', 'liga', 'calt';
+}
+
+[data-psw-forms] *,
+[data-psw-forms] *::before,
+[data-psw-forms] *::after {
+  box-sizing: inherit;
+}
+
+/* Brief mode-switch suppression — when toggling, we set
+   `data-theme-switching` on the wrapper for ~550ms to suppress
+   transitions across the entire form during the morph. */
+[data-psw-forms][data-theme-switching] *,
+[data-psw-forms][data-theme-switching] *::before,
+[data-psw-forms][data-theme-switching] *::after {
+  transition: none !important;
+}
+
+/* ============================================================
+   EDITORIAL THEME — Refined serif, warm cream
+   Source-of-truth mirror: src/themes/editorial.ts
+   ============================================================ */
+
+[data-psw-forms][data-theme-name='editorial'] {
+  --psw-font-display: 'Fraunces', Georgia, serif;
+  --psw-font-body: 'Fraunces', Georgia, serif;
+  --psw-font-mono: 'JetBrains Mono', monospace;
+  --psw-radius: 3px;
+  --psw-border-width: 1.5px;
+  --psw-title-weight: 500;
+  --psw-title-tracking: -0.025em;
+  --psw-title-line-height: 1.08;
+  --psw-title-size: clamp(2rem, 5.2vw, 3.4rem);
+  --psw-transform: none;
+}
+
+[data-psw-forms][data-theme-name='editorial'][data-theme='light'] {
+  --psw-bg: #faf6ee;
+  --psw-bg-2: #f4f0e5;
+  --psw-bg-3: #ede8dd;
+  --psw-text: #1a1a1a;
+  --psw-muted: #5b5851;
+  --psw-dim: #8e8b83;
+  --psw-accent: #2d5bff;
+  --psw-accent-rgb: 45 91 255;
+  --psw-accent-on-light: #2d5bff;
+  --psw-accent-lo: rgb(45 91 255 / 0.06);
+  --psw-border: rgba(26, 26, 26, 0.1);
+  --psw-border-md: rgba(26, 26, 26, 0.18);
+  --psw-error: #c8421a;
+  color-scheme: light;
+}
+
+[data-psw-forms][data-theme-name='editorial'][data-theme='dark'] {
+  --psw-bg: #14110d;
+  --psw-bg-2: #1c1815;
+  --psw-bg-3: #25201b;
+  --psw-text: #faf6ee;
+  --psw-muted: #b8b2a4;
+  --psw-dim: #7a7468;
+  --psw-accent: #6e8fff;
+  --psw-accent-rgb: 110 143 255;
+  --psw-accent-on-light: #2d5bff;
+  --psw-accent-lo: rgb(110 143 255 / 0.1);
+  --psw-border: rgba(250, 246, 238, 0.08);
+  --psw-border-md: rgba(250, 246, 238, 0.14);
+  --psw-error: #ff6b3d;
+  color-scheme: dark;
+}
+
+/* ============================================================
+   SWISS THEME — Bold geometric, poster energy
+   Source-of-truth mirror: src/themes/swiss.ts
+   ============================================================ */
+
+[data-psw-forms][data-theme-name='swiss'] {
+  --psw-font-display: 'Archivo Black', sans-serif;
+  --psw-font-body: 'Archivo', sans-serif;
+  --psw-font-mono: 'Archivo', sans-serif;
+  --psw-radius: 0px;
+  --psw-border-width: 2.5px;
+  --psw-title-weight: 900;
+  --psw-title-tracking: -0.04em;
+  --psw-title-line-height: 0.95;
+  --psw-title-size: clamp(2.5rem, 6.2vw, 4.2rem);
+  --psw-transform: lowercase;
+}
+
+[data-psw-forms][data-theme-name='swiss'][data-theme='light'] {
+  --psw-bg: #f2efe3;
+  --psw-bg-2: #e8e4d5;
+  --psw-bg-3: #ddd8c6;
+  --psw-text: #000000;
+  --psw-muted: #2a2a2a;
+  --psw-dim: #6b6b6b;
+  --psw-accent: #dc2626;
+  --psw-accent-rgb: 220 38 38;
+  --psw-accent-on-light: #dc2626;
+  --psw-accent-lo: rgb(220 38 38 / 0.08);
+  --psw-border: rgba(0, 0, 0, 0.18);
+  --psw-border-md: rgba(0, 0, 0, 0.28);
+  --psw-error: #dc2626;
+  color-scheme: light;
+}
+
+[data-psw-forms][data-theme-name='swiss'][data-theme='dark'] {
+  --psw-bg: #0a0a0a;
+  --psw-bg-2: #131313;
+  --psw-bg-3: #1a1a1a;
+  --psw-text: #f2efe3;
+  --psw-muted: #c8c8c8;
+  --psw-dim: #888888;
+  --psw-accent: #f87171;
+  --psw-accent-rgb: 248 113 113;
+  --psw-accent-on-light: #dc2626;
+  --psw-accent-lo: rgb(248 113 113 / 0.1);
+  --psw-border: rgba(242, 239, 227, 0.14);
+  --psw-border-md: rgba(242, 239, 227, 0.22);
+  --psw-error: #f87171;
+  color-scheme: dark;
+}
+
+/* Backwards-compat alias for the toggle CSS in §8.2, which uses
+   unprefixed `--text`, `--accent`, `--accent-rgb`, etc. The toggle
+   is wrapper-scoped so these locally shadow nothing outside the form. */
+[data-psw-forms] {
+  --text: var(--psw-text);
+  --muted: var(--psw-muted);
+  --dim: var(--psw-dim);
+  --accent: var(--psw-accent);
+  --accent-rgb: var(--psw-accent-rgb);
+  --accent-on-light: var(--psw-accent-on-light);
+  --accent-lo: var(--psw-accent-lo);
+  --bg: var(--psw-bg);
+  --bg-2: var(--psw-bg-2);
+  --bg-3: var(--psw-bg-3);
+  --border: var(--psw-border);
+  --border-md: var(--psw-border-md);
+}
