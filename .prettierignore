@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+package-lock.json
+BUILD_BRIEF.md
+intake-form.jsx
