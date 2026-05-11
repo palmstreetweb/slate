@@ -1,21 +1,16 @@
 /**
- * Tiny submission store for the PSW contact form. Persists to localStorage
- * so submissions survive page reloads during development; emits change
- * events so the inbox view can re-render live when a new submission lands.
- *
- * In production (PSW v2), swap `addSubmission`'s implementation for a
- * `fetch('/api/contact', ...)` call. The API surface (`addSubmission`,
- * `listSubmissions`, `clearSubmissions`, `subscribe`) is what the inbox UI
- * binds against, so the swap is one file.
+ * Submissions store — same shape as before but scoped per formId. All
+ * submissions live in one localStorage key with a `formId` field.
  */
 
 import type { Answers, SubmitMeta } from '@/index.js';
 
-const STORAGE_KEY = 'psw-contact-submissions';
+const STORAGE_KEY = 'psw-studio-submissions';
 
 export type StoredSubmission = {
   id: string;
-  receivedAt: string; // ISO
+  formId: string;
+  receivedAt: string;
   answers: Answers;
   meta: Pick<SubmitMeta, 'durationMs' | 'questionsVisited' | 'hiddenFields'> & {
     startedAt: string;
@@ -42,18 +37,19 @@ function write(subs: StoredSubmission[]): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(subs));
   } catch {
-    // Quota exceeded or private mode — fail silently in dev.
+    // ignored
   }
   listeners.forEach((l) => l(subs));
 }
 
-function id(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+function makeId(): string {
+  return `s_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
-export function addSubmission(answers: Answers, meta: SubmitMeta): StoredSubmission {
+export function addSubmission(formId: string, answers: Answers, meta: SubmitMeta): StoredSubmission {
   const sub: StoredSubmission = {
-    id: id(),
+    id: makeId(),
+    formId,
     receivedAt: new Date().toISOString(),
     answers,
     meta: {
@@ -64,22 +60,38 @@ export function addSubmission(answers: Answers, meta: SubmitMeta): StoredSubmiss
       hiddenFields: meta.hiddenFields,
     },
   };
-  const all = [sub, ...read()];
-  write(all);
+  write([sub, ...read()]);
   return sub;
 }
 
-export function listSubmissions(): StoredSubmission[] {
-  return read();
+export function listSubmissions(formId?: string): StoredSubmission[] {
+  const all = read();
+  return formId ? all.filter((s) => s.formId === formId) : all;
 }
 
-export function clearSubmissions(): void {
-  write([]);
+export function countSubmissions(formId?: string): number {
+  return listSubmissions(formId).length;
+}
+
+export function lastSubmissionAt(formId?: string): string | null {
+  const subs = listSubmissions(formId);
+  return subs.length > 0 ? subs[0]!.receivedAt : null;
+}
+
+export function clearSubmissions(formId?: string): void {
+  if (!formId) {
+    write([]);
+    return;
+  }
+  write(read().filter((s) => s.formId !== formId));
+}
+
+export function deleteSubmission(submissionId: string): void {
+  write(read().filter((s) => s.id !== submissionId));
 }
 
 export function subscribe(listener: Listener): () => void {
   listeners.add(listener);
-  // Cross-tab sync: storage events fire in OTHER tabs/windows.
   const onStorage = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY) listener(read());
   };

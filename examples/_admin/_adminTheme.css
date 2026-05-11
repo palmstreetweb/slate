@@ -1,0 +1,399 @@
+/* ============================================================
+   PSW Forms — Studio (admin shell) theme.
+   Coexists with [data-psw-forms] form rendering — the studio
+   chrome wraps in its OWN [data-psw-forms][data-theme-name='studio']
+   so a previewed form (its own inner data-psw-forms wrapper) keeps
+   its theme tokens via cascade specificity.
+   ============================================================ */
+
+/* The base [data-psw-forms] rule sets overflow-x: hidden, which the
+   browser implicitly turns into `overflow: hidden auto` — that makes the
+   wrapper its OWN scroll container and breaks `position: sticky` on the
+   admin header. Studio doesn't need clipping; let the document scroll. */
+[data-psw-forms][data-theme-name='studio'] {
+  overflow: visible;
+}
+
+[data-psw-forms][data-theme-name='studio'] {
+  --psw-font-display: 'Inter', system-ui, sans-serif;
+  --psw-font-body: 'Inter', system-ui, sans-serif;
+  --psw-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --psw-radius: 8px;
+  --psw-border-width: 1px;
+  --psw-title-weight: 600;
+  --psw-title-tracking: -0.02em;
+  --psw-title-line-height: 1.15;
+  --psw-title-size: clamp(1.5rem, 2.4vw, 1.875rem);
+  --psw-transform: none;
+
+  /* Layout tokens specific to admin chrome */
+  --studio-header-h: 56px;
+  --studio-sidebar-w: 240px;
+  --studio-content-pad: 32px;
+  --studio-card-pad: 20px;
+  --studio-gap: 12px;
+  --studio-radius-sm: 6px;
+  --studio-radius-md: 10px;
+  --studio-radius-lg: 14px;
+  --studio-shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.04);
+}
+
+[data-psw-forms][data-theme-name='studio'][data-theme='light'] {
+  --psw-bg: #fafafa;
+  --psw-bg-2: #ffffff;
+  --psw-bg-3: #f4f4f5;
+  --psw-text: #18181b;
+  --psw-muted: #52525b;
+  --psw-dim: #a1a1aa;
+  --psw-accent: #2d5bff;
+  --psw-accent-rgb: 45 91 255;
+  --psw-accent-on-light: #2d5bff;
+  --psw-accent-lo: rgb(45 91 255 / 0.08);
+  --psw-border: rgb(24 24 27 / 0.08);
+  --psw-border-md: rgb(24 24 27 / 0.14);
+  --psw-error: #dc2626;
+  --studio-success: #16a34a;
+  --studio-warn: #ca8a04;
+  color-scheme: light;
+}
+
+[data-psw-forms][data-theme-name='studio'][data-theme='dark'] {
+  --psw-bg: #09090b;
+  --psw-bg-2: #18181b;
+  --psw-bg-3: #27272a;
+  --psw-text: #fafafa;
+  --psw-muted: #a1a1aa;
+  --psw-dim: #71717a;
+  --psw-accent: #6e8fff;
+  --psw-accent-rgb: 110 143 255;
+  --psw-accent-on-light: #2d5bff;
+  --psw-accent-lo: rgb(110 143 255 / 0.12);
+  --psw-border: rgb(255 255 255 / 0.08);
+  --psw-border-md: rgb(255 255 255 / 0.14);
+  --psw-error: #f87171;
+  --studio-success: #4ade80;
+  --studio-warn: #facc15;
+  color-scheme: dark;
+}
+
+/* ---------- shell layout ---------- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-app {
+  min-height: 100vh;
+  background: var(--psw-bg);
+  color: var(--psw-text);
+  font-family: var(--psw-font-body);
+  /* Plain block flow so the sticky header's containing block extends with
+     the page scroll. Grid-with-row-template breaks sticky because the
+     header's containing block is only as tall as its grid cell. */
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-header {
+  position: sticky;
+  top: 0;
+  height: var(--studio-header-h);
+  background: var(--psw-bg);
+  border-bottom: 1px solid var(--psw-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 50;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: var(--psw-text);
+  text-decoration: none;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--psw-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-brand-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--psw-border-md);
+  margin: 0 4px;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-crumb {
+  color: var(--psw-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-content {
+  padding: var(--studio-content-pad);
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ---------- buttons ---------- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--studio-radius-sm);
+  border: 1px solid var(--psw-border-md);
+  background: var(--psw-bg-2);
+  color: var(--psw-text);
+  cursor: pointer;
+  transition: background 120ms ease-out, border-color 120ms ease-out, transform 120ms ease-out;
+  min-height: 32px;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-btn:hover {
+  background: var(--psw-bg-3);
+  border-color: var(--psw-text);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-btn:active {
+  transform: translateY(0.5px);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-btn--primary {
+  background: var(--psw-accent);
+  color: #fff;
+  border-color: var(--psw-accent);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-btn--primary:hover {
+  background: color-mix(in srgb, var(--psw-accent) 88%, #000);
+  border-color: var(--psw-accent);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--psw-muted);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-btn--ghost:hover {
+  background: var(--psw-bg-3);
+  color: var(--psw-text);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-btn--danger {
+  color: var(--psw-error);
+  border-color: var(--psw-border-md);
+  background: transparent;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-btn--danger:hover {
+  background: color-mix(in srgb, var(--psw-error) 12%, transparent);
+  border-color: var(--psw-error);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-btn--icon {
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  justify-content: center;
+}
+
+/* ---------- inputs ---------- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-input,
+[data-psw-forms][data-theme-name='studio'] .studio-textarea,
+[data-psw-forms][data-theme-name='studio'] .studio-select {
+  width: 100%;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--psw-text);
+  background: var(--psw-bg-2);
+  border: 1px solid var(--psw-border-md);
+  border-radius: var(--studio-radius-sm);
+  outline: none;
+  transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-input:focus,
+[data-psw-forms][data-theme-name='studio'] .studio-textarea:focus,
+[data-psw-forms][data-theme-name='studio'] .studio-select:focus {
+  border-color: var(--psw-accent);
+  box-shadow: 0 0 0 3px rgb(var(--psw-accent-rgb) / 0.18);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-textarea {
+  resize: vertical;
+  min-height: 72px;
+  font-family: var(--psw-font-mono);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--psw-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-help {
+  font-size: 11px;
+  color: var(--psw-dim);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--psw-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-checkbox input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--psw-accent);
+}
+
+/* ---------- cards / surfaces ---------- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-card {
+  background: var(--psw-bg-2);
+  border: 1px solid var(--psw-border);
+  border-radius: var(--studio-radius-md);
+  overflow: hidden;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-card-pad {
+  padding: var(--studio-card-pad);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--psw-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 12px;
+}
+
+/* ---------- badges ---------- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--psw-font-mono);
+  border-radius: 999px;
+  background: var(--psw-bg-3);
+  color: var(--psw-muted);
+  border: 1px solid var(--psw-border);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-badge--accent {
+  background: var(--psw-accent-lo);
+  color: var(--psw-accent);
+  border-color: rgb(var(--psw-accent-rgb) / 0.25);
+}
+
+/* ---------- empty state ---------- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-empty {
+  text-align: center;
+  padding: 64px 24px;
+  border: 1.5px dashed var(--psw-border-md);
+  border-radius: var(--studio-radius-lg);
+  color: var(--psw-muted);
+}
+
+/* ---------- tabs ---------- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--psw-bg-3);
+  border-radius: var(--studio-radius-sm);
+  border: 1px solid var(--psw-border);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-tab {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--psw-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-tab:hover {
+  color: var(--psw-text);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-tab--active {
+  background: var(--psw-bg);
+  color: var(--psw-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+/* ---------- preview frame (when rendering a form inside studio) ---------- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-preview {
+  border-radius: var(--studio-radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--psw-border-md);
+  box-shadow: var(--studio-shadow-card);
+  /* the inner data-psw-forms wrapper inherits these constraints */
+}
+
+/* ---------- nav links ---------- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-link {
+  color: var(--psw-accent);
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-link:hover {
+  text-decoration: underline;
+}
