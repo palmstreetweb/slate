@@ -26,9 +26,11 @@ type Props = {
   crumbs: ReactNode;
   rightSlot?: ReactNode;
   children: ReactNode;
+  /** Apply `studio-content--full-bleed` to drop max-width + padding (editor uses this). */
+  fullBleed?: boolean;
 };
 
-export function AdminShell({ crumbs, rightSlot, children }: Props) {
+export function AdminShell({ crumbs, rightSlot, children, fullBleed }: Props) {
   const [mode, setMode] = useState<ResolvedThemeMode>(() => detectInitial());
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +53,9 @@ export function AdminShell({ crumbs, rightSlot, children }: Props) {
     >
       <div className="studio-app">
         <Header crumbs={crumbs} rightSlot={rightSlot} mode={mode} onToggle={toggle} />
-        <main className="studio-content">{children}</main>
+        <main className={`studio-content${fullBleed ? ' studio-content--full-bleed' : ''}`}>
+          {children}
+        </main>
       </div>
     </div>
   );

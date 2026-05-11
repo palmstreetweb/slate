@@ -404,6 +404,213 @@
   /* the inner data-psw-forms wrapper inherits these constraints */
 }
 
+/* ===========================================================
+   THREE-PANE EDITOR LAYOUT — Outline | Canvas | Inspector
+   ============================================================ */
+
+[data-psw-forms][data-theme-name='studio'] .studio-content--full-bleed {
+  max-width: none;
+  padding: 0;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-editor {
+  display: grid;
+  grid-template-columns: 280px 1fr 340px;
+  height: calc(100vh - var(--studio-header-h));
+  background: var(--psw-bg);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-rail {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--psw-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-rail--left {
+  border-right: 1px solid var(--psw-border);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-rail--right {
+  border-left: 1px solid var(--psw-border);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-rail-pad {
+  padding: 16px 16px;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-rail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--psw-text);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-rail-toggle:hover .studio-label {
+  color: var(--psw-text);
+}
+
+/* ----- outline list ----- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-list > li {
+  position: relative;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 22px 18px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--studio-radius-sm);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--psw-text);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-row:hover {
+  background: var(--psw-bg-3);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-row--selected {
+  background: var(--psw-accent-lo);
+  border-color: rgb(var(--psw-accent-rgb) / 0.30);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-idx {
+  font-family: var(--psw-font-mono);
+  font-size: 11px;
+  color: var(--psw-dim);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-glyph {
+  font-family: var(--psw-font-mono);
+  font-size: 13px;
+  color: var(--psw-muted);
+  text-align: center;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-row--selected .studio-outline-glyph {
+  color: var(--psw-accent);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 400;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-row--selected .studio-outline-title {
+  font-weight: 500;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-actions {
+  display: none;
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  gap: 0;
+  background: var(--psw-bg-2);
+  border: 1px solid var(--psw-border);
+  border-radius: var(--studio-radius-sm);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-outline-list > li:hover .studio-outline-actions,
+[data-psw-forms][data-theme-name='studio'] .studio-outline-list > li:focus-within .studio-outline-actions {
+  display: inline-flex;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-icon-btn {
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--psw-muted);
+  font-family: inherit;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-icon-btn:hover {
+  color: var(--psw-text);
+  background: var(--psw-bg-3);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-popover {
+  background: var(--psw-bg-2);
+  border: 1px solid var(--psw-border-md);
+  border-radius: var(--studio-radius-md);
+  padding: 10px;
+  box-shadow: var(--studio-shadow-card);
+}
+
+/* ----- canvas ----- */
+
+[data-psw-forms][data-theme-name='studio'] .studio-canvas {
+  background: var(--psw-bg-3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--psw-border);
+  background: var(--psw-bg);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-canvas-label {
+  font-size: 11px;
+  font-family: var(--psw-font-mono);
+  color: var(--psw-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-canvas-frame {
+  flex: 1;
+  margin: 24px;
+  border-radius: var(--studio-radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--psw-border-md);
+  box-shadow: var(--studio-shadow-card);
+  position: relative;
+  /* the inner [data-psw-forms] wrapper supplies its own theme tokens
+     so nothing here should hard-code a background color. */
+}
+
 /* ---------- nav links ---------- */
 
 [data-psw-forms][data-theme-name='studio'] .studio-link {

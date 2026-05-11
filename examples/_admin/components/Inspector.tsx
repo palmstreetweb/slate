@@ -1,0 +1,454 @@
+/**
+ * Right-rail inspector. Shows the editable properties for the currently
+ * selected question. Per-question-type fields rendered via a switch on
+ * `question.type`. No collapsing — always shows everything for the
+ * selected question.
+ */
+
+import type { Option, Question } from '@/index.js';
+
+const TYPE_LABEL: Record<Question['type'], string> = {
+  welcome: 'Welcome screen',
+  statement: 'Statement',
+  thanks: 'Thank you screen',
+  short_text: 'Short text',
+  long_text: 'Long text',
+  email: 'Email',
+  phone: 'Phone',
+  number: 'Number',
+  single_choice: 'Single choice',
+  multi_choice: 'Multi choice',
+  scale: 'Scale',
+};
+
+type Props = {
+  question: Question;
+  onChange: (patch: Partial<Question>) => void;
+  onDelete: () => void;
+  canDelete: boolean;
+};
+
+export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
+  return (
+    <aside className="studio-rail studio-rail--right">
+      <div className="studio-rail-pad">
+        <p className="studio-label" style={{ marginBottom: 4 }}>
+          Question type
+        </p>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '6px 10px',
+            background: 'var(--psw-bg-3)',
+            borderRadius: 'var(--studio-radius-sm)',
+            fontSize: 13,
+            fontWeight: 500,
+          }}
+        >
+          <span>{TYPE_LABEL[question.type]}</span>
+          <span style={{ fontSize: 11, color: 'var(--psw-dim)', fontFamily: 'var(--psw-font-mono)' }}>
+            id: {question.id}
+          </span>
+        </div>
+      </div>
+
+      <Divider />
+
+      <div className="studio-rail-pad" style={{ display: 'grid', gap: 14 }}>
+        <Field label="Question ID" hint="Used as the answers key in onSubmit. Letters/numbers/underscore.">
+          <input
+            className="studio-input"
+            value={question.id}
+            onChange={(e) =>
+              onChange({ id: e.target.value.replace(/[^a-zA-Z0-9_]/g, '_') } as Partial<Question>)
+            }
+          />
+        </Field>
+
+        {'title' in question && typeof question.title === 'string' && (
+          <Field label="Title">
+            <textarea
+              className="studio-textarea"
+              value={question.title}
+              onChange={(e) => onChange({ title: e.target.value } as Partial<Question>)}
+              rows={2}
+            />
+          </Field>
+        )}
+        {'title' in question && typeof question.title === 'function' && (
+          <Field label="Title (dynamic function)">
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--psw-muted)' }}>
+              This title is a function — edit the schema in code to change it, or replace with a static string.
+            </p>
+          </Field>
+        )}
+
+        {'subtitle' in question && (
+          <Field label="Subtitle (optional)">
+            <textarea
+              className="studio-textarea"
+              value={question.subtitle ?? ''}
+              onChange={(e) =>
+                onChange({ subtitle: e.target.value || undefined } as Partial<Question>)
+              }
+              rows={2}
+            />
+          </Field>
+        )}
+
+        {question.type === 'statement' && (
+          <Field label="Body">
+            <textarea
+              className="studio-textarea"
+              value={question.body ?? ''}
+              onChange={(e) => onChange({ body: e.target.value || undefined } as Partial<Question>)}
+              rows={3}
+            />
+          </Field>
+        )}
+
+        {(question.type === 'welcome' ||
+          question.type === 'statement' ||
+          question.type === 'thanks') && (
+          <Field label="Button label">
+            <input
+              className="studio-input"
+              value={question.cta ?? ''}
+              placeholder={
+                question.type === 'welcome'
+                  ? 'Start'
+                  : question.type === 'thanks'
+                    ? 'Submit another'
+                    : 'Continue'
+              }
+              onChange={(e) => onChange({ cta: e.target.value || undefined } as Partial<Question>)}
+            />
+          </Field>
+        )}
+
+        {(question.type === 'short_text' ||
+          question.type === 'long_text' ||
+          question.type === 'email' ||
+          question.type === 'phone' ||
+          question.type === 'number') && (
+          <Row>
+            {(question.type === 'short_text' ||
+              question.type === 'long_text' ||
+              question.type === 'email' ||
+              question.type === 'phone') && (
+              <Field label="Placeholder">
+                <input
+                  className="studio-input"
+                  value={question.placeholder ?? ''}
+                  onChange={(e) =>
+                    onChange({ placeholder: e.target.value || undefined } as Partial<Question>)
+                  }
+                />
+              </Field>
+            )}
+            <Checkbox
+              checked={Boolean((question as { required?: boolean }).required)}
+              onChange={(v) => onChange({ required: v } as Partial<Question>)}
+              label="Required"
+            />
+          </Row>
+        )}
+
+        {(question.type === 'short_text' || question.type === 'long_text') && (
+          <Field label="Max length (characters)">
+            <input
+              className="studio-input"
+              type="number"
+              value={question.maxLength ?? ''}
+              onChange={(e) =>
+                onChange({
+                  maxLength: e.target.value ? Number(e.target.value) : undefined,
+                } as Partial<Question>)
+              }
+            />
+          </Field>
+        )}
+
+        {question.type === 'phone' && (
+          <Field label="Default country (ISO 3166-1 alpha-2)">
+            <input
+              className="studio-input"
+              value={question.defaultCountry ?? 'US'}
+              maxLength={2}
+              onChange={(e) =>
+                onChange({ defaultCountry: e.target.value.toUpperCase() } as Partial<Question>)
+              }
+            />
+          </Field>
+        )}
+
+        {question.type === 'number' && (
+          <Row>
+            <Field label="Min">
+              <input
+                className="studio-input"
+                type="number"
+                value={question.min ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    min: e.target.value ? Number(e.target.value) : undefined,
+                  } as Partial<Question>)
+                }
+              />
+            </Field>
+            <Field label="Max">
+              <input
+                className="studio-input"
+                type="number"
+                value={question.max ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    max: e.target.value ? Number(e.target.value) : undefined,
+                  } as Partial<Question>)
+                }
+              />
+            </Field>
+          </Row>
+        )}
+
+        {question.type === 'scale' && (
+          <>
+            <Row>
+              <Field label="Min value">
+                <input
+                  className="studio-input"
+                  type="number"
+                  value={question.min}
+                  onChange={(e) => onChange({ min: Number(e.target.value) } as Partial<Question>)}
+                />
+              </Field>
+              <Field label="Max value">
+                <input
+                  className="studio-input"
+                  type="number"
+                  value={question.max}
+                  onChange={(e) => onChange({ max: Number(e.target.value) } as Partial<Question>)}
+                />
+              </Field>
+            </Row>
+            <Row>
+              <Field label="Min label">
+                <input
+                  className="studio-input"
+                  value={question.minLabel ?? ''}
+                  onChange={(e) =>
+                    onChange({ minLabel: e.target.value || undefined } as Partial<Question>)
+                  }
+                />
+              </Field>
+              <Field label="Max label">
+                <input
+                  className="studio-input"
+                  value={question.maxLabel ?? ''}
+                  onChange={(e) =>
+                    onChange({ maxLabel: e.target.value || undefined } as Partial<Question>)
+                  }
+                />
+              </Field>
+            </Row>
+          </>
+        )}
+
+        {(question.type === 'single_choice' || question.type === 'multi_choice') && (
+          <Field label="Options">
+            <OptionsEditor
+              options={question.options as Option[]}
+              onChange={(opts) => onChange({ options: opts } as Partial<Question>)}
+            />
+          </Field>
+        )}
+
+        {question.type === 'multi_choice' && (
+          <Row>
+            <Field label="Min selections">
+              <input
+                className="studio-input"
+                type="number"
+                value={question.min ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    min: e.target.value ? Number(e.target.value) : undefined,
+                  } as Partial<Question>)
+                }
+              />
+            </Field>
+            <Field label="Max selections">
+              <input
+                className="studio-input"
+                type="number"
+                value={question.max ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    max: e.target.value ? Number(e.target.value) : undefined,
+                  } as Partial<Question>)
+                }
+              />
+            </Field>
+          </Row>
+        )}
+
+        {canDelete && (
+          <>
+            <div style={{ height: 1, background: 'var(--psw-border)', margin: '8px 0' }} />
+            <button type="button" className="studio-btn studio-btn--danger" onClick={onDelete}>
+              Delete question
+            </button>
+          </>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function Row({ children }: { children: React.ReactNode }) {
+  return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{children}</div>;
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label style={{ display: 'block' }}>
+      <span className="studio-label">{label}</span>
+      {children}
+      {hint && <p className="studio-help">{hint}</p>}
+    </label>
+  );
+}
+
+function Checkbox({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="studio-checkbox" style={{ alignSelf: 'end', marginBottom: 6 }}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      {label}
+    </label>
+  );
+}
+
+function OptionsEditor({
+  options,
+  onChange,
+}: {
+  options: Option[];
+  onChange: (opts: Option[]) => void;
+}) {
+  const update = (i: number, patch: Partial<Option>) => {
+    onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
+  };
+  const remove = (i: number) => onChange(options.filter((_, idx) => idx !== i));
+  const move = (i: number, dir: 'up' | 'down') => {
+    const target = dir === 'up' ? i - 1 : i + 1;
+    if (target < 0 || target >= options.length) return;
+    const next = [...options];
+    [next[i]!, next[target]!] = [next[target]!, next[i]!];
+    onChange(next);
+  };
+  const add = () => {
+    const i = options.length;
+    onChange([
+      ...options,
+      { label: `Option ${String.fromCharCode(65 + i)}`, value: `opt_${i + 1}` },
+    ]);
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: 4 }}>
+      {options.map((opt, i) => (
+        <div
+          key={i}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 110px auto',
+            gap: 4,
+            alignItems: 'center',
+          }}
+        >
+          <input
+            className="studio-input"
+            value={opt.label}
+            placeholder="Label"
+            onChange={(e) => update(i, { label: e.target.value })}
+            style={{ padding: '6px 8px', fontSize: 12 }}
+          />
+          <input
+            className="studio-input"
+            value={opt.value}
+            placeholder="value"
+            style={{
+              padding: '6px 8px',
+              fontFamily: 'var(--psw-font-mono)',
+              fontSize: 11,
+            }}
+            onChange={(e) => update(i, { value: e.target.value.replace(/\s+/g, '_') })}
+          />
+          <div style={{ display: 'flex', gap: 0 }}>
+            <button
+              type="button"
+              className="studio-icon-btn"
+              onClick={() => move(i, 'up')}
+              disabled={i === 0}
+              aria-label="Move up"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="studio-icon-btn"
+              onClick={() => move(i, 'down')}
+              disabled={i === options.length - 1}
+              aria-label="Move down"
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              className="studio-icon-btn"
+              onClick={() => remove(i)}
+              aria-label="Remove option"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="studio-btn studio-btn--ghost"
+        onClick={add}
+        style={{ justifySelf: 'start', fontSize: 12, padding: '4px 8px', marginTop: 4 }}
+      >
+        + Add option
+      </button>
+    </div>
+  );
+}
+
+function Divider() {
+  return (
+    <div
+      style={{ height: 1, background: 'var(--psw-border)', margin: '0 12px' }}
+      aria-hidden
+    />
+  );
+}
