@@ -1,0 +1,368 @@
+/* Shared question-field styling. Wrapper-scoped. */
+
+/* ---------- text-like inputs (short_text, long_text, email, phone, number) ---------- */
+
+[data-psw-forms] .psw-input {
+  width: 100%;
+  background: transparent;
+  outline: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: var(--psw-border-width) solid var(--psw-border-md);
+  padding: 0 0 0.6rem 0;
+  font-size: clamp(1.35rem, 3.2vw, 1.85rem);
+  font-family: var(--psw-font-body);
+  color: var(--psw-text);
+  font-weight: 400;
+  transition: border-color 180ms ease-out;
+  /* iOS zoom prevention. */
+  -webkit-text-size-adjust: 100%;
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-input {
+  font-size: clamp(1.4rem, 3.4vw, 2rem);
+  font-weight: 500;
+  border-bottom-color: var(--psw-text);
+}
+
+[data-psw-forms] .psw-input:focus {
+  border-bottom-color: var(--psw-accent);
+}
+
+[data-psw-forms] .psw-input--error {
+  border-bottom-color: var(--psw-error);
+}
+
+[data-psw-forms] .psw-input::placeholder {
+  color: var(--psw-dim);
+  opacity: 0.5;
+  font-style: italic;
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-input::placeholder {
+  font-style: normal;
+}
+
+[data-psw-forms] textarea.psw-input {
+  resize: none;
+  line-height: 1.5;
+  font-size: clamp(1.15rem, 2.5vw, 1.45rem);
+  min-height: 4.5em;
+}
+
+/* ---------- OK button + Enter hint ---------- */
+
+[data-psw-forms] .psw-actions {
+  margin-top: 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+[data-psw-forms] .psw-ok-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--psw-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--psw-radius);
+  font-size: 15px;
+  font-weight: 500;
+  font-family: var(--psw-font-body);
+  cursor: pointer;
+  text-transform: var(--psw-transform);
+  transition:
+    transform 180ms ease-out,
+    box-shadow 180ms ease-out;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-ok-btn {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+[data-psw-forms] .psw-ok-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgb(var(--psw-accent-rgb) / 0.25);
+}
+
+[data-psw-forms] .psw-ok-btn:active {
+  transform: translateY(0);
+}
+
+[data-psw-forms] .psw-ok-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+[data-psw-forms] .psw-hint {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  font-family: var(--psw-font-mono);
+  color: var(--psw-text);
+  opacity: 0.45;
+  text-transform: var(--psw-transform);
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-hint {
+  font-weight: 700;
+}
+
+/* ---------- error message ---------- */
+
+[data-psw-forms] .psw-err {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--psw-error);
+  font-family: var(--psw-font-mono);
+  text-transform: var(--psw-transform);
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-err {
+  font-weight: 700;
+}
+
+/* ---------- welcome CTA ---------- */
+
+[data-psw-forms] .psw-cta {
+  margin-top: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 28px;
+  background: var(--psw-text);
+  color: var(--psw-bg);
+  border: none;
+  border-radius: var(--psw-radius);
+  font-size: 16px;
+  font-weight: 500;
+  font-family: var(--psw-font-body);
+  cursor: pointer;
+  text-transform: var(--psw-transform);
+  min-height: 44px;
+  transition:
+    transform 180ms ease-out,
+    box-shadow 180ms ease-out;
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-cta {
+  padding: 16px 32px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+[data-psw-forms] .psw-cta:hover {
+  transform: translateY(-1px);
+}
+
+[data-psw-forms] .psw-cta-hint {
+  opacity: 0.55;
+  font-family: var(--psw-font-mono);
+  font-size: 0.78rem;
+  font-weight: 400;
+  text-transform: var(--psw-transform);
+}
+
+/* ---------- choice list ---------- */
+
+[data-psw-forms] .psw-choices {
+  margin-top: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-choices {
+  gap: 8px;
+}
+
+[data-psw-forms] .psw-choice {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border: var(--psw-border-width) solid rgb(var(--psw-accent-rgb) / 0);
+  border-color: var(--psw-border-md);
+  background: transparent;
+  border-radius: var(--psw-radius);
+  cursor: pointer;
+  transition:
+    border-color 150ms,
+    background 150ms,
+    color 150ms;
+  color: var(--psw-text);
+  font-family: var(--psw-font-body);
+  font-weight: 400;
+  font-size: clamp(1.05rem, 2vw, 1.2rem);
+  min-height: 44px;
+  text-transform: var(--psw-transform);
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-choice {
+  padding: 18px 20px;
+  font-weight: 600;
+  background: #fff;
+  border-color: var(--psw-text);
+}
+
+[data-psw-forms] .psw-choice:hover {
+  border-color: var(--psw-accent);
+  background: var(--psw-accent-lo);
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-choice:hover {
+  background: var(--psw-text);
+  color: #fff;
+}
+
+[data-psw-forms] .psw-choice--selected {
+  border-color: var(--psw-text);
+  background: var(--psw-accent-lo);
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-choice--selected {
+  background: var(--psw-text);
+  color: #fff;
+}
+
+[data-psw-forms] .psw-choice-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  font-family: var(--psw-font-mono);
+  font-weight: 500;
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  background: transparent;
+  color: var(--psw-text);
+  border-radius: var(--psw-radius);
+  flex-shrink: 0;
+  transition:
+    border-color 150ms,
+    background 150ms,
+    color 150ms;
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-choice-badge {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  font-weight: 900;
+  border-color: currentColor;
+}
+
+[data-psw-forms] .psw-choice--selected .psw-choice-badge {
+  border-color: var(--psw-accent);
+  background: var(--psw-accent);
+  color: #fff;
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-choice--selected .psw-choice-badge {
+  background: #fff;
+  color: var(--psw-text);
+  border-color: #fff;
+}
+
+[data-psw-forms] .psw-choice-desc {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85em;
+  opacity: 0.65;
+  font-weight: 400;
+}
+
+/* ---------- scale slider ---------- */
+
+[data-psw-forms] .psw-scale {
+  margin-top: 36px;
+}
+
+[data-psw-forms] .psw-scale-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+[data-psw-forms] .psw-scale-cell {
+  flex: 1 1 auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--psw-font-mono);
+  font-size: 16px;
+  background: transparent;
+  color: var(--psw-text);
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+  cursor: pointer;
+  transition:
+    border-color 120ms,
+    background 120ms,
+    color 120ms;
+}
+
+[data-psw-forms] .psw-scale-cell:hover {
+  border-color: var(--psw-accent);
+  background: var(--psw-accent-lo);
+}
+
+[data-psw-forms] .psw-scale-cell--selected {
+  background: var(--psw-accent);
+  border-color: var(--psw-accent);
+  color: #fff;
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-scale-cell--selected {
+  background: var(--psw-text);
+  border-color: var(--psw-text);
+  color: var(--psw-bg);
+}
+
+[data-psw-forms] .psw-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  font-family: var(--psw-font-mono);
+  opacity: 0.45;
+  text-transform: var(--psw-transform);
+}
+
+/* ---------- thanks confirmation chip ---------- */
+
+[data-psw-forms] .psw-confirm-chip {
+  display: inline-block;
+  padding: 8px 16px;
+  margin-top: 8px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  font-family: var(--psw-font-mono);
+  font-weight: 500;
+  background: var(--psw-text);
+  color: var(--psw-bg);
+  border-radius: var(--psw-radius);
+  text-transform: uppercase;
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-confirm-chip {
+  padding: 12px 20px;
+  font-weight: 700;
+}

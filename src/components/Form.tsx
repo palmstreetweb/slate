@@ -33,6 +33,7 @@ import '@/styles/tokens.css';
 import '@/styles/toggle.css';
 import '@/styles/animations.css';
 import '@/styles/base.css';
+import '@/styles/questions.css';
 
 export function Form<S extends Schema>({
   schema,
@@ -79,14 +80,16 @@ export function Form<S extends Schema>({
       } else if (currentQuestion.type === 'multi_choice') {
         const opt = currentQuestion.options[idx];
         if (!opt) return;
-        const cur = (state.answers[currentQuestion.id] as string[] | undefined) ?? [];
-        const newSet = cur.includes(opt.value)
-          ? cur.filter((v) => v !== opt.value)
-          : [...cur, opt.value];
-        setAnswer(currentQuestion.id, newSet);
+        // Functional updater so back-to-back keypresses don't see stale state.
+        setAnswer(currentQuestion.id, (prev) => {
+          const cur = Array.isArray(prev) ? (prev as string[]) : [];
+          return cur.includes(opt.value)
+            ? cur.filter((v) => v !== opt.value)
+            : [...cur, opt.value];
+        });
       }
     },
-    [currentQuestion, setAnswer, next, state.answers],
+    [currentQuestion, setAnswer, next],
   );
 
   const onSelectScale = useCallback(
@@ -132,22 +135,18 @@ export function Form<S extends Schema>({
     setSubmitStatus('submitting');
     setSubmitErrorMsg(null);
 
-    let cancelled = false;
+    // Note: we intentionally do NOT use a cancelled-flag cleanup here. The
+    // submittedRef guard already ensures onSubmit fires exactly once across
+    // any remount, including StrictMode's intentional double-invocation.
+    // Adding a cleanup that sets cancelled=true would silently swallow the
+    // success state on the second mount.
     Promise.resolve(onSubmit(getSubmitAnswers() as never, meta))
-      .then(() => {
-        if (cancelled) return;
-        setSubmitStatus('success');
-      })
+      .then(() => setSubmitStatus('success'))
       .catch((err: unknown) => {
-        if (cancelled) return;
         setSubmitStatus('error');
         const msg = err instanceof Error ? err.message : null;
         setSubmitErrorMsg(msg ?? errorMessage);
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     currentQuestion,
     onSubmit,

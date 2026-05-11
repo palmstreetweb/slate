@@ -38,12 +38,20 @@ export type FormState = {
   questionsVisited: string[];
 };
 
+type SetAnswerValue = LooseAnswers[string];
+type SetAnswerUpdater = (prev: SetAnswerValue) => SetAnswerValue;
+
 export type UseFormStateApi = {
   state: FormState;
   /** Currently shown question, or null if visible is empty. */
   currentQuestion: Question | null;
-  /** Set or update an answer. Recomputes visibility. */
-  setAnswer: (id: string, value: LooseAnswers[string]) => void;
+  /**
+   * Set or update an answer. Accepts either a value or a functional updater
+   * that receives the previous value (use the function form to avoid stale
+   * reads when multiple updates fire in the same tick — e.g. fast keyboard
+   * toggling on multi_choice). Recomputes visibility either way.
+   */
+  setAnswer: (id: string, value: SetAnswerValue | SetAnswerUpdater) => void;
   /** Advance to the next visible question. */
   next: () => void;
   /** Pop history; otherwise step − 1. */
@@ -66,7 +74,7 @@ type RawState = {
 };
 
 type Action =
-  | { type: 'set_answer'; id: string; value: LooseAnswers[string] }
+  | { type: 'set_answer'; id: string; value: SetAnswerValue | SetAnswerUpdater }
   | { type: 'go_next' }
   | { type: 'go_back' }
   | { type: 'go_to'; step: number; direction: AnimDirection }
@@ -77,7 +85,9 @@ function makeReducer(allQuestions: ReadonlyArray<Question>) {
   return function reducer(s: RawState, a: Action): RawState {
     switch (a.type) {
       case 'set_answer': {
-        const newAnswers = { ...s.answers, [a.id]: a.value };
+        const prev = s.answers[a.id];
+        const resolved = typeof a.value === 'function' ? a.value(prev) : a.value;
+        const newAnswers = { ...s.answers, [a.id]: resolved };
         const newVisible = visibleQuestions(allQuestions, newAnswers);
         const clampedStep = Math.min(s.step, Math.max(newVisible.length - 1, 0));
         return { ...s, answers: newAnswers, step: clampedStep };
@@ -154,9 +164,12 @@ export function useFormState(schema: Schema): UseFormStateApi {
     if (currentQuestion) dispatch({ type: 'record_visited', id: currentQuestion.id });
   }, [currentQuestion]);
 
-  const setAnswer = useCallback((id: string, value: LooseAnswers[string]) => {
-    dispatch({ type: 'set_answer', id, value });
-  }, []);
+  const setAnswer = useCallback(
+    (id: string, value: SetAnswerValue | SetAnswerUpdater) => {
+      dispatch({ type: 'set_answer', id, value });
+    },
+    [],
+  );
 
   const next = useCallback(() => dispatch({ type: 'go_next' }), []);
   const back = useCallback(() => dispatch({ type: 'go_back' }), []);

@@ -1,15 +1,27 @@
 /**
- * STEP 5 placeholder. Renders title + type badge + a "next" button so the
- * engine pipeline (state machine, transitions, keyboard, submit, theme) can
- * be exercised end-to-end before the per-type Field components land in
- * STEP 6. Once the real fields are written, this file becomes a discriminated
- * `switch` over `question.type` returning the right Field.
+ * Type-discriminated dispatcher for question rendering. Each `case` returns
+ * the field component for that question type. New question types only need
+ * an entry here + an `import` above + a Field component.
  */
 
 'use client';
 
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
+
+import { WelcomeScreen } from './WelcomeScreen.js';
+import { StatementScreen } from './StatementScreen.js';
+import { ThanksScreen } from './ThanksScreen.js';
+import { ShortTextField } from './ShortTextField.js';
+import { LongTextField } from './LongTextField.js';
+import { EmailField } from './EmailField.js';
+import { PhoneField } from './PhoneField.js';
+import { NumberField } from './NumberField.js';
+import { ScaleField } from './ScaleField.js';
+import { SingleChoiceField } from './SingleChoiceField.js';
+import { MultiChoiceField } from './MultiChoiceField.js';
+
+type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 export type QuestionRendererProps = {
   question: Question;
@@ -18,23 +30,25 @@ export type QuestionRendererProps = {
   advance: () => void;
   stepNumber: number;
   totalSteps: number;
-  submitStatus: 'idle' | 'submitting' | 'success' | 'error';
+  submitStatus: SubmitStatus;
   submitError: string | null;
   onRetrySubmit: () => void;
 };
 
-function resolveTitle(q: Question, answers: LooseAnswers): string {
-  if ('title' in q) {
-    const t = q.title as unknown;
-    if (typeof t === 'function') return (t as (a: LooseAnswers) => string)(answers);
-    if (typeof t === 'string') return t;
-  }
-  return '';
+function StepBadge({ step, total }: { step: number; total: number }) {
+  if (step <= 0 || total <= 0) return null;
+  return (
+    <div className="psw-step-badge">
+      <span>{String(step).padStart(2, '0')}</span>
+      <span className="psw-step-sep">→</span>
+    </div>
+  );
 }
 
 export function QuestionRenderer({
   question,
   answers,
+  setAnswer,
   advance,
   stepNumber,
   totalSteps,
@@ -42,136 +56,146 @@ export function QuestionRenderer({
   submitError,
   onRetrySubmit,
 }: QuestionRendererProps) {
-  const title = resolveTitle(question, answers);
-  const isChrome =
-    question.type === 'welcome' ||
-    question.type === 'thanks' ||
-    question.type === 'statement';
+  // Auto-advance helper for single_choice — fire after a brief pause so
+  // the selected highlight is visible before the transition starts.
+  const selectAndAdvance = (id: string, value: string) => {
+    setAnswer(id, value);
+    window.setTimeout(() => advance(), 220);
+  };
 
-  return (
-    <div>
-      {!isChrome && stepNumber > 0 && totalSteps > 0 && (
-        <div className="psw-step-badge">
-          <span>{String(stepNumber).padStart(2, '0')}</span>
-          <span className="psw-step-sep">→</span>
-        </div>
-      )}
+  switch (question.type) {
+    case 'welcome':
+      return <WelcomeScreen question={question} advance={advance} />;
 
-      <h1 className="psw-title">{title}</h1>
+    case 'statement':
+      return (
+        <StatementScreen
+          question={question}
+          advance={advance}
+          stepBadge={stepNumber}
+          totalSteps={totalSteps}
+        />
+      );
 
-      {'subtitle' in question && question.subtitle && (
-        <p className="psw-subtitle">{question.subtitle}</p>
-      )}
-
-      {/* STEP 5 placeholder body. STEP 6 swaps real fields in here. */}
-      <div
-        style={{
-          marginTop: 24,
-          fontFamily: 'var(--psw-font-mono)',
-          fontSize: 12,
-          letterSpacing: '0.12em',
-          opacity: 0.5,
-          textTransform: 'uppercase',
-        }}
-      >
-        [{question.type}] · placeholder · step 6 brings real ui
-      </div>
-
-      {question.type === 'thanks' ? (
-        <ThanksCta
+    case 'thanks':
+      return (
+        <ThanksScreen
+          question={question}
           status={submitStatus}
           error={submitError}
           onRetry={onRetrySubmit}
         />
-      ) : (
-        <button
-          type="button"
-          onClick={advance}
-          style={{
-            marginTop: 32,
-            padding: '12px 24px',
-            background: 'var(--psw-text)',
-            color: 'var(--psw-bg)',
-            border: 'none',
-            borderRadius: 'var(--psw-radius)',
-            fontFamily: 'var(--psw-font-body)',
-            fontWeight: 500,
-            fontSize: 15,
-            cursor: 'pointer',
-            textTransform: 'var(--psw-transform)' as 'lowercase' | 'none',
-          }}
-        >
-          {question.type === 'welcome'
-            ? 'cta' in question && question.cta
-              ? question.cta
-              : 'Start'
-            : 'Next →'}
-        </button>
-      )}
-    </div>
-  );
-}
+      );
 
-function ThanksCta({
-  status,
-  error,
-  onRetry,
-}: {
-  status: QuestionRendererProps['submitStatus'];
-  error: string | null;
-  onRetry: () => void;
-}) {
-  return (
-    <div style={{ marginTop: 24 }}>
-      {status === 'submitting' && (
-        <div
-          aria-live="polite"
-          style={{ fontSize: 13, opacity: 0.65, fontFamily: 'var(--psw-font-mono)' }}
-        >
-          submitting...
-        </div>
-      )}
-      {status === 'success' && (
-        <div
-          aria-live="polite"
-          style={{
-            display: 'inline-block',
-            padding: '8px 16px',
-            background: 'var(--psw-text)',
-            color: 'var(--psw-bg)',
-            borderRadius: 'var(--psw-radius)',
-            fontSize: 11,
-            letterSpacing: '0.18em',
-            fontFamily: 'var(--psw-font-mono)',
-            textTransform: 'uppercase',
-          }}
-        >
-          ✓ confirmation sent
-        </div>
-      )}
-      {status === 'error' && (
-        <div aria-live="polite">
-          <p style={{ color: 'var(--psw-error)', fontSize: 14, marginBottom: 12 }}>
-            {error ?? 'Something went wrong.'}
-          </p>
-          <button
-            type="button"
-            onClick={onRetry}
-            style={{
-              padding: '8px 16px',
-              background: 'var(--psw-accent)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 'var(--psw-radius)',
-              cursor: 'pointer',
-              fontFamily: 'var(--psw-font-body)',
-              fontSize: 13,
+    case 'short_text':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <ShortTextField
+            question={question}
+            answers={answers}
+            initialValue={(answers[question.id] as string | undefined) ?? ''}
+            onAnswer={(v) => setAnswer(question.id, v)}
+            onAdvance={advance}
+          />
+        </>
+      );
+
+    case 'long_text':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <LongTextField
+            question={question}
+            answers={answers}
+            initialValue={(answers[question.id] as string | undefined) ?? ''}
+            onAnswer={(v) => setAnswer(question.id, v)}
+            onAdvance={advance}
+          />
+        </>
+      );
+
+    case 'email':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <EmailField
+            question={question}
+            answers={answers}
+            initialValue={(answers[question.id] as string | undefined) ?? ''}
+            onAnswer={(v) => setAnswer(question.id, v)}
+            onAdvance={advance}
+          />
+        </>
+      );
+
+    case 'phone':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <PhoneField
+            question={question}
+            answers={answers}
+            initialValue={(answers[question.id] as string | undefined) ?? ''}
+            onAnswer={(v) => setAnswer(question.id, v)}
+            onAdvance={advance}
+          />
+        </>
+      );
+
+    case 'number':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <NumberField
+            question={question}
+            initialValue={answers[question.id] as number | undefined}
+            onAnswer={(v) => setAnswer(question.id, v)}
+            onAdvance={advance}
+          />
+        </>
+      );
+
+    case 'scale':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <ScaleField
+            question={question}
+            initialValue={answers[question.id] as number | undefined}
+            onAnswer={(v) => {
+              setAnswer(question.id, v);
+              window.setTimeout(() => advance(), 220);
             }}
-          >
-            Retry
-          </button>
-        </div>
-      )}
-    </div>
-  );
+          />
+        </>
+      );
+
+    case 'single_choice':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <SingleChoiceField
+            question={question}
+            answers={answers}
+            selected={answers[question.id] as string | undefined}
+            onSelect={(v) => selectAndAdvance(question.id, v)}
+          />
+        </>
+      );
+
+    case 'multi_choice':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <MultiChoiceField
+            question={question}
+            answers={answers}
+            selected={(answers[question.id] as string[] | undefined) ?? []}
+            onSelect={(vs) => setAnswer(question.id, vs)}
+            onAdvance={advance}
+          />
+        </>
+      );
+  }
 }

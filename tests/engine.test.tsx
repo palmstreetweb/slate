@@ -87,6 +87,26 @@ describe('useFormState — navigation + visibility', () => {
   });
 });
 
+describe('useFormState — setAnswer functional updater (regression)', () => {
+  it('back-to-back updates with stale closures still produce the right cumulative value', () => {
+    // Reproduces the multi_choice keyboard-toggle bug: two synchronous
+    // setAnswer calls in the same tick must both see the latest array.
+    const { result } = renderHook(() => useFormState(schema));
+    act(() => result.current.next()); // → name (just to have a stored answer slot)
+    act(() => {
+      result.current.setAnswer('addons', (prev) => [
+        ...((prev as string[] | undefined) ?? []),
+        'a',
+      ]);
+      result.current.setAnswer('addons', (prev) => [
+        ...((prev as string[] | undefined) ?? []),
+        'b',
+      ]);
+    });
+    expect(result.current.state.answers.addons).toEqual(['a', 'b']);
+  });
+});
+
 describe('useFormState — ADR-005 retain-but-exclude', () => {
   it('answers to now-hidden questions stay in state but drop from getSubmitAnswers()', () => {
     const { result } = renderHook(() => useFormState(schema));
