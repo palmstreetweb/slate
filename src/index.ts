@@ -13,6 +13,8 @@ export { isQuestionType } from './types/index.js';
 
 export { themes, editorial, swiss } from './themes/index.js';
 
+export { Form } from './components/Form.js';
+
 /**
  * Identity helper that captures the literal types of a schema for downstream
  * inference. Wrap your schema in `defineSchema({ ... })` to get strongly-typed
