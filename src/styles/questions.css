@@ -213,8 +213,21 @@
 [data-psw-forms][data-theme-name='swiss'] .psw-choice {
   padding: 18px 20px;
   font-weight: 600;
-  background: #fff;
   border-color: var(--psw-text);
+}
+
+/* Swiss light: classic white poster bg + dark text. */
+[data-psw-forms][data-theme-name='swiss'][data-theme='light'] .psw-choice {
+  background: #fff;
+  color: var(--psw-text);
+}
+
+/* Swiss dark: subtly elevated dark bg + cream text — Typeform-style.
+   Without this rule the choice would inherit `background: #fff` and end up
+   with cream text on white = unreadable (the bug Caleb caught). */
+[data-psw-forms][data-theme-name='swiss'][data-theme='dark'] .psw-choice {
+  background: var(--psw-bg-2);
+  color: var(--psw-text);
 }
 
 [data-psw-forms] .psw-choice:hover {
@@ -222,9 +235,12 @@
   background: var(--psw-accent-lo);
 }
 
+/* Swiss hover/selected = full inversion: text-color becomes the bg, bg
+   becomes the text-color. Works in both light + dark because both tokens
+   are mode-aware. */
 [data-psw-forms][data-theme-name='swiss'] .psw-choice:hover {
   background: var(--psw-text);
-  color: #fff;
+  color: var(--psw-bg);
 }
 
 [data-psw-forms] .psw-choice--selected {
@@ -232,9 +248,19 @@
   background: var(--psw-accent-lo);
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-choice--selected {
+/* The `[data-theme]` (any value) attribute selector lifts this rule's
+   specificity to (0,4,0) so it can beat the per-mode default rules above
+   (which are also (0,4,0) but source-order earlier). Without this, the
+   default-state Swiss-dark `.psw-choice` rule outranks `--selected` and
+   the highlighted choice never visually changes. */
+[data-psw-forms][data-theme-name='swiss'][data-theme] .psw-choice--selected {
   background: var(--psw-text);
-  color: #fff;
+  color: var(--psw-bg);
+}
+
+[data-psw-forms][data-theme-name='swiss'][data-theme] .psw-choice:hover {
+  background: var(--psw-text);
+  color: var(--psw-bg);
 }
 
 [data-psw-forms] .psw-choice-badge {
@@ -271,10 +297,14 @@
   color: #fff;
 }
 
+/* Selected-state badge inverts against the lit choice bg in BOTH modes:
+     light:  choice bg = #000  → badge bg = #FAF6EE-ish (var(--psw-bg))
+     dark:   choice bg = cream → badge bg = #0a0a0a-ish (var(--psw-bg))
+   Same rule, mode-aware via tokens. */
 [data-psw-forms][data-theme-name='swiss'] .psw-choice--selected .psw-choice-badge {
-  background: #fff;
+  background: var(--psw-bg);
   color: var(--psw-text);
-  border-color: #fff;
+  border-color: var(--psw-bg);
 }
 
 [data-psw-forms] .psw-choice-desc {
