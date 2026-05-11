@@ -44,7 +44,7 @@ export function ThanksScreen({ question, status, error, onRetry, onRestart }: Pr
           </div>
         )}
 
-        {question.cta && status === 'success' && (
+        {status === 'success' && (
           <button
             type="button"
             onClick={onRestart}
@@ -53,7 +53,7 @@ export function ThanksScreen({ question, status, error, onRetry, onRestart }: Pr
               marginTop: 24,
               fontSize: 14,
               textDecoration: 'underline',
-              opacity: 0.6,
+              opacity: 0.7,
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
@@ -63,7 +63,7 @@ export function ThanksScreen({ question, status, error, onRetry, onRestart }: Pr
               padding: 0,
             }}
           >
-            {question.cta}
+            {question.cta ?? 'Submit another'}
           </button>
         )}
       </div>

@@ -74,11 +74,9 @@ export function FormSubmissions({ formId }: Props) {
         </>
       }
     >
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>
-          Responses
-        </h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--psw-muted)' }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 className="studio-page-title">Responses</h1>
+        <p className="studio-page-sub">
           {subs.length === 0
             ? 'Nothing yet — open Preview and submit one to see it here.'
             : `${subs.length} ${subs.length === 1 ? 'response' : 'responses'}`}

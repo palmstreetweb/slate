@@ -15,15 +15,18 @@
 }
 
 [data-psw-forms][data-theme-name='studio'] {
-  --psw-font-display: 'Inter', system-ui, sans-serif;
+  /* Body / UI: Inter for density. Display / page titles: Fraunces serif
+     to match palmstreetweb.com's editorial feel — see _seedForms etc.
+     The studio is the same brand as the marketing site, just admin-shaped. */
+  --psw-font-display: 'Fraunces', Georgia, serif;
   --psw-font-body: 'Inter', system-ui, sans-serif;
   --psw-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --psw-radius: 8px;
   --psw-border-width: 1px;
-  --psw-title-weight: 600;
-  --psw-title-tracking: -0.02em;
-  --psw-title-line-height: 1.15;
-  --psw-title-size: clamp(1.5rem, 2.4vw, 1.875rem);
+  --psw-title-weight: 500;
+  --psw-title-tracking: -0.025em;
+  --psw-title-line-height: 1.08;
+  --psw-title-size: clamp(1.75rem, 2.6vw, 2rem);
   --psw-transform: none;
 
   /* Layout tokens specific to admin chrome */
@@ -38,39 +41,41 @@
   --studio-shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.04);
 }
 
+/* Light + dark tokens use the Editorial palette (the marketing site's
+   palette) — warm cream + deep warm dark + PSW blue. The studio IS PSW. */
 [data-psw-forms][data-theme-name='studio'][data-theme='light'] {
-  --psw-bg: #fafafa;
+  --psw-bg: #faf6ee;
   --psw-bg-2: #ffffff;
-  --psw-bg-3: #f4f4f5;
-  --psw-text: #18181b;
-  --psw-muted: #52525b;
-  --psw-dim: #a1a1aa;
+  --psw-bg-3: #f0eadd;
+  --psw-text: #1a1a1a;
+  --psw-muted: #5b5851;
+  --psw-dim: #8e8b83;
   --psw-accent: #2d5bff;
   --psw-accent-rgb: 45 91 255;
   --psw-accent-on-light: #2d5bff;
-  --psw-accent-lo: rgb(45 91 255 / 0.08);
-  --psw-border: rgb(24 24 27 / 0.08);
-  --psw-border-md: rgb(24 24 27 / 0.14);
-  --psw-error: #dc2626;
-  --studio-success: #16a34a;
-  --studio-warn: #ca8a04;
+  --psw-accent-lo: rgb(45 91 255 / 0.06);
+  --psw-border: rgba(26, 26, 26, 0.08);
+  --psw-border-md: rgba(26, 26, 26, 0.16);
+  --psw-error: #c8421a;
+  --studio-success: #2f7d32;
+  --studio-warn: #b07900;
   color-scheme: light;
 }
 
 [data-psw-forms][data-theme-name='studio'][data-theme='dark'] {
-  --psw-bg: #09090b;
-  --psw-bg-2: #18181b;
-  --psw-bg-3: #27272a;
-  --psw-text: #fafafa;
-  --psw-muted: #a1a1aa;
-  --psw-dim: #71717a;
+  --psw-bg: #14110d;
+  --psw-bg-2: #1c1815;
+  --psw-bg-3: #25201b;
+  --psw-text: #faf6ee;
+  --psw-muted: #b8b2a4;
+  --psw-dim: #7a7468;
   --psw-accent: #6e8fff;
   --psw-accent-rgb: 110 143 255;
   --psw-accent-on-light: #2d5bff;
-  --psw-accent-lo: rgb(110 143 255 / 0.12);
-  --psw-border: rgb(255 255 255 / 0.08);
-  --psw-border-md: rgb(255 255 255 / 0.14);
-  --psw-error: #f87171;
+  --psw-accent-lo: rgb(110 143 255 / 0.10);
+  --psw-border: rgba(250, 246, 238, 0.08);
+  --psw-border-md: rgba(250, 246, 238, 0.16);
+  --psw-error: #ff6b3d;
   --studio-success: #4ade80;
   --studio-warn: #facc15;
   color-scheme: dark;
@@ -105,16 +110,16 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: -0.01em;
+  font-family: var(--psw-font-display);
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: -0.02em;
   color: var(--psw-text);
   text-decoration: none;
   cursor: pointer;
   background: transparent;
   border: none;
   padding: 0;
-  font-family: inherit;
 }
 
 [data-psw-forms][data-theme-name='studio'] .studio-brand-mark {
@@ -303,6 +308,25 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin: 0 0 12px;
+  font-family: var(--psw-font-mono);
+}
+
+/* Big page heading (Fraunces serif) — Dashboard's "Your forms",
+   FormSubmissions's "Responses", etc. */
+[data-psw-forms][data-theme-name='studio'] .studio-page-title {
+  font-family: var(--psw-font-display);
+  font-size: var(--psw-title-size);
+  font-weight: var(--psw-title-weight);
+  letter-spacing: var(--psw-title-tracking);
+  line-height: var(--psw-title-line-height);
+  margin: 0;
+  color: var(--psw-text);
+}
+
+[data-psw-forms][data-theme-name='studio'] .studio-page-sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--psw-muted);
 }
 
 /* ---------- badges ---------- */

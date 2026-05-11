@@ -27,7 +27,7 @@ export function Dashboard() {
         questions: [
           { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
           { id: 'q1', type: 'short_text', title: 'First question?', required: true },
-          { id: 'done', type: 'thanks', title: "You're all set." },
+          { id: 'done', type: 'thanks', title: "You're all set.", cta: 'Submit another' },
         ],
       }),
     });
@@ -43,15 +43,11 @@ export function Dashboard() {
         </button>
       }
     >
-      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em' }}>
-            Your forms
-          </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--psw-muted)' }}>
-            {forms.length === 0 ? 'No forms yet.' : `${forms.length} ${forms.length === 1 ? 'form' : 'forms'}`}
-          </p>
-        </div>
+      <div style={{ marginBottom: 28 }}>
+        <h1 className="studio-page-title">Your forms</h1>
+        <p className="studio-page-sub">
+          {forms.length === 0 ? 'No forms yet.' : `${forms.length} ${forms.length === 1 ? 'form' : 'forms'}`}
+        </p>
       </div>
 
       {forms.length === 0 ? (
@@ -104,12 +100,21 @@ function FormCard({
           <button
             type="button"
             className="studio-link"
-            style={{ fontSize: 16, fontWeight: 600, color: 'var(--psw-text)', display: 'block', textAlign: 'left' }}
+            style={{
+              fontFamily: 'var(--psw-font-display)',
+              fontSize: 19,
+              fontWeight: 500,
+              letterSpacing: '-0.02em',
+              color: 'var(--psw-text)',
+              display: 'block',
+              textAlign: 'left',
+              lineHeight: 1.15,
+            }}
             onClick={() => navigate(`/forms/${form.id}/edit`)}
           >
             {form.name}
           </button>
-          <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--psw-dim)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--psw-dim)' }}>
             {form.schema.brand.name} · {String(form.schema.theme)}
           </p>
         </div>

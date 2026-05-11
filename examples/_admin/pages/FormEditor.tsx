@@ -55,7 +55,7 @@ export function FormEditor({ formId }: Props) {
           questions: [
             { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
             { id: 'q1', type: 'short_text', title: 'First question?', required: true },
-            { id: 'done', type: 'thanks', title: "You're all set." },
+            { id: 'done', type: 'thanks', title: "You're all set.", cta: 'Submit another' },
           ],
         }),
       });
@@ -334,7 +334,7 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
     case 'statement':
       return { id, type, title: 'A note.', body: 'Optional context for the user.', cta: 'Continue' };
     case 'thanks':
-      return { id, type, title: "You're all set." };
+      return { id, type, title: "You're all set.", cta: 'Submit another' };
     case 'short_text':
       return { id, type, title: 'Short text question?', placeholder: 'Type your answer...', required: true };
     case 'long_text':
