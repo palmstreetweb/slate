@@ -8,6 +8,7 @@ import {
   type StoredSubmission,
 } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
+import { useConfirm } from '../_confirm.js';
 import { AdminShell } from '../shell/AdminShell.js';
 
 type Props = { formId: string };
@@ -16,6 +17,7 @@ export function FormSubmissions({ formId }: Props) {
   const form = useMemo(() => getForm(formId), [formId]);
   const [subs, setSubs] = useState<StoredSubmission[]>(() => listSubmissions(formId));
   const [open, setOpen] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   useEffect(
     () => subscribe(() => setSubs(listSubmissions(formId))),
@@ -62,10 +64,14 @@ export function FormSubmissions({ formId }: Props) {
             <button
               type="button"
               className="studio-btn studio-btn--danger"
-              onClick={() => {
-                if (confirm(`Clear all ${subs.length} responses for "${form.name}"?`)) {
-                  clearSubmissions(formId);
-                }
+              onClick={async () => {
+                const ok = await confirm({
+                  title: `Clear ${subs.length} ${subs.length === 1 ? 'response' : 'responses'}?`,
+                  message: `Permanently deletes all responses for "${form.name}" from localStorage. The form itself is kept.`,
+                  confirmLabel: 'Clear all',
+                  danger: true,
+                });
+                if (ok) clearSubmissions(formId);
               }}
             >
               Clear all
@@ -98,8 +104,14 @@ export function FormSubmissions({ formId }: Props) {
                 .map((q) => q.id)}
               expanded={open === s.id}
               onToggle={() => setOpen(open === s.id ? null : s.id)}
-              onDelete={() => {
-                if (confirm('Delete this response?')) deleteSubmission(s.id);
+              onDelete={async () => {
+                const ok = await confirm({
+                  title: 'Delete this response?',
+                  message: "Removes a single submission. Won't affect other responses.",
+                  confirmLabel: 'Delete',
+                  danger: true,
+                });
+                if (ok) deleteSubmission(s.id);
               }}
             />
           ))}

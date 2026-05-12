@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { useRoute } from './_admin/_router.js';
 import { seedIfEmpty } from './_admin/_formsStore.js';
 import { seedForms } from './_admin/_seedForms.js';
+import { ConfirmProvider } from './_admin/_confirm.js';
 import { Dashboard } from './_admin/pages/Dashboard.js';
 import { FormEditor } from './_admin/pages/FormEditor.js';
 import { FormPreview } from './_admin/pages/FormPreview.js';
@@ -45,6 +46,8 @@ if (!root) throw new Error('#root not found');
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ConfirmProvider>
+      <App />
+    </ConfirmProvider>
   </StrictMode>,
 );

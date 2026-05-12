@@ -10,10 +10,12 @@ import {
 } from '../_formsStore.js';
 import { countSubmissions, lastSubmissionAt } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
+import { useConfirm } from '../_confirm.js';
 import { AdminShell } from '../shell/AdminShell.js';
 
 export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
+  const confirm = useConfirm();
 
   useEffect(() => subscribe(setForms), []);
 
@@ -21,7 +23,10 @@ export function Dashboard() {
     const created = createForm({
       name: 'Untitled form',
       schema: defineSchema({
-        brand: { name: 'Untitled' },
+        // Brand starts matching the form name so the sync logic in
+        // FormEditor can detect "user hasn't customized brand" and follow
+        // along when they rename the form. See FormEditorBody.handleNameChange.
+        brand: { name: 'Untitled form' },
         theme: 'editorial',
         themeMode: 'toggle',
         questions: [
@@ -66,11 +71,21 @@ export function Dashboard() {
           }}
         >
           {forms.map((f) => (
-            <FormCard key={f.id} form={f} onDuplicate={() => duplicateForm(f.id)} onDelete={() => {
-              if (confirm(`Delete "${f.name}"? This also deletes its submissions in localStorage.`)) {
-                deleteForm(f.id);
-              }
-            }} />
+            <FormCard
+              key={f.id}
+              form={f}
+              onDuplicate={() => duplicateForm(f.id)}
+              onDelete={async () => {
+                const ok = await confirm({
+                  title: `Delete "${f.name}"?`,
+                  message:
+                    'This also deletes its responses in localStorage. There is no undo.',
+                  confirmLabel: 'Delete form',
+                  danger: true,
+                });
+                if (ok) deleteForm(f.id);
+              }}
+            />
           ))}
         </div>
       )}

@@ -26,6 +26,7 @@ import type {
 import { defineSchema } from '@/index.js';
 import { createForm, getForm, updateForm, type FormRecord } from '../_formsStore.js';
 import { navigate } from '../_router.js';
+import { useConfirm } from '../_confirm.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import { Outline } from '../components/Outline.js';
 import { Canvas } from '../components/Canvas.js';
@@ -42,7 +43,8 @@ export function FormEditor({ formId }: Props) {
       const created = createForm({
         name: 'Untitled form',
         schema: defineSchema({
-          brand: { name: 'Untitled' },
+          // Brand mirrors form name so the sync below picks up renames.
+          brand: { name: 'Untitled form' },
           theme: 'editorial',
           themeMode: 'toggle',
           questions: [
@@ -80,6 +82,7 @@ function FormEditorBody({ formId }: { formId: string }) {
     const first = initial?.schema.questions[0];
     return first?.id ?? '';
   });
+  const confirm = useConfirm();
 
   // SYNCHRONOUS auto-save — every change writes immediately, so clicking
   // Preview right after a setting change never reads stale localStorage.
@@ -136,6 +139,21 @@ function FormEditorBody({ formId }: { formId: string }) {
 
   const patchSchema = (patch: Partial<Schema>) => {
     setSchema((s) => (s ? { ...s, ...patch } : s));
+  };
+
+  /**
+   * Rename the form. If the brand name was previously matching the form
+   * name (i.e., user hasn't customized it independently), sync the brand
+   * to the new name too — so renaming "Untitled form" → "My 2nd Form"
+   * also updates what the visitor sees at the top-left of the form.
+   * Once the user edits brand explicitly via the Settings panel, the two
+   * stop syncing.
+   */
+  const handleNameChange = (next: string) => {
+    if (schema && schema.brand.name === name) {
+      setSchema({ ...schema, brand: { ...schema.brand, name: next } });
+    }
+    setName(next);
   };
 
   const updateQuestion = (id: string, patch: Partial<Question>) => {
@@ -248,7 +266,7 @@ function FormEditorBody({ formId }: { formId: string }) {
           onAddQuestion={addQuestion}
           onReorder={reorder}
           name={name}
-          onNameChange={setName}
+          onNameChange={handleNameChange}
           onBrandChange={(v) => patchSchema({ brand: { ...schema.brand, name: v } })}
           onThemeChange={(v: ThemeName) => patchSchema({ theme: v })}
           onThemeModeChange={(v: ThemeMode) => patchSchema({ themeMode: v })}
@@ -259,10 +277,23 @@ function FormEditorBody({ formId }: { formId: string }) {
         <Inspector
           question={selectedQuestion}
           onChange={(patch) => updateQuestion(selectedQuestion.id, patch)}
-          onDelete={() => {
-            if (confirm(`Delete question "${selectedQuestion.id}"?`)) {
-              removeQuestion(selectedQuestion.id);
-            }
+          onDelete={async () => {
+            const titleText =
+              'title' in selectedQuestion && typeof selectedQuestion.title === 'string'
+                ? selectedQuestion.title
+                : selectedQuestion.id;
+            const ok = await confirm({
+              title: 'Delete this question?',
+              message: (
+                <>
+                  Removes <strong>{titleText}</strong> from this form. Existing responses
+                  for this question stay in localStorage but won&apos;t be collected anymore.
+                </>
+              ),
+              confirmLabel: 'Delete question',
+              danger: true,
+            });
+            if (ok) removeQuestion(selectedQuestion.id);
           }}
           canDelete={canDelete}
         />

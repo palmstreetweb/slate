@@ -15,7 +15,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 24px;
+  /* Asymmetric vertical padding biases content upward — Typeform-style.
+     With equal padding the geometric center sits roughly at 50vh; the
+     larger bottom value pulls the visual focus up to ~42vh, which reads
+     much better on the welcome screen and on tall monitors. */
+  padding: clamp(48px, 8vh, 120px) 24px clamp(96px, 18vh, 220px);
   position: relative;
   z-index: 5;
 }
