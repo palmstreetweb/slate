@@ -1,9 +1,17 @@
 /* ============================================================
    PSW Theme Toggle — VERBATIM port from palmstreetweb.com.
    Source: BUILD_BRIEF.md §8.2.
-   Only adaptation: every selector is prefixed with [data-psw-forms]
-   to wrapper-scope (we don't own the host page <html>).
-   DO NOT redesign — match the PSW toggle exactly.
+   Adaptations from the brief:
+     1. Every selector prefixed with [data-psw-forms] (wrapper-
+        scoped — we don't own the host page <html>).
+     2. Mode-dependent rules add :not([data-theme-name='studio'])
+        so the studio admin wrapper (also a [data-psw-forms] with
+        its own data-theme) doesn't accidentally style the form
+        preview's toggle. Without this guard, when the studio is
+        in dark mode and the previewed form is in light mode, the
+        outer selector wins source-order and the toggle renders
+        the wrong colors.
+   DO NOT redesign the look — match the PSW toggle exactly.
    ============================================================ */
 
 [data-psw-forms] .theme-toggle {
@@ -33,23 +41,23 @@
   transform: scale(0.97);
 }
 
-[data-psw-forms][data-theme='light'] .theme-toggle {
+[data-psw-forms]:not([data-theme-name='studio'])[data-theme='light'] .theme-toggle {
   background: var(--accent);
   border-color: transparent;
 }
-[data-psw-forms][data-theme='light'] .theme-toggle:hover {
+[data-psw-forms]:not([data-theme-name='studio'])[data-theme='light'] .theme-toggle:hover {
   border-color: rgba(255, 255, 255, 0.22);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-[data-psw-forms][data-theme='dark'] .theme-toggle {
+[data-psw-forms]:not([data-theme-name='studio'])[data-theme='dark'] .theme-toggle {
   background: #101812;
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
-[data-psw-forms][data-theme='dark'] .theme-toggle:hover {
+[data-psw-forms]:not([data-theme-name='studio'])[data-theme='dark'] .theme-toggle:hover {
   border-color: rgba(255, 255, 255, 0.2);
   box-shadow:
     0 0 0 1px rgb(var(--accent-rgb) / 0.2),
@@ -73,13 +81,13 @@
     background 0.26s ease-out,
     box-shadow 0.24s ease-out;
 }
-[data-psw-forms][data-theme='dark'] .theme-toggle::before {
+[data-psw-forms]:not([data-theme-name='studio'])[data-theme='dark'] .theme-toggle::before {
   background: var(--accent);
   box-shadow:
     0 1px 6px rgba(0, 0, 0, 0.38),
     0 1px 4px rgb(var(--accent-rgb) / 0.22);
 }
-[data-psw-forms][data-theme='light']
+[data-psw-forms]:not([data-theme-name='studio'])[data-theme='light']
   .theme-toggle:not(.is-morphing-to-light):not(.is-morphing-to-dark)::before {
   transform: translateX(32px);
   background: #fff;
@@ -166,19 +174,19 @@
   color: var(--muted);
   opacity: 0.45;
 }
-[data-psw-forms][data-theme='dark'] .theme-toggle .theme-ico--moon {
+[data-psw-forms]:not([data-theme-name='studio'])[data-theme='dark'] .theme-toggle .theme-ico--moon {
   color: #0a0a0e;
   opacity: 1;
 }
-[data-psw-forms][data-theme='dark'] .theme-toggle .theme-ico--sun {
+[data-psw-forms]:not([data-theme-name='studio'])[data-theme='dark'] .theme-toggle .theme-ico--sun {
   color: rgba(255, 255, 255, 0.5);
   opacity: 1;
 }
-[data-psw-forms][data-theme='light'] .theme-ico--moon {
+[data-psw-forms]:not([data-theme-name='studio'])[data-theme='light'] .theme-ico--moon {
   color: #0a0a0e;
   opacity: 0.98;
 }
-[data-psw-forms][data-theme='light'] .theme-ico--sun {
+[data-psw-forms]:not([data-theme-name='studio'])[data-theme='light'] .theme-ico--sun {
   color: #0a0a0e;
   opacity: 1;
 }

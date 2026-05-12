@@ -401,7 +401,22 @@
   overflow: hidden;
   border: 1px solid var(--psw-border-md);
   box-shadow: var(--studio-shadow-card);
-  /* the inner data-psw-forms wrapper inherits these constraints */
+}
+
+/* Anchor the previewed form's content to the upper third of the frame
+   instead of dead-center. The form's own [data-psw-forms] base CSS sets
+   `min-height: 100vh` which is larger than the studio preview frame
+   (calc(100vh - 160px)) — leaving the content visually below center.
+   These overrides cap the inner wrapper + stage to 100% of the frame and
+   pull content up with a top-padding clamp. */
+.studio-preview [data-psw-forms] {
+  min-height: 100%;
+}
+
+.studio-preview .psw-stage {
+  min-height: 100%;
+  align-items: flex-start;
+  padding-top: clamp(48px, 14vh, 140px);
 }
 
 /* ===========================================================

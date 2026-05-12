@@ -29,6 +29,15 @@ type Props = {
 };
 
 export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
+  // Chrome screens (welcome, statement, thanks) aren't answer-bearing and
+  // can't be referenced by visibleIf — their internal `id` is irrelevant
+  // to the form author, so we hide all the ID UI for them. Input questions
+  // still expose the ID since it's the key in onSubmit's answers payload.
+  const showId =
+    question.type !== 'welcome' &&
+    question.type !== 'statement' &&
+    question.type !== 'thanks';
+
   return (
     <aside className="studio-rail studio-rail--right">
       <div className="studio-rail-pad">
@@ -48,24 +57,28 @@ export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
           }}
         >
           <span>{TYPE_LABEL[question.type]}</span>
-          <span style={{ fontSize: 11, color: 'var(--psw-dim)', fontFamily: 'var(--psw-font-mono)' }}>
-            id: {question.id}
-          </span>
+          {showId && (
+            <span style={{ fontSize: 11, color: 'var(--psw-dim)', fontFamily: 'var(--psw-font-mono)' }}>
+              id: {question.id}
+            </span>
+          )}
         </div>
       </div>
 
       <Divider />
 
       <div className="studio-rail-pad" style={{ display: 'grid', gap: 14 }}>
-        <Field label="Question ID" hint="Used as the answers key in onSubmit. Letters/numbers/underscore.">
-          <input
-            className="studio-input"
-            value={question.id}
-            onChange={(e) =>
-              onChange({ id: e.target.value.replace(/[^a-zA-Z0-9_]/g, '_') } as Partial<Question>)
-            }
-          />
-        </Field>
+        {showId && (
+          <Field label="Question ID" hint="Used as the answers key in onSubmit. Letters/numbers/underscore.">
+            <input
+              className="studio-input"
+              value={question.id}
+              onChange={(e) =>
+                onChange({ id: e.target.value.replace(/[^a-zA-Z0-9_]/g, '_') } as Partial<Question>)
+              }
+            />
+          </Field>
+        )}
 
         {'title' in question && typeof question.title === 'string' && (
           <Field label="Title">
