@@ -12,7 +12,7 @@ export type StoredSubmission = {
   formId: string;
   receivedAt: string;
   answers: Answers;
-  meta: Pick<SubmitMeta, 'durationMs' | 'questionsVisited' | 'hiddenFields'> & {
+  meta: Pick<SubmitMeta, 'durationMs' | 'questionsVisited' | 'hiddenFields' | 'score'> & {
     startedAt: string;
     completedAt: string;
   };
@@ -58,6 +58,7 @@ export function addSubmission(formId: string, answers: Answers, meta: SubmitMeta
       durationMs: meta.durationMs,
       questionsVisited: meta.questionsVisited,
       hiddenFields: meta.hiddenFields,
+      score: meta.score,
     },
   };
   write([sub, ...read()]);

@@ -6,6 +6,7 @@
  */
 
 import type { Option, PictureOption, Question } from '@/index.js';
+import { ConditionBuilder, JumpRulesEditor } from './LogicEditor.js';
 
 const TYPE_LABEL: Record<Question['type'], string> = {
   welcome: 'Welcome screen',
@@ -33,12 +34,14 @@ const TYPE_LABEL: Record<Question['type'], string> = {
 
 type Props = {
   question: Question;
+  /** Full question list — feeds logic-editor field and jump-target dropdowns. */
+  allQuestions: ReadonlyArray<Question>;
   onChange: (patch: Partial<Question>) => void;
   onDelete: () => void;
   canDelete: boolean;
 };
 
-export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
+export function Inspector({ question, allQuestions, onChange, onDelete, canDelete }: Props) {
   // Chrome screens (welcome, statement, thanks) aren't answer-bearing and
   // can't be referenced by visibleIf — their internal `id` is irrelevant
   // to the form author, so we hide all the ID UI for them. Input questions
@@ -430,10 +433,14 @@ export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
           question.type === 'multi_choice' ||
           question.type === 'dropdown' ||
           question.type === 'ranking') && (
-          <Field label="Options">
+          <Field
+            label="Options"
+            hint={question.type === 'ranking' ? undefined : 'pts feed the {{score}} total.'}
+          >
             <OptionsEditor
               options={question.options as Option[]}
               onChange={(opts) => onChange({ options: opts } as Partial<Question>)}
+              withScore={question.type !== 'ranking'}
             />
           </Field>
         )}
@@ -533,6 +540,52 @@ export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
           </Row>
         )}
 
+        {question.type === 'thanks' && (
+          <Field
+            label="Redirect URL (optional)"
+            hint="Navigate here after a successful submit."
+          >
+            <input
+              className="studio-input"
+              value={question.redirectUrl ?? ''}
+              placeholder="https://example.com/thank-you"
+              onChange={(e) =>
+                onChange({ redirectUrl: e.target.value || undefined } as Partial<Question>)
+              }
+            />
+          </Field>
+        )}
+
+        {question.type !== 'welcome' && (
+          <>
+            <div style={{ height: 1, background: 'var(--psw-border)', margin: '8px 0' }} />
+            <Field
+              label={question.type === 'thanks' ? 'Show this ending when…' : 'Show this question when…'}
+              hint="Leave empty to always show."
+            >
+              <ConditionBuilder
+                value={question.visibleIf}
+                onChange={(visibleIf) => onChange({ visibleIf } as Partial<Question>)}
+                questions={allQuestions}
+              />
+            </Field>
+          </>
+        )}
+
+        {question.type !== 'welcome' && question.type !== 'thanks' && (
+          <Field
+            label="Logic jumps"
+            hint="On advance, the first matching rule wins. No match = next question."
+          >
+            <JumpRulesEditor
+              rules={('logic' in question ? question.logic : undefined) ?? []}
+              onChange={(logic) => onChange({ logic } as Partial<Question>)}
+              questions={allQuestions}
+              currentId={question.id}
+            />
+          </Field>
+        )}
+
         {canDelete && (
           <>
             <div style={{ height: 1, background: 'var(--psw-border)', margin: '8px 0' }} />
@@ -588,9 +641,12 @@ function Checkbox({
 function OptionsEditor({
   options,
   onChange,
+  withScore = false,
 }: {
   options: Option[];
   onChange: (opts: Option[]) => void;
+  /** Show a per-option points column (feeds the {{score}} total, ADR-016). */
+  withScore?: boolean;
 }) {
   const update = (i: number, patch: Partial<Option>) => {
     onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
@@ -618,7 +674,7 @@ function OptionsEditor({
           key={i}
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 110px auto',
+            gridTemplateColumns: withScore ? '1fr 90px 52px auto' : '1fr 110px auto',
             gap: 4,
             alignItems: 'center',
           }}
@@ -641,6 +697,19 @@ function OptionsEditor({
             }}
             onChange={(e) => update(i, { value: e.target.value.replace(/\s+/g, '_') })}
           />
+          {withScore && (
+            <input
+              className="studio-input"
+              type="number"
+              value={opt.score ?? ''}
+              placeholder="pts"
+              aria-label="Score points"
+              style={{ padding: '6px 6px', fontSize: 11 }}
+              onChange={(e) =>
+                update(i, { score: e.target.value === '' ? undefined : Number(e.target.value) })
+              }
+            />
+          )}
           <div style={{ display: 'flex', gap: 0 }}>
             <button
               type="button"
@@ -719,7 +788,7 @@ function PictureOptionsEditor({
             borderRadius: 'var(--studio-radius-sm)',
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px auto', gap: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 52px auto', gap: 4 }}>
             <input
               className="studio-input"
               value={opt.label}
@@ -733,6 +802,17 @@ function PictureOptionsEditor({
               placeholder="value"
               style={{ padding: '6px 8px', fontFamily: 'var(--psw-font-mono)', fontSize: 11 }}
               onChange={(e) => update(i, { value: e.target.value.replace(/\s+/g, '_') })}
+            />
+            <input
+              className="studio-input"
+              type="number"
+              value={opt.score ?? ''}
+              placeholder="pts"
+              aria-label="Score points"
+              style={{ padding: '6px 6px', fontSize: 11 }}
+              onChange={(e) =>
+                update(i, { score: e.target.value === '' ? undefined : Number(e.target.value) })
+              }
             />
             <button
               type="button"

@@ -15,12 +15,13 @@
 
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormProps, Schema, SubmitMeta } from '@/types/Schema.js';
 import { useFormState } from '@/hooks/useFormState.js';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
 import { useTheme } from '@/hooks/useTheme.js';
 import { progress as progressFn } from '@/logic/progress.js';
+import { computeScore } from '@/logic/scoring.js';
 import { themes } from '@/themes/index.js';
 import type { Theme } from '@/types/Theme.js';
 import { TopBar } from './chrome/TopBar.js';
@@ -69,6 +70,12 @@ export function Form<S extends Schema>({
     'idle',
   );
   const [submitErrorMsg, setSubmitErrorMsg] = useState<string | null>(null);
+
+  // Running score (ADR-016) — feeds {{score}} piping and SubmitMeta.
+  const score = useMemo(
+    () => computeScore(schema.questions, state.answers),
+    [schema.questions, state.answers],
+  );
 
   /* ---------- keyboard handlers ---------- */
 
@@ -158,7 +165,10 @@ export function Form<S extends Schema>({
       durationMs: Date.now() - state.startedAt.getTime(),
       questionsVisited: state.questionsVisited,
       hiddenFields: hiddenFields ?? {},
+      score,
     };
+
+    const redirectUrl = currentQuestion.redirectUrl;
 
     setSubmitStatus('submitting');
     setSubmitErrorMsg(null);
@@ -169,7 +179,11 @@ export function Form<S extends Schema>({
     // Adding a cleanup that sets cancelled=true would silently swallow the
     // success state on the second mount.
     Promise.resolve(onSubmit(getSubmitAnswers() as never, meta))
-      .then(() => setSubmitStatus('success'))
+      .then(() => {
+        setSubmitStatus('success');
+        // Ending redirect (ADR-016) — only after a confirmed submit.
+        if (redirectUrl) window.location.assign(redirectUrl);
+      })
       .catch((err: unknown) => {
         setSubmitStatus('error');
         const msg = err instanceof Error ? err.message : null;
@@ -184,6 +198,7 @@ export function Form<S extends Schema>({
     getSubmitAnswers,
     errorMessage,
     submitStatus,
+    score,
   ]);
 
   const retrySubmit = useCallback(() => {
@@ -262,6 +277,7 @@ export function Form<S extends Schema>({
               onRetrySubmit={retrySubmit}
               onRestart={restartForm}
               onFileUpload={onFileUpload}
+              score={score}
             />
           ) : null}
         </div>

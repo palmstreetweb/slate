@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import type { Schema } from '@/types/Schema.js';
 import type { Question } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
-import { visibleAnswersForSubmit, visibleQuestions } from '@/logic/progress.js';
+import { resolveJumpTarget, visibleAnswersForSubmit, visibleQuestions } from '@/logic/progress.js';
 
 export type AnimDirection = 'forward' | 'backward';
 
@@ -100,13 +100,20 @@ function makeReducer(allQuestions: ReadonlyArray<Question>) {
       }
       case 'go_next': {
         const visible = visibleQuestions(allQuestions, s.answers);
-        const next = Math.min(s.step + 1, visible.length - 1);
+        const current = visible[Math.min(s.step, visible.length - 1)];
+        // Logic jumps (ADR-015): first matching rule on the current question
+        // overrides the default step+1. Back-nav still works — the jump
+        // origin is pushed onto history like any other advance.
+        const jump = current ? resolveJumpTarget(current, visible, s.answers) : null;
+        const next = jump !== null && jump !== s.step
+          ? jump
+          : Math.min(s.step + 1, visible.length - 1);
         if (next === s.step) return s;
         return {
           ...s,
           history: [...s.history, s.step],
           step: next,
-          direction: 'forward',
+          direction: next > s.step ? 'forward' : 'backward',
           isAnimating: true,
         };
       }

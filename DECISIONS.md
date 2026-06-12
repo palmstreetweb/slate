@@ -185,6 +185,43 @@ Alternatives:
 Consequences: `LooseAnswers` values are now `string | string[] | number | File | MatrixAnswer | undefined`. `evaluate()` already treats unknown shapes safely (objects are only matched by `is_empty`/`is_not_empty`).
 Revisit when: conditional logic needs to address individual matrix rows (would need `field: 'id.row'` path syntax — new ADR).
 
+## ADR-014 — Answer piping via `{{field:id}}` template syntax
+Date: 2026-06-12
+Status: accepted
+Context: The brief's `DynamicTitle` (function-style personalization) requires writing schemas in code. Typeform-style "recall" needs a serializable syntax the studio can edit and store as JSON.
+Decision: A pure resolver in `src/logic/piping.ts` replaces `{{field:questionId}}` with the formatted answer and `{{score}}` with the running score total. Resolution happens once, in `QuestionRenderer`, over a question's `title`, `subtitle`, and `body` — function-style `DynamicTitle` keeps working (functions run first, their output is then piped). Unknown or unanswered fields resolve to `''`. Formatting: arrays join with ", ", `File` → its name, matrix → "row: col" pairs.
+Alternatives:
+- Resolving in each field component. Rejected — 18 call sites, and double-resolution risks injecting templates from user-typed answers.
+- `{{id}}` without the `field:` prefix. Rejected — leaves no namespace for future tokens (`{{score}}` already collides; `{{var:x}}` may come later).
+Consequences: Strings flow through one resolver; the studio can offer piping pickers later without engine changes.
+Revisit when: variables (`{{var:x}}`) or per-token formatting (`{{field:date|long}}`) are needed.
+
+## ADR-015 — Logic jumps: `logic: [{ if, goTo }]` evaluated on advance
+Date: 2026-06-12
+Status: accepted
+Context: `visibleIf` covers show/hide but cannot express "skip ahead to Q7 if they answered No" without inverting conditions on every in-between question.
+Decision: Answer-bearing questions (and statements) accept `logic?: LogicRule[]`. Rules are evaluated in `useFormState`'s `go_next` against the answer state at the moment the user advances *from* the carrying question. First match wins; navigation goes to the target's index in the visible list. No match, hidden target, or dangling id → normal step+1 (forgiving, not erroring). The jump origin is pushed onto history, so Back returns to it. Backward jumps are allowed (direction animates backward).
+Retention semantics vs. ADR-005: jumps change *navigation only* — they do not hide the skipped-over questions. Answers to skipped questions are retained in state and still included in the submit payload if their `visibleIf` passes. Hosts that need skipped-question exclusion should pair jumps with `visibleIf` (the studio logic editor makes both visible side by side).
+Alternatives:
+- Auto-excluding skipped-over answers from submit. Rejected — "skipped" becomes path-dependent (what if the user goes Back and takes the other branch?), while ADR-005's visibility rule is a pure function of answers.
+- A schema-level edges graph (Typeform's internal model). Rejected — per-question rules keep the flat-array schema and are exactly what the Inspector can edit.
+Consequences: `questionsVisited` reflects the actual path. Progress can jump non-linearly (accepted; it tracks position, not path length).
+Revisit when: loops become a real authoring hazard — a studio-side cycle detector would land in schema validation (Phase 6).
+
+## ADR-016 — Scoring via option-level `score` + multiple endings
+Date: 2026-06-12
+Status: accepted
+Context: Quiz/qualification forms need a score accumulated from answers, endings that differ by outcome, and a redirect for qualified leads.
+Decision:
+- `Option.score?: number` on choice options (single_choice, multi_choice, dropdown, picture_choice). `computeScore()` in `src/logic/scoring.ts` sums the scores of selected options; unscored options count 0.
+- The total is exposed in `SubmitMeta.score` and in piping as `{{score}}`.
+- Multiple endings: `thanks` screens gain `visibleIf`; several may coexist and the first visible one is shown when the user reaches the end (or is jumped there). `thanks` also gains `redirectUrl?: string`, navigated to only after `onSubmit` resolves successfully.
+Alternatives:
+- A `variables` map with per-question add/subtract operations (full Typeform model). Rejected for now — one accumulator covers scoring quizzes; a variables engine is a much bigger surface.
+- Redirect immediately on reaching thanks. Rejected — a failed submit would strand the response while the user is already gone.
+Consequences: `window.location.assign` is the one place the library touches navigation — it's host-sanctioned via the schema, not ambient behavior. SubmitMeta grows a required `score` field (0 when nothing is scored).
+Revisit when: per-question variables or score *ranges* selecting endings (sugar over `visibleIf` gt/lte) are requested.
+
 ---
 
 ## Deferred to V2
@@ -193,7 +230,7 @@ Per brief §14, V1 explicitly does **not** include the items below. Each gets a 
 
 - ~~**File upload question type**~~ — shipped in Phase 3 with host-controlled storage (ADR-012).
 - ~~**Date picker question type**~~ — shipped as segmented `date` inputs in Phase 2 (ADR-010).
-- **Calculator / scoring logic** — opens the door to a full expression language; out of scope.
+- ~~**Calculator / scoring logic**~~ — shipped as option-level `score` + `{{score}}` piping in Phase 4 (ADR-016). A full expression language remains out of scope.
 - **Save-and-resume from URL token** — needs a signing strategy.
 - **iframe / HTML script-tag embed** — different consumer model; current package is React-only.
 - **Built-in analytics event bus** — `onQuestionChange` callback is enough for V1.

@@ -188,3 +188,91 @@ describe('<Form> — dynamic titles', () => {
     expect(await screen.findByText('Caleb, how urgent?')).toBeInTheDocument();
   });
 });
+
+describe('<Form> — piping, scoring, multiple endings (Phase 4)', () => {
+  const quizSchema = () =>
+    defineSchema({
+      brand: { name: 'Quiz Co' },
+      theme: 'editorial',
+      themeMode: 'light',
+      questions: [
+        { id: 'name', type: 'short_text', title: 'Your name?', required: true },
+        {
+          id: 'level',
+          type: 'single_choice',
+          title: 'Hi {{field:name}} — pick your level',
+          options: [
+            { label: 'Beginner', value: 'beginner', score: 1 },
+            { label: 'Pro', value: 'pro', score: 10 },
+          ],
+        },
+        {
+          id: 'pro_end',
+          type: 'thanks',
+          title: 'Pro detected, {{field:name}}!',
+          visibleIf: { field: 'level', op: 'equals', value: 'pro' },
+        },
+        {
+          id: 'done',
+          type: 'thanks',
+          title: 'Thanks {{field:name}}.',
+        },
+      ],
+    });
+
+  it('pipes {{field:id}} into titles and selects the visibleIf-matching ending', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<Form schema={quizSchema()} onSubmit={onSubmit} />);
+
+    await user.type(screen.getByRole('textbox'), 'Ada');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(await screen.findByText('Hi Ada — pick your level')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: /pro/i }));
+    expect(await screen.findByText('Pro detected, Ada!')).toBeInTheDocument();
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const [, meta] = onSubmit.mock.calls[0]!;
+    expect(meta.score).toBe(10);
+  });
+
+  it('falls through to the unconditioned ending and reports the other score', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<Form schema={quizSchema()} onSubmit={onSubmit} />);
+
+    await user.type(screen.getByRole('textbox'), 'Bo');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    await user.click(await screen.findByRole('radio', { name: /beginner/i }));
+    expect(await screen.findByText('Thanks Bo.')).toBeInTheDocument();
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]![1].score).toBe(1);
+  });
+
+  it('logic jump skips ahead and back returns to the origin', async () => {
+    const user = userEvent.setup();
+    const schema = defineSchema({
+      brand: { name: 'Test' },
+      theme: 'editorial',
+      themeMode: 'light',
+      questions: [
+        {
+          id: 'interested',
+          type: 'yes_no',
+          title: 'Interested?',
+          logic: [{ if: { field: 'interested', op: 'equals', value: 'no' }, goTo: 'done' }],
+        },
+        { id: 'email', type: 'email', title: 'Your email?' },
+        { id: 'done', type: 'thanks', title: 'Bye.' },
+      ],
+    });
+    render(<Form schema={schema} onSubmit={vi.fn().mockResolvedValue(undefined)} />);
+
+    await user.click(screen.getByRole('radio', { name: /no/i }));
+    // Jumps straight past the email question to the ending.
+    expect(await screen.findByText('Bye.')).toBeInTheDocument();
+    expect(screen.queryByText('Your email?')).not.toBeInTheDocument();
+  });
+});

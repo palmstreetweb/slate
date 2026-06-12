@@ -6,8 +6,10 @@
 
 'use client';
 
+import { useMemo } from 'react';
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
+import { pipeQuestionCopy } from '@/logic/piping.js';
 
 import { WelcomeScreen } from './WelcomeScreen.js';
 import { StatementScreen } from './StatementScreen.js';
@@ -52,6 +54,8 @@ export type QuestionRendererProps = {
   onRestart: () => void;
   /** Host-controlled file storage for `file_upload` questions (ADR-012). */
   onFileUpload?: FileUploadHandler;
+  /** Running score total, available in piping as `{{score}}` (ADR-016). */
+  score?: number;
 };
 
 function StepBadge({ step, total }: { step: number; total: number }) {
@@ -65,7 +69,7 @@ function StepBadge({ step, total }: { step: number; total: number }) {
 }
 
 export function QuestionRenderer({
-  question,
+  question: rawQuestion,
   answers,
   setAnswer,
   advance,
@@ -76,7 +80,15 @@ export function QuestionRenderer({
   onRetrySubmit,
   onRestart,
   onFileUpload,
+  score = 0,
 }: QuestionRendererProps) {
+  // Resolve {{field:id}} / {{score}} piping (and function-style DynamicTitle)
+  // once here, so every field component receives ready-to-render copy.
+  const question = useMemo(
+    () => pipeQuestionCopy(rawQuestion, answers, score),
+    [rawQuestion, answers, score],
+  );
+
   // Auto-advance helper for single_choice — fire after a brief pause so
   // the selected highlight is visible before the transition starts.
   const selectAndAdvance = (id: string, value: string) => {

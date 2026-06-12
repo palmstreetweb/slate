@@ -107,6 +107,65 @@ describe('useFormState — setAnswer functional updater (regression)', () => {
   });
 });
 
+describe('useFormState — logic jumps (ADR-015)', () => {
+  const jumpSchema = defineSchema({
+    brand: { name: 'Test' },
+    theme: 'editorial',
+    themeMode: 'light',
+    questions: [
+      { id: 'welcome', type: 'welcome', title: 'hi' },
+      {
+        id: 'interested',
+        type: 'yes_no',
+        title: 'Interested?',
+        logic: [{ if: { field: 'interested', op: 'equals', value: 'no' }, goTo: 'bye' }],
+      },
+      { id: 'name', type: 'short_text', title: 'name?' },
+      { id: 'email', type: 'email', title: 'email?' },
+      { id: 'done', type: 'thanks', title: 'thanks!' },
+      {
+        id: 'bye',
+        type: 'thanks',
+        title: 'no worries',
+        visibleIf: { field: 'interested', op: 'equals', value: 'no' },
+      },
+    ],
+  });
+
+  it('matching rule jumps over in-between questions', () => {
+    const { result } = renderHook(() => useFormState(jumpSchema));
+    act(() => result.current.next()); // → interested
+    act(() => result.current.setAnswer('interested', 'no'));
+    act(() => result.current.next()); // jump → bye
+    expect(result.current.currentQuestion?.id).toBe('bye');
+  });
+
+  it('no match falls through to normal next', () => {
+    const { result } = renderHook(() => useFormState(jumpSchema));
+    act(() => result.current.next()); // → interested
+    act(() => result.current.setAnswer('interested', 'yes'));
+    act(() => result.current.next()); // → name (no jump)
+    expect(result.current.currentQuestion?.id).toBe('name');
+  });
+
+  it('back returns to the jump origin', () => {
+    const { result } = renderHook(() => useFormState(jumpSchema));
+    act(() => result.current.next());
+    act(() => result.current.setAnswer('interested', 'no'));
+    act(() => result.current.next()); // jump → bye
+    act(() => result.current.back());
+    expect(result.current.currentQuestion?.id).toBe('interested');
+  });
+
+  it('multiple endings: visibleIf-gated thanks is hidden on the other path', () => {
+    const { result } = renderHook(() => useFormState(jumpSchema));
+    act(() => result.current.setAnswer('interested', 'yes'));
+    const ids = result.current.state.visible.map((q) => q.id);
+    expect(ids).toContain('done');
+    expect(ids).not.toContain('bye');
+  });
+});
+
 describe('useFormState — ADR-005 retain-but-exclude', () => {
   it('answers to now-hidden questions stay in state but drop from getSubmitAnswers()', () => {
     const { result } = renderHook(() => useFormState(schema));

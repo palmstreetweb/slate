@@ -276,6 +276,7 @@ function FormEditorBody({ formId }: { formId: string }) {
 
         <Inspector
           question={selectedQuestion}
+          allQuestions={schema.questions}
           onChange={(patch) => updateQuestion(selectedQuestion.id, patch)}
           onDelete={async () => {
             const titleText =

@@ -28,6 +28,7 @@ export type {
   Option,
   PictureOption,
   Condition,
+  LogicRule,
   DynamicTitle,
 } from './Question.js';
 

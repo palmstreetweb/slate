@@ -123,11 +123,19 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `legal` | `title`, `body?`, `acceptLabel?`, `declineLabel?`, `required?` (default `true`) | required | `'accept' \| 'decline'` |
 | `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?` | range | `number` |
 | `nps` | `title`, `minLabel?`, `maxLabel?`, `required?` | 0–10 | `number` |
-| `thanks` | `title`, `subtitle?`, `cta?` | — | _not stored; fires `onSubmit`_ |
+| `thanks` | `title`, `subtitle?`, `cta?`, `visibleIf?`, `redirectUrl?` | — | _not stored; fires `onSubmit`_ |
 
-`Option` is `{ label: string; value: string; description?: string }`. `PictureOption` adds `{ src: string; alt?: string }`.
+`Option` is `{ label: string; value: string; description?: string; score?: number }`. `PictureOption` adds `{ src: string; alt?: string }`.
 
-`title` accepts a function for personalization on every answer-bearing type:
+### Answer piping
+
+`{{field:questionId}}` in any `title`, `subtitle`, or `body` is replaced with the formatted answer; `{{score}}` resolves to the running score total. Unanswered fields resolve to `''`.
+
+```ts
+title: "Nice to meet you, {{field:name}}. What's your email?"
+```
+
+Function-style titles still work (and are piped after they run):
 
 ```ts
 title: (answers) => `Nice to meet you, ${answers.name}. What's your email?`
@@ -149,6 +157,25 @@ Composable infinitely. Unknown fields are treated as empty. For `multi_choice` (
 
 **Retain-but-exclude semantics:** if a question's `visibleIf` later evaluates false, its previously-collected answer is _retained in internal state_ (so toggling back doesn't lose data) but _excluded from the `onSubmit` payload_. See [`DECISIONS.md`](./DECISIONS.md) ADR-005.
 
+### Logic jumps (`logic`)
+
+Any answer-bearing question (and `statement`) can carry jump rules, evaluated when the user advances from it — first match wins, no match falls through to the next question:
+
+```ts
+{
+  id: 'interested',
+  type: 'yes_no',
+  title: 'Interested in a quote?',
+  logic: [{ if: { field: 'interested', op: 'equals', value: 'no' }, goTo: 'polite_end' }],
+}
+```
+
+Jumps change navigation only; skipped questions keep their `visibleIf`-based inclusion in the submit payload (ADR-015). Back returns to the jump origin.
+
+### Scoring and multiple endings
+
+Give options a `score` and the engine accumulates a total — available in piping as `{{score}}` and delivered in `SubmitMeta.score` (ADR-016). Several `thanks` screens can coexist, each gated by `visibleIf`; the first visible one is shown. A `redirectUrl` on a thanks screen navigates there after `onSubmit` resolves.
+
 ### `SubmitMeta`
 
 ```ts
@@ -160,6 +187,8 @@ type SubmitMeta = {
   questionsVisited: string[];
   /** The hiddenFields prop, passed through unchanged. */
   hiddenFields: Record<string, unknown>;
+  /** Total of option-level `score` values (0 when nothing is scored). */
+  score: number;
 };
 ```
 

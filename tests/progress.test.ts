@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { progress, visibleAnswersForSubmit, visibleQuestions } from '@/logic/progress.js';
+import {
+  progress,
+  resolveJumpTarget,
+  visibleAnswersForSubmit,
+  visibleQuestions,
+} from '@/logic/progress.js';
 import type { Question } from '@/types/Question.js';
 
 const Q = {
@@ -93,5 +98,47 @@ describe('progress.visibleAnswersForSubmit', () => {
     const all: Question[] = [Q.name];
     const out = visibleAnswersForSubmit(all, { name: undefined });
     expect(out).toEqual({});
+  });
+});
+
+describe('progress.resolveJumpTarget (ADR-015)', () => {
+  const jumper: Question = {
+    id: 'interested',
+    type: 'yes_no',
+    title: 'Interested?',
+    logic: [
+      { if: { field: 'interested', op: 'equals', value: 'no' }, goTo: 'bye' },
+      { if: { field: 'interested', op: 'equals', value: 'yes' }, goTo: 'name' },
+    ],
+  };
+  const visible: Question[] = [
+    Q.welcome,
+    jumper,
+    Q.name,
+    Q.state,
+    { id: 'bye', type: 'thanks', title: 'ok bye' },
+  ];
+
+  it('first matching rule wins', () => {
+    expect(resolveJumpTarget(jumper, visible, { interested: 'no' })).toBe(4);
+    expect(resolveJumpTarget(jumper, visible, { interested: 'yes' })).toBe(2);
+  });
+
+  it('no match → null (normal flow)', () => {
+    expect(resolveJumpTarget(jumper, visible, {})).toBeNull();
+  });
+
+  it('questions without logic → null', () => {
+    expect(resolveJumpTarget(Q.name, visible, { name: 'x' })).toBeNull();
+  });
+
+  it('dangling / hidden target → null instead of erroring', () => {
+    const dangling: Question = {
+      id: 'q',
+      type: 'yes_no',
+      title: 'X',
+      logic: [{ if: { field: 'q', op: 'equals', value: 'yes' }, goTo: 'nonexistent' }],
+    };
+    expect(resolveJumpTarget(dangling, visible, { q: 'yes' })).toBeNull();
   });
 });

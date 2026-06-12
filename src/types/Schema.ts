@@ -36,6 +36,8 @@ export type SubmitMeta = {
   questionsVisited: string[];
   /** Hidden-field passthrough (UTM tags, server-injected IDs, etc.). */
   hiddenFields: HiddenFields;
+  /** Total of option-level `score` values for the selected answers (ADR-016). */
+  score: number;
 };
 
 /**

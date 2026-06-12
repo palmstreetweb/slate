@@ -35,6 +35,28 @@ export function visibleQuestions(
 }
 
 /**
+ * Logic jumps (ADR-015). Evaluate the current question's `logic` rules
+ * against the answer state; the first matching rule wins. Returns the index
+ * of the jump target in the `visible` list, or null when no rule matches,
+ * the question carries no rules, or the target isn't currently visible
+ * (dangling/hidden targets fall back to normal flow rather than erroring).
+ */
+export function resolveJumpTarget(
+  current: Question,
+  visible: ReadonlyArray<Question>,
+  answers: LooseAnswers,
+): number | null {
+  if (!('logic' in current) || !current.logic || current.logic.length === 0) return null;
+  for (const rule of current.logic) {
+    if (evaluate(rule.if, answers)) {
+      const idx = visible.findIndex((q) => q.id === rule.goTo);
+      return idx >= 0 ? idx : null;
+    }
+  }
+  return null;
+}
+
+/**
  * Progress percentage 0–100. Counts only answer-bearing questions in the
  * visible list. `currentStep` is the index in `visible` of the question
  * currently being shown.

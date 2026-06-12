@@ -11,6 +11,8 @@ export type Option<TValue extends string = string> = {
   label: string;
   value: TValue;
   description?: string;
+  /** Points added to the running score when this option is selected (ADR-016). */
+  score?: number;
 };
 
 /** Option with an image, for `picture_choice`. */
@@ -37,8 +39,23 @@ export type Condition =
  */
 export type DynamicTitle = string | ((answers: LooseAnswers) => string);
 
+/**
+ * Logic jump rule (ADR-015). Evaluated when the user advances *from* the
+ * question that carries it; the first rule whose condition matches wins and
+ * navigation goes to the question with id `goTo` (it must be visible).
+ * No match → normal next-question flow.
+ */
+export type LogicRule = {
+  if: Condition;
+  goTo: string;
+};
+
 type IdField<TId extends string> = { id: TId };
-type Visibility = { visibleIf?: Condition };
+type Visibility = {
+  visibleIf?: Condition;
+  /** Logic jumps, evaluated on advance (ADR-015). */
+  logic?: ReadonlyArray<LogicRule>;
+};
 
 /* ---------- chrome screens (no answer stored) ---------- */
 
@@ -62,6 +79,13 @@ export type ThanksQuestion<TId extends string = string> = IdField<TId> & {
   title: string;
   subtitle?: string;
   cta?: string;
+  /**
+   * Multiple-endings support (ADR-016): several thanks screens may coexist;
+   * the first one whose `visibleIf` passes (or that has none) is shown.
+   */
+  visibleIf?: Condition;
+  /** Navigate the page here after a successful submit. */
+  redirectUrl?: string;
 };
 
 /* ---------- text input questions ---------- */
