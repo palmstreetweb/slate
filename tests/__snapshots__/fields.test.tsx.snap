@@ -1,5 +1,161 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`question types render > date 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_9_"
+    >
+      When?
+    </h1>
+    <div
+      style="margin-top: 24px;"
+    >
+      <div
+        aria-labelledby="_r_9_"
+        class="psw-date-row"
+        role="group"
+      >
+        <input
+          aria-invalid="false"
+          aria-label="Month"
+          class="psw-input psw-date-seg"
+          inputmode="numeric"
+          placeholder="MM"
+          type="text"
+          value=""
+        />
+        <span
+          aria-hidden="true"
+          class="psw-date-sep"
+        >
+          /
+        </span>
+        <input
+          aria-invalid="false"
+          aria-label="Day"
+          class="psw-input psw-date-seg"
+          inputmode="numeric"
+          placeholder="DD"
+          type="text"
+          value=""
+        />
+        <span
+          aria-hidden="true"
+          class="psw-date-sep"
+        >
+          /
+        </span>
+        <input
+          aria-invalid="false"
+          aria-label="Year"
+          class="psw-input psw-date-seg psw-date-seg--year"
+          inputmode="numeric"
+          placeholder="YYYY"
+          type="text"
+          value=""
+        />
+      </div>
+      <div
+        class="psw-actions"
+      >
+        <button
+          class="psw-ok-btn"
+          type="button"
+        >
+          OK 
+          <span
+            aria-hidden="true"
+          >
+            ✓
+          </span>
+        </button>
+        <span
+          class="psw-hint"
+        >
+          press Enter ↵
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`question types render > dropdown 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_a_"
+    >
+      State?
+    </h1>
+    <div
+      style="margin-top: 24px; position: relative;"
+    >
+      <input
+        aria-autocomplete="list"
+        aria-controls="_r_b_"
+        aria-expanded="false"
+        aria-invalid="false"
+        aria-labelledby="_r_a_"
+        autocomplete="off"
+        class="psw-input"
+        placeholder="Type or select an option..."
+        role="combobox"
+        type="text"
+        value=""
+      />
+      <div
+        class="psw-actions"
+      >
+        <button
+          class="psw-ok-btn"
+          type="button"
+        >
+          OK 
+          <span
+            aria-hidden="true"
+          >
+            ✓
+          </span>
+        </button>
+        <span
+          class="psw-hint"
+        >
+          type to filter, ↑↓ + Enter to select
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
 exports[`question types render > email 1`] = `
 <div>
   <div
@@ -55,6 +211,78 @@ exports[`question types render > email 1`] = `
         </span>
       </div>
     </div>
+  </div>
+</div>
+`;
+
+exports[`question types render > legal 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_d_"
+    >
+      Accept terms?
+    </h1>
+    <p
+      class="psw-subtitle"
+    >
+      The fine print.
+    </p>
+    <div
+      aria-labelledby="_r_d_"
+      class="psw-choices"
+      role="radiogroup"
+    >
+      <button
+        aria-checked="false"
+        class="psw-choice"
+        role="radio"
+        type="button"
+      >
+        <span
+          class="psw-choice-badge"
+        >
+          A
+        </span>
+        <span>
+          I accept
+        </span>
+      </button>
+      <button
+        aria-checked="false"
+        class="psw-choice"
+        role="radio"
+        type="button"
+      >
+        <span
+          class="psw-choice-badge"
+        >
+          B
+        </span>
+        <span>
+          I don't accept
+        </span>
+      </button>
+    </div>
+    <p
+      class="psw-hint"
+      style="margin-top: 20px;"
+    >
+      tap a key (A, B) or click to select
+    </p>
   </div>
 </div>
 `;
@@ -190,6 +418,148 @@ exports[`question types render > multi_choice 1`] = `
         class="psw-hint"
       >
         tap keys to toggle, OK to continue
+      </span>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`question types render > nps 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_e_"
+    >
+      Recommend us?
+    </h1>
+    <div
+      aria-labelledby="_r_e_"
+      class="psw-scale"
+      role="radiogroup"
+    >
+      <div
+        class="psw-scale-row"
+      >
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          0
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          1
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          2
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          3
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          4
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          5
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          6
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          7
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          8
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          9
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          10
+        </button>
+      </div>
+      <div
+        class="psw-scale-labels"
+      >
+        <span>
+          Not at all likely
+        </span>
+        <span>
+          Extremely likely
+        </span>
+      </div>
+    </div>
+    <div
+      class="psw-actions"
+    >
+      <span
+        class="psw-hint"
+      >
+        press a number ↑
       </span>
     </div>
   </div>
@@ -586,6 +956,67 @@ exports[`question types render > thanks 1`] = `
 </div>
 `;
 
+exports[`question types render > url 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_8_"
+    >
+      Website?
+    </h1>
+    <div
+      style="margin-top: 24px;"
+    >
+      <input
+        aria-invalid="false"
+        aria-labelledby="_r_8_"
+        autocapitalize="off"
+        autocomplete="url"
+        class="psw-input"
+        inputmode="url"
+        placeholder="https://example.com"
+        spellcheck="false"
+        type="text"
+        value=""
+      />
+      <div
+        class="psw-actions"
+      >
+        <button
+          class="psw-ok-btn"
+          type="button"
+        >
+          OK 
+          <span
+            aria-hidden="true"
+          >
+            ✓
+          </span>
+        </button>
+        <span
+          class="psw-hint"
+        >
+          press Enter ↵
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
 exports[`question types render > welcome 1`] = `
 <div>
   <div>
@@ -610,6 +1041,73 @@ exports[`question types render > welcome 1`] = `
         press Enter ↵
       </span>
     </button>
+  </div>
+</div>
+`;
+
+exports[`question types render > yes_no 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_c_"
+    >
+      Insured?
+    </h1>
+    <div
+      aria-labelledby="_r_c_"
+      class="psw-choices"
+      role="radiogroup"
+    >
+      <button
+        aria-checked="false"
+        class="psw-choice"
+        role="radio"
+        type="button"
+      >
+        <span
+          class="psw-choice-badge"
+        >
+          Y
+        </span>
+        <span>
+          Yes
+        </span>
+      </button>
+      <button
+        aria-checked="false"
+        class="psw-choice"
+        role="radio"
+        type="button"
+      >
+        <span
+          class="psw-choice-badge"
+        >
+          N
+        </span>
+        <span>
+          No
+        </span>
+      </button>
+    </div>
+    <p
+      class="psw-hint"
+      style="margin-top: 20px;"
+    >
+      press Y or N, or click to select
+    </p>
   </div>
 </div>
 `;

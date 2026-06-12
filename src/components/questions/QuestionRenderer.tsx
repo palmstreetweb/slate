@@ -16,10 +16,16 @@ import { ShortTextField } from './ShortTextField.js';
 import { LongTextField } from './LongTextField.js';
 import { EmailField } from './EmailField.js';
 import { PhoneField } from './PhoneField.js';
+import { UrlField } from './UrlField.js';
 import { NumberField } from './NumberField.js';
+import { DateField } from './DateField.js';
 import { ScaleField } from './ScaleField.js';
+import { NpsField } from './NpsField.js';
 import { SingleChoiceField } from './SingleChoiceField.js';
 import { MultiChoiceField } from './MultiChoiceField.js';
+import { DropdownField } from './DropdownField.js';
+import { YesNoField } from './YesNoField.js';
+import { LegalField } from './LegalField.js';
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -151,6 +157,34 @@ export function QuestionRenderer({
         </>
       );
 
+    case 'url':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <UrlField
+            question={question}
+            answers={answers}
+            initialValue={(answers[question.id] as string | undefined) ?? ''}
+            onAnswer={(v) => setAnswer(question.id, v)}
+            onAdvance={advance}
+          />
+        </>
+      );
+
+    case 'date':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <DateField
+            question={question}
+            answers={answers}
+            initialValue={(answers[question.id] as string | undefined) ?? ''}
+            onAnswer={(v) => setAnswer(question.id, v)}
+            onAdvance={advance}
+          />
+        </>
+      );
+
     case 'number':
       return (
         <>
@@ -204,6 +238,62 @@ export function QuestionRenderer({
             selected={(answers[question.id] as string[] | undefined) ?? []}
             onSelect={(vs) => setAnswer(question.id, vs)}
             onAdvance={advance}
+          />
+        </>
+      );
+
+    case 'dropdown':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <DropdownField
+            question={question}
+            answers={answers}
+            selected={answers[question.id] as string | undefined}
+            onSelect={(v) => setAnswer(question.id, v)}
+            onAdvance={advance}
+          />
+        </>
+      );
+
+    case 'yes_no':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <YesNoField
+            question={question}
+            answers={answers}
+            selected={answers[question.id] as string | undefined}
+            onSelect={(v) => selectAndAdvance(question.id, v)}
+          />
+        </>
+      );
+
+    case 'legal':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <LegalField
+            question={question}
+            answers={answers}
+            selected={answers[question.id] as string | undefined}
+            onSelect={(v) => selectAndAdvance(question.id, v)}
+          />
+        </>
+      );
+
+    case 'nps':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <NpsField
+            question={question}
+            answers={answers}
+            initialValue={answers[question.id] as number | undefined}
+            onAnswer={(v) => {
+              setAnswer(question.id, v);
+              window.setTimeout(() => advance(), 220);
+            }}
           />
         </>
       );

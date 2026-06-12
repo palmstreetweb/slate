@@ -20,6 +20,9 @@ const choice: Question = {
   ],
 };
 const scale: Question = { id: 'urg', type: 'scale', title: 'Urgency?', min: 1, max: 5 };
+const yesNo: Question = { id: 'ins', type: 'yes_no', title: 'Insured?' };
+const legal: Question = { id: 'terms', type: 'legal', title: 'Terms?' };
+const nps: Question = { id: 'rec', type: 'nps', title: 'Recommend?' };
 
 function setup(currentQ: Question, extra: Partial<Parameters<typeof useKeyboardNav>[0]> = {}) {
   const onAdvance = vi.fn();
@@ -87,6 +90,30 @@ describe('useKeyboardNav', () => {
     const second = setup(welcome, { escapeBack: true });
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(second.onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('Y / N answer yes_no questions', () => {
+    const { onSelectChoice } = setup(yesNo);
+    fireEvent.keyDown(window, { key: 'y' });
+    expect(onSelectChoice).toHaveBeenCalledWith(0);
+    fireEvent.keyDown(window, { key: 'N' });
+    expect(onSelectChoice).toHaveBeenCalledWith(1);
+  });
+
+  it('A / B answer legal questions', () => {
+    const { onSelectChoice } = setup(legal);
+    fireEvent.keyDown(window, { key: 'a' });
+    expect(onSelectChoice).toHaveBeenCalledWith(0);
+    fireEvent.keyDown(window, { key: 'b' });
+    expect(onSelectChoice).toHaveBeenCalledWith(1);
+  });
+
+  it('digits 0–9 select NPS values', () => {
+    const { onSelectScale } = setup(nps);
+    fireEvent.keyDown(window, { key: '0' });
+    expect(onSelectScale).toHaveBeenCalledWith(0);
+    fireEvent.keyDown(window, { key: '9' });
+    expect(onSelectScale).toHaveBeenCalledWith(9);
   });
 
   it('modifier keys suppress shortcuts', () => {

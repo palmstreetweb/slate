@@ -86,6 +86,14 @@ export type EmailQuestion<TId extends string = string> = IdField<TId> &
     required?: boolean;
   };
 
+export type UrlQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'url';
+    title: DynamicTitle;
+    placeholder?: string;
+    required?: boolean;
+  };
+
 export type PhoneQuestion<TId extends string = string> = IdField<TId> &
   Visibility & {
     type: 'phone';
@@ -107,6 +115,20 @@ export type NumberQuestion<TId extends string = string> = IdField<TId> &
     min?: number;
     max?: number;
     step?: number;
+  };
+
+/* ---------- date ---------- */
+
+export type DateQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'date';
+    title: DynamicTitle;
+    required?: boolean;
+    /** Display order of the segmented inputs; default 'MM/DD/YYYY'. */
+    format?: 'MM/DD/YYYY' | 'DD/MM/YYYY';
+    /** Inclusive bounds, ISO `YYYY-MM-DD`. */
+    min?: string;
+    max?: string;
   };
 
 /* ---------- choice questions ---------- */
@@ -135,6 +157,44 @@ export type MultiChoiceQuestion<
     max?: number;
   };
 
+/** Searchable select — Typeform-style dropdown for long option lists. */
+export type DropdownQuestion<
+  TId extends string = string,
+  TOptions extends ReadonlyArray<Option> = ReadonlyArray<Option>,
+> = IdField<TId> &
+  Visibility & {
+    type: 'dropdown';
+    title: DynamicTitle;
+    options: TOptions;
+    placeholder?: string;
+    /** Defaults to true. */
+    required?: boolean;
+  };
+
+/** Binary yes/no. Stored as `'yes' | 'no'`. */
+export type YesNoQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'yes_no';
+    title: DynamicTitle;
+    yesLabel?: string;
+    noLabel?: string;
+    /** Defaults to true. */
+    required?: boolean;
+  };
+
+/** Legal/consent accept-or-decline. Stored as `'accept' | 'decline'`. */
+export type LegalQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'legal';
+    title: DynamicTitle;
+    /** Longer terms/consent copy shown under the title. */
+    body?: string;
+    acceptLabel?: string;
+    declineLabel?: string;
+    /** Defaults to true. */
+    required?: boolean;
+  };
+
 /* ---------- scale ---------- */
 
 export type ScaleQuestion<TId extends string = string> = IdField<TId> &
@@ -149,6 +209,18 @@ export type ScaleQuestion<TId extends string = string> = IdField<TId> &
     required?: boolean;
   };
 
+/** Net Promoter Score — fixed 0–10 scale with standard anchors. */
+export type NpsQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'nps';
+    title: DynamicTitle;
+    /** Defaults to 'Not at all likely'. */
+    minLabel?: string;
+    /** Defaults to 'Extremely likely'. */
+    maxLabel?: string;
+    required?: boolean;
+  };
+
 /* ---------- the union ---------- */
 
 export type Question =
@@ -158,10 +230,16 @@ export type Question =
   | LongTextQuestion
   | EmailQuestion
   | PhoneQuestion
+  | UrlQuestion
   | NumberQuestion
+  | DateQuestion
   | SingleChoiceQuestion
   | MultiChoiceQuestion
+  | DropdownQuestion
+  | YesNoQuestion
+  | LegalQuestion
   | ScaleQuestion
+  | NpsQuestion
   | ThanksQuestion;
 
 export type QuestionType = Question['type'];

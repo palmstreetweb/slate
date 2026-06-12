@@ -108,15 +108,21 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `long_text` | `title`, `placeholder?`, `required?`, `maxLength?` | required + maxLength | `string` |
 | `email` | `title`, `placeholder?`, `required?` | RFC-lite regex | `string` |
 | `phone` | `title`, `placeholder?`, `required?`, `defaultCountry?` (default `'US'`) | E.164 normalization via `libphonenumber-js` | `string` (E.164) |
+| `url` | `title`, `placeholder?`, `required?` | website shape; bare domains get `https://` prefixed | `string` |
 | `number` | `title`, `placeholder?`, `min?`, `max?`, `step?`, `required?` | range | `number` |
+| `date` | `title`, `required?`, `format?` (`'MM/DD/YYYY'` default), `min?`, `max?` (ISO) | real calendar date + bounds | `string` (ISO `YYYY-MM-DD`) |
 | `single_choice` | `title`, `options: Option[]`, `required?` (default `true`) | required | `string` |
 | `multi_choice` | `title`, `options: Option[]`, `min?`, `max?` | min/max selections | `string[]` |
+| `dropdown` | `title`, `options: Option[]`, `placeholder?`, `required?` (default `true`) | required | `string` |
+| `yes_no` | `title`, `yesLabel?`, `noLabel?`, `required?` (default `true`) | required | `'yes' \| 'no'` |
+| `legal` | `title`, `body?`, `acceptLabel?`, `declineLabel?`, `required?` (default `true`) | required | `'accept' \| 'decline'` |
 | `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?` | range | `number` |
+| `nps` | `title`, `minLabel?`, `maxLabel?`, `required?` | 0–10 | `number` |
 | `thanks` | `title`, `subtitle?`, `cta?` | — | _not stored; fires `onSubmit`_ |
 
 `Option` is `{ label: string; value: string; description?: string }`.
 
-`title` accepts a function for personalization on every answer-bearing type (`short_text`, `long_text`, `email`, `phone`, `number`, `scale`, `single_choice`, `multi_choice`):
+`title` accepts a function for personalization on every answer-bearing type:
 
 ```ts
 title: (answers) => `Nice to meet you, ${answers.name}. What's your email?`
@@ -158,8 +164,10 @@ type SubmitMeta = {
 |---|---|
 | `Enter` | Advance from welcome / statement; submit text-type fields |
 | `Shift + Enter` | New line in `long_text` |
-| `A`–`F` | Select choice option |
-| `0`–`9` | Select scale value (within the question's `[min, max]`) |
+| `A`–`F` | Select choice option (also `legal` accept/decline) |
+| `Y` / `N` | Answer `yes_no` questions |
+| `0`–`9` | Select scale / NPS value (within range) |
+| `↑` / `↓` + `Enter` | Navigate + select in `dropdown` |
 | `Tab` / `Shift+Tab` | Standard browser focus order |
 
 `Esc → back` is opt-out by default to prevent accidental loss; not currently exposed as a `<Form>` prop (planned for V1.1).

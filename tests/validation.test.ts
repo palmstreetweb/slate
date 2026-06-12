@@ -1,14 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { validate } from '@/logic/validation.js';
 import type {
+  DateQuestion,
+  DropdownQuestion,
   EmailQuestion,
+  LegalQuestion,
   LongTextQuestion,
   MultiChoiceQuestion,
+  NpsQuestion,
   NumberQuestion,
   PhoneQuestion,
   ScaleQuestion,
   ShortTextQuestion,
   SingleChoiceQuestion,
+  UrlQuestion,
+  YesNoQuestion,
 } from '@/types/Question.js';
 
 describe('validation — chrome screens always pass', () => {
@@ -166,5 +172,105 @@ describe('validation — multi_choice', () => {
 
   it('min: 1 has friendlier error message', () => {
     expect(validate({ ...q, min: 1 }, [])?.message).toBe('Please pick at least one');
+  });
+});
+
+describe('validation — url', () => {
+  const q: UrlQuestion = { id: 'q', type: 'url', title: 'X' };
+
+  it('not required + empty = ok', () => {
+    expect(validate(q, '')).toBeNull();
+  });
+
+  it('required + empty = required error', () => {
+    expect(validate({ ...q, required: true }, '')?.code).toBe('required');
+  });
+
+  it('accepts bare domains, full urls, and paths', () => {
+    expect(validate(q, 'example.com')).toBeNull();
+    expect(validate(q, 'https://example.com')).toBeNull();
+    expect(validate(q, 'http://sub.example.co.uk/path?x=1')).toBeNull();
+  });
+
+  it('rejects non-urls', () => {
+    expect(validate(q, 'not a url')?.code).toBe('url');
+    expect(validate(q, 'http://')?.code).toBe('url');
+  });
+});
+
+describe('validation — date', () => {
+  const q: DateQuestion = { id: 'q', type: 'date', title: 'X' };
+
+  it('not required + empty = ok', () => {
+    expect(validate(q, '')).toBeNull();
+  });
+
+  it('required + empty = required error', () => {
+    expect(validate({ ...q, required: true }, '')?.code).toBe('required');
+  });
+
+  it('accepts real calendar dates', () => {
+    expect(validate(q, '2026-02-28')).toBeNull();
+    expect(validate(q, '2024-02-29')).toBeNull(); // leap year
+  });
+
+  it('rejects impossible dates', () => {
+    expect(validate(q, '2026-02-30')?.code).toBe('date');
+    expect(validate(q, '2025-02-29')?.code).toBe('date'); // not a leap year
+    expect(validate(q, '2026-13-01')?.code).toBe('date');
+    expect(validate(q, 'junk')?.code).toBe('date');
+  });
+
+  it('enforces min/max ISO bounds', () => {
+    const bounded: DateQuestion = { ...q, min: '2026-01-01', max: '2026-12-31' };
+    expect(validate(bounded, '2026-06-15')).toBeNull();
+    expect(validate(bounded, '2025-12-31')?.code).toBe('min');
+    expect(validate(bounded, '2027-01-01')?.code).toBe('max');
+  });
+});
+
+describe('validation — dropdown / yes_no / legal (required by default)', () => {
+  it('dropdown requires a selection unless required:false', () => {
+    const q: DropdownQuestion = {
+      id: 'q', type: 'dropdown', title: 'X',
+      options: [{ label: 'A', value: 'a' }],
+    };
+    expect(validate(q, undefined)?.code).toBe('required');
+    expect(validate(q, 'a')).toBeNull();
+    expect(validate({ ...q, required: false }, undefined)).toBeNull();
+  });
+
+  it('yes_no requires an answer unless required:false', () => {
+    const q: YesNoQuestion = { id: 'q', type: 'yes_no', title: 'X' };
+    expect(validate(q, undefined)?.code).toBe('required');
+    expect(validate(q, 'yes')).toBeNull();
+    expect(validate({ ...q, required: false }, undefined)).toBeNull();
+  });
+
+  it('legal requires a choice unless required:false', () => {
+    const q: LegalQuestion = { id: 'q', type: 'legal', title: 'X' };
+    expect(validate(q, undefined)?.code).toBe('required');
+    expect(validate(q, 'decline')).toBeNull();
+    expect(validate({ ...q, required: false }, undefined)).toBeNull();
+  });
+});
+
+describe('validation — nps', () => {
+  const q: NpsQuestion = { id: 'q', type: 'nps', title: 'X' };
+
+  it('optional by default', () => {
+    expect(validate(q, undefined)).toBeNull();
+  });
+
+  it('required enforces presence', () => {
+    expect(validate({ ...q, required: true }, undefined)?.code).toBe('required');
+    expect(validate({ ...q, required: true }, 7)).toBeNull();
+  });
+
+  it('enforces the fixed 0–10 range', () => {
+    expect(validate(q, -1)?.code).toBe('range');
+    expect(validate(q, 11)?.code).toBe('range');
+    expect(validate(q, 0)).toBeNull();
+    expect(validate(q, 10)).toBeNull();
   });
 });

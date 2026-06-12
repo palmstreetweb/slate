@@ -19,11 +19,17 @@ const ADDABLE_TYPES: ReadonlyArray<{ type: QuestionType; label: string; group: s
   { type: 'long_text', label: 'Long text', group: 'Inputs' },
   { type: 'email', label: 'Email', group: 'Inputs' },
   { type: 'phone', label: 'Phone', group: 'Inputs' },
+  { type: 'url', label: 'Website', group: 'Inputs' },
   { type: 'number', label: 'Number', group: 'Inputs' },
+  { type: 'date', label: 'Date', group: 'Inputs' },
   { type: 'single_choice', label: 'Single choice', group: 'Choices' },
   { type: 'multi_choice', label: 'Multi choice', group: 'Choices' },
-  { type: 'scale', label: 'Scale (NPS)', group: 'Choices' },
+  { type: 'dropdown', label: 'Dropdown', group: 'Choices' },
+  { type: 'yes_no', label: 'Yes / No', group: 'Choices' },
+  { type: 'scale', label: 'Scale', group: 'Choices' },
+  { type: 'nps', label: 'NPS (0–10)', group: 'Choices' },
   { type: 'statement', label: 'Statement', group: 'Other' },
+  { type: 'legal', label: 'Legal / consent', group: 'Other' },
 ];
 
 const TYPE_GLYPH: Record<Question['type'], string> = {
@@ -34,10 +40,16 @@ const TYPE_GLYPH: Record<Question['type'], string> = {
   long_text: '¶',
   email: '@',
   phone: '☏',
+  url: '⌘',
   number: '#',
+  date: '▦',
   single_choice: '◉',
   multi_choice: '☑',
+  dropdown: '▼',
+  yes_no: '⊘',
+  legal: '§',
   scale: '◇',
+  nps: '◈',
 };
 
 const THEMES: ReadonlyArray<{ value: ThemeName; label: string }> = [

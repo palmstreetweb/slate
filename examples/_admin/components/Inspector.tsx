@@ -15,10 +15,16 @@ const TYPE_LABEL: Record<Question['type'], string> = {
   long_text: 'Long text',
   email: 'Email',
   phone: 'Phone',
+  url: 'Website',
   number: 'Number',
+  date: 'Date',
   single_choice: 'Single choice',
   multi_choice: 'Multi choice',
+  dropdown: 'Dropdown',
+  yes_no: 'Yes / No',
+  legal: 'Legal / consent',
   scale: 'Scale',
+  nps: 'NPS (0–10)',
 };
 
 type Props = {
@@ -145,12 +151,20 @@ export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
           question.type === 'long_text' ||
           question.type === 'email' ||
           question.type === 'phone' ||
-          question.type === 'number') && (
+          question.type === 'url' ||
+          question.type === 'number' ||
+          question.type === 'date' ||
+          question.type === 'dropdown' ||
+          question.type === 'yes_no' ||
+          question.type === 'legal' ||
+          question.type === 'nps') && (
           <Row>
             {(question.type === 'short_text' ||
               question.type === 'long_text' ||
               question.type === 'email' ||
-              question.type === 'phone') && (
+              question.type === 'phone' ||
+              question.type === 'url' ||
+              question.type === 'dropdown') && (
               <Field label="Placeholder">
                 <input
                   className="studio-input"
@@ -162,10 +176,119 @@ export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
               </Field>
             )}
             <Checkbox
-              checked={Boolean((question as { required?: boolean }).required)}
+              checked={
+                (question as { required?: boolean }).required ??
+                (question.type === 'dropdown' ||
+                  question.type === 'yes_no' ||
+                  question.type === 'legal')
+              }
               onChange={(v) => onChange({ required: v } as Partial<Question>)}
               label="Required"
             />
+          </Row>
+        )}
+
+        {question.type === 'date' && (
+          <Field label="Format">
+            <select
+              className="studio-select"
+              value={question.format ?? 'MM/DD/YYYY'}
+              onChange={(e) =>
+                onChange({
+                  format: e.target.value as 'MM/DD/YYYY' | 'DD/MM/YYYY',
+                } as Partial<Question>)
+              }
+            >
+              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+            </select>
+          </Field>
+        )}
+
+        {question.type === 'yes_no' && (
+          <Row>
+            <Field label="Yes label">
+              <input
+                className="studio-input"
+                value={question.yesLabel ?? ''}
+                placeholder="Yes"
+                onChange={(e) =>
+                  onChange({ yesLabel: e.target.value || undefined } as Partial<Question>)
+                }
+              />
+            </Field>
+            <Field label="No label">
+              <input
+                className="studio-input"
+                value={question.noLabel ?? ''}
+                placeholder="No"
+                onChange={(e) =>
+                  onChange({ noLabel: e.target.value || undefined } as Partial<Question>)
+                }
+              />
+            </Field>
+          </Row>
+        )}
+
+        {question.type === 'legal' && (
+          <>
+            <Field label="Terms / consent copy">
+              <textarea
+                className="studio-textarea"
+                value={question.body ?? ''}
+                onChange={(e) =>
+                  onChange({ body: e.target.value || undefined } as Partial<Question>)
+                }
+                rows={3}
+              />
+            </Field>
+            <Row>
+              <Field label="Accept label">
+                <input
+                  className="studio-input"
+                  value={question.acceptLabel ?? ''}
+                  placeholder="I accept"
+                  onChange={(e) =>
+                    onChange({ acceptLabel: e.target.value || undefined } as Partial<Question>)
+                  }
+                />
+              </Field>
+              <Field label="Decline label">
+                <input
+                  className="studio-input"
+                  value={question.declineLabel ?? ''}
+                  placeholder="I don't accept"
+                  onChange={(e) =>
+                    onChange({ declineLabel: e.target.value || undefined } as Partial<Question>)
+                  }
+                />
+              </Field>
+            </Row>
+          </>
+        )}
+
+        {question.type === 'nps' && (
+          <Row>
+            <Field label="Low anchor">
+              <input
+                className="studio-input"
+                value={question.minLabel ?? ''}
+                placeholder="Not at all likely"
+                onChange={(e) =>
+                  onChange({ minLabel: e.target.value || undefined } as Partial<Question>)
+                }
+              />
+            </Field>
+            <Field label="High anchor">
+              <input
+                className="studio-input"
+                value={question.maxLabel ?? ''}
+                placeholder="Extremely likely"
+                onChange={(e) =>
+                  onChange({ maxLabel: e.target.value || undefined } as Partial<Question>)
+                }
+              />
+            </Field>
           </Row>
         )}
 
@@ -269,7 +392,9 @@ export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
           </>
         )}
 
-        {(question.type === 'single_choice' || question.type === 'multi_choice') && (
+        {(question.type === 'single_choice' ||
+          question.type === 'multi_choice' ||
+          question.type === 'dropdown') && (
           <Field label="Options">
             <OptionsEditor
               options={question.options as Option[]}

@@ -376,6 +376,78 @@
   text-transform: var(--psw-transform);
 }
 
+/* ---------- date (segmented MM / DD / YYYY) ---------- */
+
+[data-psw-forms] .psw-date-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+[data-psw-forms] .psw-input.psw-date-seg {
+  width: 3.2ch;
+  min-width: 3.2ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-psw-forms] .psw-input.psw-date-seg--year {
+  width: 5.4ch;
+  min-width: 5.4ch;
+}
+
+[data-psw-forms] .psw-date-sep {
+  font-size: clamp(1.35rem, 3.2vw, 1.85rem);
+  color: var(--psw-dim);
+  opacity: 0.6;
+  font-family: var(--psw-font-body);
+}
+
+/* ---------- searchable dropdown ---------- */
+
+[data-psw-forms] .psw-dropdown-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--psw-bg-2);
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+}
+
+[data-psw-forms] .psw-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  border-radius: var(--psw-radius);
+  cursor: pointer;
+  color: var(--psw-text);
+  font-family: var(--psw-font-body);
+  font-size: clamp(1rem, 1.8vw, 1.1rem);
+  text-transform: var(--psw-transform);
+  transition:
+    background 120ms,
+    color 120ms;
+}
+
+[data-psw-forms] .psw-dropdown-item--hl {
+  background: var(--psw-accent-lo);
+}
+
+[data-psw-forms] .psw-dropdown-item--selected {
+  background: var(--psw-accent);
+  color: #fff;
+}
+
+[data-psw-forms][data-theme-name='swiss'] .psw-dropdown-item--selected {
+  background: var(--psw-text);
+  color: var(--psw-bg);
+}
+
 /* ---------- thanks confirmation chip ---------- */
 
 [data-psw-forms] .psw-confirm-chip {

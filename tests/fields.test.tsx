@@ -146,6 +146,61 @@ describe('question types render', () => {
     expect(screen.getByText('Done.')).toBeInTheDocument();
     expect(container).toMatchSnapshot();
   });
+
+  it('url', () => {
+    const { container } = renderQuestion({ id: 'site', type: 'url', title: 'Website?' });
+    expect(screen.getByRole('textbox')).toHaveAttribute('inputmode', 'url');
+    expect(container).toMatchSnapshot();
+  });
+
+  it('date', () => {
+    const { container } = renderQuestion({ id: 'when', type: 'date', title: 'When?' });
+    expect(screen.getByLabelText('Month')).toBeInTheDocument();
+    expect(screen.getByLabelText('Day')).toBeInTheDocument();
+    expect(screen.getByLabelText('Year')).toBeInTheDocument();
+    expect(container).toMatchSnapshot();
+  });
+
+  it('dropdown', () => {
+    const { container } = renderQuestion({
+      id: 'state',
+      type: 'dropdown',
+      title: 'State?',
+      options: [
+        { label: 'California', value: 'ca' },
+        { label: 'Texas', value: 'tx' },
+      ],
+    });
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(container).toMatchSnapshot();
+  });
+
+  it('yes_no', () => {
+    const { container } = renderQuestion({ id: 'insured', type: 'yes_no', title: 'Insured?' });
+    expect(screen.getByRole('radio', { name: /yes/i })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /no/i })).toBeInTheDocument();
+    expect(container).toMatchSnapshot();
+  });
+
+  it('legal', () => {
+    const { container } = renderQuestion({
+      id: 'terms',
+      type: 'legal',
+      title: 'Accept terms?',
+      body: 'The fine print.',
+    });
+    expect(screen.getByRole('radio', { name: /i accept/i })).toBeInTheDocument();
+    expect(screen.getByText('The fine print.')).toBeInTheDocument();
+    expect(container).toMatchSnapshot();
+  });
+
+  it('nps', () => {
+    const { container } = renderQuestion({ id: 'rec', type: 'nps', title: 'Recommend us?' });
+    expect(screen.getAllByRole('radio')).toHaveLength(11);
+    expect(screen.getByText('Not at all likely')).toBeInTheDocument();
+    expect(screen.getByText('Extremely likely')).toBeInTheDocument();
+    expect(container).toMatchSnapshot();
+  });
 });
 
 describe('field interactions', () => {
@@ -216,5 +271,101 @@ describe('field interactions', () => {
     });
     await user.click(screen.getByRole('radio', { name: '2' }));
     expect(setAnswer).toHaveBeenCalledWith('urgency', 2);
+  });
+
+  it('date segments auto-advance, store ISO, and reject impossible dates', async () => {
+    const user = userEvent.setup();
+    const { setAnswer, advance } = renderQuestion({
+      id: 'when',
+      type: 'date',
+      title: 'When?',
+    });
+    const month = screen.getByLabelText('Month');
+    const day = screen.getByLabelText('Day');
+    const year = screen.getByLabelText('Year');
+
+    await user.type(month, '02');
+    // Focus auto-advanced to the day segment after two digits.
+    expect(day).toHaveFocus();
+    await user.type(day, '30');
+    await user.type(year, '2026');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(await screen.findByText(/valid date/i)).toBeInTheDocument();
+    expect(advance).not.toHaveBeenCalled();
+
+    await user.clear(day);
+    await user.type(day, '28');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(setAnswer).toHaveBeenCalledWith('when', '2026-02-28');
+    expect(advance).toHaveBeenCalled();
+  });
+
+  it('dropdown filters options and selects via click', async () => {
+    const user = userEvent.setup();
+    const { setAnswer } = renderQuestion({
+      id: 'state',
+      type: 'dropdown',
+      title: 'State?',
+      options: [
+        { label: 'California', value: 'ca' },
+        { label: 'Colorado', value: 'co' },
+        { label: 'Texas', value: 'tx' },
+      ],
+    });
+    await user.type(screen.getByRole('combobox'), 'col');
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent('Colorado');
+    await user.click(options[0]!);
+    expect(setAnswer).toHaveBeenCalledWith('state', 'co');
+  });
+
+  it('dropdown blocks OK when required and empty', async () => {
+    const user = userEvent.setup();
+    const { advance } = renderQuestion({
+      id: 'state',
+      type: 'dropdown',
+      title: 'State?',
+      options: [{ label: 'California', value: 'ca' }],
+    });
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(await screen.findByText(/pick one/i)).toBeInTheDocument();
+    expect(advance).not.toHaveBeenCalled();
+  });
+
+  it('yes_no click stores yes/no', async () => {
+    const user = userEvent.setup();
+    const { setAnswer } = renderQuestion({ id: 'insured', type: 'yes_no', title: 'Insured?' });
+    await user.click(screen.getByRole('radio', { name: /no/i }));
+    expect(setAnswer).toHaveBeenCalledWith('insured', 'no');
+  });
+
+  it('legal click stores accept/decline', async () => {
+    const user = userEvent.setup();
+    const { setAnswer } = renderQuestion({ id: 'terms', type: 'legal', title: 'Terms?' });
+    await user.click(screen.getByRole('radio', { name: /i accept/i }));
+    expect(setAnswer).toHaveBeenCalledWith('terms', 'accept');
+  });
+
+  it('nps click stores the 0–10 value', async () => {
+    const user = userEvent.setup();
+    const { setAnswer } = renderQuestion({ id: 'rec', type: 'nps', title: 'Recommend?' });
+    await user.click(screen.getByRole('radio', { name: '10' }));
+    expect(setAnswer).toHaveBeenCalledWith('rec', 10);
+  });
+
+  it('url normalizes bare domains and rejects junk', async () => {
+    const user = userEvent.setup();
+    const { setAnswer, advance } = renderQuestion({ id: 'site', type: 'url', title: 'Site?' });
+    await user.type(screen.getByRole('textbox'), 'not a url');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(await screen.findByText(/valid website/i)).toBeInTheDocument();
+    expect(advance).not.toHaveBeenCalled();
+
+    await user.clear(screen.getByRole('textbox'));
+    await user.type(screen.getByRole('textbox'), 'example.com');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(setAnswer).toHaveBeenCalledWith('site', 'https://example.com');
+    expect(advance).toHaveBeenCalled();
   });
 });

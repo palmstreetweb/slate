@@ -12,10 +12,16 @@ import type {
   LongTextQuestion,
   EmailQuestion,
   PhoneQuestion,
+  UrlQuestion,
   NumberQuestion,
+  DateQuestion,
   ScaleQuestion,
+  NpsQuestion,
   SingleChoiceQuestion,
   MultiChoiceQuestion,
+  DropdownQuestion,
+  YesNoQuestion,
+  LegalQuestion,
 } from './Question.js';
 
 /**
@@ -24,11 +30,14 @@ import type {
  * generic helper). For strongly-typed access at the consumer's `onSubmit`,
  * see `AnswersOf<Q>`.
  *
- * Per brief §6:
- *   - short_text, long_text, email, phone → string
- *   - number, scale → number
- *   - single_choice → string (the option `value`)
+ * Per brief §6 (+ Typeform-parity roadmap additions):
+ *   - short_text, long_text, email, phone, url → string
+ *   - date → string (ISO `YYYY-MM-DD`)
+ *   - number, scale, nps → number
+ *   - single_choice, dropdown → string (the option `value`)
  *   - multi_choice → string[] (array of option `value`s)
+ *   - yes_no → 'yes' | 'no'
+ *   - legal → 'accept' | 'decline'
  *   - welcome, statement, thanks → never stored
  */
 export type LooseAnswers = Record<string, string | string[] | number | undefined>;
@@ -52,24 +61,39 @@ export type AnswerValueOf<Q extends Question> = Q extends ShortTextQuestion
       ? string
       : Q extends PhoneQuestion
         ? string
-        : Q extends NumberQuestion
-          ? number
-          : Q extends ScaleQuestion
-            ? number
-            : Q extends SingleChoiceQuestion<string, infer TOpts>
-              ? OptionValueOf<TOpts>
-              : Q extends MultiChoiceQuestion<string, infer TOpts>
-                ? Array<OptionValueOf<TOpts>>
-                : never;
+        : Q extends UrlQuestion
+          ? string
+          : Q extends DateQuestion
+            ? string
+            : Q extends NumberQuestion
+              ? number
+              : Q extends ScaleQuestion
+                ? number
+                : Q extends NpsQuestion
+                  ? number
+                  : Q extends YesNoQuestion
+                    ? 'yes' | 'no'
+                    : Q extends LegalQuestion
+                      ? 'accept' | 'decline'
+                      : Q extends SingleChoiceQuestion<string, infer TOpts>
+                        ? OptionValueOf<TOpts>
+                        : Q extends DropdownQuestion<string, infer TOpts>
+                          ? OptionValueOf<TOpts>
+                          : Q extends MultiChoiceQuestion<string, infer TOpts>
+                            ? Array<OptionValueOf<TOpts>>
+                            : never;
 
 /**
  * `required: true` on a question means its answer is guaranteed present at
  * submit time. Anything else may be `undefined`. `single_choice` defaults to
- * required:true per brief §5.
+ * required:true per brief §5; `dropdown`, `yes_no`, and `legal` follow the
+ * same default.
  */
+type DefaultRequiredQuestion = SingleChoiceQuestion | DropdownQuestion | YesNoQuestion | LegalQuestion;
+
 type IsRequired<Q extends Question> = Q extends { required: true }
   ? true
-  : Q extends SingleChoiceQuestion
+  : Q extends DefaultRequiredQuestion
     ? Q extends { required: false }
       ? false
       : true

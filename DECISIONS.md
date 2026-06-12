@@ -132,6 +132,30 @@ Consequences:
 - Ships with `system-ui` as fallback so the form renders sanely before the webfont loads.
 Revisit when: budget allows the Berthold license; or when a closer free alternative emerges (the Klim folks have hinted at OSS work).
 
+## ADR-010 — Date question via segmented native inputs, no picker dependency
+Date: 2026-06-12
+Status: accepted
+Context: The Typeform-parity roadmap (Phase 2) adds a `date` question type, which the brief's §14 had deferred. Date pickers are the classic bundle-budget trap — popular React date libraries are 30–100kb+ and bring their own styling systems, which fights the wrapper-scoped token CSS.
+Decision: Implement `date` as three segmented native text inputs (month / day / year, order controlled by a `format: 'MM/DD/YYYY' | 'DD/MM/YYYY'` schema field, US-first default). Auto-advance focus between segments as each fills. Store the answer as an ISO `YYYY-MM-DD` string. Calendar validity (leap years, days-per-month) is checked by a small pure helper (`isValidIsoDate` in `src/logic/validation.ts`); optional `min`/`max` bounds compare ISO strings lexicographically.
+Alternatives:
+- `<input type="date">`. Rejected — native picker UI is unstylable and visually clashes with both themes; placeholder behavior differs wildly across browsers.
+- react-day-picker / similar. Rejected — bundle budget (brief §2.9) and theming friction. Typing a date is also faster than a calendar for known dates (birthdays, etc.), which is the dominant intake-form case.
+Consequences:
+- No month-grid calendar UI. If a consumer ever needs visual date *browsing* (e.g. appointment booking), that's a separate question type with its own ADR.
+- ISO string storage keeps `Answers` within the existing `string | string[] | number` value union — no type-system ripple.
+Revisit when: a consumer needs date ranges, times, or calendar-style availability picking.
+
+## ADR-011 — Phase 2 question types extend the brief's §5 catalog
+Date: 2026-06-12
+Status: accepted
+Context: Typeform-parity roadmap Phase 2 adds `url`, `date`, `dropdown`, `yes_no`, `legal`, and `nps` to the question-type union — beyond the brief's frozen 11-type catalog. The brief stays unmodified; this ADR records the API extension.
+Decision: Add the six types following the AGENTS.md "How to add a question type" recipe. Stored values stay within the existing answers value union: `url`/`date`/`dropdown` → `string`, `yes_no` → `'yes' | 'no'`, `legal` → `'accept' | 'decline'`, `nps` → `number`. `dropdown`, `yes_no`, and `legal` default to `required: true` (same rationale as `single_choice` — clicking is cheap and a skippable consent question is meaningless). `nps` is a fixed 0–10 with standard anchor labels rather than a `scale` preset, so analytics consumers can discriminate on the type.
+Alternatives:
+- Model `yes_no`/`legal` as `single_choice` presets. Rejected — distinct types let the renderer give them dedicated keyboard shortcuts (Y/N) and let scoring/branching treat consent specially later.
+- Store `yes_no` as boolean. Rejected — would widen the answers value union and ripple through `AnswersOf` inference and consumers' switch statements.
+Consequences: The public `Question` union, validators, renderer switch, keyboard map, README, and studio all grew together; tests cover each new type.
+Revisit when: V1.1 theme-registry work lands (custom themes may want type-specific decoration hooks).
+
 ---
 
 ## Deferred to V2
@@ -139,7 +163,7 @@ Revisit when: budget allows the Berthold license; or when a closer free alternat
 Per brief §14, V1 explicitly does **not** include the items below. Each gets a stub ADR when the work is actually scheduled.
 
 - **File upload question type** — needs storage strategy decision (presigned URLs vs. direct multipart).
-- **Date picker question type** — large surface area; punt until a real consumer needs it.
+- ~~**Date picker question type**~~ — shipped as segmented `date` inputs in Phase 2 (ADR-010).
 - **Calculator / scoring logic** — opens the door to a full expression language; out of scope.
 - **Save-and-resume from URL token** — needs a signing strategy.
 - **iframe / HTML script-tag embed** — different consumer model; current package is React-only.

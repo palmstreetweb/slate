@@ -342,8 +342,12 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
       return { id, type, title: 'Email?', required: true };
     case 'phone':
       return { id, type, title: 'Phone?', required: true, defaultCountry: 'US' };
+    case 'url':
+      return { id, type, title: 'Your website?' };
     case 'number':
       return { id, type, title: 'A number?' };
+    case 'date':
+      return { id, type, title: 'Pick a date', format: 'MM/DD/YYYY' };
     case 'single_choice':
       return {
         id,
@@ -364,6 +368,26 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
           { label: 'Option B', value: 'b' },
         ],
       };
+    case 'dropdown':
+      return {
+        id,
+        type,
+        title: 'Pick from the list',
+        options: [
+          { label: 'Option A', value: 'a' },
+          { label: 'Option B', value: 'b' },
+          { label: 'Option C', value: 'c' },
+        ],
+      };
+    case 'yes_no':
+      return { id, type, title: 'Yes or no?' };
+    case 'legal':
+      return {
+        id,
+        type,
+        title: 'Do you accept our terms?',
+        body: 'Add your terms or consent copy here.',
+      };
     case 'scale':
       return {
         id,
@@ -373,6 +397,12 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
         max: 10,
         minLabel: 'low',
         maxLabel: 'high',
+      };
+    case 'nps':
+      return {
+        id,
+        type,
+        title: 'How likely are you to recommend us?',
       };
   }
 }

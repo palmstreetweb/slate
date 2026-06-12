@@ -80,6 +80,12 @@ export function Form<S extends Schema>({
         setAnswer(currentQuestion.id, opt.value);
         // Auto-advance per brief §5.
         window.setTimeout(() => next(), 220);
+      } else if (currentQuestion.type === 'yes_no') {
+        setAnswer(currentQuestion.id, idx === 0 ? 'yes' : 'no');
+        window.setTimeout(() => next(), 220);
+      } else if (currentQuestion.type === 'legal') {
+        setAnswer(currentQuestion.id, idx === 0 ? 'accept' : 'decline');
+        window.setTimeout(() => next(), 220);
       } else if (currentQuestion.type === 'multi_choice') {
         const opt = currentQuestion.options[idx];
         if (!opt) return;
@@ -97,7 +103,8 @@ export function Form<S extends Schema>({
 
   const onSelectScale = useCallback(
     (value: number) => {
-      if (!currentQuestion || currentQuestion.type !== 'scale') return;
+      if (!currentQuestion) return;
+      if (currentQuestion.type !== 'scale' && currentQuestion.type !== 'nps') return;
       setAnswer(currentQuestion.id, value);
       window.setTimeout(() => next(), 220);
     },

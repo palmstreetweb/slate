@@ -3,7 +3,9 @@
  *
  *   Enter (in body)            → advance from welcome/statement
  *   A–F (any focus)            → select choice option N (auto-advance for single_choice — caller decides)
- *   0–9 (in body)              → select scale value if in range
+ *   Y / N (in body)            → select yes_no answer (A/B also work)
+ *   A / B (in body)            → select legal accept/decline
+ *   0–9 (in body)              → select scale / nps value if in range
  *   Esc (opt-in)               → back
  *
  * Field-internal Enter handling (text inputs, textareas) lives inside each
@@ -86,11 +88,44 @@ export function useKeyboardNav({
         }
       }
 
-      // Scale selection — 0–9 (within the question's [min, max] window).
-      if (currentQ.type === 'scale' && onSelectScale && !typing) {
+      // Yes/No — Y/N shortcuts (A/B also map to yes/no for muscle memory).
+      if (currentQ.type === 'yes_no' && onSelectChoice && !typing) {
+        const k = e.key.toUpperCase();
+        if (k === 'Y') {
+          e.preventDefault();
+          onSelectChoice(0);
+          return;
+        }
+        if (k === 'N') {
+          e.preventDefault();
+          onSelectChoice(1);
+          return;
+        }
+        const idx = indexFromLetter(e.key);
+        if (idx === 0 || idx === 1) {
+          e.preventDefault();
+          onSelectChoice(idx);
+          return;
+        }
+      }
+
+      // Legal — A (accept) / B (decline).
+      if (currentQ.type === 'legal' && onSelectChoice && !typing) {
+        const idx = indexFromLetter(e.key);
+        if (idx === 0 || idx === 1) {
+          e.preventDefault();
+          onSelectChoice(idx);
+          return;
+        }
+      }
+
+      // Scale / NPS selection — 0–9 (within the question's range).
+      if ((currentQ.type === 'scale' || currentQ.type === 'nps') && onSelectScale && !typing) {
         if (/^[0-9]$/.test(e.key)) {
           const value = Number.parseInt(e.key, 10);
-          if (value >= currentQ.min && value <= currentQ.max) {
+          const min = currentQ.type === 'nps' ? 0 : currentQ.min;
+          const max = currentQ.type === 'nps' ? 10 : currentQ.max;
+          if (value >= min && value <= max) {
             e.preventDefault();
             onSelectScale(value);
             return;
