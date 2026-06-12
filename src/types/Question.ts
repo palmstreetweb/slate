@@ -88,6 +88,20 @@ export type ThanksQuestion<TId extends string = string> = IdField<TId> & {
   redirectUrl?: string;
 };
 
+/**
+ * Review screen (roadmap Phase 5) — chrome step, usually placed right before
+ * `thanks`. Lists every visible answered question with a jump-to-edit link.
+ * Stores no answer.
+ */
+export type ReviewQuestion<TId extends string = string> = IdField<TId> & {
+  type: 'review';
+  title: string;
+  subtitle?: string;
+  /** Confirm button label; default "Looks good". */
+  cta?: string;
+  visibleIf?: Condition;
+};
+
 /* ---------- text input questions ---------- */
 
 export type ShortTextQuestion<TId extends string = string> = IdField<TId> &
@@ -338,12 +352,16 @@ export type Question =
   | LegalQuestion
   | ScaleQuestion
   | NpsQuestion
+  | ReviewQuestion
   | ThanksQuestion;
 
 export type QuestionType = Question['type'];
 
 /** Question types that contribute an entry to the Answers payload. */
-export type StoredQuestionType = Exclude<QuestionType, 'welcome' | 'statement' | 'thanks'>;
+export type StoredQuestionType = Exclude<
+  QuestionType,
+  'welcome' | 'statement' | 'review' | 'thanks'
+>;
 
 /** Type guard — narrows a Question to a specific variant by its `type` discriminant. */
 export function isQuestionType<T extends QuestionType>(

@@ -67,6 +67,8 @@ export type UseFormStateApi = {
    * the thanks-screen "Submit another" CTA.
    */
   restart: () => void;
+  /** Replace answers/step/visited from a saved session (ADR-017). */
+  hydrate: (snapshot: ResumeSnapshot) => void;
 };
 
 type RawState = {
@@ -78,6 +80,13 @@ type RawState = {
   visitedIds: string[];
 };
 
+/** Snapshot shape used by save-and-resume (ADR-017). */
+export type ResumeSnapshot = {
+  answers: LooseAnswers;
+  step: number;
+  visitedIds: string[];
+};
+
 type Action =
   | { type: 'set_answer'; id: string; value: SetAnswerValue | SetAnswerUpdater }
   | { type: 'go_next' }
@@ -85,6 +94,7 @@ type Action =
   | { type: 'go_to'; step: number; direction: AnimDirection }
   | { type: 'animation_end' }
   | { type: 'record_visited'; id: string }
+  | { type: 'hydrate'; snapshot: ResumeSnapshot }
   | { type: 'reset' };
 
 function makeReducer(allQuestions: ReadonlyArray<Question>) {
@@ -142,6 +152,20 @@ function makeReducer(allQuestions: ReadonlyArray<Question>) {
       }
       case 'animation_end':
         return s.isAnimating ? { ...s, isAnimating: false } : s;
+      case 'hydrate': {
+        const answers = a.snapshot.answers;
+        const visible = visibleQuestions(allQuestions, answers);
+        const step = Math.max(0, Math.min(a.snapshot.step, Math.max(visible.length - 1, 0)));
+        return {
+          ...s,
+          answers,
+          step,
+          visitedIds: a.snapshot.visitedIds,
+          history: [],
+          direction: 'forward',
+          isAnimating: false,
+        };
+      }
       case 'record_visited': {
         if (s.visitedIds.includes(a.id)) return s;
         return { ...s, visitedIds: [...s.visitedIds, a.id] };
@@ -200,6 +224,10 @@ export function useFormState(schema: Schema): UseFormStateApi {
     dispatch({ type: 'reset' });
   }, []);
 
+  const hydrate = useCallback((snapshot: ResumeSnapshot) => {
+    dispatch({ type: 'hydrate', snapshot });
+  }, []);
+
   const getSubmitAnswers = useCallback(
     () => visibleAnswersForSubmit(visible, raw.answers),
     [visible, raw.answers],
@@ -226,5 +254,6 @@ export function useFormState(schema: Schema): UseFormStateApi {
     animationEnd,
     getSubmitAnswers,
     restart,
+    hydrate,
   };
 }

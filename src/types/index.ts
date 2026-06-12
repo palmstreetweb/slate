@@ -6,6 +6,7 @@ export type {
   StoredQuestionType,
   WelcomeQuestion,
   StatementQuestion,
+  ReviewQuestion,
   ThanksQuestion,
   ShortTextQuestion,
   LongTextQuestion,
@@ -53,4 +54,4 @@ export type {
   ThemeStaticTokens,
 } from './Theme.js';
 
-export type { Schema, FormProps, SubmitMeta, BrandConfig } from './Schema.js';
+export type { Schema, FormProps, SubmitMeta, PartialMeta, BrandConfig } from './Schema.js';

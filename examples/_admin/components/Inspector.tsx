@@ -30,6 +30,7 @@ const TYPE_LABEL: Record<Question['type'], string> = {
   legal: 'Legal / consent',
   scale: 'Scale',
   nps: 'NPS (0–10)',
+  review: 'Review screen',
 };
 
 type Props = {
@@ -49,6 +50,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
   const showId =
     question.type !== 'welcome' &&
     question.type !== 'statement' &&
+    question.type !== 'review' &&
     question.type !== 'thanks';
 
   return (
@@ -137,6 +139,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {(question.type === 'welcome' ||
           question.type === 'statement' ||
+          question.type === 'review' ||
           question.type === 'thanks') && (
           <Field label="Button label">
             <input
@@ -147,7 +150,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                   ? 'Start'
                   : question.type === 'thanks'
                     ? 'Submit another'
-                    : 'Continue'
+                    : question.type === 'review'
+                      ? 'Looks good'
+                      : 'Continue'
               }
               onChange={(e) => onChange({ cta: e.target.value || undefined } as Partial<Question>)}
             />
@@ -572,7 +577,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
           </>
         )}
 
-        {question.type !== 'welcome' && question.type !== 'thanks' && (
+        {question.type !== 'welcome' && question.type !== 'thanks' && question.type !== 'review' && (
           <Field
             label="Logic jumps"
             hint="On advance, the first matching rule wins. No match = next question."

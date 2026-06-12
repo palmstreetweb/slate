@@ -222,6 +222,18 @@ Alternatives:
 Consequences: `window.location.assign` is the one place the library touches navigation — it's host-sanctioned via the schema, not ambient behavior. SubmitMeta grows a required `score` field (0 when nothing is scored).
 Revisit when: per-question variables or score *ranges* selecting endings (sugar over `visibleIf` gt/lte) are requested.
 
+## ADR-017 — Save-and-resume under `psw-forms-resume:<formId>`
+Date: 2026-06-12
+Status: accepted
+Context: Long conversational forms lose respondents to accidental tab closes. Typeform persists partial progress; we need the same without a backend.
+Decision: Opt-in via the `<Form resume>` prop, which requires a new optional `schema.id` (the namespace). Snapshots (`answers` + `step` + `visitedIds` + `savedAt`) are written to `localStorage` on every change under the key `psw-forms-resume:<schema.id>` — a new user-visible storage name, prefix-consistent with `psw-forms-theme`. On remount with a saved session, a banner offers Resume (hydrates the state machine) or Start over (deletes the save). The save is cleared on successful submit. `File` answers are stripped before serialization (un-serializable); the question is simply unanswered after resume.
+Alternatives:
+- Always-on autosave. Rejected — writing respondent PII to localStorage without the host opting in is a privacy decision the host must make.
+- Silent auto-restore without a prompt. Rejected — shared devices; an explicit prompt is the Typeform behavior too.
+- `sessionStorage`. Rejected — doesn't survive the accidental-close case, which is the whole point.
+Consequences: Hosts embedding multiple forms must give each a distinct `schema.id`. The resume prompt is wrapper-scoped UI (no document-level dialogs). Phase 5 also adds the `review` chrome screen (no answer stored, listed in no payload) and `onPartialChange(answers, meta)` for abandonment capture — both pure additions to the public API.
+Revisit when: resume-from-URL-token (cross-device) gets scheduled; that needs signing and stays deferred.
+
 ---
 
 ## Deferred to V2
@@ -231,7 +243,7 @@ Per brief §14, V1 explicitly does **not** include the items below. Each gets a 
 - ~~**File upload question type**~~ — shipped in Phase 3 with host-controlled storage (ADR-012).
 - ~~**Date picker question type**~~ — shipped as segmented `date` inputs in Phase 2 (ADR-010).
 - ~~**Calculator / scoring logic**~~ — shipped as option-level `score` + `{{score}}` piping in Phase 4 (ADR-016). A full expression language remains out of scope.
-- **Save-and-resume from URL token** — needs a signing strategy.
+- **Save-and-resume from URL token** — needs a signing strategy. (Same-device resume via `localStorage` shipped in Phase 5, ADR-017.)
 - **iframe / HTML script-tag embed** — different consumer model; current package is React-only.
 - **Built-in analytics event bus** — `onQuestionChange` callback is enough for V1.
 - **Translation / i18n** — current pattern: callers pass already-localized strings.

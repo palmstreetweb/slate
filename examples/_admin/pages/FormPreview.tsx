@@ -63,7 +63,8 @@ export function FormPreview({ formId }: Props) {
       </p>
       <div className="studio-preview" style={{ height: 'calc(100vh - 160px)', overflow: 'hidden' }}>
         <Form
-          schema={form.schema}
+          schema={{ ...form.schema, id: formId }}
+          resume
           onSubmit={async (answers, meta) => {
             await new Promise((r) => setTimeout(r, 250));
             addSubmission(formId, answers, meta);

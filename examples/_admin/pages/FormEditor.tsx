@@ -418,6 +418,8 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
           { label: 'Great', value: 'great' },
         ],
       };
+    case 'review':
+      return { id, type, title: 'Review your answers', subtitle: 'Tap edit to change anything.' };
     case 'yes_no':
       return { id, type, title: 'Yes or no?' };
     case 'legal':

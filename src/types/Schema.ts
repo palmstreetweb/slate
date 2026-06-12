@@ -20,11 +20,28 @@ export type BrandConfig = {
  * flags for downstream inference.
  */
 export type Schema<Q extends ReadonlyArray<Question> = ReadonlyArray<Question>> = {
+  /**
+   * Stable form identifier. Namespaces the save-and-resume autosave key
+   * (`psw-forms-resume:<id>`, ADR-017). Required when `<Form resume>` is set.
+   */
+  id?: string;
   brand: BrandConfig;
   /** Built-in theme name, or a custom string when consumers register their own. */
   theme: ThemeName | (string & {});
   themeMode: ThemeMode;
   questions: Q;
+};
+
+/** Metadata passed to `onPartialChange` while the form is in progress. */
+export type PartialMeta = {
+  startedAt: Date;
+  /** The question being shown when this change happened. */
+  lastQuestionId: string;
+  /** Ordered IDs of questions shown so far. */
+  questionsVisited: string[];
+  hiddenFields: HiddenFields;
+  /** Running score total (ADR-016). */
+  score: number;
 };
 
 /** Metadata passed to `onSubmit` alongside the answers payload. */
@@ -65,4 +82,20 @@ export type FormProps<S extends Schema = Schema> = {
    * and delivered in the `onSubmit` payload.
    */
   onFileUpload?: (file: File, questionId: string) => Promise<string>;
+  /**
+   * Save-and-resume (ADR-017). When set, in-progress answers autosave to
+   * `localStorage` under `psw-forms-resume:<schema.id>`, a "resume where
+   * you left off?" prompt appears on remount, and the save is cleared on
+   * successful submit. Requires `schema.id`.
+   */
+  resume?: boolean;
+  /**
+   * Fires whenever an answer changes — abandonment capture for hosts that
+   * want partial responses. Receives the same visibility-filtered answers
+   * payload as `onSubmit`.
+   */
+  onPartialChange?: (
+    answers: S extends Schema<infer Q> ? Partial<AnswersOf<Q>> : LooseAnswers,
+    meta: PartialMeta,
+  ) => void;
 };

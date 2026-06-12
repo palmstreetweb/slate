@@ -66,7 +66,9 @@ export function useKeyboardNav({
       if (
         e.key === 'Enter' &&
         !e.shiftKey &&
-        (currentQ.type === 'welcome' || currentQ.type === 'statement') &&
+        (currentQ.type === 'welcome' ||
+          currentQ.type === 'statement' ||
+          currentQ.type === 'review') &&
         !typing
       ) {
         e.preventDefault();

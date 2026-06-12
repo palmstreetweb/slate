@@ -3,7 +3,7 @@
  * submit success/error/retry, onQuestionChange, and theme decorations.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form, defineSchema } from '@/index.js';
@@ -251,6 +251,41 @@ describe('<Form> — piping, scoring, multiple endings (Phase 4)', () => {
     expect(onSubmit.mock.calls[0]![1].score).toBe(1);
   });
 
+  it('review screen lists answers and jumps back for editing', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const schema = defineSchema({
+      brand: { name: 'Test' },
+      theme: 'editorial',
+      themeMode: 'light',
+      questions: [
+        { id: 'name', type: 'short_text', title: 'Your name?', required: true },
+        { id: 'check', type: 'review', title: 'Everything correct?' },
+        { id: 'done', type: 'thanks', title: 'Done!' },
+      ],
+    });
+    render(<Form schema={schema} onSubmit={onSubmit} />);
+
+    await user.type(screen.getByRole('textbox'), 'Ada');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+
+    // Review lists the question + answer.
+    expect(await screen.findByText('Everything correct?')).toBeInTheDocument();
+    expect(screen.getByText('Ada')).toBeInTheDocument();
+
+    // Edit jumps back to the question.
+    await user.click(screen.getByRole('button', { name: /edit your name/i }));
+    expect(await screen.findByText('Your name?')).toBeInTheDocument();
+
+    // Walk forward again and confirm.
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    await screen.findByText('Everything correct?');
+    await user.click(screen.getByRole('button', { name: /looks good/i }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    // Chrome review step contributes nothing to the answers payload.
+    expect(onSubmit.mock.calls[0]![0]).toEqual({ name: 'Ada' });
+  });
+
   it('logic jump skips ahead and back returns to the origin', async () => {
     const user = userEvent.setup();
     const schema = defineSchema({
@@ -274,5 +309,124 @@ describe('<Form> — piping, scoring, multiple endings (Phase 4)', () => {
     // Jumps straight past the email question to the ending.
     expect(await screen.findByText('Bye.')).toBeInTheDocument();
     expect(screen.queryByText('Your email?')).not.toBeInTheDocument();
+  });
+});
+
+describe('<Form> — save-and-resume (ADR-017)', () => {
+  const RESUME_KEY = 'psw-forms-resume:intake';
+
+  const resumableSchema = () =>
+    defineSchema({
+      id: 'intake',
+      brand: { name: 'Test' },
+      theme: 'editorial',
+      themeMode: 'light',
+      questions: [
+        { id: 'welcome', type: 'welcome', title: 'Hey.', cta: 'Start' },
+        { id: 'name', type: 'short_text', title: 'Your name?', required: true },
+        { id: 'email', type: 'email', title: 'Your email?' },
+        { id: 'done', type: 'thanks', title: 'Done!' },
+      ],
+    });
+
+  beforeEach(() => {
+    window.localStorage.removeItem(RESUME_KEY);
+  });
+
+  it('autosaves progress to the namespaced key', async () => {
+    const user = userEvent.setup();
+    render(<Form schema={resumableSchema()} resume onSubmit={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: /start/i }));
+    await user.type(await screen.findByRole('textbox'), 'Ada');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    await screen.findByText('Your email?');
+
+    const saved = JSON.parse(window.localStorage.getItem(RESUME_KEY)!);
+    expect(saved.answers).toEqual({ name: 'Ada' });
+    expect(saved.step).toBe(2);
+  });
+
+  it('prompts on remount; Resume restores the session', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      RESUME_KEY,
+      JSON.stringify({
+        answers: { name: 'Ada' },
+        step: 2,
+        visitedIds: ['welcome', 'name'],
+        savedAt: new Date().toISOString(),
+      }),
+    );
+    render(<Form schema={resumableSchema()} resume onSubmit={vi.fn()} />);
+
+    expect(screen.getByText(/pick up where you left off/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^resume$/i }));
+    expect(await screen.findByText('Your email?')).toBeInTheDocument();
+  });
+
+  it('Start over discards the saved session', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      RESUME_KEY,
+      JSON.stringify({
+        answers: { name: 'Ada' },
+        step: 2,
+        visitedIds: ['welcome', 'name'],
+        savedAt: new Date().toISOString(),
+      }),
+    );
+    render(<Form schema={resumableSchema()} resume onSubmit={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: /start over/i }));
+    expect(window.localStorage.getItem(RESUME_KEY)).toBeNull();
+    expect(screen.getByText('Hey.')).toBeInTheDocument();
+  });
+
+  it('clears the save after a successful submit', async () => {
+    const user = userEvent.setup();
+    render(
+      <Form schema={resumableSchema()} resume onSubmit={vi.fn().mockResolvedValue(undefined)} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /start/i }));
+    await user.type(await screen.findByRole('textbox'), 'Ada');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    await user.type(await screen.findByRole('textbox'), 'ada@example.com');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+
+    await screen.findByText(/confirmation sent/i);
+    expect(window.localStorage.getItem(RESUME_KEY)).toBeNull();
+  });
+
+  it('no autosave without the resume prop', async () => {
+    const user = userEvent.setup();
+    render(<Form schema={resumableSchema()} onSubmit={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: /start/i }));
+    await user.type(await screen.findByRole('textbox'), 'Ada');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    await screen.findByText('Your email?');
+    expect(window.localStorage.getItem(RESUME_KEY)).toBeNull();
+  });
+});
+
+describe('<Form> — onPartialChange', () => {
+  it('fires with visibility-filtered answers and partial meta on each change', async () => {
+    const user = userEvent.setup();
+    const onPartialChange = vi.fn();
+    render(
+      <Form schema={makeSchema()} onSubmit={vi.fn()} onPartialChange={onPartialChange} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /start/i }));
+    await user.type(await screen.findByRole('textbox'), 'Ada');
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+
+    await waitFor(() => expect(onPartialChange).toHaveBeenCalled());
+    const [answers, meta] = onPartialChange.mock.calls.at(-1)!;
+    expect(answers).toEqual({ name: 'Ada' });
+    expect(meta.lastQuestionId).toBeDefined();
+    expect(meta.startedAt).toBeInstanceOf(Date);
+    expect(typeof meta.score).toBe('number');
   });
 });

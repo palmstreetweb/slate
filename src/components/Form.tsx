@@ -16,8 +16,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FormProps, Schema, SubmitMeta } from '@/types/Schema.js';
+import type { FormProps, PartialMeta, Schema, SubmitMeta } from '@/types/Schema.js';
 import { useFormState } from '@/hooks/useFormState.js';
+import { useAutosave } from '@/hooks/useAutosave.js';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
 import { useTheme } from '@/hooks/useTheme.js';
 import { progress as progressFn } from '@/logic/progress.js';
@@ -45,6 +46,8 @@ export function Form<S extends Schema>({
   hiddenFields,
   errorMessage = 'Something went wrong submitting your form. Please try again.',
   onFileUpload,
+  resume = false,
+  onPartialChange,
 }: FormProps<S>) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -61,10 +64,23 @@ export function Form<S extends Schema>({
     setAnswer,
     next,
     back,
+    goTo,
     getSubmitAnswers,
     animationEnd,
     restart,
+    hydrate,
   } = useFormState(schema);
+
+  /* ---------- save-and-resume (ADR-017) ---------- */
+
+  const resumeEnabled = Boolean(resume && schema.id);
+  const autosave = useAutosave({
+    enabled: resumeEnabled,
+    formId: schema.id ?? '',
+    answers: state.answers,
+    step: state.step,
+    visitedIds: state.questionsVisited,
+  });
 
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>(
     'idle',
@@ -148,6 +164,25 @@ export function Form<S extends Schema>({
     onQuestionChange(currentQuestion.id, getSubmitAnswers() as never);
   }, [currentQuestion, onQuestionChange, getSubmitAnswers]);
 
+  /* ---------- onPartialChange (abandonment capture) ---------- */
+
+  useEffect(() => {
+    if (!onPartialChange || !currentQuestion) return;
+    if (Object.keys(state.answers).length === 0) return;
+    if (currentQuestion.type === 'thanks') return;
+    const meta: PartialMeta = {
+      startedAt: state.startedAt,
+      lastQuestionId: currentQuestion.id,
+      questionsVisited: state.questionsVisited,
+      hiddenFields: hiddenFields ?? {},
+      score,
+    };
+    onPartialChange(getSubmitAnswers() as never, meta);
+    // Intentionally keyed on answers only — fires per answer change, not per
+    // navigation step (onQuestionChange covers that).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.answers]);
+
   /* ---------- onSubmit (fires exactly once on entering thanks) ---------- */
 
   const submittedRef = useRef(false);
@@ -181,6 +216,8 @@ export function Form<S extends Schema>({
     Promise.resolve(onSubmit(getSubmitAnswers() as never, meta))
       .then(() => {
         setSubmitStatus('success');
+        // Completed — drop the save-and-resume snapshot (ADR-017).
+        if (resumeEnabled) autosave.clear();
         // Ending redirect (ADR-016) — only after a confirmed submit.
         if (redirectUrl) window.location.assign(redirectUrl);
       })
@@ -199,6 +236,8 @@ export function Form<S extends Schema>({
     errorMessage,
     submitStatus,
     score,
+    resumeEnabled,
+    autosave.clear,
   ]);
 
   const retrySubmit = useCallback(() => {
@@ -257,6 +296,31 @@ export function Form<S extends Schema>({
         }
       />
 
+      {autosave.savedSession && (
+        <div className="psw-resume-banner" role="dialog" aria-label="Resume saved progress">
+          <span className="psw-resume-text">Pick up where you left off?</span>
+          <div className="psw-resume-actions">
+            <button
+              type="button"
+              className="psw-resume-btn psw-resume-btn--primary"
+              onClick={() => {
+                const snapshot = autosave.acceptSaved();
+                if (snapshot) hydrate(snapshot);
+              }}
+            >
+              Resume
+            </button>
+            <button
+              type="button"
+              className="psw-resume-btn"
+              onClick={autosave.discardSaved}
+            >
+              Start over
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="psw-stage">
         <div
           key={currentQuestion?.id ?? 'empty'}
@@ -278,6 +342,11 @@ export function Form<S extends Schema>({
               onRestart={restartForm}
               onFileUpload={onFileUpload}
               score={score}
+              visibleList={state.visible}
+              onEditQuestion={(id) => {
+                const idx = state.visible.findIndex((q) => q.id === id);
+                if (idx >= 0) goTo(idx, 'backward');
+              }}
             />
           ) : null}
         </div>

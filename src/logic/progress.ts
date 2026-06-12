@@ -11,7 +11,7 @@ import type { LooseAnswers } from '@/types/Answers.js';
 import { evaluate } from './conditional.js';
 
 /** Question types that are not answer-bearing. */
-const CHROME_TYPES = new Set(['welcome', 'statement', 'thanks']);
+const CHROME_TYPES = new Set(['welcome', 'statement', 'review', 'thanks']);
 
 function isChrome(q: Question): boolean {
   return CHROME_TYPES.has(q.type);

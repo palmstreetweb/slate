@@ -190,3 +190,52 @@
 [data-psw-forms] .psw-step-sep {
   opacity: 0.5;
 }
+
+/* ---------- save-and-resume banner (ADR-017) ---------- */
+
+[data-psw-forms] .psw-resume-banner {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--psw-bg-2);
+  border: 1px solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+
+[data-psw-forms] .psw-resume-text {
+  font-family: var(--psw-font-body);
+  font-size: 14px;
+  color: var(--psw-text);
+  white-space: nowrap;
+}
+
+[data-psw-forms] .psw-resume-actions {
+  display: flex;
+  gap: 8px;
+}
+
+[data-psw-forms] .psw-resume-btn {
+  padding: 6px 14px;
+  font-family: var(--psw-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  background: none;
+  color: var(--psw-text);
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+}
+
+[data-psw-forms] .psw-resume-btn--primary {
+  background: var(--psw-accent);
+  border-color: var(--psw-accent);
+  color: var(--psw-bg);
+}

@@ -34,6 +34,7 @@ const ADDABLE_TYPES: ReadonlyArray<{ type: QuestionType; label: string; group: s
   { type: 'matrix', label: 'Matrix', group: 'Choices' },
   { type: 'statement', label: 'Statement', group: 'Other' },
   { type: 'legal', label: 'Legal / consent', group: 'Other' },
+  { type: 'review', label: 'Review answers', group: 'Other' },
 ];
 
 const TYPE_GLYPH: Record<Question['type'], string> = {
@@ -58,6 +59,7 @@ const TYPE_GLYPH: Record<Question['type'], string> = {
   legal: '§',
   scale: '◇',
   nps: '◈',
+  review: '☰',
 };
 
 const THEMES: ReadonlyArray<{ value: ThemeName; label: string }> = [

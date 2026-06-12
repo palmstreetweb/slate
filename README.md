@@ -73,6 +73,8 @@ export default function QuotePage() {
 | `hiddenFields` | `Record<string, unknown>` |  | Passed through to `meta.hiddenFields`. Never rendered. |
 | `errorMessage` | `string` |  | Fallback shown when `onSubmit` rejects (default: "Something went wrong submitting your form. Please try again."). |
 | `onFileUpload` | `(file, questionId) => Promise<string>` |  | Host-controlled storage for `file_upload` questions. Resolved string is stored as the answer; omit it to receive raw `File` objects in `onSubmit`. See `DECISIONS.md` ADR-012. |
+| `resume` | `boolean` |  | Save-and-resume (ADR-017). Autosaves progress to `localStorage` under `psw-forms-resume:<schema.id>`, prompts to resume on remount, clears on submit. Requires `schema.id`. |
+| `onPartialChange` | `(answers, meta) => void` |  | Fires on every answer change with the visibility-filtered answers — abandonment capture. `meta` carries `startedAt`, `lastQuestionId`, `questionsVisited`, `hiddenFields`, `score`. |
 
 ### `defineSchema(schema)`
 
@@ -123,6 +125,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `legal` | `title`, `body?`, `acceptLabel?`, `declineLabel?`, `required?` (default `true`) | required | `'accept' \| 'decline'` |
 | `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?` | range | `number` |
 | `nps` | `title`, `minLabel?`, `maxLabel?`, `required?` | 0–10 | `number` |
+| `review` | `title`, `subtitle?`, `cta?`, `visibleIf?` | — | _not stored; lists answers with jump-to-edit_ |
 | `thanks` | `title`, `subtitle?`, `cta?`, `visibleIf?`, `redirectUrl?` | — | _not stored; fires `onSubmit`_ |
 
 `Option` is `{ label: string; value: string; description?: string; score?: number }`. `PictureOption` adds `{ src: string; alt?: string }`.

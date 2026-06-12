@@ -166,6 +166,34 @@ describe('useFormState — logic jumps (ADR-015)', () => {
   });
 });
 
+describe('useFormState — hydrate (save-and-resume, ADR-017)', () => {
+  it('restores answers, step, and visited IDs', () => {
+    const { result } = renderHook(() => useFormState(schema));
+    act(() =>
+      result.current.hydrate({
+        answers: { name: 'Caleb', state: 'ca' },
+        step: 3, // license — visible because state=ca
+        visitedIds: ['welcome', 'name', 'state'],
+      }),
+    );
+    expect(result.current.currentQuestion?.id).toBe('license');
+    expect(result.current.state.answers).toEqual({ name: 'Caleb', state: 'ca' });
+    expect(result.current.state.questionsVisited).toContain('name');
+  });
+
+  it('clamps a stale step when hidden questions shrink the visible list', () => {
+    const { result } = renderHook(() => useFormState(schema));
+    act(() =>
+      result.current.hydrate({
+        answers: { name: 'Caleb', state: 'tx' }, // license hidden
+        step: 99,
+        visitedIds: ['welcome'],
+      }),
+    );
+    expect(result.current.currentQuestion?.id).toBe('done');
+  });
+});
+
 describe('useFormState — ADR-005 retain-but-exclude', () => {
   it('answers to now-hidden questions stay in state but drop from getSubmitAnswers()', () => {
     const { result } = renderHook(() => useFormState(schema));

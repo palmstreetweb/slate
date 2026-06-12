@@ -48,6 +48,7 @@ export function validate(question: Question, answer: unknown): ValidationResult 
   switch (question.type) {
     case 'welcome':
     case 'statement':
+    case 'review':
     case 'thanks':
       return null;
 

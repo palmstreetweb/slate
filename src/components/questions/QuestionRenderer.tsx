@@ -13,6 +13,7 @@ import { pipeQuestionCopy } from '@/logic/piping.js';
 
 import { WelcomeScreen } from './WelcomeScreen.js';
 import { StatementScreen } from './StatementScreen.js';
+import { ReviewScreen } from './ReviewScreen.js';
 import { ThanksScreen } from './ThanksScreen.js';
 import { ShortTextField } from './ShortTextField.js';
 import { LongTextField } from './LongTextField.js';
@@ -56,6 +57,10 @@ export type QuestionRendererProps = {
   onFileUpload?: FileUploadHandler;
   /** Running score total, available in piping as `{{score}}` (ADR-016). */
   score?: number;
+  /** Currently visible questions — feeds the review screen's answer list. */
+  visibleList?: ReadonlyArray<Question>;
+  /** Jump back to a question for editing (review screen). */
+  onEditQuestion?: (questionId: string) => void;
 };
 
 function StepBadge({ step, total }: { step: number; total: number }) {
@@ -81,6 +86,8 @@ export function QuestionRenderer({
   onRestart,
   onFileUpload,
   score = 0,
+  visibleList,
+  onEditQuestion,
 }: QuestionRendererProps) {
   // Resolve {{field:id}} / {{score}} piping (and function-style DynamicTitle)
   // once here, so every field component receives ready-to-render copy.
@@ -107,6 +114,17 @@ export function QuestionRenderer({
           advance={advance}
           stepBadge={stepNumber}
           totalSteps={totalSteps}
+        />
+      );
+
+    case 'review':
+      return (
+        <ReviewScreen
+          question={question}
+          visible={visibleList ?? []}
+          answers={answers}
+          onEdit={(id) => onEditQuestion?.(id)}
+          onAdvance={advance}
         />
       );
 
