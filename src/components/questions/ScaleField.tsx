@@ -2,14 +2,17 @@
 
 import { useId } from 'react';
 import type { ScaleQuestion } from '@/types/Question.js';
+import type { LooseAnswers } from '@/types/Answers.js';
+import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
   question: ScaleQuestion;
+  answers: LooseAnswers;
   initialValue: number | undefined;
   onAnswer: (value: number) => void;
 };
 
-export function ScaleField({ question, initialValue, onAnswer }: Props) {
+export function ScaleField({ question, answers, initialValue, onAnswer }: Props) {
   const labelId = useId();
   const step = question.step ?? 1;
   const cells: number[] = [];
@@ -18,7 +21,7 @@ export function ScaleField({ question, initialValue, onAnswer }: Props) {
   return (
     <div>
       <h1 id={labelId} className="psw-title">
-        {question.title}
+        {resolveTitle(question.title, answers)}
       </h1>
 
       <div className="psw-scale" role="radiogroup" aria-labelledby={labelId}>

@@ -2,17 +2,20 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import type { NumberQuestion } from '@/types/Question.js';
+import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { focusAfter } from '@/utils/focus.js';
+import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
   question: NumberQuestion;
+  answers: LooseAnswers;
   initialValue: number | undefined;
   onAnswer: (value: number | undefined) => void;
   onAdvance: () => void;
 };
 
-export function NumberField({ question, initialValue, onAnswer, onAdvance }: Props) {
+export function NumberField({ question, answers, initialValue, onAnswer, onAdvance }: Props) {
   const [text, setText] = useState<string>(initialValue !== undefined ? String(initialValue) : '');
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,7 +52,7 @@ export function NumberField({ question, initialValue, onAnswer, onAdvance }: Pro
   return (
     <div>
       <h1 id={labelId} className="psw-title">
-        {question.title}
+        {resolveTitle(question.title, answers)}
       </h1>
       <div style={{ marginTop: 24 }}>
         <input

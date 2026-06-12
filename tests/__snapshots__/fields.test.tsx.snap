@@ -1,0 +1,615 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`question types render > email 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_2_"
+    >
+      Email?
+    </h1>
+    <div
+      style="margin-top: 24px;"
+    >
+      <input
+        aria-invalid="false"
+        aria-labelledby="_r_2_"
+        autocomplete="email"
+        class="psw-input"
+        inputmode="email"
+        placeholder="name@example.com"
+        type="email"
+        value=""
+      />
+      <div
+        class="psw-actions"
+      >
+        <button
+          class="psw-ok-btn"
+          type="button"
+        >
+          OK 
+          <span
+            aria-hidden="true"
+          >
+            ✓
+          </span>
+        </button>
+        <span
+          class="psw-hint"
+        >
+          press Enter ↵
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`question types render > long_text 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_1_"
+    >
+      Notes?
+    </h1>
+    <div
+      style="margin-top: 24px;"
+    >
+      <textarea
+        aria-invalid="false"
+        aria-labelledby="_r_1_"
+        class="psw-input"
+        placeholder="Type your answer..."
+        rows="3"
+      />
+      <div
+        class="psw-actions"
+      >
+        <button
+          class="psw-ok-btn"
+          type="button"
+        >
+          OK 
+          <span
+            aria-hidden="true"
+          >
+            ✓
+          </span>
+        </button>
+        <span
+          class="psw-hint"
+        >
+          Shift + Enter for new line
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`question types render > multi_choice 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_6_"
+    >
+      Add-ons?
+    </h1>
+    <div
+      aria-labelledby="_r_6_"
+      class="psw-choices"
+      role="group"
+    >
+      <button
+        aria-checked="false"
+        class="psw-choice"
+        role="checkbox"
+        type="button"
+      >
+        <span
+          class="psw-choice-badge"
+        >
+          A
+        </span>
+        <span>
+          A
+        </span>
+      </button>
+      <button
+        aria-checked="false"
+        class="psw-choice"
+        role="checkbox"
+        type="button"
+      >
+        <span
+          class="psw-choice-badge"
+        >
+          B
+        </span>
+        <span>
+          B
+        </span>
+      </button>
+    </div>
+    <div
+      class="psw-actions"
+    >
+      <button
+        class="psw-ok-btn"
+        type="button"
+      >
+        OK 
+        <span
+          aria-hidden="true"
+        >
+          ✓
+        </span>
+      </button>
+      <span
+        class="psw-hint"
+      >
+        tap keys to toggle, OK to continue
+      </span>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`question types render > number 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_4_"
+    >
+      Sq ft?
+    </h1>
+    <div
+      style="margin-top: 24px;"
+    >
+      <input
+        aria-invalid="false"
+        aria-labelledby="_r_4_"
+        class="psw-input"
+        inputmode="decimal"
+        pattern="[0-9]*[.]?[0-9]*"
+        placeholder="0"
+        type="text"
+        value=""
+      />
+      <div
+        class="psw-actions"
+      >
+        <button
+          class="psw-ok-btn"
+          type="button"
+        >
+          OK 
+          <span
+            aria-hidden="true"
+          >
+            ✓
+          </span>
+        </button>
+        <span
+          class="psw-hint"
+        >
+          press Enter ↵
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`question types render > phone 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_3_"
+    >
+      Phone?
+    </h1>
+    <div
+      style="margin-top: 24px;"
+    >
+      <input
+        aria-invalid="false"
+        aria-labelledby="_r_3_"
+        autocomplete="tel"
+        class="psw-input"
+        inputmode="tel"
+        placeholder="(555) 123-4567"
+        type="tel"
+        value=""
+      />
+      <div
+        class="psw-actions"
+      >
+        <button
+          class="psw-ok-btn"
+          type="button"
+        >
+          OK 
+          <span
+            aria-hidden="true"
+          >
+            ✓
+          </span>
+        </button>
+        <span
+          class="psw-hint"
+        >
+          press Enter ↵
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`question types render > scale 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_7_"
+    >
+      Urgency?
+    </h1>
+    <div
+      aria-labelledby="_r_7_"
+      class="psw-scale"
+      role="radiogroup"
+    >
+      <div
+        class="psw-scale-row"
+      >
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          1
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          2
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          3
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          4
+        </button>
+        <button
+          aria-checked="false"
+          class="psw-scale-cell"
+          role="radio"
+          type="button"
+        >
+          5
+        </button>
+      </div>
+      <div
+        class="psw-scale-labels"
+      >
+        <span>
+          chill
+        </span>
+        <span>
+          asap
+        </span>
+      </div>
+    </div>
+    <div
+      class="psw-actions"
+    >
+      <span
+        class="psw-hint"
+      >
+        press a number ↑
+      </span>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`question types render > short_text 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_0_"
+    >
+      Name?
+    </h1>
+    <div
+      style="margin-top: 24px;"
+    >
+      <input
+        aria-invalid="false"
+        aria-labelledby="_r_0_"
+        autocomplete="off"
+        class="psw-input"
+        placeholder="Jane"
+        type="text"
+        value=""
+      />
+      <div
+        class="psw-actions"
+      >
+        <button
+          class="psw-ok-btn"
+          type="button"
+        >
+          OK 
+          <span
+            aria-hidden="true"
+          >
+            ✓
+          </span>
+        </button>
+        <span
+          class="psw-hint"
+        >
+          press Enter ↵
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`question types render > single_choice 1`] = `
+<div>
+  <div
+    class="psw-step-badge"
+  >
+    <span>
+      01
+    </span>
+    <span
+      class="psw-step-sep"
+    >
+      →
+    </span>
+  </div>
+  <div>
+    <h1
+      class="psw-title"
+      id="_r_5_"
+    >
+      Service?
+    </h1>
+    <div
+      aria-labelledby="_r_5_"
+      class="psw-choices"
+      role="radiogroup"
+    >
+      <button
+        aria-checked="false"
+        class="psw-choice"
+        role="radio"
+        type="button"
+      >
+        <span
+          class="psw-choice-badge"
+        >
+          A
+        </span>
+        <span>
+          One
+        </span>
+      </button>
+      <button
+        aria-checked="false"
+        class="psw-choice"
+        role="radio"
+        type="button"
+      >
+        <span
+          class="psw-choice-badge"
+        >
+          B
+        </span>
+        <span>
+          Two
+          <span
+            class="psw-choice-desc"
+          >
+            the second
+          </span>
+        </span>
+      </button>
+    </div>
+    <p
+      class="psw-hint"
+      style="margin-top: 20px;"
+    >
+      tap a key (A, B, C, D) or click to select
+    </p>
+  </div>
+</div>
+`;
+
+exports[`question types render > statement 1`] = `
+<div>
+  <div>
+    <h1
+      class="psw-title"
+    >
+      Quick note
+    </h1>
+    <p
+      class="psw-subtitle"
+    >
+      We never share your data.
+    </p>
+    <button
+      class="psw-cta"
+      type="button"
+    >
+      Continue
+      <span
+        class="psw-cta-hint"
+      >
+        press Enter ↵
+      </span>
+    </button>
+  </div>
+</div>
+`;
+
+exports[`question types render > thanks 1`] = `
+<div>
+  <div>
+    <h1
+      class="psw-title"
+    >
+      Done.
+    </h1>
+    <p
+      class="psw-subtitle"
+    >
+      Talk soon.
+    </p>
+    <div
+      style="margin-top: 24px;"
+    />
+  </div>
+</div>
+`;
+
+exports[`question types render > welcome 1`] = `
+<div>
+  <div>
+    <h1
+      class="psw-title"
+    >
+      Hello.
+    </h1>
+    <p
+      class="psw-subtitle"
+    >
+      Welcome aboard
+    </p>
+    <button
+      class="psw-cta"
+      type="button"
+    >
+      Begin
+      <span
+        class="psw-cta-hint"
+      >
+        press Enter ↵
+      </span>
+    </button>
+  </div>
+</div>
+`;

@@ -157,6 +157,7 @@ export function QuestionRenderer({
           <StepBadge step={stepNumber} total={totalSteps} />
           <NumberField
             question={question}
+            answers={answers}
             initialValue={answers[question.id] as number | undefined}
             onAnswer={(v) => setAnswer(question.id, v)}
             onAdvance={advance}
@@ -170,6 +171,7 @@ export function QuestionRenderer({
           <StepBadge step={stepNumber} total={totalSteps} />
           <ScaleField
             question={question}
+            answers={answers}
             initialValue={answers[question.id] as number | undefined}
             onAnswer={(v) => {
               setAnswer(question.id, v);

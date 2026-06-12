@@ -21,11 +21,15 @@ import { useFormState } from '@/hooks/useFormState.js';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
 import { useTheme } from '@/hooks/useTheme.js';
 import { progress as progressFn } from '@/logic/progress.js';
+import { themes } from '@/themes/index.js';
+import type { Theme } from '@/types/Theme.js';
 import { TopBar } from './chrome/TopBar.js';
 import { ProgressBar } from './chrome/ProgressBar.js';
 import { FooterCounter } from './chrome/FooterCounter.js';
 import { ThemeToggle } from './chrome/ThemeToggle.js';
 import { QuestionRenderer } from './questions/QuestionRenderer.js';
+import { SwissDecoration } from './decorations/SwissDecoration.js';
+import { GrainDecoration } from './decorations/GrainDecoration.js';
 
 import '@/styles/tokens.css';
 import '@/styles/toggle.css';
@@ -119,6 +123,9 @@ export function Form<S extends Schema>({
 
   const submittedRef = useRef(false);
 
+  // `submitStatus` is a dependency so that retrySubmit (which resets the
+  // ref and flips status back to 'idle') re-triggers this effect — without
+  // it the Retry button never re-fires onSubmit.
   useEffect(() => {
     if (currentQuestion?.type !== 'thanks' || submittedRef.current) return;
     submittedRef.current = true;
@@ -154,6 +161,7 @@ export function Form<S extends Schema>({
     hiddenFields,
     getSubmitAnswers,
     errorMessage,
+    submitStatus,
   ]);
 
   const retrySubmit = useCallback(() => {
@@ -186,6 +194,11 @@ export function Form<S extends Schema>({
   const showBack = state.step > 0 && currentQuestion?.type !== 'thanks';
   const progressPct = progressFn(state.visible, state.step);
 
+  // Decoration hint from the theme registry; custom theme names fall back
+  // to no decoration.
+  const decoration =
+    (themes as Record<string, Theme | undefined>)[schema.theme]?.decoration ?? 'none';
+
   return (
     <div
       ref={wrapperRef}
@@ -193,6 +206,9 @@ export function Form<S extends Schema>({
       data-theme-name={schema.theme}
       data-theme={themeMode}
     >
+      {decoration === 'shapes' && <SwissDecoration step={state.step} />}
+      {decoration === 'grain' && <GrainDecoration />}
+
       <ProgressBar value={progressPct} />
 
       <TopBar

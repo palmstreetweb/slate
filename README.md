@@ -116,7 +116,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 
 `Option` is `{ label: string; value: string; description?: string }`.
 
-`title` accepts a function for personalization on `short_text`, `long_text`, `email`, `phone`, `single_choice`, `multi_choice`:
+`title` accepts a function for personalization on every answer-bearing type (`short_text`, `long_text`, `email`, `phone`, `number`, `scale`, `single_choice`, `multi_choice`):
 
 ```ts
 title: (answers) => `Nice to meet you, ${answers.name}. What's your email?`
@@ -171,7 +171,11 @@ Two themes ship built-in, each with light and dark token sets:
 | Theme | Vibe | Display font | Body font | Accent (light → dark) |
 |---|---|---|---|---|
 | `editorial` | Refined serif, warm cream | Fraunces | Fraunces | `#2D5BFF` → `#6E8FFF` |
-| `swiss` | Bold geometric, lowercase | Archivo Black | Archivo | `#DC2626` → `#F87171` |
+| `swiss` | Bold geometric, lowercase | Inter (900) | Inter | `#DC2626` → `#F87171` |
+
+(Swiss originally shipped with Archivo Black; it was swapped for Inter as a closer Akzidenz-Grotesk substitute — see `DECISIONS.md` ADR-009.)
+
+Each theme can carry a `decoration` hint: `editorial` renders a subtle grain overlay; `swiss` renders a rotating set of geometric poster compositions behind each step.
 
 Both are wrapper-scoped on `[data-psw-forms]` — the package never writes to your host page's `<html>`. The PSW theme toggle is a 1:1 visual port of palmstreetweb.com (same morph, same easing).
 
@@ -190,13 +194,13 @@ A custom-theme registry API ships in V1.1 (`themes.register()`).
 
 ## Examples
 
-The `examples/` folder isn't published, but you can browse the source on the repo:
+The `examples/` folder isn't published. It hosts **PSW Studio**, a dev-only admin app for building and previewing forms:
 
-- `examples/basic-quote-form.tsx` — full 8-question schema covering every common type.
-- `examples/conditional-logic.tsx` — branching with `visibleIf` (homeowner → lot_size OR business → company).
-- `examples/theme-toggle-demo.tsx` — minimal page rendering just the PSW toggle on a sample wrapper.
+- Dashboard listing locally-stored form definitions (with two seed schemas).
+- Three-pane editor (outline / canvas / inspector) for composing schemas visually.
+- Live `<Form>` preview and a submissions inbox, both backed by `localStorage`.
 
-Run `npm run dev` to serve them locally with hot reload.
+Run `npm run dev` and open the printed URL to use it.
 
 ## Coming in V2
 

@@ -23,7 +23,9 @@ export type Condition =
 
 /**
  * Title can be a static string or a function called with the current answers
- * for personalization. Allowed on text/email/phone/choice types per brief §5.
+ * for personalization. Allowed on every answer-bearing question type
+ * (brief §5 listed text/email/phone/choice; number + scale were extended
+ * to match in the Typeform-parity roadmap, Phase 1).
  */
 export type DynamicTitle = string | ((answers: LooseAnswers) => string);
 
@@ -99,7 +101,7 @@ export type PhoneQuestion<TId extends string = string> = IdField<TId> &
 export type NumberQuestion<TId extends string = string> = IdField<TId> &
   Visibility & {
     type: 'number';
-    title: string;
+    title: DynamicTitle;
     placeholder?: string;
     required?: boolean;
     min?: number;
@@ -138,7 +140,7 @@ export type MultiChoiceQuestion<
 export type ScaleQuestion<TId extends string = string> = IdField<TId> &
   Visibility & {
     type: 'scale';
-    title: string;
+    title: DynamicTitle;
     min: number;
     max: number;
     minLabel?: string;

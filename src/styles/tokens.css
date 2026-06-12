@@ -107,6 +107,11 @@
 }
 
 [data-psw-forms][data-theme-name='swiss'][data-theme='light'] {
+  /* Geometric poster decoration palette (SwissDecoration.tsx). */
+  --psw-deco-red: #dc2626;
+  --psw-deco-yellow: #facc15;
+  --psw-deco-blue: #1d4ed8;
+  --psw-deco-ink: #000000;
   --psw-bg: #f2efe3;
   --psw-bg-2: #e8e4d5;
   --psw-bg-3: #ddd8c6;
@@ -124,6 +129,12 @@
 }
 
 [data-psw-forms][data-theme-name='swiss'][data-theme='dark'] {
+  /* Dimmed poster palette so shapes sit behind cream text without glare;
+     "ink" flips to cream because pure black vanishes on the dark bg. */
+  --psw-deco-red: #991b1b;
+  --psw-deco-yellow: #a16207;
+  --psw-deco-blue: #1e3a8a;
+  --psw-deco-ink: #f2efe3;
   --psw-bg: #0a0a0a;
   --psw-bg-2: #131313;
   --psw-bg-3: #1a1a1a;
