@@ -11,11 +11,22 @@ export type {
   LongTextQuestion,
   EmailQuestion,
   PhoneQuestion,
+  UrlQuestion,
   NumberQuestion,
+  DateQuestion,
+  FileUploadQuestion,
   SingleChoiceQuestion,
   MultiChoiceQuestion,
+  DropdownQuestion,
+  PictureChoiceQuestion,
+  RankingQuestion,
+  MatrixQuestion,
+  YesNoQuestion,
+  LegalQuestion,
   ScaleQuestion,
+  NpsQuestion,
   Option,
+  PictureOption,
   Condition,
   DynamicTitle,
 } from './Question.js';
@@ -28,6 +39,8 @@ export type {
   AnswersOf,
   AnswerValueOf,
   HiddenFields,
+  FileAnswer,
+  MatrixAnswer,
 } from './Answers.js';
 
 export type {

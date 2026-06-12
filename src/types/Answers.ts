@@ -15,11 +15,15 @@ import type {
   UrlQuestion,
   NumberQuestion,
   DateQuestion,
+  FileUploadQuestion,
   ScaleQuestion,
   NpsQuestion,
   SingleChoiceQuestion,
   MultiChoiceQuestion,
   DropdownQuestion,
+  PictureChoiceQuestion,
+  RankingQuestion,
+  MatrixQuestion,
   YesNoQuestion,
   LegalQuestion,
 } from './Question.js';
@@ -35,12 +39,25 @@ import type {
  *   - date → string (ISO `YYYY-MM-DD`)
  *   - number, scale, nps → number
  *   - single_choice, dropdown → string (the option `value`)
- *   - multi_choice → string[] (array of option `value`s)
+ *   - multi_choice, ranking → string[] (option `value`s; full order for ranking)
+ *   - picture_choice → string, or string[] when `multiple: true`
  *   - yes_no → 'yes' | 'no'
  *   - legal → 'accept' | 'decline'
+ *   - file_upload → File, or string when the host uploads via `onFileUpload`
+ *   - matrix → Record<rowValue, columnValue | columnValue[]> (see ADR-013)
  *   - welcome, statement, thanks → never stored
  */
-export type LooseAnswers = Record<string, string | string[] | number | undefined>;
+
+/** A `file_upload` answer — the raw File, or the host's URL/id after upload. */
+export type FileAnswer = File | string;
+
+/** A `matrix` answer — row value → selected column value(s). */
+export type MatrixAnswer = Record<string, string | string[]>;
+
+export type LooseAnswers = Record<
+  string,
+  string | string[] | number | File | MatrixAnswer | undefined
+>;
 
 /** Public alias — what the brief calls `Answers`. */
 export type Answers = LooseAnswers;
@@ -75,13 +92,23 @@ export type AnswerValueOf<Q extends Question> = Q extends ShortTextQuestion
                     ? 'yes' | 'no'
                     : Q extends LegalQuestion
                       ? 'accept' | 'decline'
-                      : Q extends SingleChoiceQuestion<string, infer TOpts>
-                        ? OptionValueOf<TOpts>
-                        : Q extends DropdownQuestion<string, infer TOpts>
-                          ? OptionValueOf<TOpts>
-                          : Q extends MultiChoiceQuestion<string, infer TOpts>
+                      : Q extends FileUploadQuestion
+                        ? FileAnswer
+                        : Q extends MatrixQuestion
+                          ? MatrixAnswer
+                          : Q extends RankingQuestion<string, infer TOpts>
                             ? Array<OptionValueOf<TOpts>>
-                            : never;
+                            : Q extends PictureChoiceQuestion<string, infer TOpts>
+                              ? Q extends { multiple: true }
+                                ? Array<OptionValueOf<TOpts>>
+                                : OptionValueOf<TOpts>
+                              : Q extends SingleChoiceQuestion<string, infer TOpts>
+                                ? OptionValueOf<TOpts>
+                                : Q extends DropdownQuestion<string, infer TOpts>
+                                  ? OptionValueOf<TOpts>
+                                  : Q extends MultiChoiceQuestion<string, infer TOpts>
+                                    ? Array<OptionValueOf<TOpts>>
+                                    : never;
 
 /**
  * `required: true` on a question means its answer is guaranteed present at

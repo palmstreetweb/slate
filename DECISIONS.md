@@ -156,13 +156,42 @@ Alternatives:
 Consequences: The public `Question` union, validators, renderer switch, keyboard map, README, and studio all grew together; tests cover each new type.
 Revisit when: V1.1 theme-registry work lands (custom themes may want type-specific decoration hooks).
 
+## ADR-012 — file_upload: host-controlled storage via `onFileUpload`
+Date: 2026-06-12
+Status: accepted
+Context: Phase 3 of the Typeform-parity roadmap adds `file_upload`. The library is a renderer with no backend, so it cannot own storage. The brief's §14 deferred this pending a storage-strategy decision.
+Decision: Two-mode answer shape. `<Form>` gains an optional `onFileUpload?: (file: File, questionId: string) => Promise<string>` prop. When provided, the field hands the file off at selection time and stores the resolved string (URL, S3 key, whatever the host returns) as the answer. When omitted, the raw `File` object is stored and delivered in the `onSubmit` payload, and the host deals with it there. `LooseAnswers` widens to include `File` in its value union. Client-side guards: native `accept` attribute + `maxSizeMb` size check at selection.
+Alternatives:
+- Always require `onFileUpload`. Rejected — simple hosts (e.g. posting FormData to their own endpoint) shouldn't need to implement an upload round-trip before submit.
+- Store data-URLs. Rejected — multi-MB base64 strings in state, in autosave payloads, and in `onSubmit` JSON is a footgun.
+- Presigned-URL protocol baked into the library. Rejected — couples the renderer to a backend contract; `onFileUpload` lets hosts implement exactly that in ~5 lines if they want it.
+Consequences:
+- The answers value union is no longer JSON-safe when a raw `File` is present; hosts that serialize answers must either provide `onFileUpload` or handle `File` themselves. Documented in the README.
+- Phase 5 autosave must skip `File` values (can't be persisted to localStorage).
+Revisit when: a consumer needs multi-file answers or upload progress UI.
+
+## ADR-013 — Phase 3 answer shapes: picture_choice, ranking, matrix
+Date: 2026-06-12
+Status: accepted
+Context: The remaining "hard" Typeform/Google-Forms types need answer-shape decisions beyond the original `string | string[] | number` union.
+Decision:
+- `picture_choice` — single mode stores the option `value` string (required-by-default + auto-advance like `single_choice`); `multiple: true` stores `string[]` with `min`/`max` bounds like `multi_choice`. Options are `PictureOption = Option & { src, alt? }`.
+- `ranking` — stores the **full ordered array** of option values on OK. No partial ranks; the validator rejects non-permutations. Reordering is via keyboard-accessible up/down buttons plus HTML5 drag for mouse users (no drag-drop dependency, per the bundle budget).
+- `matrix` — stores `Record<rowValue, columnValue | columnValue[]>` (`MatrixAnswer`), the `| columnValue[]` arm for `multiple: true` checkbox grids. The answers value union widens accordingly. Desktop renders a CSS-grid table; ≤560px stacks each row with the column label inside the cell.
+Alternatives:
+- Matrix as flattened `"row:col"` string arrays. Rejected — pushes parsing onto every consumer.
+- Matrix as auto-generated child questions (one per row). Rejected — pollutes `questionsVisited`, progress counts, and the studio outline.
+- Ranking via a dnd library (dnd-kit ~12kb). Rejected for now — buttons + native DnD cover it dep-free.
+Consequences: `LooseAnswers` values are now `string | string[] | number | File | MatrixAnswer | undefined`. `evaluate()` already treats unknown shapes safely (objects are only matched by `is_empty`/`is_not_empty`).
+Revisit when: conditional logic needs to address individual matrix rows (would need `field: 'id.row'` path syntax — new ADR).
+
 ---
 
 ## Deferred to V2
 
 Per brief §14, V1 explicitly does **not** include the items below. Each gets a stub ADR when the work is actually scheduled.
 
-- **File upload question type** — needs storage strategy decision (presigned URLs vs. direct multipart).
+- ~~**File upload question type**~~ — shipped in Phase 3 with host-controlled storage (ADR-012).
 - ~~**Date picker question type**~~ — shipped as segmented `date` inputs in Phase 2 (ADR-010).
 - **Calculator / scoring logic** — opens the door to a full expression language; out of scope.
 - **Save-and-resume from URL token** — needs a signing strategy.

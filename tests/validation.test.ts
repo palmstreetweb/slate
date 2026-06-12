@@ -4,12 +4,16 @@ import type {
   DateQuestion,
   DropdownQuestion,
   EmailQuestion,
+  FileUploadQuestion,
   LegalQuestion,
   LongTextQuestion,
+  MatrixQuestion,
   MultiChoiceQuestion,
   NpsQuestion,
   NumberQuestion,
   PhoneQuestion,
+  PictureChoiceQuestion,
+  RankingQuestion,
   ScaleQuestion,
   ShortTextQuestion,
   SingleChoiceQuestion,
@@ -272,5 +276,99 @@ describe('validation — nps', () => {
     expect(validate(q, 11)?.code).toBe('range');
     expect(validate(q, 0)).toBeNull();
     expect(validate(q, 10)).toBeNull();
+  });
+});
+
+describe('validation — file_upload', () => {
+  const q: FileUploadQuestion = { id: 'q', type: 'file_upload', title: 'X' };
+
+  it('optional by default', () => {
+    expect(validate(q, undefined)).toBeNull();
+  });
+
+  it('required accepts a File or a non-empty string', () => {
+    const required = { ...q, required: true };
+    expect(validate(required, undefined)?.code).toBe('required');
+    expect(validate(required, '')?.code).toBe('required');
+    expect(validate(required, new File(['x'], 'x.txt'))).toBeNull();
+    expect(validate(required, 'https://cdn.example.com/x.txt')).toBeNull();
+  });
+});
+
+describe('validation — picture_choice', () => {
+  const opts = [
+    { label: 'A', value: 'a', src: 'a.jpg' },
+    { label: 'B', value: 'b', src: 'b.jpg' },
+  ];
+
+  it('single mode is required by default', () => {
+    const q: PictureChoiceQuestion = { id: 'q', type: 'picture_choice', title: 'X', options: opts };
+    expect(validate(q, undefined)?.code).toBe('required');
+    expect(validate(q, 'a')).toBeNull();
+    expect(validate({ ...q, required: false }, undefined)).toBeNull();
+  });
+
+  it('multiple mode enforces min/max selections', () => {
+    const q: PictureChoiceQuestion = {
+      id: 'q', type: 'picture_choice', title: 'X', options: opts,
+      multiple: true, min: 1, max: 1,
+    };
+    expect(validate(q, [])?.code).toBe('min_selections');
+    expect(validate(q, ['a'])).toBeNull();
+    expect(validate(q, ['a', 'b'])?.code).toBe('max_selections');
+  });
+});
+
+describe('validation — ranking', () => {
+  const q: RankingQuestion = {
+    id: 'q', type: 'ranking', title: 'X',
+    options: [
+      { label: 'A', value: 'a' },
+      { label: 'B', value: 'b' },
+      { label: 'C', value: 'c' },
+    ],
+  };
+
+  it('accepts any full permutation, and untouched (undefined)', () => {
+    expect(validate(q, undefined)).toBeNull();
+    expect(validate(q, ['c', 'a', 'b'])).toBeNull();
+  });
+
+  it('rejects partial or alien orders', () => {
+    expect(validate(q, ['a', 'b'])?.code).toBe('ranking');
+    expect(validate(q, ['a', 'b', 'x'])?.code).toBe('ranking');
+    expect(validate(q, 'a')?.code).toBe('ranking');
+  });
+});
+
+describe('validation — matrix', () => {
+  const q: MatrixQuestion = {
+    id: 'q', type: 'matrix', title: 'X',
+    rows: [
+      { label: 'R1', value: 'r1' },
+      { label: 'R2', value: 'r2' },
+    ],
+    columns: [
+      { label: 'C1', value: 'c1' },
+      { label: 'C2', value: 'c2' },
+    ],
+  };
+
+  it('optional by default', () => {
+    expect(validate(q, undefined)).toBeNull();
+    expect(validate(q, { r1: 'c1' })).toBeNull();
+  });
+
+  it('required demands every row answered', () => {
+    const required = { ...q, required: true };
+    expect(validate(required, undefined)?.code).toBe('required');
+    expect(validate(required, { r1: 'c1' })?.code).toBe('required');
+    expect(validate(required, { r1: 'c1', r2: 'c2' })).toBeNull();
+  });
+
+  it('required treats empty arrays as unanswered (multiple mode)', () => {
+    const required = { ...q, required: true, multiple: true };
+    expect(validate(required, { r1: ['c1'], r2: [] })?.code).toBe('required');
+    expect(validate(required, { r1: ['c1'], r2: ['c1', 'c2'] })).toBeNull();
   });
 });

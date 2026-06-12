@@ -23,6 +23,15 @@ const scale: Question = { id: 'urg', type: 'scale', title: 'Urgency?', min: 1, m
 const yesNo: Question = { id: 'ins', type: 'yes_no', title: 'Insured?' };
 const legal: Question = { id: 'terms', type: 'legal', title: 'Terms?' };
 const nps: Question = { id: 'rec', type: 'nps', title: 'Recommend?' };
+const picture: Question = {
+  id: 'pet',
+  type: 'picture_choice',
+  title: 'Pick a pet',
+  options: [
+    { label: 'Cat', value: 'cat', src: 'cat.jpg' },
+    { label: 'Dog', value: 'dog', src: 'dog.jpg' },
+  ],
+};
 
 function setup(currentQ: Question, extra: Partial<Parameters<typeof useKeyboardNav>[0]> = {}) {
   const onAdvance = vi.fn();
@@ -106,6 +115,14 @@ describe('useKeyboardNav', () => {
     expect(onSelectChoice).toHaveBeenCalledWith(0);
     fireEvent.keyDown(window, { key: 'b' });
     expect(onSelectChoice).toHaveBeenCalledWith(1);
+  });
+
+  it('A/B select picture_choice options', () => {
+    const { onSelectChoice } = setup(picture);
+    fireEvent.keyDown(window, { key: 'b' });
+    expect(onSelectChoice).toHaveBeenCalledWith(1);
+    fireEvent.keyDown(window, { key: 'c' });
+    expect(onSelectChoice).toHaveBeenCalledTimes(1);
   });
 
   it('digits 0–9 select NPS values', () => {

@@ -76,7 +76,9 @@ export function useKeyboardNav({
 
       // Choice selection — A–F.
       if (
-        (currentQ.type === 'single_choice' || currentQ.type === 'multi_choice') &&
+        (currentQ.type === 'single_choice' ||
+          currentQ.type === 'multi_choice' ||
+          currentQ.type === 'picture_choice') &&
         onSelectChoice &&
         !typing
       ) {

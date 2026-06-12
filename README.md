@@ -72,6 +72,7 @@ export default function QuotePage() {
 | `onQuestionChange` | `(questionId, answers) => void` |  | Fires on every step transition. Good for analytics. |
 | `hiddenFields` | `Record<string, unknown>` |  | Passed through to `meta.hiddenFields`. Never rendered. |
 | `errorMessage` | `string` |  | Fallback shown when `onSubmit` rejects (default: "Something went wrong submitting your form. Please try again."). |
+| `onFileUpload` | `(file, questionId) => Promise<string>` |  | Host-controlled storage for `file_upload` questions. Resolved string is stored as the answer; omit it to receive raw `File` objects in `onSubmit`. See `DECISIONS.md` ADR-012. |
 
 ### `defineSchema(schema)`
 
@@ -111,16 +112,20 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `url` | `title`, `placeholder?`, `required?` | website shape; bare domains get `https://` prefixed | `string` |
 | `number` | `title`, `placeholder?`, `min?`, `max?`, `step?`, `required?` | range | `number` |
 | `date` | `title`, `required?`, `format?` (`'MM/DD/YYYY'` default), `min?`, `max?` (ISO) | real calendar date + bounds | `string` (ISO `YYYY-MM-DD`) |
+| `file_upload` | `title`, `required?`, `accept?`, `maxSizeMb?` | presence + size | `File`, or `string` via `onFileUpload` |
 | `single_choice` | `title`, `options: Option[]`, `required?` (default `true`) | required | `string` |
 | `multi_choice` | `title`, `options: Option[]`, `min?`, `max?` | min/max selections | `string[]` |
 | `dropdown` | `title`, `options: Option[]`, `placeholder?`, `required?` (default `true`) | required | `string` |
+| `picture_choice` | `title`, `options: PictureOption[]`, `multiple?`, `required?`, `min?`, `max?` | required / min-max | `string` or `string[]` |
+| `ranking` | `title`, `options: Option[]` | full permutation | `string[]` (ordered) |
+| `matrix` | `title`, `rows: Option[]`, `columns: Option[]`, `multiple?`, `required?` | all rows when required | `Record<row, col \| col[]>` |
 | `yes_no` | `title`, `yesLabel?`, `noLabel?`, `required?` (default `true`) | required | `'yes' \| 'no'` |
 | `legal` | `title`, `body?`, `acceptLabel?`, `declineLabel?`, `required?` (default `true`) | required | `'accept' \| 'decline'` |
 | `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?` | range | `number` |
 | `nps` | `title`, `minLabel?`, `maxLabel?`, `required?` | 0–10 | `number` |
 | `thanks` | `title`, `subtitle?`, `cta?` | — | _not stored; fires `onSubmit`_ |
 
-`Option` is `{ label: string; value: string; description?: string }`.
+`Option` is `{ label: string; value: string; description?: string }`. `PictureOption` adds `{ src: string; alt?: string }`.
 
 `title` accepts a function for personalization on every answer-bearing type:
 
@@ -164,7 +169,7 @@ type SubmitMeta = {
 |---|---|
 | `Enter` | Advance from welcome / statement; submit text-type fields |
 | `Shift + Enter` | New line in `long_text` |
-| `A`–`F` | Select choice option (also `legal` accept/decline) |
+| `A`–`F` | Select choice option (also `picture_choice` and `legal` accept/decline) |
 | `Y` / `N` | Answer `yes_no` questions |
 | `0`–`9` | Select scale / NPS value (within range) |
 | `↑` / `↓` + `Enter` | Navigate + select in `dropdown` |
@@ -210,22 +215,16 @@ The `examples/` folder isn't published. It hosts **PSW Studio**, a dev-only admi
 
 Run `npm run dev` and open the printed URL to use it.
 
-## Coming in V2
+## Still deferred
 
-Per [`DECISIONS.md`](./DECISIONS.md), the V1 scope intentionally excludes:
+Per [`DECISIONS.md`](./DECISIONS.md), currently out of scope (each gets an ADR when scheduled):
 
-- File upload question type
-- Date picker question type
-- Calculator / scoring logic
-- Save-and-resume from URL token
 - iframe / HTML script-tag embed
-- Built-in analytics event bus (use `onQuestionChange` for V1)
+- Built-in analytics event bus (use `onQuestionChange`)
 - Translation / i18n system
-- Visual form-builder UI
 - Multi-tenant form-storage backend
 - Client-facing admin dashboard
-
-Each will get a dedicated ADR when scheduled.
+- Payments
 
 ## Bundle
 

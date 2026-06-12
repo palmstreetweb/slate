@@ -448,6 +448,321 @@
   color: var(--psw-bg);
 }
 
+/* ---------- file upload ---------- */
+
+[data-psw-forms] .psw-upload-zone {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 40px 24px;
+  background: transparent;
+  border: var(--psw-border-width) dashed var(--psw-border-md);
+  border-radius: var(--psw-radius);
+  cursor: pointer;
+  color: var(--psw-text);
+  font-family: var(--psw-font-body);
+  transition:
+    border-color 150ms,
+    background 150ms;
+}
+
+[data-psw-forms] .psw-upload-zone:hover,
+[data-psw-forms] .psw-upload-zone--over {
+  border-color: var(--psw-accent);
+  background: var(--psw-accent-lo);
+}
+
+[data-psw-forms] .psw-upload-cta {
+  font-size: clamp(1.05rem, 2vw, 1.2rem);
+  font-weight: 500;
+  text-transform: var(--psw-transform);
+}
+
+[data-psw-forms] .psw-upload-hint {
+  font-size: 12px;
+  opacity: 0.55;
+  text-transform: var(--psw-transform);
+}
+
+[data-psw-forms] .psw-upload-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+  font-family: var(--psw-font-body);
+  color: var(--psw-text);
+}
+
+[data-psw-forms] .psw-upload-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(1rem, 1.8vw, 1.1rem);
+}
+
+[data-psw-forms] .psw-upload-remove {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+  color: var(--psw-text);
+  font-size: 16px;
+  cursor: pointer;
+  transition:
+    border-color 150ms,
+    color 150ms;
+}
+
+[data-psw-forms] .psw-upload-remove:hover {
+  border-color: var(--psw-error);
+  color: var(--psw-error);
+}
+
+/* ---------- picture choice ---------- */
+
+[data-psw-forms] .psw-picture-grid {
+  margin-top: 36px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+[data-psw-forms] .psw-picture {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: transparent;
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+  overflow: hidden;
+  cursor: pointer;
+  color: var(--psw-text);
+  font-family: var(--psw-font-body);
+  transition:
+    border-color 150ms,
+    background 150ms;
+}
+
+[data-psw-forms] .psw-picture:hover {
+  border-color: var(--psw-accent);
+  background: var(--psw-accent-lo);
+}
+
+[data-psw-forms] .psw-picture--selected {
+  border-color: var(--psw-accent);
+  background: var(--psw-accent-lo);
+}
+
+[data-psw-forms] .psw-picture-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+[data-psw-forms] .psw-picture-caption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  text-align: left;
+  text-transform: var(--psw-transform);
+}
+
+[data-psw-forms] .psw-picture-caption .psw-choice-badge {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+}
+
+/* ---------- ranking ---------- */
+
+[data-psw-forms] .psw-ranking {
+  list-style: none;
+  margin: 36px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-psw-forms] .psw-ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+  background: transparent;
+  cursor: grab;
+  font-family: var(--psw-font-body);
+  color: var(--psw-text);
+  font-size: clamp(1rem, 1.8vw, 1.15rem);
+  text-transform: var(--psw-transform);
+}
+
+[data-psw-forms] .psw-ranking-pos {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--psw-font-mono);
+  font-size: 12px;
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+}
+
+[data-psw-forms] .psw-ranking-label {
+  flex: 1;
+}
+
+[data-psw-forms] .psw-ranking-controls {
+  display: flex;
+  gap: 4px;
+}
+
+[data-psw-forms] .psw-ranking-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+  color: var(--psw-text);
+  cursor: pointer;
+  transition:
+    border-color 150ms,
+    background 150ms;
+}
+
+[data-psw-forms] .psw-ranking-btn:hover:not(:disabled) {
+  border-color: var(--psw-accent);
+  background: var(--psw-accent-lo);
+}
+
+[data-psw-forms] .psw-ranking-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ---------- matrix ---------- */
+
+[data-psw-forms] .psw-matrix {
+  margin-top: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+[data-psw-forms] .psw-matrix-head,
+[data-psw-forms] .psw-matrix-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.4fr) repeat(var(--psw-matrix-cols), 1fr);
+  gap: 6px;
+  align-items: stretch;
+}
+
+[data-psw-forms] .psw-matrix-colhead {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  font-family: var(--psw-font-mono);
+  opacity: 0.6;
+  text-align: center;
+  align-self: end;
+  padding-bottom: 4px;
+  text-transform: var(--psw-transform);
+}
+
+[data-psw-forms] .psw-matrix-rowlabel {
+  display: flex;
+  align-items: center;
+  font-size: clamp(0.95rem, 1.6vw, 1.05rem);
+  text-transform: var(--psw-transform);
+}
+
+[data-psw-forms] .psw-matrix-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  background: transparent;
+  border: var(--psw-border-width) solid var(--psw-border-md);
+  border-radius: var(--psw-radius);
+  cursor: pointer;
+  color: var(--psw-text);
+  transition:
+    border-color 120ms,
+    background 120ms;
+}
+
+[data-psw-forms] .psw-matrix-cell:hover {
+  border-color: var(--psw-accent);
+  background: var(--psw-accent-lo);
+}
+
+[data-psw-forms] .psw-matrix-cell--selected {
+  border-color: var(--psw-accent);
+  background: var(--psw-accent);
+}
+
+[data-psw-forms] .psw-matrix-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--psw-border-md);
+}
+
+[data-psw-forms] .psw-matrix-cell--selected .psw-matrix-dot {
+  background: #fff;
+}
+
+/* Column labels inside cells only show on the stacked mobile layout. */
+[data-psw-forms] .psw-matrix-cell-label {
+  display: none;
+  font-size: 0.85rem;
+  text-transform: var(--psw-transform);
+}
+
+@media (max-width: 560px) {
+  [data-psw-forms] .psw-matrix-head {
+    display: none;
+  }
+
+  [data-psw-forms] .psw-matrix-row {
+    grid-template-columns: 1fr;
+    margin-bottom: 10px;
+  }
+
+  [data-psw-forms] .psw-matrix-cell {
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  [data-psw-forms] .psw-matrix-cell-label {
+    display: inline;
+  }
+
+  [data-psw-forms] .psw-matrix-cell--selected .psw-matrix-cell-label {
+    color: #fff;
+  }
+}
+
 /* ---------- thanks confirmation chip ---------- */
 
 [data-psw-forms] .psw-confirm-chip {

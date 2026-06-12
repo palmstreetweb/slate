@@ -5,13 +5,17 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QuestionRenderer } from '@/components/questions/QuestionRenderer.js';
 import type { Question } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 
-function renderQuestion(question: Question, answers: LooseAnswers = {}) {
+function renderQuestion(
+  question: Question,
+  answers: LooseAnswers = {},
+  onFileUpload?: (file: File, questionId: string) => Promise<string>,
+) {
   const setAnswer = vi.fn();
   const advance = vi.fn();
   const utils = render(
@@ -26,6 +30,7 @@ function renderQuestion(question: Question, answers: LooseAnswers = {}) {
       submitError={null}
       onRetrySubmit={vi.fn()}
       onRestart={vi.fn()}
+      onFileUpload={onFileUpload}
     />,
   );
   return { ...utils, setAnswer, advance };
@@ -367,5 +372,201 @@ describe('field interactions', () => {
     await user.click(screen.getByRole('button', { name: /ok/i }));
     expect(setAnswer).toHaveBeenCalledWith('site', 'https://example.com');
     expect(advance).toHaveBeenCalled();
+  });
+});
+
+describe('phase 3 question types', () => {
+  const pictureOpts = [
+    { label: 'Cat', value: 'cat', src: 'https://example.com/cat.jpg' },
+    { label: 'Dog', value: 'dog', src: 'https://example.com/dog.jpg' },
+    { label: 'Bird', value: 'bird', src: 'https://example.com/bird.jpg' },
+  ];
+
+  it('file_upload renders drop zone + snapshot', () => {
+    const { container } = renderQuestion({
+      id: 'doc',
+      type: 'file_upload',
+      title: 'Upload your doc',
+      maxSizeMb: 5,
+    });
+    expect(screen.getByText(/choose a file/i)).toBeInTheDocument();
+    expect(screen.getByText(/max 5 MB/i)).toBeInTheDocument();
+    expect(container).toMatchSnapshot();
+  });
+
+  it('file_upload stores the raw File when no onFileUpload is given', async () => {
+    const user = userEvent.setup();
+    const { container, setAnswer, advance } = renderQuestion({
+      id: 'doc',
+      type: 'file_upload',
+      title: 'Upload your doc',
+      required: true,
+    });
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
+    const input = container.querySelector('input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(setAnswer).toHaveBeenCalledWith('doc', file);
+    expect(screen.getByText(/hello\.txt/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(advance).toHaveBeenCalled();
+  });
+
+  it('file_upload hands the file to onFileUpload and stores the returned string', async () => {
+    const onFileUpload = vi.fn().mockResolvedValue('https://cdn.example.com/hello.txt');
+    const { container, setAnswer } = renderQuestion(
+      { id: 'doc', type: 'file_upload', title: 'Upload your doc' },
+      {},
+      onFileUpload,
+    );
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [file] },
+    });
+    await waitFor(() =>
+      expect(setAnswer).toHaveBeenCalledWith('doc', 'https://cdn.example.com/hello.txt'),
+    );
+    expect(onFileUpload).toHaveBeenCalledWith(file, 'doc');
+  });
+
+  it('file_upload rejects files over maxSizeMb', () => {
+    const { container, setAnswer } = renderQuestion({
+      id: 'doc',
+      type: 'file_upload',
+      title: 'Upload your doc',
+      maxSizeMb: 1,
+    });
+    const big = new File([new ArrayBuffer(2 * 1024 * 1024)], 'big.bin');
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [big] },
+    });
+    expect(screen.getByText(/too big/i)).toBeInTheDocument();
+    expect(setAnswer).not.toHaveBeenCalled();
+  });
+
+  it('file_upload blocks OK when required and empty', async () => {
+    const user = userEvent.setup();
+    const { advance } = renderQuestion({
+      id: 'doc',
+      type: 'file_upload',
+      title: 'Upload your doc',
+      required: true,
+    });
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(await screen.findByText(/Please choose a file/)).toBeInTheDocument();
+    expect(advance).not.toHaveBeenCalled();
+  });
+
+  it('picture_choice renders the image grid + snapshot', () => {
+    const { container } = renderQuestion({
+      id: 'pet',
+      type: 'picture_choice',
+      title: 'Pick a pet',
+      options: pictureOpts,
+    });
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    expect(screen.getByAltText('Cat')).toBeInTheDocument();
+    expect(container).toMatchSnapshot();
+  });
+
+  it('picture_choice single select stores the value and advances', async () => {
+    const user = userEvent.setup();
+    const { setAnswer, advance } = renderQuestion({
+      id: 'pet',
+      type: 'picture_choice',
+      title: 'Pick a pet',
+      options: pictureOpts,
+    });
+    await user.click(screen.getByRole('radio', { name: /dog/i }));
+    expect(setAnswer).toHaveBeenCalledWith('pet', 'dog');
+    // Auto-advance fires after a 220ms highlight pause.
+    await waitFor(() => expect(advance).toHaveBeenCalled());
+  });
+
+  it('picture_choice multiple toggles and enforces min', async () => {
+    const user = userEvent.setup();
+    const { setAnswer, advance } = renderQuestion({
+      id: 'pets',
+      type: 'picture_choice',
+      title: 'Pick pets',
+      options: pictureOpts,
+      multiple: true,
+      min: 1,
+    });
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(await screen.findByText(/at least one/i)).toBeInTheDocument();
+    expect(advance).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('checkbox', { name: /cat/i }));
+    expect(setAnswer).toHaveBeenCalledWith('pets', ['cat']);
+  });
+
+  it('ranking renders + snapshot, reorders via buttons, submits full order', async () => {
+    const user = userEvent.setup();
+    const { container, setAnswer, advance } = renderQuestion({
+      id: 'rank',
+      type: 'ranking',
+      title: 'Rank these',
+      options: [
+        { label: 'Alpha', value: 'a' },
+        { label: 'Beta', value: 'b' },
+        { label: 'Gamma', value: 'c' },
+      ],
+    });
+    expect(container).toMatchSnapshot();
+
+    await user.click(screen.getByRole('button', { name: /move gamma up/i }));
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(setAnswer).toHaveBeenCalledWith('rank', ['a', 'c', 'b']);
+    expect(advance).toHaveBeenCalled();
+  });
+
+  it('matrix renders + snapshot, single-select per row, required blocks gaps', async () => {
+    const user = userEvent.setup();
+    const { container, setAnswer, advance } = renderQuestion({
+      id: 'rate',
+      type: 'matrix',
+      title: 'Rate each',
+      required: true,
+      rows: [
+        { label: 'Quality', value: 'quality' },
+        { label: 'Speed', value: 'speed' },
+      ],
+      columns: [
+        { label: 'Poor', value: 'poor' },
+        { label: 'Great', value: 'great' },
+      ],
+    });
+    expect(container).toMatchSnapshot();
+
+    await user.click(screen.getByRole('radio', { name: 'Quality: Great' }));
+    expect(setAnswer).toHaveBeenCalledWith('rate', { quality: 'great' });
+
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(await screen.findByText(/answer every row/i)).toBeInTheDocument();
+    expect(advance).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('radio', { name: 'Speed: Poor' }));
+    await user.click(screen.getByRole('button', { name: /ok/i }));
+    expect(advance).toHaveBeenCalled();
+  });
+
+  it('matrix multiple toggles checkbox cells', async () => {
+    const user = userEvent.setup();
+    const { setAnswer } = renderQuestion({
+      id: 'use',
+      type: 'matrix',
+      title: 'Which apply?',
+      multiple: true,
+      rows: [{ label: 'Web', value: 'web' }],
+      columns: [
+        { label: 'Daily', value: 'daily' },
+        { label: 'Weekly', value: 'weekly' },
+      ],
+    });
+    await user.click(screen.getByRole('checkbox', { name: 'Web: Daily' }));
+    expect(setAnswer).toHaveBeenCalledWith('use', { web: ['daily'] });
+    await user.click(screen.getByRole('checkbox', { name: 'Web: Weekly' }));
+    expect(setAnswer).toHaveBeenLastCalledWith('use', { web: ['daily', 'weekly'] });
   });
 });

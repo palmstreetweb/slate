@@ -5,7 +5,7 @@
  * selected question.
  */
 
-import type { Option, Question } from '@/index.js';
+import type { Option, PictureOption, Question } from '@/index.js';
 
 const TYPE_LABEL: Record<Question['type'], string> = {
   welcome: 'Welcome screen',
@@ -18,9 +18,13 @@ const TYPE_LABEL: Record<Question['type'], string> = {
   url: 'Website',
   number: 'Number',
   date: 'Date',
+  file_upload: 'File upload',
   single_choice: 'Single choice',
   multi_choice: 'Multi choice',
   dropdown: 'Dropdown',
+  picture_choice: 'Picture choice',
+  ranking: 'Ranking',
+  matrix: 'Matrix',
   yes_no: 'Yes / No',
   legal: 'Legal / consent',
   scale: 'Scale',
@@ -157,7 +161,10 @@ export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
           question.type === 'dropdown' ||
           question.type === 'yes_no' ||
           question.type === 'legal' ||
-          question.type === 'nps') && (
+          question.type === 'nps' ||
+          question.type === 'file_upload' ||
+          question.type === 'matrix' ||
+          (question.type === 'picture_choice' && !question.multiple)) && (
           <Row>
             {(question.type === 'short_text' ||
               question.type === 'long_text' ||
@@ -180,7 +187,8 @@ export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
                 (question as { required?: boolean }).required ??
                 (question.type === 'dropdown' ||
                   question.type === 'yes_no' ||
-                  question.type === 'legal')
+                  question.type === 'legal' ||
+                  question.type === 'picture_choice')
               }
               onChange={(v) => onChange({ required: v } as Partial<Question>)}
               label="Required"
@@ -392,15 +400,108 @@ export function Inspector({ question, onChange, onDelete, canDelete }: Props) {
           </>
         )}
 
+        {question.type === 'file_upload' && (
+          <Row>
+            <Field label="Accept (file types)" hint="e.g. image/*,.pdf">
+              <input
+                className="studio-input"
+                value={question.accept ?? ''}
+                onChange={(e) =>
+                  onChange({ accept: e.target.value || undefined } as Partial<Question>)
+                }
+              />
+            </Field>
+            <Field label="Max size (MB)">
+              <input
+                className="studio-input"
+                type="number"
+                value={question.maxSizeMb ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    maxSizeMb: e.target.value ? Number(e.target.value) : undefined,
+                  } as Partial<Question>)
+                }
+              />
+            </Field>
+          </Row>
+        )}
+
         {(question.type === 'single_choice' ||
           question.type === 'multi_choice' ||
-          question.type === 'dropdown') && (
+          question.type === 'dropdown' ||
+          question.type === 'ranking') && (
           <Field label="Options">
             <OptionsEditor
               options={question.options as Option[]}
               onChange={(opts) => onChange({ options: opts } as Partial<Question>)}
             />
           </Field>
+        )}
+
+        {question.type === 'picture_choice' && (
+          <>
+            <Checkbox
+              checked={Boolean(question.multiple)}
+              onChange={(v) => onChange({ multiple: v } as Partial<Question>)}
+              label="Allow multiple selections"
+            />
+            <Field label="Options (label / value / image URL)">
+              <PictureOptionsEditor
+                options={question.options as PictureOption[]}
+                onChange={(opts) => onChange({ options: opts } as Partial<Question>)}
+              />
+            </Field>
+            {question.multiple && (
+              <Row>
+                <Field label="Min selections">
+                  <input
+                    className="studio-input"
+                    type="number"
+                    value={question.min ?? ''}
+                    onChange={(e) =>
+                      onChange({
+                        min: e.target.value ? Number(e.target.value) : undefined,
+                      } as Partial<Question>)
+                    }
+                  />
+                </Field>
+                <Field label="Max selections">
+                  <input
+                    className="studio-input"
+                    type="number"
+                    value={question.max ?? ''}
+                    onChange={(e) =>
+                      onChange({
+                        max: e.target.value ? Number(e.target.value) : undefined,
+                      } as Partial<Question>)
+                    }
+                  />
+                </Field>
+              </Row>
+            )}
+          </>
+        )}
+
+        {question.type === 'matrix' && (
+          <>
+            <Checkbox
+              checked={Boolean(question.multiple)}
+              onChange={(v) => onChange({ multiple: v } as Partial<Question>)}
+              label="Allow multiple per row"
+            />
+            <Field label="Rows">
+              <OptionsEditor
+                options={question.rows as Option[]}
+                onChange={(rows) => onChange({ rows } as Partial<Question>)}
+              />
+            </Field>
+            <Field label="Columns">
+              <OptionsEditor
+                options={question.columns as Option[]}
+                onChange={(columns) => onChange({ columns } as Partial<Question>)}
+              />
+            </Field>
+          </>
         )}
 
         {question.type === 'multi_choice' && (
@@ -575,6 +676,87 @@ function OptionsEditor({
         className="studio-btn studio-btn--ghost"
         onClick={add}
         style={{ justifySelf: 'start', fontSize: 12, padding: '4px 8px', marginTop: 4 }}
+      >
+        + Add option
+      </button>
+    </div>
+  );
+}
+
+function PictureOptionsEditor({
+  options,
+  onChange,
+}: {
+  options: PictureOption[];
+  onChange: (opts: PictureOption[]) => void;
+}) {
+  const update = (i: number, patch: Partial<PictureOption>) => {
+    onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
+  };
+  const remove = (i: number) => onChange(options.filter((_, idx) => idx !== i));
+  const add = () => {
+    const i = options.length;
+    onChange([
+      ...options,
+      {
+        label: `Option ${String.fromCharCode(65 + i)}`,
+        value: `opt_${i + 1}`,
+        src: 'https://picsum.photos/seed/' + (i + 1) + '/400/300',
+      },
+    ]);
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {options.map((opt, i) => (
+        <div
+          key={i}
+          style={{
+            display: 'grid',
+            gap: 4,
+            padding: 8,
+            border: '1px solid var(--psw-border)',
+            borderRadius: 'var(--studio-radius-sm)',
+          }}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px auto', gap: 4 }}>
+            <input
+              className="studio-input"
+              value={opt.label}
+              placeholder="Label"
+              onChange={(e) => update(i, { label: e.target.value })}
+              style={{ padding: '6px 8px', fontSize: 12 }}
+            />
+            <input
+              className="studio-input"
+              value={opt.value}
+              placeholder="value"
+              style={{ padding: '6px 8px', fontFamily: 'var(--psw-font-mono)', fontSize: 11 }}
+              onChange={(e) => update(i, { value: e.target.value.replace(/\s+/g, '_') })}
+            />
+            <button
+              type="button"
+              className="studio-icon-btn"
+              onClick={() => remove(i)}
+              aria-label="Remove option"
+            >
+              ×
+            </button>
+          </div>
+          <input
+            className="studio-input"
+            value={opt.src}
+            placeholder="https://image-url..."
+            style={{ padding: '6px 8px', fontFamily: 'var(--psw-font-mono)', fontSize: 11 }}
+            onChange={(e) => update(i, { src: e.target.value })}
+          />
+        </div>
+      ))}
+      <button
+        type="button"
+        className="studio-btn studio-btn--ghost"
+        onClick={add}
+        style={{ justifySelf: 'start', fontSize: 12, padding: '4px 8px' }}
       >
         + Add option
       </button>

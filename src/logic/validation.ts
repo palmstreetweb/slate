@@ -160,6 +160,74 @@ export function validate(question: Question, answer: unknown): ValidationResult 
       return null;
     }
 
+    case 'file_upload': {
+      if (question.required) {
+        const hasFile =
+          (typeof File !== 'undefined' && answer instanceof File) ||
+          (typeof answer === 'string' && answer.trim() !== '');
+        if (!hasFile) {
+          return { code: 'required', message: 'Please choose a file' };
+        }
+      }
+      return null;
+    }
+
+    case 'picture_choice': {
+      if (question.multiple) {
+        const arr = Array.isArray(answer) ? answer : [];
+        const min = question.min ?? 0;
+        if (arr.length < min) {
+          return {
+            code: 'min_selections',
+            message: min === 1 ? 'Please pick at least one' : `Pick at least ${min}`,
+          };
+        }
+        if (question.max !== undefined && arr.length > question.max) {
+          return { code: 'max_selections', message: `Pick at most ${question.max}` };
+        }
+        return null;
+      }
+      const required = question.required ?? true;
+      if (required && isBlankString(answer)) {
+        return { code: 'required', message: 'Please pick one' };
+      }
+      return null;
+    }
+
+    case 'ranking': {
+      // The field always submits the full order; if an answer exists it
+      // must be a permutation of the option values.
+      if (answer === undefined || answer === null) return null;
+      const arr = Array.isArray(answer) ? answer : null;
+      const values = question.options.map((o) => o.value);
+      const isPermutation =
+        arr !== null &&
+        arr.length === values.length &&
+        values.every((v) => arr.includes(v));
+      if (!isPermutation) {
+        return { code: 'ranking', message: 'Please rank every item' };
+      }
+      return null;
+    }
+
+    case 'matrix': {
+      if (!question.required) return null;
+      const obj =
+        answer !== null && typeof answer === 'object' && !Array.isArray(answer)
+          ? (answer as Record<string, unknown>)
+          : {};
+      const unanswered = question.rows.filter((r) => {
+        const v = obj[r.value];
+        if (v === undefined || v === null || v === '') return true;
+        if (Array.isArray(v) && v.length === 0) return true;
+        return false;
+      });
+      if (unanswered.length > 0) {
+        return { code: 'required', message: 'Please answer every row' };
+      }
+      return null;
+    }
+
     case 'single_choice':
     case 'dropdown': {
       const required = question.required ?? true;

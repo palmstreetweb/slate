@@ -13,6 +13,14 @@ export type Option<TValue extends string = string> = {
   description?: string;
 };
 
+/** Option with an image, for `picture_choice`. */
+export type PictureOption<TValue extends string = string> = Option<TValue> & {
+  /** Image URL. */
+  src: string;
+  /** Accessible alt text; falls back to the label. */
+  alt?: string;
+};
+
 export type Condition =
   | { field: string; op: 'equals' | 'not_equals'; value: string | number }
   | { field: string; op: 'in' | 'not_in'; value: ReadonlyArray<string | number> }
@@ -117,6 +125,19 @@ export type NumberQuestion<TId extends string = string> = IdField<TId> &
     step?: number;
   };
 
+/* ---------- file upload ---------- */
+
+export type FileUploadQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'file_upload';
+    title: DynamicTitle;
+    required?: boolean;
+    /** Native `accept` attribute value, e.g. `'image/*,.pdf'`. */
+    accept?: string;
+    /** Client-side max size in megabytes, checked at selection time. */
+    maxSizeMb?: number;
+  };
+
 /* ---------- date ---------- */
 
 export type DateQuestion<TId extends string = string> = IdField<TId> &
@@ -182,6 +203,55 @@ export type YesNoQuestion<TId extends string = string> = IdField<TId> &
     required?: boolean;
   };
 
+/**
+ * Image-grid choice. Single-select by default (auto-advance, required
+ * unless `required: false`); `multiple: true` switches to toggle-and-OK
+ * with optional `min`/`max` selection bounds.
+ */
+export type PictureChoiceQuestion<
+  TId extends string = string,
+  TOptions extends ReadonlyArray<PictureOption> = ReadonlyArray<PictureOption>,
+> = IdField<TId> &
+  Visibility & {
+    type: 'picture_choice';
+    title: DynamicTitle;
+    options: TOptions;
+    multiple?: boolean;
+    /** Single-select only; defaults to true. */
+    required?: boolean;
+    /** Multi-select only. */
+    min?: number;
+    max?: number;
+  };
+
+/** Reorder a list. Stored as the full ordered array of option values. */
+export type RankingQuestion<
+  TId extends string = string,
+  TOptions extends ReadonlyArray<Option> = ReadonlyArray<Option>,
+> = IdField<TId> &
+  Visibility & {
+    type: 'ranking';
+    title: DynamicTitle;
+    /** Initial order. */
+    options: TOptions;
+  };
+
+/**
+ * Rows x columns grid (Google Forms style). One answer per row
+ * (radio cells), or multiple per row with `multiple: true` (checkboxes).
+ * Stored as `Record<rowValue, columnValue | columnValue[]>`.
+ */
+export type MatrixQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'matrix';
+    title: DynamicTitle;
+    rows: ReadonlyArray<Option>;
+    columns: ReadonlyArray<Option>;
+    multiple?: boolean;
+    /** Require every row to be answered. */
+    required?: boolean;
+  };
+
 /** Legal/consent accept-or-decline. Stored as `'accept' | 'decline'`. */
 export type LegalQuestion<TId extends string = string> = IdField<TId> &
   Visibility & {
@@ -233,9 +303,13 @@ export type Question =
   | UrlQuestion
   | NumberQuestion
   | DateQuestion
+  | FileUploadQuestion
   | SingleChoiceQuestion
   | MultiChoiceQuestion
   | DropdownQuestion
+  | PictureChoiceQuestion
+  | RankingQuestion
+  | MatrixQuestion
   | YesNoQuestion
   | LegalQuestion
   | ScaleQuestion

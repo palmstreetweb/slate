@@ -43,6 +43,7 @@ export function Form<S extends Schema>({
   onQuestionChange,
   hiddenFields,
   errorMessage = 'Something went wrong submitting your form. Please try again.',
+  onFileUpload,
 }: FormProps<S>) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -80,6 +81,20 @@ export function Form<S extends Schema>({
         setAnswer(currentQuestion.id, opt.value);
         // Auto-advance per brief §5.
         window.setTimeout(() => next(), 220);
+      } else if (currentQuestion.type === 'picture_choice') {
+        const opt = currentQuestion.options[idx];
+        if (!opt) return;
+        if (currentQuestion.multiple) {
+          setAnswer(currentQuestion.id, (prev) => {
+            const cur = Array.isArray(prev) ? (prev as string[]) : [];
+            return cur.includes(opt.value)
+              ? cur.filter((v) => v !== opt.value)
+              : [...cur, opt.value];
+          });
+        } else {
+          setAnswer(currentQuestion.id, opt.value);
+          window.setTimeout(() => next(), 220);
+        }
       } else if (currentQuestion.type === 'yes_no') {
         setAnswer(currentQuestion.id, idx === 0 ? 'yes' : 'no');
         window.setTimeout(() => next(), 220);
@@ -246,6 +261,7 @@ export function Form<S extends Schema>({
               submitError={submitErrorMsg}
               onRetrySubmit={retrySubmit}
               onRestart={restartForm}
+              onFileUpload={onFileUpload}
             />
           ) : null}
         </div>

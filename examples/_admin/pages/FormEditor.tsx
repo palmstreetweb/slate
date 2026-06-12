@@ -348,6 +348,8 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
       return { id, type, title: 'A number?' };
     case 'date':
       return { id, type, title: 'Pick a date', format: 'MM/DD/YYYY' };
+    case 'file_upload':
+      return { id, type, title: 'Upload a file', maxSizeMb: 10 };
     case 'single_choice':
       return {
         id,
@@ -377,6 +379,42 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
           { label: 'Option A', value: 'a' },
           { label: 'Option B', value: 'b' },
           { label: 'Option C', value: 'c' },
+        ],
+      };
+    case 'picture_choice':
+      return {
+        id,
+        type,
+        title: 'Pick a picture',
+        options: [
+          { label: 'Option A', value: 'a', src: 'https://picsum.photos/seed/a/400/300' },
+          { label: 'Option B', value: 'b', src: 'https://picsum.photos/seed/b/400/300' },
+        ],
+      };
+    case 'ranking':
+      return {
+        id,
+        type,
+        title: 'Rank these in order of preference',
+        options: [
+          { label: 'First thing', value: 'one' },
+          { label: 'Second thing', value: 'two' },
+          { label: 'Third thing', value: 'three' },
+        ],
+      };
+    case 'matrix':
+      return {
+        id,
+        type,
+        title: 'Rate each item',
+        rows: [
+          { label: 'Quality', value: 'quality' },
+          { label: 'Speed', value: 'speed' },
+        ],
+        columns: [
+          { label: 'Poor', value: 'poor' },
+          { label: 'Okay', value: 'okay' },
+          { label: 'Great', value: 'great' },
         ],
       };
     case 'yes_no':

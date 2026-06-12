@@ -26,6 +26,11 @@ import { MultiChoiceField } from './MultiChoiceField.js';
 import { DropdownField } from './DropdownField.js';
 import { YesNoField } from './YesNoField.js';
 import { LegalField } from './LegalField.js';
+import { FileUploadField, type FileUploadHandler } from './FileUploadField.js';
+import { PictureChoiceField } from './PictureChoiceField.js';
+import { RankingField } from './RankingField.js';
+import { MatrixField } from './MatrixField.js';
+import type { MatrixAnswer } from '@/types/Answers.js';
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -45,6 +50,8 @@ export type QuestionRendererProps = {
   onRetrySubmit: () => void;
   /** Called when user clicks the thanks-screen restart CTA. */
   onRestart: () => void;
+  /** Host-controlled file storage for `file_upload` questions (ADR-012). */
+  onFileUpload?: FileUploadHandler;
 };
 
 function StepBadge({ step, total }: { step: number; total: number }) {
@@ -68,6 +75,7 @@ export function QuestionRenderer({
   submitError,
   onRetrySubmit,
   onRestart,
+  onFileUpload,
 }: QuestionRendererProps) {
   // Auto-advance helper for single_choice — fire after a brief pause so
   // the selected highlight is visible before the transition starts.
@@ -294,6 +302,64 @@ export function QuestionRenderer({
               setAnswer(question.id, v);
               window.setTimeout(() => advance(), 220);
             }}
+          />
+        </>
+      );
+
+    case 'file_upload':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <FileUploadField
+            question={question}
+            answers={answers}
+            initialValue={answers[question.id] as File | string | undefined}
+            onAnswer={(v) => setAnswer(question.id, v)}
+            onAdvance={advance}
+            onFileUpload={onFileUpload}
+          />
+        </>
+      );
+
+    case 'picture_choice':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <PictureChoiceField
+            question={question}
+            answers={answers}
+            selected={answers[question.id] as string | string[] | undefined}
+            onSelectSingle={(v) => selectAndAdvance(question.id, v)}
+            onSelectMulti={(vs) => setAnswer(question.id, vs)}
+            onAdvance={advance}
+          />
+        </>
+      );
+
+    case 'ranking':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <RankingField
+            question={question}
+            answers={answers}
+            initialValue={answers[question.id] as string[] | undefined}
+            onAnswer={(order) => setAnswer(question.id, order)}
+            onAdvance={advance}
+          />
+        </>
+      );
+
+    case 'matrix':
+      return (
+        <>
+          <StepBadge step={stepNumber} total={totalSteps} />
+          <MatrixField
+            question={question}
+            answers={answers}
+            initialValue={answers[question.id] as MatrixAnswer | undefined}
+            onAnswer={(v) => setAnswer(question.id, v)}
+            onAdvance={advance}
           />
         </>
       );

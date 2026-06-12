@@ -56,4 +56,11 @@ export type FormProps<S extends Schema = Schema> = {
   hiddenFields?: HiddenFields;
   /** Override the fallback message shown when `onSubmit` rejects. */
   errorMessage?: string;
+  /**
+   * Host-controlled storage for `file_upload` questions (ADR-012). Called
+   * with the selected File; the resolved string (URL or identifier) is
+   * stored as the answer. When omitted, the raw `File` object is stored
+   * and delivered in the `onSubmit` payload.
+   */
+  onFileUpload?: (file: File, questionId: string) => Promise<string>;
 };

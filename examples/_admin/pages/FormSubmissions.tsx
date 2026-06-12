@@ -135,10 +135,7 @@ function ResponseRow({
   onDelete: () => void;
 }) {
   const a = sub.answers;
-  const summary = questionIds.slice(0, 2).map((qid) => {
-    const v = a[qid];
-    return v === undefined || v === '' ? '—' : Array.isArray(v) ? v.join(', ') : String(v);
-  });
+  const summary = questionIds.slice(0, 2).map((qid) => formatValue(a[qid]));
   const when = new Date(sub.receivedAt);
 
   return (
@@ -228,6 +225,15 @@ function ResponseRow({
 function formatValue(v: unknown): string {
   if (v === undefined || v === null || v === '') return '—';
   if (Array.isArray(v)) return v.join(', ');
+  if (typeof File !== 'undefined' && v instanceof File) {
+    return `${v.name} (${Math.round(v.size / 1024)} KB)`;
+  }
+  if (typeof v === 'object') {
+    // Matrix answers: row → column(s).
+    return Object.entries(v as Record<string, unknown>)
+      .map(([row, col]) => `${row}: ${Array.isArray(col) ? col.join(', ') : String(col)}`)
+      .join(' · ');
+  }
   return String(v);
 }
 
