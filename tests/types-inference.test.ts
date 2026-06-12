@@ -104,8 +104,13 @@ describe('defineSchema → AnswersOf inference', () => {
   });
 
   it('LooseAnswers (Answers) is the runtime-shaped fallback', () => {
+    // Widened in Phase 3: File for file_upload (ADR-012) and MatrixAnswer
+    // (Record<row, col | col[]>) for matrix (ADR-013).
     expectTypeOf<Answers>().toEqualTypeOf<
-      Record<string, string | string[] | number | undefined>
+      Record<
+        string,
+        string | string[] | number | File | Record<string, string | string[]> | undefined
+      >
     >();
   });
 });

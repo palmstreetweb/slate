@@ -175,6 +175,15 @@ Any answer-bearing question (and `statement`) can carry jump rules, evaluated wh
 
 Jumps change navigation only; skipped questions keep their `visibleIf`-based inclusion in the submit payload (ADR-015). Back returns to the jump origin.
 
+### Schema sanity checking
+
+`checkSchema(questions)` is a pure helper that returns `SchemaIssue[]` — duplicate ids, `visibleIf`/jump conditions referencing unknown questions, and dangling or self jump targets. The engine is forgiving at runtime (bad refs fall through to normal flow); use this in CI or on save to catch authoring mistakes early. The PSW Studio surfaces these in an editor banner.
+
+```ts
+import { checkSchema } from '@palmstreetweb/forms';
+const issues = checkSchema(schema.questions); // [] when clean
+```
+
 ### Scoring and multiple endings
 
 Give options a `score` and the engine accumulates a total — available in piping as `{{score}}` and delivered in `SubmitMeta.score` (ADR-016). Several `thanks` screens can coexist, each gated by `visibleIf`; the first visible one is shown. A `redirectUrl` on a thanks screen navigates there after `onSubmit` resolves.
@@ -239,11 +248,11 @@ A custom-theme registry API ships in V1.1 (`themes.register()`).
 
 ## Examples
 
-The `examples/` folder isn't published. It hosts **PSW Studio**, a dev-only admin app for building and previewing forms:
+The `examples/` folder isn't published. It hosts **PSW Studio**, a supported internal dev tool (ADR-018) for building and previewing forms:
 
 - Dashboard listing locally-stored form definitions (with two seed schemas).
-- Three-pane editor (outline / canvas / inspector) for composing schemas visually.
-- Live `<Form>` preview and a submissions inbox, both backed by `localStorage`.
+- Three-pane editor (outline / canvas / inspector) with drag-and-drop reordering, duplication, bulk delete, a visual logic editor (conditions, jumps, scores), and a schema-issue banner powered by `checkSchema`.
+- Live `<Form>` preview (with save-and-resume on) and a responses inbox with CSV export and per-question summaries, all backed by `localStorage`.
 
 Run `npm run dev` and open the printed URL to use it.
 

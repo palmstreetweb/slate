@@ -52,7 +52,10 @@ function toLeaf(c: Condition): Leaf | null {
   if (c.op === 'is_empty' || c.op === 'is_not_empty') {
     return { field: c.field, op: c.op, value: '' };
   }
-  return { field: c.field, op: c.op, value: String(c.value) };
+  // `op` isn't a unit-type discriminant, so TS can't narrow away the
+  // valueless variants above — assert the remaining shape.
+  const leaf = c as { field: string; op: LeafOp; value: string | number };
+  return { field: leaf.field, op: leaf.op, value: String(leaf.value) };
 }
 
 /** Editable row → leaf Condition, typing the value off the target question. */

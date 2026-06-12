@@ -23,7 +23,7 @@ import type {
   ThemeMode,
   ThemeName,
 } from '@/index.js';
-import { defineSchema } from '@/index.js';
+import { checkSchema, defineSchema } from '@/index.js';
 import { createForm, getForm, updateForm, type FormRecord } from '../_formsStore.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
@@ -191,6 +191,64 @@ function FormEditorBody({ formId }: { formId: string }) {
     });
   };
 
+  /** Drag-and-drop reorder — move a question to an absolute index. */
+  const moveTo = (id: string, toIndex: number) => {
+    setSchema((s) => {
+      if (!s) return s;
+      const arr = [...s.questions];
+      const from = arr.findIndex((q) => q.id === id);
+      if (from === -1 || arr[from]!.type === 'welcome' || arr[from]!.type === 'thanks') return s;
+      // Clamp inside the pinned welcome/thanks slots.
+      const min = arr[0]?.type === 'welcome' ? 1 : 0;
+      const max =
+        arr[arr.length - 1]?.type === 'thanks' ? arr.length - 2 : arr.length - 1;
+      const to = Math.max(min, Math.min(toIndex, max));
+      if (to === from) return s;
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved!);
+      return { ...s, questions: arr };
+    });
+  };
+
+  const duplicateQuestion = (id: string) => {
+    setSchema((s) => {
+      if (!s) return s;
+      const idx = s.questions.findIndex((q) => q.id === id);
+      const original = s.questions[idx];
+      if (!original || original.type === 'welcome' || original.type === 'thanks') return s;
+      let copyId = `${original.id}_copy`;
+      let n = 2;
+      while (s.questions.some((q) => q.id === copyId)) {
+        copyId = `${original.id}_copy${n}`;
+        n += 1;
+      }
+      const next = [...s.questions];
+      next.splice(idx + 1, 0, cloneQuestion(original, copyId));
+      setSelectedId(copyId);
+      return { ...s, questions: next };
+    });
+  };
+
+  const bulkDelete = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const ok = await confirm({
+      title: `Delete ${ids.length} ${ids.length === 1 ? 'question' : 'questions'}?`,
+      message: 'Removes them from this form. Existing responses keep their data in localStorage.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    setSchema((s) => {
+      if (!s) return s;
+      return {
+        ...s,
+        questions: s.questions.filter(
+          (q) => q.type === 'welcome' || q.type === 'thanks' || !ids.includes(q.id),
+        ),
+      };
+    });
+  };
+
   const addQuestion = (type: QuestionType) => {
     // Welcome / thanks are single-instance pins. Adding either should focus
     // the existing one instead of duplicating (the picker hides these types
@@ -216,6 +274,10 @@ function FormEditorBody({ formId }: { formId: string }) {
   };
 
   /* ---------- render ---------- */
+
+  // Schema sanity (roadmap Phase 6) — recomputed on every change since
+  // saving is synchronous; surfaces dangling visibleIf / jump references.
+  const issues = checkSchema(schema.questions);
 
   return (
     <AdminShell
@@ -258,6 +320,37 @@ function FormEditorBody({ formId }: { formId: string }) {
         </>
       }
     >
+      {issues.length > 0 && (
+        <div
+          role="alert"
+          style={{
+            margin: '0 0 0',
+            padding: '8px 16px',
+            background: 'rgb(220 38 38 / 0.08)',
+            borderBottom: '1px solid rgb(220 38 38 / 0.25)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '4px 16px',
+            fontSize: 12,
+          }}
+        >
+          <strong style={{ color: 'var(--psw-error, #dc2626)' }}>
+            {issues.length} schema {issues.length === 1 ? 'issue' : 'issues'}:
+          </strong>
+          {issues.map((issue, i) => (
+            <button
+              key={i}
+              type="button"
+              className="studio-link"
+              style={{ fontSize: 12 }}
+              onClick={() => setSelectedId(issue.questionId)}
+            >
+              {issue.message}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="studio-editor">
         <Outline
           schema={schema}
@@ -265,6 +358,9 @@ function FormEditorBody({ formId }: { formId: string }) {
           onSelect={setSelectedId}
           onAddQuestion={addQuestion}
           onReorder={reorder}
+          onMove={moveTo}
+          onDuplicate={duplicateQuestion}
+          onBulkDelete={(ids) => void bulkDelete(ids)}
           name={name}
           onNameChange={handleNameChange}
           onBrandChange={(v) => patchSchema({ brand: { ...schema.brand, name: v } })}
@@ -301,6 +397,22 @@ function FormEditorBody({ formId }: { formId: string }) {
       </div>
     </AdminShell>
   );
+}
+
+/**
+ * Clone a question one level deep — copies option/row/column arrays so the
+ * duplicate can be edited independently. Function titles (code-authored
+ * schemas only; the studio stores JSON) pass through by reference.
+ */
+function cloneQuestion(q: Question, id: string): Question {
+  const cloned: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(q)) {
+    cloned[k] = Array.isArray(v)
+      ? v.map((item) => (typeof item === 'object' && item !== null ? { ...item } : item))
+      : v;
+  }
+  cloned.id = id;
+  return cloned as unknown as Question;
 }
 
 function formatTime(d: Date): string {

@@ -234,6 +234,18 @@ Alternatives:
 Consequences: Hosts embedding multiple forms must give each a distinct `schema.id`. The resume prompt is wrapper-scoped UI (no document-level dialogs). Phase 5 also adds the `review` chrome screen (no answer stored, listed in no payload) and `onPartialChange(answers, meta)` for abandonment capture — both pure additions to the public API.
 Revisit when: resume-from-URL-token (cross-device) gets scheduled; that needs signing and stays deferred.
 
+## ADR-018 — The studio is a supported dev-tool surface
+Date: 2026-06-12
+Status: accepted
+Context: Brief §14 declared "Visual form builder UI" out of V1 scope ("agency writes schemas in code; clients never edit forms directly"). The `examples/_admin` studio has nevertheless grown into a real builder — outline with drag-and-drop reordering, duplication and bulk delete, a three-pane editor with logic/jump/score editing, live preview with save-and-resume, submissions with CSV export and per-question summaries. Pretending it's "just an example" no longer matches reality.
+Decision: The studio is formally a **supported internal dev tool**: agency-facing, dev-server-only (`npm run dev`), localStorage-backed. It is *not* part of the published package (nothing under `examples/` ships in `dist/`), not client-facing, and carries no multi-tenant/auth/backend ambitions — those remain deferred per §14. Engine rule going forward (already roadmap policy): every schema feature must be editable in the studio Inspector, or it isn't done.
+Decision (supporting): schema sanity checking lives in the *engine* as a pure, exported `checkSchema(questions): SchemaIssue[]` (`src/logic/schemaCheck.ts`) — duplicate ids, dangling `visibleIf`/jump-condition references, dangling/self jump targets. The studio surfaces issues in an editor banner; hosts and CI can call it directly. The runtime engine stays forgiving (dangling refs fall through) per ADR-015.
+Alternatives:
+- Keep the builder unofficial. Rejected — it already contradicts the brief in practice; an ADR is the honest paper trail.
+- Promote it into the published package. Rejected — bundle budget and scope; the engine is the product, the studio is tooling.
+Consequences: Studio code is held to repo conventions (TS, tokens, tests where practical) but not to the engine's bundle budget. Brief §14 stays frozen; this ADR is the documented exception.
+Revisit when: someone wants to deploy the studio for non-developers — that's the "client-facing admin dashboard" line item, still deferred.
+
 ---
 
 ## Deferred to V2
@@ -247,7 +259,7 @@ Per brief §14, V1 explicitly does **not** include the items below. Each gets a 
 - **iframe / HTML script-tag embed** — different consumer model; current package is React-only.
 - **Built-in analytics event bus** — `onQuestionChange` callback is enough for V1.
 - **Translation / i18n** — current pattern: callers pass already-localized strings.
-- **Visual form builder UI** — agency writes schemas in code; clients never edit forms directly.
+- ~~**Visual form builder UI**~~ — the PSW Studio is now a supported internal dev tool (ADR-018). A *client-facing* builder remains deferred.
 - **Multi-tenant form storage backend** — out of package scope.
 - **Client-facing admin dashboard** — out of package scope.
 

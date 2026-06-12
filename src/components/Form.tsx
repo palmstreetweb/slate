@@ -81,6 +81,7 @@ export function Form<S extends Schema>({
     step: state.step,
     visitedIds: state.questionsVisited,
   });
+  const clearAutosave = autosave.clear;
 
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>(
     'idle',
@@ -217,7 +218,7 @@ export function Form<S extends Schema>({
       .then(() => {
         setSubmitStatus('success');
         // Completed — drop the save-and-resume snapshot (ADR-017).
-        if (resumeEnabled) autosave.clear();
+        if (resumeEnabled) clearAutosave();
         // Ending redirect (ADR-016) — only after a confirmed submit.
         if (redirectUrl) window.location.assign(redirectUrl);
       })
@@ -237,7 +238,7 @@ export function Form<S extends Schema>({
     submitStatus,
     score,
     resumeEnabled,
-    autosave.clear,
+    clearAutosave,
   ]);
 
   const retrySubmit = useCallback(() => {

@@ -5,7 +5,7 @@
  * mode, brand) live at the top and bottom of this rail.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type {
   Question,
   QuestionType,
@@ -80,6 +80,10 @@ type Props = {
   onSelect: (id: string) => void;
   onAddQuestion: (type: QuestionType) => void;
   onReorder: (id: string, dir: 'up' | 'down') => void;
+  /** Drag-and-drop — move a question to an absolute index. */
+  onMove: (id: string, toIndex: number) => void;
+  onDuplicate: (id: string) => void;
+  onBulkDelete: (ids: string[]) => void;
   // Form-level controls
   name: string;
   onNameChange: (v: string) => void;
@@ -94,6 +98,9 @@ export function Outline({
   onSelect,
   onAddQuestion,
   onReorder,
+  onMove,
+  onDuplicate,
+  onBulkDelete,
   name,
   onNameChange,
   onBrandChange,
@@ -102,6 +109,23 @@ export function Outline({
 }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const dragId = useRef<string | null>(null);
+
+  const toggleChecked = (id: string) => {
+    setChecked((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setChecked(new Set());
+  };
 
   return (
     <aside className="studio-rail studio-rail--left">
@@ -123,33 +147,94 @@ export function Outline({
 
       {/* Questions outline */}
       <div className="studio-rail-pad" style={{ paddingTop: 8 }}>
-        <p className="studio-label" style={{ marginBottom: 8 }}>
-          Questions
-        </p>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8,
+          }}
+        >
+          <p className="studio-label" style={{ margin: 0 }}>
+            Questions
+          </p>
+          <button
+            type="button"
+            className="studio-btn studio-btn--ghost"
+            style={{ fontSize: 10, padding: '2px 8px' }}
+            onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+          >
+            {selectMode ? 'Done' : 'Select'}
+          </button>
+        </div>
+        {selectMode && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 11, color: 'var(--psw-dim)' }}>
+              {checked.size} selected
+            </span>
+            <button
+              type="button"
+              className="studio-btn studio-btn--danger"
+              style={{ fontSize: 10, padding: '2px 8px' }}
+              disabled={checked.size === 0}
+              onClick={() => {
+                onBulkDelete([...checked]);
+                exitSelectMode();
+              }}
+            >
+              Delete selected
+            </button>
+          </div>
+        )}
         <ul className="studio-outline-list">
           {schema.questions.map((q, i) => {
             const isSelected = selectedId === q.id;
             const pinned = q.type === 'welcome' || q.type === 'thanks';
             const titleText = typeof q.title === 'string' ? q.title : '(dynamic title)';
             return (
-              <li key={q.id}>
-                <button
-                  type="button"
-                  className={`studio-outline-row${isSelected ? ' studio-outline-row--selected' : ''}`}
-                  onClick={() => onSelect(q.id)}
-                >
-                  <span className="studio-outline-idx">{String(i + 1).padStart(2, '0')}</span>
-                  <span className="studio-outline-glyph" aria-hidden>
-                    {TYPE_GLYPH[q.type]}
-                  </span>
-                  <span className="studio-outline-title">{titleText || '(no title)'}</span>
-                  {pinned && (
-                    <span className="studio-badge" style={{ fontSize: 9, padding: '0 5px' }}>
-                      pinned
-                    </span>
+              <li
+                key={q.id}
+                draggable={!pinned && !selectMode}
+                onDragStart={() => {
+                  dragId.current = q.id;
+                }}
+                onDragOver={(e) => {
+                  if (dragId.current === null || dragId.current === q.id || pinned) return;
+                  e.preventDefault();
+                  onMove(dragId.current, i);
+                }}
+                onDragEnd={() => {
+                  dragId.current = null;
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {selectMode && !pinned && (
+                    <input
+                      type="checkbox"
+                      checked={checked.has(q.id)}
+                      onChange={() => toggleChecked(q.id)}
+                      aria-label={`Select ${titleText || q.id}`}
+                    />
                   )}
-                </button>
-                {!pinned && (
+                  <button
+                    type="button"
+                    className={`studio-outline-row${isSelected ? ' studio-outline-row--selected' : ''}`}
+                    style={{ flex: 1, cursor: !pinned && !selectMode ? 'grab' : undefined }}
+                    onClick={() => (selectMode && !pinned ? toggleChecked(q.id) : onSelect(q.id))}
+                  >
+                    <span className="studio-outline-idx">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="studio-outline-glyph" aria-hidden>
+                      {TYPE_GLYPH[q.type]}
+                    </span>
+                    <span className="studio-outline-title">{titleText || '(no title)'}</span>
+                    {pinned && (
+                      <span className="studio-badge" style={{ fontSize: 9, padding: '0 5px' }}>
+                        pinned
+                      </span>
+                    )}
+                  </button>
+                </div>
+                {!pinned && !selectMode && (
                   <div className="studio-outline-actions">
                     {i > 0 && schema.questions[i - 1]?.type !== 'welcome' && (
                       <button
@@ -173,6 +258,15 @@ export function Outline({
                         ↓
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="studio-icon-btn"
+                      onClick={() => onDuplicate(q.id)}
+                      aria-label="Duplicate"
+                      title="Duplicate"
+                    >
+                      ⧉
+                    </button>
                   </div>
                 )}
               </li>
