@@ -2,58 +2,73 @@
 
 /* ---------- text-like inputs (short_text, long_text, email, phone, number) ---------- */
 
-[data-psw-forms] .psw-input {
+[data-slate-forms] .slate-input {
   width: 100%;
   background: transparent;
   outline: none;
-  border-top: none;
-  border-left: none;
-  border-right: none;
-  border-bottom: var(--psw-border-width) solid var(--psw-border-md);
+  border: none;
+  border-bottom: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: 0;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
   padding: 0 0 0.6rem 0;
   font-size: clamp(1.35rem, 3.2vw, 1.85rem);
-  font-family: var(--psw-font-body);
-  color: var(--psw-text);
+  font-family: var(--slate-font-body);
+  color: var(--slate-text);
   font-weight: 400;
   transition: border-color 180ms ease-out;
   /* iOS zoom prevention. */
   -webkit-text-size-adjust: 100%;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-input {
+/* Strip Chrome/Safari autofill's filled-in box — keep the underline field. */
+[data-slate-forms] .slate-input:-webkit-autofill,
+[data-slate-forms] .slate-input:-webkit-autofill:hover,
+[data-slate-forms] .slate-input:-webkit-autofill:focus,
+[data-slate-forms] .slate-input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--slate-text);
+  caret-color: var(--slate-text);
+  transition: background-color 99999s ease-out 0s;
+}
+
+[data-slate-forms][data-theme-name='swiss'] .slate-input {
   font-size: clamp(1.4rem, 3.4vw, 2rem);
   font-weight: 500;
-  border-bottom-color: var(--psw-text);
+  border-bottom-color: var(--slate-text);
 }
 
-[data-psw-forms] .psw-input:focus {
-  border-bottom-color: var(--psw-accent);
+[data-slate-forms] .slate-input:focus {
+  border-bottom-color: var(--slate-accent);
 }
 
-[data-psw-forms] .psw-input--error {
-  border-bottom-color: var(--psw-error);
+[data-slate-forms] .slate-input--error {
+  border-bottom-color: var(--slate-error);
 }
 
-[data-psw-forms] .psw-input::placeholder {
-  color: var(--psw-dim);
+[data-slate-forms] .slate-input::placeholder {
+  color: var(--slate-dim);
   opacity: 0.5;
   font-style: italic;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-input::placeholder {
+[data-slate-forms][data-theme-name='swiss'] .slate-input::placeholder {
   font-style: normal;
 }
 
-[data-psw-forms] textarea.psw-input {
+[data-slate-forms] textarea.slate-input {
   resize: none;
   line-height: 1.5;
   font-size: clamp(1.15rem, 2.5vw, 1.45rem);
   min-height: 4.5em;
 }
 
-/* ---------- OK button + Enter hint ---------- */
+/* ---------- OK button + Enter hint ----------
+   FILL RULE (ADR-024): any surface filled with `--slate-accent` must use
+   `color: var(--slate-on-accent)` — never `#fff` or `--slate-text`.
+   Surfaces filled with `--slate-text` use `color: var(--slate-bg)`. ---------- */
 
-[data-psw-forms] .psw-actions {
+[data-slate-forms] .slate-actions {
   margin-top: 32px;
   display: flex;
   align-items: center;
@@ -61,20 +76,20 @@
   flex-wrap: wrap;
 }
 
-[data-psw-forms] .psw-ok-btn {
+[data-slate-forms] .slate-ok-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: var(--psw-accent);
-  color: #fff;
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
   border: none;
-  border-radius: var(--psw-radius);
+  border-radius: var(--slate-radius);
   font-size: 15px;
   font-weight: 500;
-  font-family: var(--psw-font-body);
+  font-family: var(--slate-font-body);
   cursor: pointer;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
   transition:
     transform 180ms ease-out,
     box-shadow 180ms ease-out;
@@ -82,200 +97,209 @@
   min-width: 44px;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-ok-btn {
+[data-slate-forms][data-theme-name='swiss'] .slate-ok-btn {
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.05em;
 }
 
-[data-psw-forms] .psw-ok-btn:hover {
+[data-slate-forms] .slate-ok-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgb(var(--psw-accent-rgb) / 0.25);
+  box-shadow: 0 4px 12px rgb(var(--slate-accent-rgb) / 0.25);
 }
 
-[data-psw-forms] .psw-ok-btn:active {
+[data-slate-forms] .slate-ok-btn:active {
   transform: translateY(0);
 }
 
-[data-psw-forms] .psw-ok-btn:disabled {
+[data-slate-forms] .slate-ok-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   transform: none;
 }
 
-[data-psw-forms] .psw-hint {
+[data-slate-forms] .slate-hint {
   font-size: 11px;
   letter-spacing: 0.15em;
-  font-family: var(--psw-font-mono);
-  color: var(--psw-text);
+  font-family: var(--slate-font-mono);
+  color: var(--slate-text);
   opacity: 0.45;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-hint {
+[data-slate-forms][data-theme-name='swiss'] .slate-hint {
   font-weight: 700;
 }
 
 /* ---------- error message ---------- */
 
-[data-psw-forms] .psw-err {
+[data-slate-forms] .slate-err {
   margin-top: 12px;
-  font-size: 13px;
-  color: var(--psw-error);
-  font-family: var(--psw-font-mono);
-  text-transform: var(--psw-transform);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--slate-error);
+  font-family: var(--slate-font-body);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-err {
+[data-slate-forms][data-theme-name='swiss'] .slate-err {
   font-weight: 700;
+  font-size: 13px;
+}
+
+[data-slate-forms][data-theme-name='mono'] .slate-err {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.01em;
 }
 
 /* ---------- welcome CTA ---------- */
 
-[data-psw-forms] .psw-cta {
+[data-slate-forms] .slate-cta {
   margin-top: 32px;
   display: inline-flex;
   align-items: center;
   gap: 12px;
   padding: 14px 28px;
-  background: var(--psw-text);
-  color: var(--psw-bg);
+  background: var(--slate-text);
+  color: var(--slate-bg);
   border: none;
-  border-radius: var(--psw-radius);
+  border-radius: var(--slate-radius);
   font-size: 16px;
   font-weight: 500;
-  font-family: var(--psw-font-body);
+  font-family: var(--slate-font-body);
   cursor: pointer;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
   min-height: 44px;
   transition:
     transform 180ms ease-out,
     box-shadow 180ms ease-out;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-cta {
+[data-slate-forms][data-theme-name='swiss'] .slate-cta {
   padding: 16px 32px;
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.05em;
 }
 
-[data-psw-forms] .psw-cta:hover {
+[data-slate-forms] .slate-cta:hover {
   transform: translateY(-1px);
 }
 
-[data-psw-forms] .psw-cta-hint {
+[data-slate-forms] .slate-cta-hint {
   opacity: 0.55;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   font-size: 0.78rem;
   font-weight: 400;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
 /* ---------- choice list ---------- */
 
-[data-psw-forms] .psw-choices {
+[data-slate-forms] .slate-choices {
   margin-top: 36px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-choices {
+[data-slate-forms][data-theme-name='swiss'] .slate-choices {
   gap: 8px;
 }
 
-[data-psw-forms] .psw-choice {
+[data-slate-forms] .slate-choice {
   width: 100%;
   text-align: left;
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 16px 20px;
-  border: var(--psw-border-width) solid rgb(var(--psw-accent-rgb) / 0);
-  border-color: var(--psw-border-md);
+  border: var(--slate-border-width) solid rgb(var(--slate-accent-rgb) / 0);
+  border-color: var(--slate-border-md);
   background: transparent;
-  border-radius: var(--psw-radius);
+  border-radius: var(--slate-radius);
   cursor: pointer;
   transition:
     border-color 150ms,
     background 150ms,
     color 150ms;
-  color: var(--psw-text);
-  font-family: var(--psw-font-body);
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
   font-weight: 400;
   font-size: clamp(1.05rem, 2vw, 1.2rem);
   min-height: 44px;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-choice {
+[data-slate-forms][data-theme-name='swiss'] .slate-choice {
   padding: 18px 20px;
   font-weight: 600;
-  border-color: var(--psw-text);
+  border-color: var(--slate-text);
 }
 
 /* Swiss light: classic white poster bg + dark text. */
-[data-psw-forms][data-theme-name='swiss'][data-theme='light'] .psw-choice {
+[data-slate-forms][data-theme-name='swiss'][data-theme='light'] .slate-choice {
   background: #fff;
-  color: var(--psw-text);
+  color: var(--slate-text);
 }
 
 /* Swiss dark: subtly elevated dark bg + cream text — Typeform-style.
    Without this rule the choice would inherit `background: #fff` and end up
    with cream text on white = unreadable (the bug Caleb caught). */
-[data-psw-forms][data-theme-name='swiss'][data-theme='dark'] .psw-choice {
-  background: var(--psw-bg-2);
-  color: var(--psw-text);
+[data-slate-forms][data-theme-name='swiss'][data-theme='dark'] .slate-choice {
+  background: var(--slate-bg-2);
+  color: var(--slate-text);
 }
 
-[data-psw-forms] .psw-choice:hover {
-  border-color: var(--psw-accent);
-  background: var(--psw-accent-lo);
+[data-slate-forms] .slate-choice:hover {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent-lo);
 }
 
 /* Swiss hover/selected = full inversion: text-color becomes the bg, bg
    becomes the text-color. Works in both light + dark because both tokens
    are mode-aware. */
-[data-psw-forms][data-theme-name='swiss'] .psw-choice:hover {
-  background: var(--psw-text);
-  color: var(--psw-bg);
+[data-slate-forms][data-theme-name='swiss'] .slate-choice:hover {
+  background: var(--slate-text);
+  color: var(--slate-bg);
 }
 
-[data-psw-forms] .psw-choice--selected {
-  border-color: var(--psw-text);
-  background: var(--psw-accent-lo);
+[data-slate-forms] .slate-choice--selected {
+  border-color: var(--slate-text);
+  background: var(--slate-accent-lo);
 }
 
 /* The `[data-theme]` (any value) attribute selector lifts this rule's
    specificity to (0,4,0) so it can beat the per-mode default rules above
    (which are also (0,4,0) but source-order earlier). Without this, the
-   default-state Swiss-dark `.psw-choice` rule outranks `--selected` and
+   default-state Swiss-dark `.slate-choice` rule outranks `--selected` and
    the highlighted choice never visually changes. */
-[data-psw-forms][data-theme-name='swiss'][data-theme] .psw-choice--selected {
-  background: var(--psw-text);
-  color: var(--psw-bg);
+[data-slate-forms][data-theme-name='swiss'][data-theme] .slate-choice--selected {
+  background: var(--slate-text);
+  color: var(--slate-bg);
 }
 
-[data-psw-forms][data-theme-name='swiss'][data-theme] .psw-choice:hover {
-  background: var(--psw-text);
-  color: var(--psw-bg);
+[data-slate-forms][data-theme-name='swiss'][data-theme] .slate-choice:hover {
+  background: var(--slate-text);
+  color: var(--slate-bg);
 }
 
-[data-psw-forms] .psw-choice-badge {
+[data-slate-forms] .slate-choice-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
   font-size: 12px;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   font-weight: 500;
-  border: var(--psw-border-width) solid var(--psw-border-md);
+  border: var(--slate-border-width) solid var(--slate-border-md);
   background: transparent;
-  color: var(--psw-text);
-  border-radius: var(--psw-radius);
+  color: var(--slate-text);
+  border-radius: var(--slate-radius);
   flex-shrink: 0;
   transition:
     border-color 150ms,
@@ -283,7 +307,7 @@
     color 150ms;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-choice-badge {
+[data-slate-forms][data-theme-name='swiss'] .slate-choice-badge {
   width: 32px;
   height: 32px;
   font-size: 14px;
@@ -291,23 +315,26 @@
   border-color: currentColor;
 }
 
-[data-psw-forms] .psw-choice--selected .psw-choice-badge {
-  border-color: var(--psw-accent);
-  background: var(--psw-accent);
-  color: #fff;
+[data-slate-forms] .slate-choice--selected .slate-choice-badge {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
 }
 
-/* Selected-state badge inverts against the lit choice bg in BOTH modes:
-     light:  choice bg = #000  → badge bg = #FAF6EE-ish (var(--psw-bg))
-     dark:   choice bg = cream → badge bg = #0a0a0a-ish (var(--psw-bg))
-   Same rule, mode-aware via tokens. */
-[data-psw-forms][data-theme-name='swiss'] .psw-choice--selected .psw-choice-badge {
-  background: var(--psw-bg);
-  color: var(--psw-text);
-  border-color: var(--psw-bg);
+/* Selected/hover badge inverts against the lit choice bg in BOTH modes:
+     light:  choice bg = #000  → badge bg = #FAF6EE-ish (var(--slate-bg))
+     dark:   choice bg = cream → badge bg = #0a0a0a-ish (var(--slate-bg))
+   Same rule, mode-aware via tokens. The :hover variant is essential —
+   without it the badge stays cream-on-cream on the inverted hover bg and
+   the letter disappears. */
+[data-slate-forms][data-theme-name='swiss'] .slate-choice--selected .slate-choice-badge,
+[data-slate-forms][data-theme-name='swiss'] .slate-choice:hover .slate-choice-badge {
+  background: var(--slate-bg);
+  color: var(--slate-text);
+  border-color: var(--slate-bg);
 }
 
-[data-psw-forms] .psw-choice-desc {
+[data-slate-forms] .slate-choice-desc {
   display: block;
   margin-top: 2px;
   font-size: 0.85em;
@@ -317,17 +344,17 @@
 
 /* ---------- scale slider ---------- */
 
-[data-psw-forms] .psw-scale {
+[data-slate-forms] .slate-scale {
   margin-top: 36px;
 }
 
-[data-psw-forms] .psw-scale-row {
+[data-slate-forms] .slate-scale-row {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-[data-psw-forms] .psw-scale-cell {
+[data-slate-forms] .slate-scale-cell {
   flex: 1 1 auto;
   min-width: 44px;
   min-height: 44px;
@@ -335,12 +362,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   font-size: 16px;
   background: transparent;
-  color: var(--psw-text);
-  border: var(--psw-border-width) solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
+  color: var(--slate-text);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
   cursor: pointer;
   transition:
     border-color 120ms,
@@ -348,109 +375,109 @@
     color 120ms;
 }
 
-[data-psw-forms] .psw-scale-cell:hover {
-  border-color: var(--psw-accent);
-  background: var(--psw-accent-lo);
+[data-slate-forms] .slate-scale-cell:hover {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent-lo);
 }
 
-[data-psw-forms] .psw-scale-cell--selected {
-  background: var(--psw-accent);
-  border-color: var(--psw-accent);
-  color: #fff;
+[data-slate-forms] .slate-scale-cell--selected {
+  background: var(--slate-accent);
+  border-color: var(--slate-accent);
+  color: var(--slate-on-accent);
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-scale-cell--selected {
-  background: var(--psw-text);
-  border-color: var(--psw-text);
-  color: var(--psw-bg);
+[data-slate-forms][data-theme-name='swiss'] .slate-scale-cell--selected {
+  background: var(--slate-text);
+  border-color: var(--slate-text);
+  color: var(--slate-bg);
 }
 
-[data-psw-forms] .psw-scale-labels {
+[data-slate-forms] .slate-scale-labels {
   display: flex;
   justify-content: space-between;
   margin-top: 12px;
   font-size: 11px;
   letter-spacing: 0.15em;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   opacity: 0.45;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
 /* ---------- date (segmented MM / DD / YYYY) ---------- */
 
-[data-psw-forms] .psw-date-row {
+[data-slate-forms] .slate-date-row {
   display: flex;
   align-items: baseline;
   gap: 12px;
 }
 
-[data-psw-forms] .psw-input.psw-date-seg {
+[data-slate-forms] .slate-input.slate-date-seg {
   width: 3.2ch;
   min-width: 3.2ch;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
-[data-psw-forms] .psw-input.psw-date-seg--year {
+[data-slate-forms] .slate-input.slate-date-seg--year {
   width: 5.4ch;
   min-width: 5.4ch;
 }
 
-[data-psw-forms] .psw-date-sep {
+[data-slate-forms] .slate-date-sep {
   font-size: clamp(1.35rem, 3.2vw, 1.85rem);
-  color: var(--psw-dim);
+  color: var(--slate-dim);
   opacity: 0.6;
-  font-family: var(--psw-font-body);
+  font-family: var(--slate-font-body);
 }
 
 /* ---------- searchable dropdown ---------- */
 
-[data-psw-forms] .psw-dropdown-list {
+[data-slate-forms] .slate-dropdown-list {
   list-style: none;
   margin: 8px 0 0;
   padding: 4px;
   max-height: 280px;
   overflow-y: auto;
-  background: var(--psw-bg-2);
-  border: var(--psw-border-width) solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
+  background: var(--slate-bg-2);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
 }
 
-[data-psw-forms] .psw-dropdown-item {
+[data-slate-forms] .slate-dropdown-item {
   display: block;
   width: 100%;
   text-align: left;
   padding: 12px 14px;
   background: transparent;
   border: none;
-  border-radius: var(--psw-radius);
+  border-radius: var(--slate-radius);
   cursor: pointer;
-  color: var(--psw-text);
-  font-family: var(--psw-font-body);
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
   font-size: clamp(1rem, 1.8vw, 1.1rem);
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
   transition:
     background 120ms,
     color 120ms;
 }
 
-[data-psw-forms] .psw-dropdown-item--hl {
-  background: var(--psw-accent-lo);
+[data-slate-forms] .slate-dropdown-item--hl {
+  background: var(--slate-accent-lo);
 }
 
-[data-psw-forms] .psw-dropdown-item--selected {
-  background: var(--psw-accent);
-  color: #fff;
+[data-slate-forms] .slate-dropdown-item--selected {
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-dropdown-item--selected {
-  background: var(--psw-text);
-  color: var(--psw-bg);
+[data-slate-forms][data-theme-name='swiss'] .slate-dropdown-item--selected {
+  background: var(--slate-text);
+  color: var(--slate-bg);
 }
 
 /* ---------- file upload ---------- */
 
-[data-psw-forms] .psw-upload-zone {
+[data-slate-forms] .slate-upload-zone {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -458,54 +485,54 @@
   gap: 6px;
   padding: 40px 24px;
   background: transparent;
-  border: var(--psw-border-width) dashed var(--psw-border-md);
-  border-radius: var(--psw-radius);
+  border: var(--slate-border-width) dashed var(--slate-border-md);
+  border-radius: var(--slate-radius);
   cursor: pointer;
-  color: var(--psw-text);
-  font-family: var(--psw-font-body);
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
   transition:
     border-color 150ms,
     background 150ms;
 }
 
-[data-psw-forms] .psw-upload-zone:hover,
-[data-psw-forms] .psw-upload-zone--over {
-  border-color: var(--psw-accent);
-  background: var(--psw-accent-lo);
+[data-slate-forms] .slate-upload-zone:hover,
+[data-slate-forms] .slate-upload-zone--over {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent-lo);
 }
 
-[data-psw-forms] .psw-upload-cta {
+[data-slate-forms] .slate-upload-cta {
   font-size: clamp(1.05rem, 2vw, 1.2rem);
   font-weight: 500;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms] .psw-upload-hint {
+[data-slate-forms] .slate-upload-hint {
   font-size: 12px;
   opacity: 0.55;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms] .psw-upload-file {
+[data-slate-forms] .slate-upload-file {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 16px 20px;
-  border: var(--psw-border-width) solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
-  font-family: var(--psw-font-body);
-  color: var(--psw-text);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
+  font-family: var(--slate-font-body);
+  color: var(--slate-text);
 }
 
-[data-psw-forms] .psw-upload-name {
+[data-slate-forms] .slate-upload-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: clamp(1rem, 1.8vw, 1.1rem);
 }
 
-[data-psw-forms] .psw-upload-remove {
+[data-slate-forms] .slate-upload-remove {
   flex-shrink: 0;
   width: 32px;
   height: 32px;
@@ -513,9 +540,9 @@
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: var(--psw-border-width) solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
-  color: var(--psw-text);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
+  color: var(--slate-text);
   font-size: 16px;
   cursor: pointer;
   transition:
@@ -523,64 +550,64 @@
     color 150ms;
 }
 
-[data-psw-forms] .psw-upload-remove:hover {
-  border-color: var(--psw-error);
-  color: var(--psw-error);
+[data-slate-forms] .slate-upload-remove:hover {
+  border-color: var(--slate-error);
+  color: var(--slate-error);
 }
 
 /* ---------- picture choice ---------- */
 
-[data-psw-forms] .psw-picture-grid {
+[data-slate-forms] .slate-picture-grid {
   margin-top: 36px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 12px;
 }
 
-[data-psw-forms] .psw-picture {
+[data-slate-forms] .slate-picture {
   display: flex;
   flex-direction: column;
   padding: 0;
   background: transparent;
-  border: var(--psw-border-width) solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
   overflow: hidden;
   cursor: pointer;
-  color: var(--psw-text);
-  font-family: var(--psw-font-body);
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
   transition:
     border-color 150ms,
     background 150ms;
 }
 
-[data-psw-forms] .psw-picture:hover {
-  border-color: var(--psw-accent);
-  background: var(--psw-accent-lo);
+[data-slate-forms] .slate-picture:hover {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent-lo);
 }
 
-[data-psw-forms] .psw-picture--selected {
-  border-color: var(--psw-accent);
-  background: var(--psw-accent-lo);
+[data-slate-forms] .slate-picture--selected {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent-lo);
 }
 
-[data-psw-forms] .psw-picture-img {
+[data-slate-forms] .slate-picture-img {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
   display: block;
 }
 
-[data-psw-forms] .psw-picture-caption {
+[data-slate-forms] .slate-picture-caption {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
   font-size: 0.95rem;
   text-align: left;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms] .psw-picture-caption .psw-choice-badge {
+[data-slate-forms] .slate-picture-caption .slate-choice-badge {
   width: 22px;
   height: 22px;
   font-size: 11px;
@@ -588,7 +615,7 @@
 
 /* ---------- ranking ---------- */
 
-[data-psw-forms] .psw-ranking {
+[data-slate-forms] .slate-ranking {
   list-style: none;
   margin: 36px 0 0;
   padding: 0;
@@ -597,253 +624,398 @@
   gap: 8px;
 }
 
-[data-psw-forms] .psw-ranking-row {
+[data-slate-forms] .slate-ranking-row {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
-  border: var(--psw-border-width) solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
   background: transparent;
   cursor: grab;
-  font-family: var(--psw-font-body);
-  color: var(--psw-text);
+  font-family: var(--slate-font-body);
+  color: var(--slate-text);
   font-size: clamp(1rem, 1.8vw, 1.15rem);
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms] .psw-ranking-pos {
+[data-slate-forms] .slate-ranking-pos {
   flex-shrink: 0;
   width: 26px;
   height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   font-size: 12px;
-  border: var(--psw-border-width) solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
 }
 
-[data-psw-forms] .psw-ranking-label {
+[data-slate-forms] .slate-ranking-label {
   flex: 1;
 }
 
-[data-psw-forms] .psw-ranking-controls {
+[data-slate-forms] .slate-ranking-controls {
   display: flex;
   gap: 4px;
 }
 
-[data-psw-forms] .psw-ranking-btn {
+[data-slate-forms] .slate-ranking-btn {
   width: 30px;
   height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: var(--psw-border-width) solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
-  color: var(--psw-text);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
+  color: var(--slate-text);
   cursor: pointer;
   transition:
     border-color 150ms,
     background 150ms;
 }
 
-[data-psw-forms] .psw-ranking-btn:hover:not(:disabled) {
-  border-color: var(--psw-accent);
-  background: var(--psw-accent-lo);
+[data-slate-forms] .slate-ranking-btn:hover:not(:disabled) {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent-lo);
 }
 
-[data-psw-forms] .psw-ranking-btn:disabled {
+[data-slate-forms] .slate-ranking-btn:disabled {
   opacity: 0.3;
   cursor: default;
 }
 
 /* ---------- matrix ---------- */
 
-[data-psw-forms] .psw-matrix {
+[data-slate-forms] .slate-matrix {
   margin-top: 36px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-[data-psw-forms] .psw-matrix-head,
-[data-psw-forms] .psw-matrix-row {
+[data-slate-forms] .slate-matrix-head,
+[data-slate-forms] .slate-matrix-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.4fr) repeat(var(--psw-matrix-cols), 1fr);
+  grid-template-columns: minmax(120px, 1.4fr) repeat(var(--slate-matrix-cols), 1fr);
   gap: 6px;
   align-items: stretch;
 }
 
-[data-psw-forms] .psw-matrix-colhead {
+[data-slate-forms] .slate-matrix-colhead {
   font-size: 11px;
   letter-spacing: 0.1em;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   opacity: 0.6;
   text-align: center;
   align-self: end;
   padding-bottom: 4px;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms] .psw-matrix-rowlabel {
+[data-slate-forms] .slate-matrix-rowlabel {
   display: flex;
   align-items: center;
   font-size: clamp(0.95rem, 1.6vw, 1.05rem);
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms] .psw-matrix-cell {
+[data-slate-forms] .slate-matrix-cell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 44px;
   background: transparent;
-  border: var(--psw-border-width) solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
   cursor: pointer;
-  color: var(--psw-text);
+  color: var(--slate-text);
   transition:
     border-color 120ms,
     background 120ms;
 }
 
-[data-psw-forms] .psw-matrix-cell:hover {
-  border-color: var(--psw-accent);
-  background: var(--psw-accent-lo);
+[data-slate-forms] .slate-matrix-cell:hover {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent-lo);
 }
 
-[data-psw-forms] .psw-matrix-cell--selected {
-  border-color: var(--psw-accent);
-  background: var(--psw-accent);
+[data-slate-forms] .slate-matrix-cell--selected {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
 }
 
-[data-psw-forms] .psw-matrix-dot {
+[data-slate-forms] .slate-matrix-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--psw-border-md);
+  background: var(--slate-border-md);
 }
 
-[data-psw-forms] .psw-matrix-cell--selected .psw-matrix-dot {
-  background: #fff;
+[data-slate-forms] .slate-matrix-cell--selected .slate-matrix-dot {
+  background: var(--slate-on-accent);
 }
 
 /* Column labels inside cells only show on the stacked mobile layout. */
-[data-psw-forms] .psw-matrix-cell-label {
+[data-slate-forms] .slate-matrix-cell-label {
   display: none;
   font-size: 0.85rem;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
 @media (max-width: 560px) {
-  [data-psw-forms] .psw-matrix-head {
+  [data-slate-forms] .slate-matrix-head {
     display: none;
   }
 
-  [data-psw-forms] .psw-matrix-row {
+  [data-slate-forms] .slate-matrix-row {
     grid-template-columns: 1fr;
     margin-bottom: 10px;
   }
 
-  [data-psw-forms] .psw-matrix-cell {
+  [data-slate-forms] .slate-matrix-cell {
     justify-content: flex-start;
     gap: 10px;
     padding: 10px 14px;
   }
 
-  [data-psw-forms] .psw-matrix-cell-label {
+  [data-slate-forms] .slate-matrix-cell-label {
     display: inline;
   }
 
-  [data-psw-forms] .psw-matrix-cell--selected .psw-matrix-cell-label {
-    color: #fff;
+  [data-slate-forms] .slate-matrix-cell--selected .slate-matrix-cell-label {
+    color: var(--slate-on-accent);
   }
 }
 
 /* ---------- thanks confirmation chip ---------- */
 
-[data-psw-forms] .psw-confirm-chip {
+[data-slate-forms] .slate-confirm-chip {
   display: inline-block;
   padding: 8px 16px;
   margin-top: 8px;
   font-size: 11px;
   letter-spacing: 0.18em;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   font-weight: 500;
-  background: var(--psw-text);
-  color: var(--psw-bg);
-  border-radius: var(--psw-radius);
+  background: var(--slate-text);
+  color: var(--slate-bg);
+  border-radius: var(--slate-radius);
   text-transform: uppercase;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-confirm-chip {
+[data-slate-forms][data-theme-name='swiss'] .slate-confirm-chip {
   padding: 12px 20px;
   font-weight: 700;
 }
 
 /* ---------- review screen ---------- */
 
-[data-psw-forms] .psw-review {
+[data-slate-forms] .slate-review {
   display: grid;
   gap: 0;
   margin: 28px 0 0;
-  border-top: 1px solid var(--psw-border-md);
+  border-top: 1px solid var(--slate-border-md);
 }
 
-[data-psw-forms] .psw-review-row {
+[data-slate-forms] .slate-review-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   align-items: baseline;
   padding: 12px 0;
-  border-bottom: 1px solid var(--psw-border-md);
+  border-bottom: 1px solid var(--slate-border-md);
 }
 
-[data-psw-forms] .psw-review-q {
+[data-slate-forms] .slate-review-q {
   margin: 0;
   font-size: 14px;
-  color: var(--psw-dim);
-  font-family: var(--psw-font-body);
+  color: var(--slate-dim);
+  font-family: var(--slate-font-body);
 }
 
-[data-psw-forms] .psw-review-a {
+[data-slate-forms] .slate-review-a {
   margin: 0;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
   font-size: 15px;
-  color: var(--psw-text);
-  font-family: var(--psw-font-body);
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
   overflow-wrap: anywhere;
 }
 
-[data-psw-forms] .psw-review-empty {
-  color: var(--psw-dim);
+[data-slate-forms] .slate-review-empty {
+  color: var(--slate-dim);
   font-style: italic;
 }
 
-[data-psw-forms] .psw-review-edit {
+[data-slate-forms] .slate-review-edit {
   border: none;
   background: none;
   padding: 0;
   cursor: pointer;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--psw-accent);
+  color: var(--slate-accent);
   text-decoration: underline;
   text-underline-offset: 3px;
   flex-shrink: 0;
 }
 
 @media (max-width: 560px) {
-  [data-psw-forms] .psw-review-row {
+  [data-slate-forms] .slate-review-row {
     grid-template-columns: 1fr;
     gap: 4px;
   }
+}
+
+/* ============================================================
+   CLASSIC THEME controls — old Typeform: soft pills, friendly blue
+   buttons, calm captions. Gated to [data-theme-name='classic'] so the
+   editorial + swiss looks are untouched.
+   ============================================================ */
+
+/* Choice rows become roomy, lightly-filled pills that lift on hover. */
+[data-slate-forms][data-theme-name='classic'] .slate-choice {
+  padding: 18px 20px;
+  gap: 14px;
+  font-size: clamp(1.05rem, 1.8vw, 1.18rem);
+  background: var(--slate-bg-2);
+  border-color: var(--slate-border-md);
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-choice:hover,
+[data-slate-forms][data-theme-name='classic'] .slate-choice--selected {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent-lo);
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-choice-badge {
+  border-radius: 6px;
+  font-family: var(--slate-font-body);
+  font-weight: 600;
+  border-color: var(--slate-border-md);
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-choice--selected .slate-choice-badge {
+  background: var(--slate-accent);
+  border-color: var(--slate-accent);
+  color: var(--slate-on-accent);
+}
+
+/* OK button + welcome/statement CTA: solid friendly blue with a soft lift. */
+[data-slate-forms][data-theme-name='classic'] .slate-ok-btn {
+  font-family: var(--slate-font-body);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgb(var(--slate-accent-rgb) / 0.25);
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-cta {
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+  font-family: var(--slate-font-body);
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgb(var(--slate-accent-rgb) / 0.28);
+}
+
+/* Captions ("press Enter ↵") in the body font, soft and unobtrusive. */
+[data-slate-forms][data-theme-name='classic'] .slate-hint,
+[data-slate-forms][data-theme-name='classic'] .slate-cta-hint {
+  font-family: var(--slate-font-body);
+  letter-spacing: 0.02em;
+  opacity: 0.55;
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-scale-labels {
+  font-family: var(--slate-font-body);
+  letter-spacing: 0.02em;
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-err {
+  font-family: var(--slate-font-body);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ============================================================
+   DECORATION READABILITY — opaque control surfaces when bold
+   per-step backdrops are active (mono circles, riso blobs, etc.).
+   Gated on [data-has-decoration] from Form.tsx.
+   ============================================================ */
+
+[data-slate-forms][data-has-decoration] .slate-choice {
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms][data-has-decoration] .slate-choice-badge {
+  background: var(--slate-bg);
+}
+
+/* Text fields: no opaque panel, no halo — just the underline from .slate-input. */
+
+[data-slate-forms][data-has-decoration] .slate-scale-cell {
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms][data-has-decoration] .slate-picture {
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms][data-has-decoration] .slate-upload-zone {
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms][data-has-decoration] .slate-matrix-cell {
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms][data-has-decoration] .slate-ranking-row {
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms][data-has-decoration] .slate-review-row {
+  background: var(--slate-bg-2);
+  border-radius: var(--slate-radius);
+  padding: 12px 16px;
+}
+
+/* Mono: choices default to transparent — always give them a surface. */
+[data-slate-forms][data-theme-name='mono'] .slate-choice {
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms][data-theme-name='mono'] .slate-choice-badge {
+  background: var(--slate-bg);
+}
+
+/* Selected/hover badges must beat decoration + mono default-surface
+   overrides above (same specificity, later source order). Swiss keeps its
+   inverted badge (cream-on-black / black-on-cream) — excluded here. */
+[data-slate-forms][data-has-decoration]:not([data-theme-name='swiss']) .slate-choice--selected .slate-choice-badge,
+[data-slate-forms][data-has-decoration]:not([data-theme-name='swiss']) .slate-picture--selected .slate-choice-badge {
+  background: var(--slate-accent);
+  border-color: var(--slate-accent);
+  color: var(--slate-on-accent);
+}
+
+[data-slate-forms][data-has-decoration] .slate-matrix-cell--selected {
+  background: var(--slate-accent);
+  border-color: var(--slate-accent);
+}
+
+[data-slate-forms][data-has-decoration] .slate-matrix-cell--selected .slate-matrix-dot {
+  background: var(--slate-bg);
+}
+
+[data-slate-forms][data-has-decoration] .slate-scale-cell--selected {
+  background: var(--slate-accent);
+  border-color: var(--slate-accent);
+  color: var(--slate-on-accent);
 }

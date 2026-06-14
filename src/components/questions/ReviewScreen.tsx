@@ -34,24 +34,24 @@ export function ReviewScreen({ question, visible, answers, onEdit, onAdvance }: 
 
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {question.title}
       </h1>
-      {question.subtitle && <p className="psw-subtitle">{question.subtitle}</p>}
+      {question.subtitle && <p className="slate-subtitle">{question.subtitle}</p>}
 
-      <dl className="psw-review" aria-labelledby={labelId}>
+      <dl className="slate-review" aria-labelledby={labelId}>
         {rows.map((q) => {
           const value = formatAnswer(answers[q.id]);
           return (
-            <div key={q.id} className="psw-review-row">
-              <dt className="psw-review-q">{titleOf(q, answers)}</dt>
-              <dd className="psw-review-a">
-                <span className={value === '' ? 'psw-review-empty' : undefined}>
+            <div key={q.id} className="slate-review-row">
+              <dt className="slate-review-q">{titleOf(q, answers)}</dt>
+              <dd className="slate-review-a">
+                <span className={value === '' ? 'slate-review-empty' : undefined}>
                   {value === '' ? 'Not answered' : value}
                 </span>
                 <button
                   type="button"
-                  className="psw-review-edit"
+                  className="slate-review-edit"
                   onClick={() => onEdit(q.id)}
                   aria-label={`Edit ${titleOf(q, answers)}`}
                 >
@@ -63,11 +63,11 @@ export function ReviewScreen({ question, visible, answers, onEdit, onAdvance }: 
         })}
       </dl>
 
-      <div className="psw-actions">
-        <button type="button" className="psw-ok-btn" onClick={onAdvance}>
+      <div className="slate-actions">
+        <button type="button" className="slate-ok-btn" onClick={onAdvance}>
           {question.cta ?? 'Looks good'} <span aria-hidden>✓</span>
         </button>
-        <span className="psw-hint">
+        <span className="slate-hint">
           press <strong>Enter ↵</strong>
         </span>
       </div>

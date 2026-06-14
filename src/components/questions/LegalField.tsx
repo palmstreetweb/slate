@@ -21,12 +21,12 @@ export function LegalField({ question, answers, selected, onSelect }: Props) {
 
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
-      {question.body && <p className="psw-subtitle">{question.body}</p>}
+      {question.body && <p className="slate-subtitle">{question.body}</p>}
 
-      <div className="psw-choices" role="radiogroup" aria-labelledby={labelId}>
+      <div className="slate-choices" role="radiogroup" aria-labelledby={labelId}>
         {choices.map((c) => {
           const isSelected = selected === c.value;
           return (
@@ -36,15 +36,15 @@ export function LegalField({ question, answers, selected, onSelect }: Props) {
               role="radio"
               aria-checked={isSelected}
               onClick={() => onSelect(c.value)}
-              className={`psw-choice${isSelected ? ' psw-choice--selected' : ''}`}
+              className={`slate-choice${isSelected ? ' slate-choice--selected' : ''}`}
             >
-              <span className="psw-choice-badge">{c.badge}</span>
+              <span className="slate-choice-badge">{c.badge}</span>
               <span>{c.label}</span>
             </button>
           );
         })}
       </div>
-      <p className="psw-hint" style={{ marginTop: 20 }}>
+      <p className="slate-hint" style={{ marginTop: 20 }}>
         tap a key (A, B) or click to select
       </p>
     </div>

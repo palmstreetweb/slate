@@ -10,7 +10,7 @@ import { createRef } from 'react';
 import { useTheme } from '@/hooks/useTheme.js';
 import type { ThemeMode } from '@/types/Theme.js';
 
-const STORAGE_KEY = 'psw-forms-theme';
+const STORAGE_KEY = 'slate-forms-theme';
 
 function setup(mode: ThemeMode) {
   const wrapper = document.createElement('div');
@@ -48,7 +48,7 @@ describe('useTheme — mode resolution', () => {
     expect(result.current.toggleable).toBe(false);
   });
 
-  it("'toggle' reads the stored psw-forms-theme value first", () => {
+  it("'toggle' reads the stored slate-forms-theme value first", () => {
     window.localStorage.setItem(STORAGE_KEY, 'light');
     const { result } = setup('toggle');
     expect(result.current.resolved).toBe('light');

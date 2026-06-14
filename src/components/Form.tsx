@@ -23,15 +23,18 @@ import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
 import { useTheme } from '@/hooks/useTheme.js';
 import { progress as progressFn } from '@/logic/progress.js';
 import { computeScore } from '@/logic/scoring.js';
-import { themes } from '@/themes/index.js';
-import type { Theme } from '@/types/Theme.js';
 import { TopBar } from './chrome/TopBar.js';
 import { ProgressBar } from './chrome/ProgressBar.js';
 import { FooterCounter } from './chrome/FooterCounter.js';
 import { ThemeToggle } from './chrome/ThemeToggle.js';
 import { QuestionRenderer } from './questions/QuestionRenderer.js';
-import { SwissDecoration } from './decorations/SwissDecoration.js';
-import { GrainDecoration } from './decorations/GrainDecoration.js';
+import {
+  ThemeDecoration,
+  hasStepDecorationBackdrop,
+  resolveThemeDecoration,
+} from './ThemeDecoration.js';
+import { playFormSound, resolveFormSound } from '@/utils/formSounds.js';
+import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
 
 import '@/styles/tokens.css';
 import '@/styles/toggle.css';
@@ -51,6 +54,10 @@ export function Form<S extends Schema>({
 }: FormProps<S>) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    migrateSlateLocalStorageKeys();
+  }, []);
 
   const { resolved: themeMode, toggleable, toggle } = useTheme({
     mode: schema.themeMode,
@@ -94,6 +101,19 @@ export function Form<S extends Schema>({
     [schema.questions, state.answers],
   );
 
+  /* ---------- sound (ADR-023) — interaction-time, not step-change ---------- */
+
+  const soundId = resolveFormSound(schema.sound);
+
+  const playInteractionSound = useCallback(() => {
+    if (soundId !== 'off') playFormSound(soundId);
+  }, [soundId]);
+
+  const advanceWithSound = useCallback(() => {
+    playInteractionSound();
+    next();
+  }, [playInteractionSound, next]);
+
   /* ---------- keyboard handlers ---------- */
 
   const onSelectChoice = useCallback(
@@ -102,12 +122,14 @@ export function Form<S extends Schema>({
       if (currentQuestion.type === 'single_choice') {
         const opt = currentQuestion.options[idx];
         if (!opt) return;
+        playInteractionSound();
         setAnswer(currentQuestion.id, opt.value);
         // Auto-advance per brief §5.
         window.setTimeout(() => next(), 220);
       } else if (currentQuestion.type === 'picture_choice') {
         const opt = currentQuestion.options[idx];
         if (!opt) return;
+        playInteractionSound();
         if (currentQuestion.multiple) {
           setAnswer(currentQuestion.id, (prev) => {
             const cur = Array.isArray(prev) ? (prev as string[]) : [];
@@ -120,14 +142,17 @@ export function Form<S extends Schema>({
           window.setTimeout(() => next(), 220);
         }
       } else if (currentQuestion.type === 'yes_no') {
+        playInteractionSound();
         setAnswer(currentQuestion.id, idx === 0 ? 'yes' : 'no');
         window.setTimeout(() => next(), 220);
       } else if (currentQuestion.type === 'legal') {
+        playInteractionSound();
         setAnswer(currentQuestion.id, idx === 0 ? 'accept' : 'decline');
         window.setTimeout(() => next(), 220);
       } else if (currentQuestion.type === 'multi_choice') {
         const opt = currentQuestion.options[idx];
         if (!opt) return;
+        playInteractionSound();
         // Functional updater so back-to-back keypresses don't see stale state.
         setAnswer(currentQuestion.id, (prev) => {
           const cur = Array.isArray(prev) ? (prev as string[]) : [];
@@ -137,22 +162,23 @@ export function Form<S extends Schema>({
         });
       }
     },
-    [currentQuestion, setAnswer, next],
+    [currentQuestion, setAnswer, next, playInteractionSound],
   );
 
   const onSelectScale = useCallback(
     (value: number) => {
       if (!currentQuestion) return;
       if (currentQuestion.type !== 'scale' && currentQuestion.type !== 'nps') return;
+      playInteractionSound();
       setAnswer(currentQuestion.id, value);
       window.setTimeout(() => next(), 220);
     },
-    [currentQuestion, setAnswer, next],
+    [currentQuestion, setAnswer, next, playInteractionSound],
   );
 
   useKeyboardNav({
     currentQ: currentQuestion,
-    onAdvance: next,
+    onAdvance: advanceWithSound,
     onBack: back,
     onSelectChoice,
     onSelectScale,
@@ -271,20 +297,17 @@ export function Form<S extends Schema>({
   const showBack = state.step > 0 && currentQuestion?.type !== 'thanks';
   const progressPct = progressFn(state.visible, state.step);
 
-  // Decoration hint from the theme registry; custom theme names fall back
-  // to no decoration.
-  const decoration =
-    (themes as Record<string, Theme | undefined>)[schema.theme]?.decoration ?? 'none';
+  const decoration = resolveThemeDecoration(schema.theme);
 
   return (
     <div
       ref={wrapperRef}
-      data-psw-forms=""
+      data-slate-forms=""
       data-theme-name={schema.theme}
       data-theme={themeMode}
+      {...(hasStepDecorationBackdrop(decoration) ? { 'data-has-decoration': '' } : {})}
     >
-      {decoration === 'shapes' && <SwissDecoration step={state.step} />}
-      {decoration === 'grain' && <GrainDecoration />}
+      <ThemeDecoration themeName={schema.theme} step={state.step} />
 
       <ProgressBar value={progressPct} />
 
@@ -298,12 +321,12 @@ export function Form<S extends Schema>({
       />
 
       {autosave.savedSession && (
-        <div className="psw-resume-banner" role="dialog" aria-label="Resume saved progress">
-          <span className="psw-resume-text">Pick up where you left off?</span>
-          <div className="psw-resume-actions">
+        <div className="slate-resume-banner" role="dialog" aria-label="Resume saved progress">
+          <span className="slate-resume-text">Pick up where you left off?</span>
+          <div className="slate-resume-actions">
             <button
               type="button"
-              className="psw-resume-btn psw-resume-btn--primary"
+              className="slate-resume-btn slate-resume-btn--primary"
               onClick={() => {
                 const snapshot = autosave.acceptSaved();
                 if (snapshot) hydrate(snapshot);
@@ -313,7 +336,7 @@ export function Form<S extends Schema>({
             </button>
             <button
               type="button"
-              className="psw-resume-btn"
+              className="slate-resume-btn"
               onClick={autosave.discardSaved}
             >
               Start over
@@ -322,10 +345,10 @@ export function Form<S extends Schema>({
         </div>
       )}
 
-      <div className="psw-stage">
+      <div className="slate-stage">
         <div
           key={currentQuestion?.id ?? 'empty'}
-          className="psw-q-enter psw-stage-content"
+          className="slate-q-enter slate-stage-content"
           data-direction={state.direction}
           onAnimationEnd={animationEnd}
         >
@@ -348,6 +371,7 @@ export function Form<S extends Schema>({
                 const idx = state.visible.findIndex((q) => q.id === id);
                 if (idx >= 0) goTo(idx, 'backward');
               }}
+              playInteractionSound={playInteractionSound}
             />
           ) : null}
         </div>

@@ -3,7 +3,7 @@
    Swiss:     380ms forward in, 180ms out, snappier.
 */
 
-@keyframes psw-q-in-forward {
+@keyframes slate-q-in-forward {
   0% {
     opacity: 0;
     transform: translateY(28px);
@@ -14,7 +14,7 @@
   }
 }
 
-@keyframes psw-q-in-back {
+@keyframes slate-q-in-back {
   0% {
     opacity: 0;
     transform: translateY(-16px);
@@ -25,7 +25,7 @@
   }
 }
 
-@keyframes psw-q-out {
+@keyframes slate-q-out {
   0% {
     opacity: 1;
     transform: translateY(0);
@@ -36,34 +36,81 @@
   }
 }
 
-[data-psw-forms] .psw-q-enter[data-direction='forward'] {
-  animation: psw-q-in-forward 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+[data-slate-forms] .slate-q-enter[data-direction='forward'] {
+  animation: slate-q-in-forward 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-[data-psw-forms] .psw-q-enter[data-direction='backward'] {
-  animation: psw-q-in-back 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+[data-slate-forms] .slate-q-enter[data-direction='backward'] {
+  animation: slate-q-in-back 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-[data-psw-forms] .psw-q-leave {
-  animation: psw-q-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+[data-slate-forms] .slate-q-leave {
+  animation: slate-q-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
 /* Swiss is snappier — 380ms in / 180ms out, slightly less Y travel. */
-[data-psw-forms][data-theme-name='swiss'] .psw-q-enter[data-direction='forward'] {
+[data-slate-forms][data-theme-name='swiss'] .slate-q-enter[data-direction='forward'] {
   animation-duration: 380ms;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-q-enter[data-direction='backward'] {
+[data-slate-forms][data-theme-name='swiss'] .slate-q-enter[data-direction='backward'] {
   animation-duration: 380ms;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-q-leave {
+[data-slate-forms][data-theme-name='swiss'] .slate-q-leave {
   animation-duration: 180ms;
 }
 
+/* Classic — old-Typeform "scroll up" feel: more travel, longer, calmer ease.
+   Questions rise into place and lift away on exit. */
+@keyframes slate-q-in-forward-classic {
+  0% {
+    opacity: 0;
+    transform: translateY(44px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slate-q-in-back-classic {
+  0% {
+    opacity: 0;
+    transform: translateY(-28px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slate-q-out-classic {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-32px);
+  }
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-q-enter[data-direction='forward'] {
+  animation: slate-q-in-forward-classic 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-q-enter[data-direction='backward'] {
+  animation: slate-q-in-back-classic 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-q-leave {
+  animation: slate-q-out-classic 260ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  [data-psw-forms] .psw-q-enter,
-  [data-psw-forms] .psw-q-leave {
+  [data-slate-forms] .slate-q-enter,
+  [data-slate-forms] .slate-q-leave {
     animation: none !important;
   }
 }

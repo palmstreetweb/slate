@@ -9,6 +9,7 @@
  */
 
 import type { Condition, LogicRule, Question } from '@/index.js';
+import { SlateSelect } from './SlateSelect.js';
 
 type LeafOp =
   | 'equals'
@@ -39,6 +40,47 @@ const NUMERIC_TYPES = new Set(['number', 'scale', 'nps']);
 
 function isAnswerBearing(q: Question): boolean {
   return q.type !== 'welcome' && q.type !== 'statement' && q.type !== 'thanks';
+}
+
+/** Human-readable name for a question — its title, never the internal id. */
+function displayName(q: Question): string {
+  const title = 'title' in q && typeof q.title === 'string' ? q.title.trim() : '';
+  const base = title || `Untitled ${q.type.replace(/_/g, ' ')}`;
+  return base.length > 44 ? `${base.slice(0, 43)}…` : base;
+}
+
+/**
+ * The selectable answers for a question, so logic conditions can be picked by
+ * label instead of forcing the author to know the internal option value.
+ * Returns null for free-form/numeric/other types (those use a plain input).
+ */
+function optionsFor(
+  q: Question | undefined,
+): ReadonlyArray<{ label: string; value: string }> | null {
+  if (!q) return null;
+  switch (q.type) {
+    case 'single_choice':
+    case 'multi_choice':
+    case 'dropdown':
+    case 'ranking':
+    case 'picture_choice':
+      return (q.options as ReadonlyArray<{ label: string; value: string }>).map((o) => ({
+        label: o.label,
+        value: o.value,
+      }));
+    case 'yes_no':
+      return [
+        { label: q.yesLabel ?? 'Yes', value: 'yes' },
+        { label: q.noLabel ?? 'No', value: 'no' },
+      ];
+    case 'legal':
+      return [
+        { label: q.acceptLabel ?? 'I accept', value: 'accept' },
+        { label: q.declineLabel ?? "I don't accept", value: 'decline' },
+      ];
+    default:
+      return null;
+  }
 }
 
 function isLeafCondition(c: Condition): c is Extract<Condition, { field: string }> {
@@ -123,45 +165,56 @@ function LeafRow({
   onRemove: () => void;
 }) {
   const fields = questions.filter(isAnswerBearing);
+  const target = questions.find((q) => q.id === leaf.field);
+  const choices = optionsFor(target);
+  const showChoiceSelect = choices !== null && !NUMERIC_OPS.has(leaf.op);
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
       <div style={{ display: 'grid', gap: 4 }}>
-        <select
-          className="studio-select"
+        <SlateSelect
           value={leaf.field}
-          onChange={(e) => onChange({ ...leaf, field: e.target.value })}
-        >
-          <option value="">— pick a question —</option>
-          {fields.map((q) => (
-            <option key={q.id} value={q.id}>
-              {q.id}
-            </option>
-          ))}
-        </select>
+          placeholder="— pick a question —"
+          options={[
+            { value: '', label: '— Pick a Question —' },
+            ...fields.map((q) => ({ value: q.id, label: displayName(q) })),
+          ]}
+          aria-label="Question"
+          onChange={(field) => onChange({ ...leaf, field })}
+        />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-          <select
-            className="studio-select"
+          <SlateSelect
             value={leaf.op}
-            onChange={(e) => onChange({ ...leaf, op: e.target.value as LeafOp })}
-          >
-            {(Object.keys(OP_LABEL) as LeafOp[]).map((op) => (
-              <option key={op} value={op}>
-                {OP_LABEL[op]}
-              </option>
+            options={(Object.keys(OP_LABEL) as LeafOp[]).map((op) => ({
+              value: op,
+              label: OP_LABEL[op],
+            }))}
+            aria-label="Operator"
+            onChange={(op) => onChange({ ...leaf, op })}
+          />
+          {!VALUELESS_OPS.has(leaf.op) &&
+            (showChoiceSelect ? (
+              <SlateSelect
+                value={leaf.value}
+                placeholder="— pick an answer —"
+                options={[
+                  { value: '', label: '— Pick an Answer —' },
+                  ...choices.map((o) => ({ value: o.value, label: o.label })),
+                ]}
+                aria-label="Answer value"
+                onChange={(value) => onChange({ ...leaf, value })}
+              />
+            ) : (
+              <input
+                className="slate-input"
+                value={leaf.value}
+                placeholder="value"
+                style={{ padding: '6px 8px', fontSize: 12 }}
+                onChange={(e) => onChange({ ...leaf, value: e.target.value })}
+              />
             ))}
-          </select>
-          {!VALUELESS_OPS.has(leaf.op) && (
-            <input
-              className="studio-input"
-              value={leaf.value}
-              placeholder="value"
-              style={{ padding: '6px 8px', fontSize: 12 }}
-              onChange={(e) => onChange({ ...leaf, value: e.target.value })}
-            />
-          )}
         </div>
       </div>
-      <button type="button" className="studio-icon-btn" onClick={onRemove} aria-label="Remove rule">
+      <button type="button" className="slate-icon-btn" onClick={onRemove} aria-label="Remove rule">
         ×
       </button>
     </div>
@@ -181,11 +234,11 @@ export function ConditionBuilder({
 
   if (!parsed.editable) {
     return (
-      <p style={{ margin: 0, fontSize: 12, color: 'var(--psw-muted)' }}>
+      <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-muted)' }}>
         This condition uses nested groups or in/not_in — edit it in the schema code, or{' '}
         <button
           type="button"
-          className="studio-btn studio-btn--ghost"
+          className="slate-btn slate-btn--ghost"
           style={{ fontSize: 12, padding: '2px 6px' }}
           onClick={() => onChange(undefined)}
         >
@@ -205,15 +258,16 @@ export function ConditionBuilder({
       {leaves.length > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
           <span>Match</span>
-          <select
-            className="studio-select"
-            style={{ width: 'auto' }}
+          <SlateSelect
+            className="slate-select-wrap--auto"
             value={combinator}
-            onChange={(e) => emit(e.target.value as 'all' | 'any', leaves)}
-          >
-            <option value="all">all</option>
-            <option value="any">any</option>
-          </select>
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'any', label: 'Any' },
+            ]}
+            aria-label="Match combinator"
+            onChange={(next) => emit(next, leaves)}
+          />
           <span>of the rules:</span>
         </div>
       )}
@@ -228,7 +282,7 @@ export function ConditionBuilder({
       ))}
       <button
         type="button"
-        className="studio-btn studio-btn--ghost"
+        className="slate-btn slate-btn--ghost"
         style={{ justifySelf: 'start', fontSize: 12, padding: '4px 8px' }}
         onClick={() => emit(combinator, [...leaves, { field: '', op: 'equals', value: '' }])}
       >
@@ -263,8 +317,8 @@ export function JumpRulesEditor({
               display: 'grid',
               gap: 6,
               padding: 8,
-              border: '1px solid var(--psw-border)',
-              borderRadius: 'var(--studio-radius-sm)',
+              border: '1px solid var(--slate-border)',
+              borderRadius: 'var(--slate-radius-sm)',
             }}
           >
             {leaf ? (
@@ -281,34 +335,32 @@ export function JumpRulesEditor({
                 onRemove={() => emit(rules.filter((_, idx) => idx !== i))}
               />
             ) : (
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--psw-muted)' }}>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-muted)' }}>
                 Composite condition — edit in schema code.
               </p>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
               <span>→ jump to</span>
-              <select
-                className="studio-select"
-                style={{ flex: 1 }}
+              <SlateSelect
                 value={rule.goTo}
-                onChange={(e) =>
-                  emit(rules.map((r, idx) => (idx === i ? { ...r, goTo: e.target.value } : r)))
+                style={{ flex: 1 }}
+                placeholder="— pick a target —"
+                options={[
+                  { value: '', label: '— Pick a Target —' },
+                  ...targets.map((q) => ({ value: q.id, label: displayName(q) })),
+                ]}
+                aria-label="Jump target"
+                onChange={(goTo) =>
+                  emit(rules.map((r, idx) => (idx === i ? { ...r, goTo } : r)))
                 }
-              >
-                <option value="">— pick a target —</option>
-                {targets.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.id} ({q.type})
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
         );
       })}
       <button
         type="button"
-        className="studio-btn studio-btn--ghost"
+        className="slate-btn slate-btn--ghost"
         style={{ justifySelf: 'start', fontSize: 12, padding: '4px 8px' }}
         onClick={() =>
           emit([...rules, { if: { field: currentId, op: 'equals', value: '' }, goTo: '' }])

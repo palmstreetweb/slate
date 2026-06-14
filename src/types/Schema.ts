@@ -7,6 +7,7 @@
 import type { Question } from './Question.js';
 import type { AnswersOf, HiddenFields, LooseAnswers } from './Answers.js';
 import type { ThemeMode, ThemeName } from './Theme.js';
+import type { FormSound } from './Sound.js';
 
 export type BrandConfig = {
   name: string;
@@ -22,13 +23,19 @@ export type BrandConfig = {
 export type Schema<Q extends ReadonlyArray<Question> = ReadonlyArray<Question>> = {
   /**
    * Stable form identifier. Namespaces the save-and-resume autosave key
-   * (`psw-forms-resume:<id>`, ADR-017). Required when `<Form resume>` is set.
+   * (`slate-forms-resume:<id>`, ADR-017). Required when `<Form resume>` is set.
    */
   id?: string;
   brand: BrandConfig;
   /** Built-in theme name, or a custom string when consumers register their own. */
   theme: ThemeName | (string & {});
   themeMode: ThemeMode;
+  /**
+   * Step confirmation sound on forward navigation (ADR-023). One of ten built-in
+   * synthesized presets, or `'off'` / omit for silent. Legacy `true` maps to
+   * `'pixie-mallet'`.
+   */
+  sound?: FormSound | boolean;
   questions: Q;
 };
 
@@ -84,7 +91,7 @@ export type FormProps<S extends Schema = Schema> = {
   onFileUpload?: (file: File, questionId: string) => Promise<string>;
   /**
    * Save-and-resume (ADR-017). When set, in-progress answers autosave to
-   * `localStorage` under `psw-forms-resume:<schema.id>`, a "resume where
+   * `localStorage` under `slate-forms-resume:<schema.id>`, a "resume where
    * you left off?" prompt appears on remount, and the save is cleared on
    * successful submit. Requires `schema.id`.
    */

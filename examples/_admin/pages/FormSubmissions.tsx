@@ -29,9 +29,9 @@ export function FormSubmissions({ formId }: Props) {
   if (!form) {
     return (
       <AdminShell crumbs={null}>
-        <div className="studio-empty">
+        <div className="slate-empty">
           <p style={{ margin: '0 0 12px' }}>Form not found.</p>
-          <button type="button" className="studio-btn studio-btn--primary" onClick={() => navigate('/')}>
+          <button type="button" className="slate-btn slate-btn--primary" onClick={() => navigate('/')}>
             Back to dashboard
           </button>
         </div>
@@ -42,30 +42,30 @@ export function FormSubmissions({ formId }: Props) {
   return (
     <AdminShell
       crumbs={
-        <span className="studio-crumb">
-          <button type="button" className="studio-link" onClick={() => navigate('/')}>
+        <span className="slate-crumb">
+          <button type="button" className="slate-link" onClick={() => navigate('/')}>
             Forms
           </button>
           {' / '}
-          <button type="button" className="studio-link" onClick={() => navigate(`/forms/${formId}/edit`)}>
+          <button type="button" className="slate-link" onClick={() => navigate(`/forms/${formId}/edit`)}>
             {form.name}
           </button>
           {' / '}
-          <span style={{ color: 'var(--psw-text)' }}>Responses</span>
+          <span style={{ color: 'var(--slate-text)' }}>Responses</span>
         </span>
       }
       rightSlot={
         <>
-          <button type="button" className="studio-btn" onClick={() => navigate(`/forms/${formId}/edit`)}>
+          <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/edit`)}>
             ← Editor
           </button>
-          <button type="button" className="studio-btn" onClick={() => navigate(`/forms/${formId}`)}>
+          <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}`)}>
             Preview ↗
           </button>
           {subs.length > 0 && (
             <button
               type="button"
-              className="studio-btn"
+              className="slate-btn"
               onClick={() => downloadCsv(form.name, answerQuestions(form.schema.questions), subs)}
             >
               Export CSV
@@ -74,7 +74,7 @@ export function FormSubmissions({ formId }: Props) {
           {subs.length > 0 && (
             <button
               type="button"
-              className="studio-btn studio-btn--danger"
+              className="slate-btn slate-btn--danger"
               onClick={async () => {
                 const ok = await confirm({
                   title: `Clear ${subs.length} ${subs.length === 1 ? 'response' : 'responses'}?`,
@@ -92,8 +92,8 @@ export function FormSubmissions({ formId }: Props) {
       }
     >
       <div style={{ marginBottom: 24 }}>
-        <h1 className="studio-page-title">Responses</h1>
-        <p className="studio-page-sub">
+        <h1 className="slate-page-title">Responses</h1>
+        <p className="slate-page-sub">
           {subs.length === 0
             ? 'Nothing yet — open Preview and submit one to see it here.'
             : `${subs.length} ${subs.length === 1 ? 'response' : 'responses'}`}
@@ -102,7 +102,7 @@ export function FormSubmissions({ formId }: Props) {
           <div style={{ display: 'flex', gap: 4, marginTop: 12 }}>
             <button
               type="button"
-              className={`studio-btn${view === 'list' ? ' studio-btn--primary' : ''}`}
+              className={`slate-btn${view === 'list' ? ' slate-btn--primary' : ''}`}
               style={{ fontSize: 12, padding: '4px 12px' }}
               onClick={() => setView('list')}
             >
@@ -110,7 +110,7 @@ export function FormSubmissions({ formId }: Props) {
             </button>
             <button
               type="button"
-              className={`studio-btn${view === 'summary' ? ' studio-btn--primary' : ''}`}
+              className={`slate-btn${view === 'summary' ? ' slate-btn--primary' : ''}`}
               style={{ fontSize: 12, padding: '4px 12px' }}
               onClick={() => setView('summary')}
             >
@@ -121,7 +121,7 @@ export function FormSubmissions({ formId }: Props) {
       </div>
 
       {subs.length === 0 ? (
-        <div className="studio-empty">
+        <div className="slate-empty">
           <p style={{ margin: 0, fontSize: 14 }}>Empty inbox.</p>
         </div>
       ) : view === 'summary' ? (
@@ -309,7 +309,7 @@ function QuestionSummary({ question, subs }: { question: Question; subs: StoredS
           {rows.map((r) => (
             <li key={r.label}>
               {r.label}{' '}
-              <span style={{ color: 'var(--psw-dim)', fontSize: 11 }}>
+              <span style={{ color: 'var(--slate-dim)', fontSize: 11 }}>
                 (avg position {Number.isFinite(r.avg) ? r.avg.toFixed(1) : '—'})
               </span>
             </li>
@@ -319,17 +319,17 @@ function QuestionSummary({ question, subs }: { question: Question; subs: StoredS
     }
   } else {
     body = (
-      <p style={{ margin: 0, fontSize: 13, color: 'var(--psw-muted)' }}>
+      <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
         {answered} of {subs.length} answered
       </p>
     );
   }
 
   return (
-    <div className="studio-card" style={{ padding: 16 }}>
+    <div className="slate-card" style={{ padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
         <strong style={{ fontSize: 13 }}>{titleOf(question)}</strong>
-        <span style={{ fontSize: 11, color: 'var(--psw-dim)', fontFamily: 'var(--psw-font-mono)' }}>
+        <span style={{ fontSize: 11, color: 'var(--slate-dim)', fontFamily: 'var(--slate-font-mono)' }}>
           {question.id} · {answered}/{subs.length}
         </span>
       </div>
@@ -357,18 +357,18 @@ function DistributionBars({
           <span style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {r.label}
           </span>
-          <div style={{ background: 'var(--psw-bg)', borderRadius: 4, overflow: 'hidden', height: 14 }}>
+          <div style={{ background: 'var(--slate-bg)', borderRadius: 4, overflow: 'hidden', height: 14 }}>
             <div
               style={{
                 width: `${(r.count / max) * 100}%`,
                 height: '100%',
-                background: 'var(--psw-accent, #2d5bff)',
+                background: 'var(--slate-accent, #2d5bff)',
                 opacity: 0.75,
                 borderRadius: 4,
               }}
             />
           </div>
-          <span style={{ fontSize: 11, color: 'var(--psw-dim)', textAlign: 'right' }}>
+          <span style={{ fontSize: 11, color: 'var(--slate-dim)', textAlign: 'right' }}>
             {r.count} ({total > 0 ? Math.round((r.count / total) * 100) : 0}%)
           </span>
         </div>
@@ -378,7 +378,7 @@ function DistributionBars({
 }
 
 function Muted({ children }: { children: React.ReactNode }) {
-  return <p style={{ margin: 0, fontSize: 13, color: 'var(--psw-muted)' }}>{children}</p>;
+  return <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>{children}</p>;
 }
 
 function ResponseRow({
@@ -399,7 +399,7 @@ function ResponseRow({
   const when = new Date(sub.receivedAt);
 
   return (
-    <div className="studio-card">
+    <div className="slate-card">
       <button
         type="button"
         onClick={onToggle}
@@ -423,23 +423,23 @@ function ResponseRow({
         <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {summary[0] || '—'}
         </span>
-        <span style={{ color: 'var(--psw-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ color: 'var(--slate-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {summary[1] || '—'}
         </span>
-        <span style={{ color: 'var(--psw-dim)', fontSize: 11 }}>{humanizeMs(sub.meta.durationMs)}</span>
-        <span style={{ color: 'var(--psw-dim)', fontSize: 11, textAlign: 'right' }}>
+        <span style={{ color: 'var(--slate-dim)', fontSize: 11 }}>{humanizeMs(sub.meta.durationMs)}</span>
+        <span style={{ color: 'var(--slate-dim)', fontSize: 11, textAlign: 'right' }}>
           {timeAgo(when)}
         </span>
       </button>
 
       {expanded && (
-        <div style={{ borderTop: '1px solid var(--psw-border)', padding: 16, display: 'grid', gap: 14 }}>
+        <div style={{ borderTop: '1px solid var(--slate-border)', padding: 16, display: 'grid', gap: 14 }}>
           <div style={{ display: 'grid', gap: 10 }}>
             {questionIds.map((qid) => {
               const v = a[qid];
               return (
                 <div key={qid} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12 }}>
-                  <span style={{ fontSize: 11, color: 'var(--psw-dim)', fontFamily: 'var(--psw-font-mono)', paddingTop: 2 }}>
+                  <span style={{ fontSize: 11, color: 'var(--slate-dim)', fontFamily: 'var(--slate-font-mono)', paddingTop: 2 }}>
                     {qid}
                   </span>
                   <span style={{ fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
@@ -451,14 +451,14 @@ function ResponseRow({
           </div>
 
           <details>
-            <summary style={{ cursor: 'pointer', fontSize: 11, color: 'var(--psw-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <summary style={{ cursor: 'pointer', fontSize: 11, color: 'var(--slate-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Meta + raw payload
             </summary>
             <pre
               style={{
                 marginTop: 8,
-                background: 'var(--psw-bg)',
-                border: '1px solid var(--psw-border)',
+                background: 'var(--slate-bg)',
+                border: '1px solid var(--slate-border)',
                 padding: 12,
                 borderRadius: 6,
                 fontSize: 11,
@@ -471,8 +471,8 @@ function ResponseRow({
             </pre>
           </details>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--psw-border)', paddingTop: 12 }}>
-            <button type="button" className="studio-btn studio-btn--danger" onClick={onDelete}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--slate-border)', paddingTop: 12 }}>
+            <button type="button" className="slate-btn slate-btn--danger" onClick={onDelete}>
               Delete response
             </button>
           </div>

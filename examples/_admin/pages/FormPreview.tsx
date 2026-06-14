@@ -19,9 +19,9 @@ export function FormPreview({ formId }: Props) {
   if (!form) {
     return (
       <AdminShell crumbs={null}>
-        <div className="studio-empty">
+        <div className="slate-empty">
           <p style={{ margin: '0 0 12px' }}>Form not found.</p>
-          <button type="button" className="studio-btn studio-btn--primary" onClick={() => navigate('/')}>
+          <button type="button" className="slate-btn slate-btn--primary" onClick={() => navigate('/')}>
             Back to dashboard
           </button>
         </div>
@@ -32,39 +32,42 @@ export function FormPreview({ formId }: Props) {
   return (
     <AdminShell
       crumbs={
-        <span className="studio-crumb">
-          <button type="button" className="studio-link" onClick={() => navigate('/')}>
+        <span className="slate-crumb">
+          <button type="button" className="slate-link" onClick={() => navigate('/')}>
             Forms
           </button>
           {' / '}
-          <button type="button" className="studio-link" onClick={() => navigate(`/forms/${formId}/edit`)}>
+          <button type="button" className="slate-link" onClick={() => navigate(`/forms/${formId}/edit`)}>
             {form.name}
           </button>
           {' / '}
-          <span style={{ color: 'var(--psw-text)' }}>Preview</span>
+          <span style={{ color: 'var(--slate-text)' }}>Preview</span>
         </span>
       }
       rightSlot={
         <>
-          <button type="button" className="studio-btn" onClick={() => navigate(`/forms/${formId}/edit`)}>
+          <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/edit`)}>
             ← Back to editor
           </button>
-          <button type="button" className="studio-btn" onClick={() => navigate(`/forms/${formId}/submissions`)}>
+          <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/submissions`)}>
             Responses
           </button>
         </>
       }
     >
-      <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--psw-muted)' }}>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--slate-muted)' }}>
         Live preview. Submissions you make here are saved to localStorage and visible under{' '}
-        <button type="button" className="studio-link" onClick={() => navigate(`/forms/${formId}/submissions`)}>
+        <button type="button" className="slate-link" onClick={() => navigate(`/forms/${formId}/submissions`)}>
           Responses
         </button>.
       </p>
-      <div className="studio-preview" style={{ height: 'calc(100vh - 160px)', overflow: 'hidden' }}>
+      <div className="slate-preview" style={{ height: 'calc(100vh - 160px)', overflow: 'hidden' }}>
+        {/* No `resume` here: the preview is a build/test surface, not a real
+            respondent session. Autosaving partial test runs and offering to
+            resume them on every preview open reads as a glitch. Production
+            embeds opt into save-and-resume themselves (ADR-017). */}
         <Form
-          schema={{ ...form.schema, id: formId }}
-          resume
+          schema={form.schema}
           onSubmit={async (answers, meta) => {
             await new Promise((r) => setTimeout(r, 250));
             addSubmission(formId, answers, meta);

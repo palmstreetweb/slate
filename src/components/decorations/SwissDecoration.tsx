@@ -1,7 +1,7 @@
 /**
  * Swiss theme geometric poster decorations — a different composition per
  * step, cycling through nine layouts. Ported 1:1 from the prototype
- * (intake-form.jsx SWISS_COMPOSITIONS); fills read the `--psw-deco-*`
+ * (intake-form.jsx SWISS_COMPOSITIONS); fills read the `--slate-deco-*`
  * tokens defined in src/styles/tokens.css so light/dark each get a
  * mode-appropriate palette.
  */
@@ -10,10 +10,10 @@
 
 import type { ReactElement } from 'react';
 
-const RED = 'var(--psw-deco-red)';
-const YELLOW = 'var(--psw-deco-yellow)';
-const BLUE = 'var(--psw-deco-blue)';
-const INK = 'var(--psw-deco-ink)';
+const RED = 'var(--slate-deco-red)';
+const YELLOW = 'var(--slate-deco-yellow)';
+const BLUE = 'var(--slate-deco-blue)';
+const INK = 'var(--slate-deco-ink)';
 
 const COMPOSITIONS: ReadonlyArray<() => ReactElement> = [
   // 0 — welcome
@@ -96,11 +96,11 @@ export function SwissDecoration({ step }: Props) {
   const Comp = COMPOSITIONS[((step % COMPOSITIONS.length) + COMPOSITIONS.length) % COMPOSITIONS.length]!;
   return (
     <svg
-      className="psw-decoration"
+      className="slate-decoration"
       viewBox="0 0 1080 1080"
       preserveAspectRatio="xMidYMid slice"
       aria-hidden="true"
-      data-testid="psw-swiss-decoration"
+      data-testid="slate-swiss-decoration"
     >
       <Comp />
     </svg>

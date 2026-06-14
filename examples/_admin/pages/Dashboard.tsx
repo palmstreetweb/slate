@@ -41,24 +41,24 @@ export function Dashboard() {
 
   return (
     <AdminShell
-      crumbs={<span className="studio-crumb">Forms</span>}
+      crumbs={<span className="slate-crumb">Forms</span>}
       rightSlot={
-        <button type="button" className="studio-btn studio-btn--primary" onClick={onNew}>
+        <button type="button" className="slate-btn slate-btn--primary" onClick={onNew}>
           + New form
         </button>
       }
     >
       <div style={{ marginBottom: 28 }}>
-        <h1 className="studio-page-title">Your forms</h1>
-        <p className="studio-page-sub">
+        <h1 className="slate-page-title">Your forms</h1>
+        <p className="slate-page-sub">
           {forms.length === 0 ? 'No forms yet.' : `${forms.length} ${forms.length === 1 ? 'form' : 'forms'}`}
         </p>
       </div>
 
       {forms.length === 0 ? (
-        <div className="studio-empty">
+        <div className="slate-empty">
           <p style={{ margin: '0 0 12px', fontSize: 14 }}>No forms yet.</p>
-          <button type="button" className="studio-btn studio-btn--primary" onClick={onNew}>
+          <button type="button" className="slate-btn slate-btn--primary" onClick={onNew}>
             Create your first form
           </button>
         </div>
@@ -109,18 +109,18 @@ function FormCard({
   ).length;
 
   return (
-    <div className="studio-card">
-      <div className="studio-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="slate-card">
+      <div className="slate-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div>
           <button
             type="button"
-            className="studio-link"
+            className="slate-link"
             style={{
-              fontFamily: 'var(--psw-font-display)',
+              fontFamily: 'var(--slate-font-display)',
               fontSize: 19,
               fontWeight: 500,
               letterSpacing: '-0.02em',
-              color: 'var(--psw-text)',
+              color: 'var(--slate-text)',
               display: 'block',
               textAlign: 'left',
               lineHeight: 1.15,
@@ -129,57 +129,57 @@ function FormCard({
           >
             {form.name}
           </button>
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--psw-dim)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--slate-dim)' }}>
             {form.schema.brand.name} · {String(form.schema.theme)}
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <span className="studio-badge">{qCount} {qCount === 1 ? 'question' : 'questions'}</span>
-          <span className="studio-badge">
+          <span className="slate-badge">{qCount} {qCount === 1 ? 'question' : 'questions'}</span>
+          <span className="slate-badge">
             {subCount} {subCount === 1 ? 'response' : 'responses'}
           </span>
           {lastAt && (
-            <span className="studio-badge">last {timeAgo(new Date(lastAt))}</span>
+            <span className="slate-badge">last {timeAgo(new Date(lastAt))}</span>
           )}
         </div>
       </div>
 
       <div
         style={{
-          borderTop: '1px solid var(--psw-border)',
+          borderTop: '1px solid var(--slate-border)',
           padding: '10px 14px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: 8,
-          background: 'var(--psw-bg)',
+          background: 'var(--slate-bg)',
         }}
       >
         <div style={{ display: 'flex', gap: 4 }}>
           <button
             type="button"
-            className="studio-btn studio-btn--ghost"
+            className="slate-btn slate-btn--ghost"
             onClick={() => navigate(`/forms/${form.id}/edit`)}
           >
             Edit
           </button>
           <button
             type="button"
-            className="studio-btn studio-btn--ghost"
+            className="slate-btn slate-btn--ghost"
             onClick={() => navigate(`/forms/${form.id}`)}
           >
             Preview
           </button>
           <button
             type="button"
-            className="studio-btn studio-btn--ghost"
+            className="slate-btn slate-btn--ghost"
             onClick={() => navigate(`/forms/${form.id}/submissions`)}
           >
             Responses
             {subCount > 0 && (
               <span
-                className="studio-badge studio-badge--accent"
+                className="slate-badge slate-badge--accent"
                 style={{ padding: '0 6px', fontSize: 10, marginLeft: 4 }}
               >
                 {subCount}
@@ -188,10 +188,10 @@ function FormCard({
           </button>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
-          <button type="button" className="studio-btn studio-btn--ghost studio-btn--icon" onClick={onDuplicate} aria-label="Duplicate" title="Duplicate">
+          <button type="button" className="slate-btn slate-btn--ghost slate-btn--icon" onClick={onDuplicate} aria-label="Duplicate" title="Duplicate">
             <DuplicateIcon />
           </button>
-          <button type="button" className="studio-btn studio-btn--ghost studio-btn--icon" onClick={onDelete} aria-label="Delete" title="Delete">
+          <button type="button" className="slate-btn slate-btn--ghost slate-btn--icon" onClick={onDelete} aria-label="Delete" title="Delete">
             <TrashIcon />
           </button>
         </div>

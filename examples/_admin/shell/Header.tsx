@@ -11,20 +11,20 @@ type Props = {
 
 export function Header({ crumbs, rightSlot, mode, onToggle }: Props) {
   return (
-    <header className="studio-header">
+    <header className="slate-header">
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button
           type="button"
-          className="studio-brand"
+          className="slate-brand"
           onClick={() => navigate('/')}
-          aria-label="PSW Studio home"
+          aria-label="Slate home"
         >
-          <span className="studio-brand-mark">P</span>
-          <span>PSW Studio</span>
+          <span className="slate-brand-mark">S</span>
+          <span>Slate</span>
         </button>
         {crumbs && (
           <>
-            <span className="studio-brand-divider" aria-hidden="true" />
+            <span className="slate-brand-divider" aria-hidden="true" />
             {crumbs}
           </>
         )}
@@ -34,7 +34,7 @@ export function Header({ crumbs, rightSlot, mode, onToggle }: Props) {
         {rightSlot}
         <button
           type="button"
-          className="studio-btn studio-btn--ghost studio-btn--icon"
+          className="slate-btn slate-btn--ghost slate-btn--icon"
           onClick={onToggle}
           aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}

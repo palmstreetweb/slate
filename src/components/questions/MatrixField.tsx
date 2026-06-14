@@ -63,19 +63,19 @@ export function MatrixField({ question, answers, initialValue, onAnswer, onAdvan
 
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
 
       <div
-        className="psw-matrix"
-        style={{ ['--psw-matrix-cols' as string]: colCount }}
+        className="slate-matrix"
+        style={{ ['--slate-matrix-cols' as string]: colCount }}
         aria-labelledby={labelId}
       >
-        <div className="psw-matrix-head" aria-hidden="true">
-          <span className="psw-matrix-corner" />
+        <div className="slate-matrix-head" aria-hidden="true">
+          <span className="slate-matrix-corner" />
           {question.columns.map((c) => (
-            <span key={c.value} className="psw-matrix-colhead">
+            <span key={c.value} className="slate-matrix-colhead">
               {c.label}
             </span>
           ))}
@@ -84,11 +84,11 @@ export function MatrixField({ question, answers, initialValue, onAnswer, onAdvan
         {question.rows.map((row) => (
           <div
             key={row.value}
-            className="psw-matrix-row"
+            className="slate-matrix-row"
             role={multiple ? 'group' : 'radiogroup'}
             aria-label={row.label}
           >
-            <span className="psw-matrix-rowlabel">{row.label}</span>
+            <span className="slate-matrix-rowlabel">{row.label}</span>
             {question.columns.map((col) => {
               const checked = isChecked(row.value, col.value);
               return (
@@ -99,10 +99,10 @@ export function MatrixField({ question, answers, initialValue, onAnswer, onAdvan
                   aria-checked={checked}
                   aria-label={`${row.label}: ${col.label}`}
                   onClick={() => setCell(row.value, col.value)}
-                  className={`psw-matrix-cell${checked ? ' psw-matrix-cell--selected' : ''}`}
+                  className={`slate-matrix-cell${checked ? ' slate-matrix-cell--selected' : ''}`}
                 >
-                  <span className="psw-matrix-dot" aria-hidden="true" />
-                  <span className="psw-matrix-cell-label">{col.label}</span>
+                  <span className="slate-matrix-dot" aria-hidden="true" />
+                  <span className="slate-matrix-cell-label">{col.label}</span>
                 </button>
               );
             })}
@@ -111,12 +111,12 @@ export function MatrixField({ question, answers, initialValue, onAnswer, onAdvan
       </div>
 
       {error && (
-        <p className="psw-err" aria-live="polite">
+        <p className="slate-err" aria-live="polite">
           ! {error}
         </p>
       )}
-      <div className="psw-actions">
-        <button type="button" className="psw-ok-btn" onClick={submit}>
+      <div className="slate-actions">
+        <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>
         </button>
       </div>

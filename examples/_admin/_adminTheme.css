@@ -1,104 +1,104 @@
 /* ============================================================
-   PSW Forms — Studio (admin shell) theme.
-   Coexists with [data-psw-forms] form rendering — the studio
-   chrome wraps in its OWN [data-psw-forms][data-theme-name='studio']
-   so a previewed form (its own inner data-psw-forms wrapper) keeps
+   Slate (admin shell) theme.
+   Coexists with [data-slate-forms] form rendering — Slate
+   chrome wraps in its OWN [data-slate-forms][data-theme-name='slate']
+   so a previewed form (its own inner data-slate-forms wrapper) keeps
    its theme tokens via cascade specificity.
    ============================================================ */
 
-/* The base [data-psw-forms] rule sets overflow-x: hidden, which the
+/* The base [data-slate-forms] rule sets overflow-x: hidden, which the
    browser implicitly turns into `overflow: hidden auto` — that makes the
    wrapper its OWN scroll container and breaks `position: sticky` on the
-   admin header. Studio doesn't need clipping; let the document scroll. */
-[data-psw-forms][data-theme-name='studio'] {
+   admin header. Slate doesn't need clipping; let the document scroll. */
+[data-slate-forms][data-theme-name='slate'] {
   overflow: visible;
 }
 
-[data-psw-forms][data-theme-name='studio'] {
+[data-slate-forms][data-theme-name='slate'] {
   /* Body / UI: Inter for density. Display / page titles: Fraunces serif
      to match palmstreetweb.com's editorial feel — see _seedForms etc.
      The studio is the same brand as the marketing site, just admin-shaped. */
-  --psw-font-display: 'Fraunces', Georgia, serif;
-  --psw-font-body: 'Inter', system-ui, sans-serif;
-  --psw-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --psw-radius: 8px;
-  --psw-border-width: 1px;
-  --psw-title-weight: 500;
-  --psw-title-tracking: -0.025em;
-  --psw-title-line-height: 1.08;
-  --psw-title-size: clamp(1.75rem, 2.6vw, 2rem);
-  --psw-transform: none;
+  --slate-font-display: 'Fraunces', Georgia, serif;
+  --slate-font-body: 'Inter', system-ui, sans-serif;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --slate-radius: 8px;
+  --slate-border-width: 1px;
+  --slate-title-weight: 500;
+  --slate-title-tracking: -0.025em;
+  --slate-title-line-height: 1.08;
+  --slate-title-size: clamp(1.75rem, 2.6vw, 2rem);
+  --slate-transform: none;
 
   /* Layout tokens specific to admin chrome */
-  --studio-header-h: 56px;
-  --studio-sidebar-w: 240px;
-  --studio-content-pad: 32px;
-  --studio-card-pad: 20px;
-  --studio-gap: 12px;
-  --studio-radius-sm: 6px;
-  --studio-radius-md: 10px;
-  --studio-radius-lg: 14px;
-  --studio-shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.04);
+  --slate-header-h: 56px;
+  --slate-sidebar-w: 240px;
+  --slate-content-pad: 32px;
+  --slate-card-pad: 20px;
+  --slate-gap: 12px;
+  --slate-radius-sm: 6px;
+  --slate-radius-md: 10px;
+  --slate-radius-lg: 14px;
+  --slate-shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.04);
 }
 
 /* Light + dark tokens use the Editorial palette (the marketing site's
    palette) — warm cream + deep warm dark + PSW blue. The studio IS PSW. */
-[data-psw-forms][data-theme-name='studio'][data-theme='light'] {
-  --psw-bg: #faf6ee;
-  --psw-bg-2: #ffffff;
-  --psw-bg-3: #f0eadd;
-  --psw-text: #1a1a1a;
-  --psw-muted: #5b5851;
-  --psw-dim: #8e8b83;
-  --psw-accent: #2d5bff;
-  --psw-accent-rgb: 45 91 255;
-  --psw-accent-on-light: #2d5bff;
-  --psw-accent-lo: rgb(45 91 255 / 0.06);
-  --psw-border: rgba(26, 26, 26, 0.08);
-  --psw-border-md: rgba(26, 26, 26, 0.16);
-  --psw-error: #c8421a;
-  --studio-success: #2f7d32;
-  --studio-warn: #b07900;
+[data-slate-forms][data-theme-name='slate'][data-theme='light'] {
+  --slate-bg: #faf6ee;
+  --slate-bg-2: #ffffff;
+  --slate-bg-3: #f0eadd;
+  --slate-text: #1a1a1a;
+  --slate-muted: #5b5851;
+  --slate-dim: #8e8b83;
+  --slate-accent: #2d5bff;
+  --slate-accent-rgb: 45 91 255;
+  --slate-accent-on-light: #2d5bff;
+  --slate-accent-lo: rgb(45 91 255 / 0.06);
+  --slate-border: rgba(26, 26, 26, 0.08);
+  --slate-border-md: rgba(26, 26, 26, 0.16);
+  --slate-error: #c8421a;
+  --slate-success: #2f7d32;
+  --slate-warn: #b07900;
   color-scheme: light;
 }
 
-[data-psw-forms][data-theme-name='studio'][data-theme='dark'] {
-  --psw-bg: #14110d;
-  --psw-bg-2: #1c1815;
-  --psw-bg-3: #25201b;
-  --psw-text: #faf6ee;
-  --psw-muted: #b8b2a4;
-  --psw-dim: #7a7468;
-  --psw-accent: #6e8fff;
-  --psw-accent-rgb: 110 143 255;
-  --psw-accent-on-light: #2d5bff;
-  --psw-accent-lo: rgb(110 143 255 / 0.10);
-  --psw-border: rgba(250, 246, 238, 0.08);
-  --psw-border-md: rgba(250, 246, 238, 0.16);
-  --psw-error: #ff6b3d;
-  --studio-success: #4ade80;
-  --studio-warn: #facc15;
+[data-slate-forms][data-theme-name='slate'][data-theme='dark'] {
+  --slate-bg: #14110d;
+  --slate-bg-2: #1c1815;
+  --slate-bg-3: #25201b;
+  --slate-text: #faf6ee;
+  --slate-muted: #b8b2a4;
+  --slate-dim: #7a7468;
+  --slate-accent: #6e8fff;
+  --slate-accent-rgb: 110 143 255;
+  --slate-accent-on-light: #2d5bff;
+  --slate-accent-lo: rgb(110 143 255 / 0.10);
+  --slate-border: rgba(250, 246, 238, 0.08);
+  --slate-border-md: rgba(250, 246, 238, 0.16);
+  --slate-error: #ff6b3d;
+  --slate-success: #4ade80;
+  --slate-warn: #facc15;
   color-scheme: dark;
 }
 
 /* ---------- shell layout ---------- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-app {
+[data-slate-forms][data-theme-name='slate'] .slate-app {
   min-height: 100vh;
-  background: var(--psw-bg);
-  color: var(--psw-text);
-  font-family: var(--psw-font-body);
+  background: var(--slate-bg);
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
   /* Plain block flow so the sticky header's containing block extends with
      the page scroll. Grid-with-row-template breaks sticky because the
      header's containing block is only as tall as its grid cell. */
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-header {
+[data-slate-forms][data-theme-name='slate'] .slate-header {
   position: sticky;
   top: 0;
-  height: var(--studio-header-h);
-  background: var(--psw-bg);
-  border-bottom: 1px solid var(--psw-border);
+  height: var(--slate-header-h);
+  background: var(--slate-bg);
+  border-bottom: 1px solid var(--slate-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -106,15 +106,15 @@
   z-index: 50;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-brand {
+[data-slate-forms][data-theme-name='slate'] .slate-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: var(--psw-font-display);
+  font-family: var(--slate-font-display);
   font-weight: 500;
   font-size: 17px;
   letter-spacing: -0.02em;
-  color: var(--psw-text);
+  color: var(--slate-text);
   text-decoration: none;
   cursor: pointer;
   background: transparent;
@@ -122,11 +122,11 @@
   padding: 0;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-brand-mark {
+[data-slate-forms][data-theme-name='slate'] .slate-brand-mark {
   width: 22px;
   height: 22px;
   border-radius: 5px;
-  background: var(--psw-accent);
+  background: var(--slate-accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -136,21 +136,21 @@
   letter-spacing: -0.02em;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-brand-divider {
+[data-slate-forms][data-theme-name='slate'] .slate-brand-divider {
   width: 1px;
   height: 16px;
-  background: var(--psw-border-md);
+  background: var(--slate-border-md);
   margin: 0 4px;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-crumb {
-  color: var(--psw-muted);
+[data-slate-forms][data-theme-name='slate'] .slate-crumb {
+  color: var(--slate-muted);
   font-size: 13px;
   font-weight: 500;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-content {
-  padding: var(--studio-content-pad);
+[data-slate-forms][data-theme-name='slate'] .slate-content {
+  padding: var(--slate-content-pad);
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
@@ -158,7 +158,7 @@
 
 /* ---------- buttons ---------- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-btn {
+[data-slate-forms][data-theme-name='slate'] .slate-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -166,58 +166,58 @@
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
-  border-radius: var(--studio-radius-sm);
-  border: 1px solid var(--psw-border-md);
-  background: var(--psw-bg-2);
-  color: var(--psw-text);
+  border-radius: var(--slate-radius-sm);
+  border: 1px solid var(--slate-border-md);
+  background: var(--slate-bg-2);
+  color: var(--slate-text);
   cursor: pointer;
   transition: background 120ms ease-out, border-color 120ms ease-out, transform 120ms ease-out;
   min-height: 32px;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-btn:hover {
-  background: var(--psw-bg-3);
-  border-color: var(--psw-text);
+[data-slate-forms][data-theme-name='slate'] .slate-btn:hover {
+  background: var(--slate-bg-3);
+  border-color: var(--slate-text);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-btn:active {
+[data-slate-forms][data-theme-name='slate'] .slate-btn:active {
   transform: translateY(0.5px);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-btn--primary {
-  background: var(--psw-accent);
+[data-slate-forms][data-theme-name='slate'] .slate-btn--primary {
+  background: var(--slate-accent);
   color: #fff;
-  border-color: var(--psw-accent);
+  border-color: var(--slate-accent);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-btn--primary:hover {
-  background: color-mix(in srgb, var(--psw-accent) 88%, #000);
-  border-color: var(--psw-accent);
+[data-slate-forms][data-theme-name='slate'] .slate-btn--primary:hover {
+  background: color-mix(in srgb, var(--slate-accent) 88%, #000);
+  border-color: var(--slate-accent);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-btn--ghost {
+[data-slate-forms][data-theme-name='slate'] .slate-btn--ghost {
   background: transparent;
   border-color: transparent;
-  color: var(--psw-muted);
+  color: var(--slate-muted);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-btn--ghost:hover {
-  background: var(--psw-bg-3);
-  color: var(--psw-text);
+[data-slate-forms][data-theme-name='slate'] .slate-btn--ghost:hover {
+  background: var(--slate-bg-3);
+  color: var(--slate-text);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-btn--danger {
-  color: var(--psw-error);
-  border-color: var(--psw-border-md);
+[data-slate-forms][data-theme-name='slate'] .slate-btn--danger {
+  color: var(--slate-error);
+  border-color: var(--slate-border-md);
   background: transparent;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-btn--danger:hover {
-  background: color-mix(in srgb, var(--psw-error) 12%, transparent);
-  border-color: var(--psw-error);
+[data-slate-forms][data-theme-name='slate'] .slate-btn--danger:hover {
+  background: color-mix(in srgb, var(--slate-error) 12%, transparent);
+  border-color: var(--slate-error);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-btn--icon {
+[data-slate-forms][data-theme-name='slate'] .slate-btn--icon {
   padding: 0;
   width: 32px;
   height: 32px;
@@ -226,157 +226,283 @@
 
 /* ---------- inputs ---------- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-input,
-[data-psw-forms][data-theme-name='studio'] .studio-textarea,
-[data-psw-forms][data-theme-name='studio'] .studio-select {
+[data-slate-forms][data-theme-name='slate'] .slate-input,
+[data-slate-forms][data-theme-name='slate'] .slate-textarea,
+[data-slate-forms][data-theme-name='slate'] .slate-select {
   width: 100%;
   padding: 8px 12px;
   font-family: inherit;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--psw-text);
-  background: var(--psw-bg-2);
-  border: 1px solid var(--psw-border-md);
-  border-radius: var(--studio-radius-sm);
+  color: var(--slate-text);
+  background: var(--slate-bg-2);
+  border: 1px solid var(--slate-border-md);
+  border-radius: var(--slate-radius-sm);
   outline: none;
   transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-input:focus,
-[data-psw-forms][data-theme-name='studio'] .studio-textarea:focus,
-[data-psw-forms][data-theme-name='studio'] .studio-select:focus {
-  border-color: var(--psw-accent);
-  box-shadow: 0 0 0 3px rgb(var(--psw-accent-rgb) / 0.18);
+[data-slate-forms][data-theme-name='slate'] .slate-input:focus,
+[data-slate-forms][data-theme-name='slate'] .slate-textarea:focus,
+[data-slate-forms][data-theme-name='slate'] .slate-select:focus,
+[data-slate-forms][data-theme-name='slate'] .slate-select-trigger:focus-visible,
+[data-slate-forms][data-theme-name='slate'] .slate-select-trigger--open {
+  border-color: var(--slate-accent);
+  box-shadow: 0 0 0 3px rgb(var(--slate-accent-rgb) / 0.18);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-textarea {
+/* Custom select (replaces native <select> menus in the studio). */
+[data-slate-forms][data-theme-name='slate'] .slate-select-wrap {
+  position: relative;
+  width: 100%;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-wrap--auto {
+  width: auto;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-wrap--auto .slate-select-trigger {
+  width: auto;
+  min-width: 4.5rem;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--slate-text);
+  background: var(--slate-bg-2);
+  border: 1px solid var(--slate-border-md);
+  border-radius: var(--slate-radius-sm);
+  outline: none;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-chevron {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  opacity: 0.55;
+  background: currentColor;
+  clip-path: polygon(15% 35%, 50% 70%, 85% 35%, 75% 25%, 50% 50%, 25% 25%);
+  transition: transform 120ms ease-out;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-trigger--open .slate-select-chevron {
+  transform: rotate(180deg);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--slate-bg-2);
+  border: 1px solid var(--slate-border-md);
+  border-radius: var(--slate-radius-sm);
+  box-shadow: var(--slate-shadow-card), 0 8px 24px rgb(0 0 0 / 0.08);
+  max-height: min(280px, 50vh);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Portaled menus escape sidebar overflow clipping (SlateSelect.tsx). */
+[data-slate-forms][data-theme-name='slate'] .slate-select-menu--portal {
+  position: fixed;
+  z-index: 200;
+  right: auto;
+  overscroll-behavior: contain;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--slate-text);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--slate-radius-sm) - 2px);
+  cursor: pointer;
+  text-align: left;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-option-label {
+  flex: 1;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-option:hover {
+  background: var(--slate-bg-3);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-option--selected {
+  background: var(--slate-accent-lo);
+  color: var(--slate-text);
+  font-weight: 500;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-select-check {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  background: var(--slate-accent);
+  clip-path: polygon(14% 52%, 38% 76%, 88% 22%, 78% 12%, 38% 56%, 24% 42%);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-textarea {
   resize: vertical;
   min-height: 72px;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-label {
+[data-slate-forms][data-theme-name='slate'] .slate-label {
   display: block;
   font-size: 11px;
   font-weight: 600;
-  color: var(--psw-muted);
+  color: var(--slate-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 6px;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-help {
+[data-slate-forms][data-theme-name='slate'] .slate-help {
   font-size: 11px;
-  color: var(--psw-dim);
+  color: var(--slate-dim);
   margin-top: 6px;
   line-height: 1.4;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-checkbox {
+[data-slate-forms][data-theme-name='slate'] .slate-checkbox {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: var(--psw-text);
+  color: var(--slate-text);
   cursor: pointer;
   user-select: none;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-checkbox input {
+[data-slate-forms][data-theme-name='slate'] .slate-checkbox input {
   width: 14px;
   height: 14px;
-  accent-color: var(--psw-accent);
+  accent-color: var(--slate-accent);
 }
 
 /* ---------- cards / surfaces ---------- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-card {
-  background: var(--psw-bg-2);
-  border: 1px solid var(--psw-border);
-  border-radius: var(--studio-radius-md);
+[data-slate-forms][data-theme-name='slate'] .slate-card {
+  background: var(--slate-bg-2);
+  border: 1px solid var(--slate-border);
+  border-radius: var(--slate-radius-md);
   overflow: hidden;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-card-pad {
-  padding: var(--studio-card-pad);
+[data-slate-forms][data-theme-name='slate'] .slate-card-pad {
+  padding: var(--slate-card-pad);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-section-title {
+[data-slate-forms][data-theme-name='slate'] .slate-section-title {
   font-size: 11px;
   font-weight: 600;
-  color: var(--psw-muted);
+  color: var(--slate-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin: 0 0 12px;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
 }
 
 /* Big page heading (Fraunces serif) — Dashboard's "Your forms",
    FormSubmissions's "Responses", etc. */
-[data-psw-forms][data-theme-name='studio'] .studio-page-title {
-  font-family: var(--psw-font-display);
-  font-size: var(--psw-title-size);
-  font-weight: var(--psw-title-weight);
-  letter-spacing: var(--psw-title-tracking);
-  line-height: var(--psw-title-line-height);
+[data-slate-forms][data-theme-name='slate'] .slate-page-title {
+  font-family: var(--slate-font-display);
+  font-size: var(--slate-title-size);
+  font-weight: var(--slate-title-weight);
+  letter-spacing: var(--slate-title-tracking);
+  line-height: var(--slate-title-line-height);
   margin: 0;
-  color: var(--psw-text);
+  color: var(--slate-text);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-page-sub {
+[data-slate-forms][data-theme-name='slate'] .slate-page-sub {
   margin: 6px 0 0;
   font-size: 13px;
-  color: var(--psw-muted);
+  color: var(--slate-muted);
 }
 
 /* ---------- badges ---------- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-badge {
+[data-slate-forms][data-theme-name='slate'] .slate-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
   font-size: 11px;
   font-weight: 500;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   border-radius: 999px;
-  background: var(--psw-bg-3);
-  color: var(--psw-muted);
-  border: 1px solid var(--psw-border);
+  background: var(--slate-bg-3);
+  color: var(--slate-muted);
+  border: 1px solid var(--slate-border);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-badge--accent {
-  background: var(--psw-accent-lo);
-  color: var(--psw-accent);
-  border-color: rgb(var(--psw-accent-rgb) / 0.25);
+[data-slate-forms][data-theme-name='slate'] .slate-badge--accent {
+  background: var(--slate-accent-lo);
+  color: var(--slate-accent);
+  border-color: rgb(var(--slate-accent-rgb) / 0.25);
 }
 
 /* ---------- empty state ---------- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-empty {
+[data-slate-forms][data-theme-name='slate'] .slate-empty {
   text-align: center;
   padding: 64px 24px;
-  border: 1.5px dashed var(--psw-border-md);
-  border-radius: var(--studio-radius-lg);
-  color: var(--psw-muted);
+  border: 1.5px dashed var(--slate-border-md);
+  border-radius: var(--slate-radius-lg);
+  color: var(--slate-muted);
 }
 
 /* ---------- tabs ---------- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-tabs {
+[data-slate-forms][data-theme-name='slate'] .slate-tabs {
   display: inline-flex;
   gap: 2px;
   padding: 4px;
-  background: var(--psw-bg-3);
-  border-radius: var(--studio-radius-sm);
-  border: 1px solid var(--psw-border);
+  background: var(--slate-bg-3);
+  border-radius: var(--slate-radius-sm);
+  border: 1px solid var(--slate-border);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-tab {
+[data-slate-forms][data-theme-name='slate'] .slate-tab {
   padding: 5px 12px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--psw-muted);
+  color: var(--slate-muted);
   background: transparent;
   border: none;
   border-radius: 4px;
@@ -384,36 +510,36 @@
   font-family: inherit;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-tab:hover {
-  color: var(--psw-text);
+[data-slate-forms][data-theme-name='slate'] .slate-tab:hover {
+  color: var(--slate-text);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-tab--active {
-  background: var(--psw-bg);
-  color: var(--psw-text);
+[data-slate-forms][data-theme-name='slate'] .slate-tab--active {
+  background: var(--slate-bg);
+  color: var(--slate-text);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
 }
 
 /* ---------- preview frame (when rendering a form inside studio) ---------- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-preview {
-  border-radius: var(--studio-radius-lg);
+[data-slate-forms][data-theme-name='slate'] .slate-preview {
+  border-radius: var(--slate-radius-lg);
   overflow: hidden;
-  border: 1px solid var(--psw-border-md);
-  box-shadow: var(--studio-shadow-card);
+  border: 1px solid var(--slate-border-md);
+  box-shadow: var(--slate-shadow-card);
 }
 
 /* Anchor the previewed form's content to the upper third of the frame
-   instead of dead-center. The form's own [data-psw-forms] base CSS sets
-   `min-height: 100vh` which is larger than the studio preview frame
+   instead of dead-center. The form's own [data-slate-forms] base CSS sets
+   `min-height: 100vh` which is larger than Slate preview frame
    (calc(100vh - 160px)) — leaving the content visually below center.
    These overrides cap the inner wrapper + stage to 100% of the frame and
    pull content up with a top-padding clamp. */
-.studio-preview [data-psw-forms] {
+.slate-preview [data-slate-forms] {
   min-height: 100%;
 }
 
-.studio-preview .psw-stage {
+.slate-preview .slate-stage {
   min-height: 100%;
   align-items: flex-start;
   padding-top: clamp(48px, 14vh, 140px);
@@ -423,12 +549,12 @@
    CONFIRM DIALOG — backdrop blur + centered card
    ============================================================ */
 
-@keyframes psw-studio-fade-in {
+@keyframes slate-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes psw-studio-dialog-in {
+@keyframes slate-dialog-in {
   from {
     opacity: 0;
     transform: translateY(8px) scale(0.97);
@@ -439,7 +565,7 @@
   }
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-dialog-backdrop {
+[data-slate-forms][data-theme-name='slate'] .slate-dialog-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -450,47 +576,47 @@
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(10px) saturate(120%);
   -webkit-backdrop-filter: blur(10px) saturate(120%);
-  animation: psw-studio-fade-in 180ms ease-out both;
+  animation: slate-fade-in 180ms ease-out both;
 }
 
-[data-psw-forms][data-theme-name='studio'][data-theme='light'] .studio-dialog-backdrop {
+[data-slate-forms][data-theme-name='slate'][data-theme='light'] .slate-dialog-backdrop {
   /* Lighter veil over the warm-cream studio so the modal pops without
      looking like a black blanket. */
   background: rgba(26, 26, 26, 0.32);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-dialog {
+[data-slate-forms][data-theme-name='slate'] .slate-dialog {
   width: 100%;
   max-width: 420px;
-  background: var(--psw-bg-2);
-  color: var(--psw-text);
-  border: 1px solid var(--psw-border-md);
-  border-radius: var(--studio-radius-lg);
+  background: var(--slate-bg-2);
+  color: var(--slate-text);
+  border: 1px solid var(--slate-border-md);
+  border-radius: var(--slate-radius-lg);
   padding: 24px 24px 20px;
   box-shadow:
     0 24px 48px -12px rgba(0, 0, 0, 0.4),
     0 8px 16px -8px rgba(0, 0, 0, 0.25);
-  animation: psw-studio-dialog-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slate-dialog-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-dialog-title {
+[data-slate-forms][data-theme-name='slate'] .slate-dialog-title {
   margin: 0 0 8px;
-  font-family: var(--psw-font-display);
+  font-family: var(--slate-font-display);
   font-size: 22px;
   font-weight: 500;
   letter-spacing: -0.02em;
   line-height: 1.15;
-  color: var(--psw-text);
+  color: var(--slate-text);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-dialog-message {
+[data-slate-forms][data-theme-name='slate'] .slate-dialog-message {
   margin: 0 0 20px;
   font-size: 14px;
   line-height: 1.55;
-  color: var(--psw-muted);
+  color: var(--slate-muted);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-dialog-actions {
+[data-slate-forms][data-theme-name='slate'] .slate-dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -499,19 +625,19 @@
 
 /* Filled-danger button variant for the modal's confirm action — strong
    visual weight matching the primary button but in error color. */
-[data-psw-forms][data-theme-name='studio'] .studio-btn--danger-filled {
-  background: var(--psw-error);
+[data-slate-forms][data-theme-name='slate'] .slate-btn--danger-filled {
+  background: var(--slate-error);
   color: #fff;
-  border-color: var(--psw-error);
+  border-color: var(--slate-error);
 }
-[data-psw-forms][data-theme-name='studio'] .studio-btn--danger-filled:hover {
-  background: color-mix(in srgb, var(--psw-error) 88%, #000);
-  border-color: var(--psw-error);
+[data-slate-forms][data-theme-name='slate'] .slate-btn--danger-filled:hover {
+  background: color-mix(in srgb, var(--slate-error) 88%, #000);
+  border-color: var(--slate-error);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-psw-forms][data-theme-name='studio'] .studio-dialog-backdrop,
-  [data-psw-forms][data-theme-name='studio'] .studio-dialog {
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-backdrop,
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog {
     animation: none;
   }
 }
@@ -520,39 +646,39 @@
    THREE-PANE EDITOR LAYOUT — Outline | Canvas | Inspector
    ============================================================ */
 
-[data-psw-forms][data-theme-name='studio'] .studio-content--full-bleed {
+[data-slate-forms][data-theme-name='slate'] .slate-content--full-bleed {
   max-width: none;
   padding: 0;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-editor {
+[data-slate-forms][data-theme-name='slate'] .slate-editor {
   display: grid;
   grid-template-columns: 280px 1fr 340px;
-  height: calc(100vh - var(--studio-header-h));
-  background: var(--psw-bg);
+  height: calc(100vh - var(--slate-header-h));
+  background: var(--slate-bg);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-rail {
+[data-slate-forms][data-theme-name='slate'] .slate-rail {
   height: 100%;
   overflow-y: auto;
-  background: var(--psw-bg);
+  background: var(--slate-bg);
   display: flex;
   flex-direction: column;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-rail--left {
-  border-right: 1px solid var(--psw-border);
+[data-slate-forms][data-theme-name='slate'] .slate-rail--left {
+  border-right: 1px solid var(--slate-border);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-rail--right {
-  border-left: 1px solid var(--psw-border);
+[data-slate-forms][data-theme-name='slate'] .slate-rail--right {
+  border-left: 1px solid var(--slate-border);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-rail-pad {
+[data-slate-forms][data-theme-name='slate'] .slate-rail-pad {
   padding: 16px 16px;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-rail-toggle {
+[data-slate-forms][data-theme-name='slate'] .slate-rail-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -561,16 +687,16 @@
   padding: 0;
   cursor: pointer;
   font-family: inherit;
-  color: var(--psw-text);
+  color: var(--slate-text);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-rail-toggle:hover .studio-label {
-  color: var(--psw-text);
+[data-slate-forms][data-theme-name='slate'] .slate-rail-toggle:hover .slate-label {
+  color: var(--slate-text);
 }
 
 /* ----- outline list ----- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-list {
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -579,11 +705,28 @@
   gap: 2px;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-list > li {
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > li {
   position: relative;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-row {
+[data-slate-forms][data-theme-name='slate'] .slate-outline-item--drop-before::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: var(--slate-accent);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row[draggable='true']:active {
+  cursor: grabbing;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row {
   width: 100%;
   display: grid;
   grid-template-columns: 22px 18px 1fr auto;
@@ -592,74 +735,97 @@
   padding: 7px 10px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--studio-radius-sm);
+  border-radius: var(--slate-radius-sm);
   cursor: pointer;
   text-align: left;
   font-family: inherit;
   font-size: 13px;
-  color: var(--psw-text);
+  color: var(--slate-text);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-row:hover {
-  background: var(--psw-bg-3);
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row:hover {
+  background: var(--slate-bg-3);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-row--selected {
-  background: var(--psw-accent-lo);
-  border-color: rgb(var(--psw-accent-rgb) / 0.30);
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row--selected {
+  background: var(--slate-accent-lo);
+  border-color: rgb(var(--slate-accent-rgb) / 0.30);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-idx {
-  font-family: var(--psw-font-mono);
+[data-slate-forms][data-theme-name='slate'] .slate-outline-idx {
+  font-family: var(--slate-font-mono);
   font-size: 11px;
-  color: var(--psw-dim);
+  color: var(--slate-dim);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-glyph {
-  font-family: var(--psw-font-mono);
+[data-slate-forms][data-theme-name='slate'] .slate-outline-glyph {
+  font-family: var(--slate-font-mono);
   font-size: 13px;
-  color: var(--psw-muted);
+  color: var(--slate-muted);
   text-align: center;
+  flex-shrink: 0;
+  width: 1.1em;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-row--selected .studio-outline-glyph {
-  color: var(--psw-accent);
+[data-slate-forms][data-theme-name='slate'] .slate-type-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--slate-bg-3);
+  border-radius: var(--slate-radius-sm);
+  font-size: 13px;
+  font-weight: 500;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-title {
+[data-slate-forms][data-theme-name='slate'] .slate-type-chip .slate-outline-glyph {
+  color: var(--slate-accent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row--selected .slate-outline-glyph {
+  color: var(--slate-accent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-title {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   font-weight: 400;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-row--selected .studio-outline-title {
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row--selected .slate-outline-title {
   font-weight: 500;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-actions {
+[data-slate-forms][data-theme-name='slate'] .slate-outline-actions {
   display: none;
   position: absolute;
-  top: 2px;
+  top: 50%;
   right: 6px;
+  transform: translateY(-50%);
+  align-items: center;
+  justify-content: center;
   gap: 0;
-  background: var(--psw-bg-2);
-  border: 1px solid var(--psw-border);
-  border-radius: var(--studio-radius-sm);
+  overflow: hidden;
+  background: var(--slate-bg-2);
+  border: 1px solid var(--slate-border);
+  border-radius: var(--slate-radius-sm);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-outline-list > li:hover .studio-outline-actions,
-[data-psw-forms][data-theme-name='studio'] .studio-outline-list > li:focus-within .studio-outline-actions {
-  display: inline-flex;
+/* Reveal on row hover only. We intentionally omit :focus-within — selecting a
+   row focuses its button, which would otherwise keep that row's controls
+   stuck visible after the mouse leaves. */
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > li:hover .slate-outline-actions {
+  display: flex;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-icon-btn {
+[data-slate-forms][data-theme-name='slate'] .slate-icon-btn {
   width: 22px;
   height: 22px;
   background: transparent;
   border: none;
   cursor: pointer;
-  color: var(--psw-muted);
+  color: var(--slate-muted);
   font-family: inherit;
   font-size: 12px;
   display: inline-flex;
@@ -667,66 +833,86 @@
   justify-content: center;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-icon-btn:hover {
-  color: var(--psw-text);
-  background: var(--psw-bg-3);
+[data-slate-forms][data-theme-name='slate'] .slate-icon-btn:hover {
+  color: var(--slate-text);
+  background: var(--slate-bg-3);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-icon-btn:disabled {
+/* Clip hover fills to the pill's rounded ends (no white sliver at the edges). */
+[data-slate-forms][data-theme-name='slate'] .slate-outline-actions .slate-icon-btn:first-child:hover {
+  border-radius: calc(var(--slate-radius-sm) - 1px) 0 0 calc(var(--slate-radius-sm) - 1px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-actions .slate-icon-btn:last-child:hover {
+  border-radius: 0 calc(var(--slate-radius-sm) - 1px) calc(var(--slate-radius-sm) - 1px) 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-actions .slate-icon-btn:only-child:hover {
+  border-radius: calc(var(--slate-radius-sm) - 1px);
+}
+
+/* Destructive affordance: the "×" remove buttons (aria-label "Remove …") get a
+   reddish tint on hover so it reads as delete, not a neutral action. */
+[data-slate-forms][data-theme-name='slate'] .slate-icon-btn[aria-label^='Remove']:hover {
+  color: var(--slate-error);
+  background: rgb(200 66 26 / 0.12);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-icon-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-popover {
-  background: var(--psw-bg-2);
-  border: 1px solid var(--psw-border-md);
-  border-radius: var(--studio-radius-md);
+[data-slate-forms][data-theme-name='slate'] .slate-popover {
+  background: var(--slate-bg-2);
+  border: 1px solid var(--slate-border-md);
+  border-radius: var(--slate-radius-md);
   padding: 10px;
-  box-shadow: var(--studio-shadow-card);
+  box-shadow: var(--slate-shadow-card);
 }
 
 /* ----- canvas ----- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-canvas {
-  background: var(--psw-bg-3);
+[data-slate-forms][data-theme-name='slate'] .slate-canvas {
+  background: var(--slate-bg-3);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-canvas-toolbar {
+[data-slate-forms][data-theme-name='slate'] .slate-canvas-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--psw-border);
-  background: var(--psw-bg);
+  border-bottom: 1px solid var(--slate-border);
+  background: var(--slate-bg);
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-canvas-label {
+[data-slate-forms][data-theme-name='slate'] .slate-canvas-label {
   font-size: 11px;
-  font-family: var(--psw-font-mono);
-  color: var(--psw-muted);
+  font-family: var(--slate-font-mono);
+  color: var(--slate-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-canvas-frame {
+[data-slate-forms][data-theme-name='slate'] .slate-canvas-frame {
   flex: 1;
   margin: 24px;
-  border-radius: var(--studio-radius-lg);
+  border-radius: var(--slate-radius-lg);
   overflow: hidden;
-  border: 1px solid var(--psw-border-md);
-  box-shadow: var(--studio-shadow-card);
+  border: 1px solid var(--slate-border-md);
+  box-shadow: var(--slate-shadow-card);
   position: relative;
-  /* the inner [data-psw-forms] wrapper supplies its own theme tokens
+  /* the inner [data-slate-forms] wrapper supplies its own theme tokens
      so nothing here should hard-code a background color. */
 }
 
 /* ---------- nav links ---------- */
 
-[data-psw-forms][data-theme-name='studio'] .studio-link {
-  color: var(--psw-accent);
+[data-slate-forms][data-theme-name='slate'] .slate-link {
+  color: var(--slate-accent);
   text-decoration: none;
   font-weight: 500;
   cursor: pointer;
@@ -737,6 +923,131 @@
   font-size: inherit;
 }
 
-[data-psw-forms][data-theme-name='studio'] .studio-link:hover {
+[data-slate-forms][data-theme-name='slate'] .slate-link:hover {
   text-decoration: underline;
+}
+
+/* ---------- share panel (uses slate-dialog-backdrop for the veil) ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-panel {
+  width: min(440px, 100%);
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  background: var(--slate-bg);
+  color: var(--slate-text);
+  border: 1px solid var(--slate-border-md);
+  border-radius: var(--slate-radius-lg);
+  box-shadow:
+    0 24px 48px -12px rgba(0, 0, 0, 0.4),
+    0 8px 16px -8px rgba(0, 0, 0, 0.25);
+  animation: slate-dialog-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--slate-border);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-title {
+  margin: 0;
+  font-family: var(--slate-font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-body {
+  display: grid;
+  gap: 20px;
+  padding: 16px 20px 22px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-field {
+  display: grid;
+  gap: 6px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-slug-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-slug-prefix {
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  color: var(--slate-dim);
+  padding: 8px 0 8px 10px;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-slug-row .slate-input {
+  flex: 1;
+  min-width: 120px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-hint {
+  font-size: 12px;
+  color: var(--slate-dim);
+  line-height: 1.4;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-callout {
+  padding: 12px 14px;
+  background: var(--slate-bg-2);
+  border: 1px solid var(--slate-border);
+  border-radius: var(--slate-radius-sm);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-code {
+  font-family: var(--slate-font-mono);
+  font-size: 11px;
+  background: var(--slate-bg-3);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-block {
+  padding-top: 4px;
+  border-top: 1px solid var(--slate-border);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 10px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-url {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-qr {
+  display: block;
+  margin-top: 14px;
+  border-radius: var(--slate-radius-sm);
+  border: 1px solid var(--slate-border);
+  background: #faf6ee;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-qr--placeholder {
+  width: 168px;
+  height: 168px;
+  background: var(--slate-bg-2);
 }

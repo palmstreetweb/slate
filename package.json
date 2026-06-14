@@ -1,7 +1,7 @@
 {
-  "name": "@palmstreetweb/forms",
+  "name": "@palmstreetweb/slate",
   "version": "1.0.0-beta.1",
-  "description": "Palm Street Web's internal conversational form-rendering library. Schema in, Typeform-quality form out.",
+  "description": "Slate — Palm Street Web's internal conversational form engine. Schema in, Typeform-quality form out.",
   "type": "module",
   "license": "UNLICENSED",
   "private": false,
@@ -57,6 +57,7 @@
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
     "@types/node": "^25.6.2",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@typescript-eslint/eslint-plugin": "^8.18.2",
@@ -68,6 +69,7 @@
     "globals": "^15.14.0",
     "jsdom": "^29.1.1",
     "prettier": "^3.4.2",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tsup": "^8.3.5",
@@ -87,5 +89,9 @@
     "internal"
   ],
   "author": "Palm Street Web",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/palmstreetweb/slate.git"
+  },
   "homepage": "https://palmstreetweb.com"
 }

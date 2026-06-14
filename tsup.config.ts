@@ -16,7 +16,7 @@ export default defineConfig({
   // expects the global stylesheet to be loaded). At build time we treat
   // them as no-ops in JS — onSuccess concatenates src/styles/*.css into
   // a single dist/styles.css that consumers import via the
-  // `@palmstreetweb/forms/styles.css` entry.
+  // `@palmstreetweb/slate/styles.css` entry.
   loader: { '.css': 'empty' },
   onSuccess: 'node scripts/bundle-css.mjs',
   outExtension({ format }) {

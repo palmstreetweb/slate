@@ -1,7 +1,7 @@
 /* ============================================================
-   @palmstreetweb/forms — design tokens
+   @palmstreetweb/slate — design tokens
    ============================================================
-   All tokens are wrapper-scoped on `[data-psw-forms]`. We never
+   All tokens are wrapper-scoped on `[data-slate-forms]`. We never
    write to <html> (see DECISIONS.md ADR-004). Theme + mode are
    driven by two data attributes:
      data-theme-name = 'editorial' | 'swiss' | <custom>
@@ -11,7 +11,7 @@
    properties via utils/tokens.ts.
    ============================================================ */
 
-[data-psw-forms] {
+[data-slate-forms] {
   box-sizing: border-box;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -19,19 +19,71 @@
   font-feature-settings: 'kern', 'liga', 'calt';
 }
 
-[data-psw-forms] *,
-[data-psw-forms] *::before,
-[data-psw-forms] *::after {
+[data-slate-forms] *,
+[data-slate-forms] *::before,
+[data-slate-forms] *::after {
   box-sizing: inherit;
 }
 
 /* Brief mode-switch suppression — when toggling, we set
    `data-theme-switching` on the wrapper for ~550ms to suppress
    transitions across the entire form during the morph. */
-[data-psw-forms][data-theme-switching] *,
-[data-psw-forms][data-theme-switching] *::before,
-[data-psw-forms][data-theme-switching] *::after {
+[data-slate-forms][data-theme-switching] *,
+[data-slate-forms][data-theme-switching] *::before,
+[data-slate-forms][data-theme-switching] *::after {
   transition: none !important;
+}
+
+/* ============================================================
+   CLASSIC THEME — Calm, full-screen, conversational (old Typeform)
+   Source-of-truth mirror: src/themes/classic.ts
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='classic'] {
+  --slate-font-display: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --slate-font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --slate-radius: 8px;
+  --slate-border-width: 1.5px;
+  --slate-title-weight: 500;
+  --slate-title-tracking: -0.01em;
+  --slate-title-line-height: 1.3;
+  --slate-title-size: clamp(1.6rem, 3.6vw, 2.4rem);
+  --slate-transform: none;
+}
+
+[data-slate-forms][data-theme-name='classic'][data-theme='light'] {
+  --slate-bg: #ffffff;
+  --slate-bg-2: #f5f7f9;
+  --slate-bg-3: #eceff3;
+  --slate-text: #2b2e33;
+  --slate-muted: #62676e;
+  --slate-dim: #9aa0a6;
+  --slate-accent: #2c6ef2;
+  --slate-accent-rgb: 44 110 242;
+  --slate-accent-on-light: #2c6ef2;
+  --slate-accent-lo: rgb(44 110 242 / 0.08);
+  --slate-border: rgba(43, 46, 51, 0.12);
+  --slate-border-md: rgba(43, 46, 51, 0.2);
+  --slate-error: #d92d20;
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='classic'][data-theme='dark'] {
+  --slate-bg: #2a2d34;
+  --slate-bg-2: #313640;
+  --slate-bg-3: #3a404b;
+  --slate-text: #f3f5f7;
+  --slate-muted: #b6bcc4;
+  --slate-dim: #828892;
+  --slate-accent: #5b9bff;
+  --slate-accent-rgb: 91 155 255;
+  --slate-accent-on-light: #2c6ef2;
+  --slate-accent-lo: rgb(91 155 255 / 0.12);
+  --slate-border: rgba(243, 245, 247, 0.12);
+  --slate-border-md: rgba(243, 245, 247, 0.2);
+  --slate-error: #ff6b5e;
+  color-scheme: dark;
 }
 
 /* ============================================================
@@ -39,50 +91,50 @@
    Source-of-truth mirror: src/themes/editorial.ts
    ============================================================ */
 
-[data-psw-forms][data-theme-name='editorial'] {
-  --psw-font-display: 'Fraunces', Georgia, serif;
-  --psw-font-body: 'Fraunces', Georgia, serif;
-  --psw-font-mono: 'JetBrains Mono', monospace;
-  --psw-radius: 3px;
-  --psw-border-width: 1.5px;
-  --psw-title-weight: 500;
-  --psw-title-tracking: -0.025em;
-  --psw-title-line-height: 1.08;
-  --psw-title-size: clamp(2rem, 5.2vw, 3.4rem);
-  --psw-transform: none;
+[data-slate-forms][data-theme-name='editorial'] {
+  --slate-font-display: 'Fraunces', Georgia, serif;
+  --slate-font-body: 'Fraunces', Georgia, serif;
+  --slate-font-mono: 'JetBrains Mono', monospace;
+  --slate-radius: 3px;
+  --slate-border-width: 1.5px;
+  --slate-title-weight: 500;
+  --slate-title-tracking: -0.025em;
+  --slate-title-line-height: 1.08;
+  --slate-title-size: clamp(2rem, 5.2vw, 3.4rem);
+  --slate-transform: none;
 }
 
-[data-psw-forms][data-theme-name='editorial'][data-theme='light'] {
-  --psw-bg: #faf6ee;
-  --psw-bg-2: #f4f0e5;
-  --psw-bg-3: #ede8dd;
-  --psw-text: #1a1a1a;
-  --psw-muted: #5b5851;
-  --psw-dim: #8e8b83;
-  --psw-accent: #2d5bff;
-  --psw-accent-rgb: 45 91 255;
-  --psw-accent-on-light: #2d5bff;
-  --psw-accent-lo: rgb(45 91 255 / 0.06);
-  --psw-border: rgba(26, 26, 26, 0.1);
-  --psw-border-md: rgba(26, 26, 26, 0.18);
-  --psw-error: #c8421a;
+[data-slate-forms][data-theme-name='editorial'][data-theme='light'] {
+  --slate-bg: #faf6ee;
+  --slate-bg-2: #f4f0e5;
+  --slate-bg-3: #ede8dd;
+  --slate-text: #1a1a1a;
+  --slate-muted: #5b5851;
+  --slate-dim: #8e8b83;
+  --slate-accent: #2d5bff;
+  --slate-accent-rgb: 45 91 255;
+  --slate-accent-on-light: #2d5bff;
+  --slate-accent-lo: rgb(45 91 255 / 0.06);
+  --slate-border: rgba(26, 26, 26, 0.1);
+  --slate-border-md: rgba(26, 26, 26, 0.18);
+  --slate-error: #c8421a;
   color-scheme: light;
 }
 
-[data-psw-forms][data-theme-name='editorial'][data-theme='dark'] {
-  --psw-bg: #14110d;
-  --psw-bg-2: #1c1815;
-  --psw-bg-3: #25201b;
-  --psw-text: #faf6ee;
-  --psw-muted: #b8b2a4;
-  --psw-dim: #7a7468;
-  --psw-accent: #6e8fff;
-  --psw-accent-rgb: 110 143 255;
-  --psw-accent-on-light: #2d5bff;
-  --psw-accent-lo: rgb(110 143 255 / 0.1);
-  --psw-border: rgba(250, 246, 238, 0.08);
-  --psw-border-md: rgba(250, 246, 238, 0.14);
-  --psw-error: #ff6b3d;
+[data-slate-forms][data-theme-name='editorial'][data-theme='dark'] {
+  --slate-bg: #14110d;
+  --slate-bg-2: #1c1815;
+  --slate-bg-3: #25201b;
+  --slate-text: #faf6ee;
+  --slate-muted: #b8b2a4;
+  --slate-dim: #7a7468;
+  --slate-accent: #6e8fff;
+  --slate-accent-rgb: 110 143 255;
+  --slate-accent-on-light: #2d5bff;
+  --slate-accent-lo: rgb(110 143 255 / 0.1);
+  --slate-border: rgba(250, 246, 238, 0.08);
+  --slate-border-md: rgba(250, 246, 238, 0.14);
+  --slate-error: #ff6b3d;
   color-scheme: dark;
 }
 
@@ -91,80 +143,607 @@
    Source-of-truth mirror: src/themes/swiss.ts
    ============================================================ */
 
-[data-psw-forms][data-theme-name='swiss'] {
+[data-slate-forms][data-theme-name='swiss'] {
   /* Inter as Akzidenz-Grotesk substitute — see DECISIONS.md ADR-009.
      Mirror of src/themes/swiss.ts; keep in sync. */
-  --psw-font-display: 'Inter', system-ui, sans-serif;
-  --psw-font-body: 'Inter', system-ui, sans-serif;
-  --psw-font-mono: 'Inter', system-ui, sans-serif;
-  --psw-radius: 0px;
-  --psw-border-width: 2.5px;
-  --psw-title-weight: 900;
-  --psw-title-tracking: -0.035em;
-  --psw-title-line-height: 0.95;
-  --psw-title-size: clamp(2.5rem, 6.2vw, 4.2rem);
-  --psw-transform: lowercase;
+  --slate-font-display: 'Inter', system-ui, sans-serif;
+  --slate-font-body: 'Inter', system-ui, sans-serif;
+  --slate-font-mono: 'Inter', system-ui, sans-serif;
+  --slate-radius: 0px;
+  --slate-border-width: 2.5px;
+  --slate-title-weight: 900;
+  --slate-title-tracking: -0.035em;
+  --slate-title-line-height: 0.95;
+  --slate-title-size: clamp(2.5rem, 6.2vw, 4.2rem);
+  --slate-transform: lowercase;
 }
 
-[data-psw-forms][data-theme-name='swiss'][data-theme='light'] {
+[data-slate-forms][data-theme-name='swiss'][data-theme='light'] {
   /* Geometric poster decoration palette (SwissDecoration.tsx). */
-  --psw-deco-red: #dc2626;
-  --psw-deco-yellow: #facc15;
-  --psw-deco-blue: #1d4ed8;
-  --psw-deco-ink: #000000;
-  --psw-bg: #f2efe3;
-  --psw-bg-2: #e8e4d5;
-  --psw-bg-3: #ddd8c6;
-  --psw-text: #000000;
-  --psw-muted: #2a2a2a;
-  --psw-dim: #6b6b6b;
-  --psw-accent: #dc2626;
-  --psw-accent-rgb: 220 38 38;
-  --psw-accent-on-light: #dc2626;
-  --psw-accent-lo: rgb(220 38 38 / 0.08);
-  --psw-border: rgba(0, 0, 0, 0.18);
-  --psw-border-md: rgba(0, 0, 0, 0.28);
-  --psw-error: #dc2626;
+  --slate-deco-red: #dc2626;
+  --slate-deco-yellow: #facc15;
+  --slate-deco-blue: #1d4ed8;
+  --slate-deco-ink: #000000;
+  --slate-bg: #f2efe3;
+  --slate-bg-2: #e8e4d5;
+  --slate-bg-3: #ddd8c6;
+  --slate-text: #000000;
+  --slate-muted: #2a2a2a;
+  --slate-dim: #6b6b6b;
+  --slate-accent: #dc2626;
+  --slate-accent-rgb: 220 38 38;
+  --slate-accent-on-light: #dc2626;
+  --slate-accent-lo: rgb(220 38 38 / 0.08);
+  --slate-border: rgba(0, 0, 0, 0.18);
+  --slate-border-md: rgba(0, 0, 0, 0.28);
+  --slate-error: #dc2626;
   color-scheme: light;
 }
 
-[data-psw-forms][data-theme-name='swiss'][data-theme='dark'] {
+[data-slate-forms][data-theme-name='swiss'][data-theme='dark'] {
   /* Dimmed poster palette so shapes sit behind cream text without glare;
      "ink" flips to cream because pure black vanishes on the dark bg. */
-  --psw-deco-red: #991b1b;
-  --psw-deco-yellow: #a16207;
-  --psw-deco-blue: #1e3a8a;
-  --psw-deco-ink: #f2efe3;
-  --psw-bg: #0a0a0a;
-  --psw-bg-2: #131313;
-  --psw-bg-3: #1a1a1a;
-  --psw-text: #f2efe3;
-  --psw-muted: #c8c8c8;
-  --psw-dim: #888888;
-  --psw-accent: #f87171;
-  --psw-accent-rgb: 248 113 113;
-  --psw-accent-on-light: #dc2626;
-  --psw-accent-lo: rgb(248 113 113 / 0.1);
-  --psw-border: rgba(242, 239, 227, 0.14);
-  --psw-border-md: rgba(242, 239, 227, 0.22);
-  --psw-error: #f87171;
+  --slate-deco-red: #991b1b;
+  --slate-deco-yellow: #a16207;
+  --slate-deco-blue: #1e3a8a;
+  --slate-deco-ink: #f2efe3;
+  --slate-bg: #0a0a0a;
+  --slate-bg-2: #131313;
+  --slate-bg-3: #1a1a1a;
+  --slate-text: #f2efe3;
+  --slate-muted: #c8c8c8;
+  --slate-dim: #888888;
+  --slate-accent: #f87171;
+  --slate-accent-rgb: 248 113 113;
+  --slate-accent-on-light: #dc2626;
+  --slate-accent-lo: rgb(248 113 113 / 0.1);
+  --slate-border: rgba(242, 239, 227, 0.14);
+  --slate-border-md: rgba(242, 239, 227, 0.22);
+  --slate-error: #f87171;
+  color-scheme: dark;
+}
+
+/* ============================================================
+   MIDNIGHT THEME — Indigo night, aurora glow
+   Source-of-truth mirror: src/themes/midnight.ts
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='midnight'] {
+  --slate-font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --slate-radius: 12px;
+  --slate-border-width: 1.5px;
+  --slate-title-weight: 600;
+  --slate-title-tracking: -0.02em;
+  --slate-title-line-height: 1.2;
+  --slate-title-size: clamp(1.8rem, 4vw, 2.8rem);
+  --slate-transform: none;
+}
+
+[data-slate-forms][data-theme-name='midnight'][data-theme='light'] {
+  --slate-bg: #f4f4fb;
+  --slate-bg-2: #ececf7;
+  --slate-bg-3: #e2e2f2;
+  --slate-text: #1b1b2e;
+  --slate-muted: #555573;
+  --slate-dim: #9494b0;
+  --slate-accent: #6366f1;
+  --slate-accent-rgb: 99 102 241;
+  --slate-accent-on-light: #6366f1;
+  --slate-accent-lo: rgb(99 102 241 / 0.08);
+  --slate-border: rgba(27, 27, 46, 0.1);
+  --slate-border-md: rgba(27, 27, 46, 0.18);
+  --slate-error: #d92d20;
+  /* aurora glow palette */
+  --slate-deco-1: #c7cbff;
+  --slate-deco-2: #dcd2ff;
+  --slate-deco-3: #bfe0ff;
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='midnight'][data-theme='dark'] {
+  --slate-bg: #0e0e1a;
+  --slate-bg-2: #15152a;
+  --slate-bg-3: #1e1e38;
+  --slate-text: #ececff;
+  --slate-muted: #b0b0d8;
+  --slate-dim: #6e6e96;
+  --slate-accent: #818cf8;
+  --slate-accent-rgb: 129 140 248;
+  --slate-accent-on-light: #6366f1;
+  --slate-accent-lo: rgb(129 140 248 / 0.12);
+  --slate-border: rgba(236, 236, 255, 0.1);
+  --slate-border-md: rgba(236, 236, 255, 0.18);
+  --slate-error: #ff6b5e;
+  --slate-deco-1: #4f46e5;
+  --slate-deco-2: #7c3aed;
+  --slate-deco-3: #2563eb;
+  color-scheme: dark;
+}
+
+/* ============================================================
+   SUNSET THEME — Warm coral, amber glow
+   Source-of-truth mirror: src/themes/sunset.ts
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='sunset'] {
+  --slate-font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --slate-radius: 14px;
+  --slate-border-width: 1.5px;
+  --slate-title-weight: 600;
+  --slate-title-tracking: -0.02em;
+  --slate-title-line-height: 1.2;
+  --slate-title-size: clamp(1.8rem, 4vw, 2.8rem);
+  --slate-transform: none;
+}
+
+[data-slate-forms][data-theme-name='sunset'][data-theme='light'] {
+  --slate-bg: #fff8f2;
+  --slate-bg-2: #fdeee2;
+  --slate-bg-3: #fae2cf;
+  --slate-text: #3a2018;
+  --slate-muted: #7a4a38;
+  --slate-dim: #b08470;
+  --slate-accent: #e2552b;
+  --slate-accent-rgb: 226 85 43;
+  --slate-accent-on-light: #e2552b;
+  --slate-accent-lo: rgb(226 85 43 / 0.08);
+  --slate-border: rgba(58, 32, 24, 0.12);
+  --slate-border-md: rgba(58, 32, 24, 0.2);
+  --slate-error: #d92d20;
+  --slate-deco-1: #ffd0b0;
+  --slate-deco-2: #ffce7a;
+  --slate-deco-3: #ffb3c7;
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='sunset'][data-theme='dark'] {
+  --slate-bg: #1e1012;
+  --slate-bg-2: #2a161a;
+  --slate-bg-3: #371d22;
+  --slate-text: #ffede3;
+  --slate-muted: #d9a892;
+  --slate-dim: #9c6a58;
+  --slate-accent: #ff8a5c;
+  --slate-accent-rgb: 255 138 92;
+  --slate-accent-on-light: #e2552b;
+  --slate-accent-lo: rgb(255 138 92 / 0.12);
+  --slate-border: rgba(255, 237, 227, 0.12);
+  --slate-border-md: rgba(255, 237, 227, 0.2);
+  --slate-error: #ff6b5e;
+  --slate-deco-1: #f4683c;
+  --slate-deco-2: #f59e0b;
+  --slate-deco-3: #db2777;
+  color-scheme: dark;
+}
+
+/* ============================================================
+   TERMINAL THEME — Monospace phosphor, blueprint grid
+   Source-of-truth mirror: src/themes/terminal.ts
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='terminal'] {
+  --slate-font-display: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --slate-font-body: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --slate-radius: 2px;
+  --slate-border-width: 1.5px;
+  --slate-title-weight: 600;
+  --slate-title-tracking: 0em;
+  --slate-title-line-height: 1.25;
+  --slate-title-size: clamp(1.5rem, 3.4vw, 2.3rem);
+  --slate-transform: none;
+}
+
+[data-slate-forms][data-theme-name='terminal'][data-theme='light'] {
+  --slate-bg: #f2f4f0;
+  --slate-bg-2: #e8ebe4;
+  --slate-bg-3: #dce0d6;
+  --slate-text: #13241b;
+  --slate-muted: #44604e;
+  --slate-dim: #8aa092;
+  --slate-accent: #0e8c44;
+  --slate-accent-rgb: 14 140 68;
+  --slate-accent-on-light: #0e8c44;
+  --slate-accent-lo: rgb(14 140 68 / 0.08);
+  --slate-border: rgba(19, 36, 27, 0.14);
+  --slate-border-md: rgba(19, 36, 27, 0.24);
+  --slate-error: #d92d20;
+  --slate-deco-line: rgb(19 36 27 / 0.1);
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='terminal'][data-theme='dark'] {
+  --slate-bg: #0a0f0b;
+  --slate-bg-2: #101810;
+  --slate-bg-3: #18221a;
+  --slate-text: #c6f7d6;
+  --slate-muted: #6fb58a;
+  --slate-dim: #4a6e58;
+  --slate-accent: #36f58c;
+  --slate-accent-rgb: 54 245 140;
+  --slate-accent-on-light: #0e8c44;
+  --slate-accent-lo: rgb(54 245 140 / 0.12);
+  --slate-border: rgba(198, 247, 214, 0.12);
+  --slate-border-md: rgba(198, 247, 214, 0.22);
+  --slate-error: #ff6b5e;
+  --slate-deco-line: rgb(54 245 140 / 0.09);
+  color-scheme: dark;
+}
+
+/* ============================================================
+   FOREST THEME — Earthy sage, soft grain
+   Source-of-truth mirror: src/themes/forest.ts
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='forest'] {
+  --slate-font-display: 'Fraunces', Georgia, serif;
+  --slate-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --slate-radius: 6px;
+  --slate-border-width: 1.5px;
+  --slate-title-weight: 500;
+  --slate-title-tracking: -0.02em;
+  --slate-title-line-height: 1.15;
+  --slate-title-size: clamp(1.9rem, 4.4vw, 3rem);
+  --slate-transform: none;
+}
+
+[data-slate-forms][data-theme-name='forest'][data-theme='light'] {
+  --slate-bg: #f3f1e7;
+  --slate-bg-2: #e9e6d6;
+  --slate-bg-3: #ddd9c4;
+  --slate-text: #1f2a1e;
+  --slate-muted: #4f5e48;
+  --slate-dim: #8a9580;
+  --slate-accent: #3f7a3a;
+  --slate-accent-rgb: 63 122 58;
+  --slate-accent-on-light: #3f7a3a;
+  --slate-accent-lo: rgb(63 122 58 / 0.08);
+  --slate-border: rgba(31, 42, 30, 0.12);
+  --slate-border-md: rgba(31, 42, 30, 0.2);
+  --slate-error: #b4451f;
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='forest'][data-theme='dark'] {
+  --slate-bg: #11160f;
+  --slate-bg-2: #181e14;
+  --slate-bg-3: #20281b;
+  --slate-text: #edefe2;
+  --slate-muted: #b2bba0;
+  --slate-dim: #74806a;
+  --slate-accent: #7fb76b;
+  --slate-accent-rgb: 127 183 107;
+  --slate-accent-on-light: #3f7a3a;
+  --slate-accent-lo: rgb(127 183 107 / 0.12);
+  --slate-border: rgba(237, 239, 226, 0.12);
+  --slate-border-md: rgba(237, 239, 226, 0.2);
+  --slate-error: #ef8354;
+  color-scheme: dark;
+}
+
+/* ============================================================
+   MONO THEME — Brutalist black & white
+   Source-of-truth mirror: src/themes/mono.ts
+   Reuses the Swiss `shapes` decoration with a grayscale deco palette so
+   the per-step compositions render as bold monochrome forms.
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='mono'] {
+  --slate-font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --slate-radius: 0px;
+  --slate-border-width: 2px;
+  --slate-title-weight: 800;
+  --slate-title-tracking: -0.03em;
+  --slate-title-line-height: 1;
+  --slate-title-size: clamp(2.2rem, 5.6vw, 3.8rem);
+  --slate-transform: none;
+}
+
+[data-slate-forms][data-theme-name='mono'][data-theme='light'] {
+  --slate-bg: #ffffff;
+  --slate-bg-2: #f2f2f2;
+  --slate-bg-3: #e6e6e6;
+  --slate-text: #000000;
+  --slate-muted: #2e2e2e;
+  --slate-dim: #707070;
+  --slate-accent: #111111;
+  --slate-accent-rgb: 17 17 17;
+  --slate-accent-on-light: #111111;
+  --slate-accent-lo: rgb(17 17 17 / 0.06);
+  --slate-border: rgba(0, 0, 0, 0.2);
+  --slate-border-md: rgba(0, 0, 0, 0.42);
+  --slate-error: #b00020;
+  /* grayscale poster palette for the shapes decoration */
+  --slate-deco-red: #111111;
+  --slate-deco-yellow: #bdbdbd;
+  --slate-deco-blue: #6e6e6e;
+  --slate-deco-ink: #000000;
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='mono'][data-theme='dark'] {
+  --slate-bg: #000000;
+  --slate-bg-2: #0d0d0d;
+  --slate-bg-3: #161616;
+  --slate-text: #ffffff;
+  --slate-muted: #c4c4c4;
+  --slate-dim: #7c7c7c;
+  --slate-accent: #ffffff;
+  --slate-accent-rgb: 255 255 255;
+  --slate-accent-on-light: #111111;
+  --slate-accent-lo: rgb(255 255 255 / 0.08);
+  --slate-border: rgba(255, 255, 255, 0.2);
+  --slate-border-md: rgba(255, 255, 255, 0.42);
+  --slate-error: #ff5470;
+  --slate-deco-red: #ededed;
+  --slate-deco-yellow: #8a8a8a;
+  --slate-deco-blue: #b0b0b0;
+  --slate-deco-ink: #ffffff;
+  color-scheme: dark;
+}
+
+/* ============================================================
+   CONSTELLATION THEME — Cosmic, narrative star-map backdrop
+   Source-of-truth mirror: src/themes/constellation.ts
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='constellation'] {
+  --slate-font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --slate-radius: 10px;
+  --slate-border-width: 1.5px;
+  --slate-title-weight: 600;
+  --slate-title-tracking: -0.02em;
+  --slate-title-line-height: 1.2;
+  --slate-title-size: clamp(1.8rem, 4vw, 2.8rem);
+  --slate-transform: none;
+}
+
+[data-slate-forms][data-theme-name='constellation'][data-theme='light'] {
+  --slate-bg: #f5f6fc;
+  --slate-bg-2: #eceef8;
+  --slate-bg-3: #e1e4f2;
+  --slate-text: #161a2e;
+  --slate-muted: #4e536e;
+  --slate-dim: #9094b0;
+  --slate-accent: #4f46e5;
+  --slate-accent-rgb: 79 70 229;
+  --slate-accent-on-light: #4338ca;
+  --slate-accent-lo: rgb(79 70 229 / 0.08);
+  --slate-border: rgba(22, 26, 46, 0.1);
+  --slate-border-md: rgba(22, 26, 46, 0.18);
+  --slate-error: #d92d20;
+  /* stars + connectors */
+  --slate-deco-1: #6b73c0;
+  --slate-deco-line: rgb(79 70 229 / 0.20);
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='constellation'][data-theme='dark'] {
+  --slate-bg: #07070f;
+  --slate-bg-2: #0d0e1b;
+  --slate-bg-3: #15172a;
+  --slate-text: #eaedff;
+  --slate-muted: #a6abd6;
+  --slate-dim: #5e6390;
+  --slate-accent: #7dd3fc;
+  --slate-accent-rgb: 125 211 252;
+  --slate-accent-on-light: #4338ca;
+  --slate-accent-lo: rgb(125 211 252 / 0.12);
+  --slate-border: rgba(234, 237, 255, 0.1);
+  --slate-border-md: rgba(234, 237, 255, 0.18);
+  --slate-error: #ff6b5e;
+  --slate-deco-1: #c7d2fe;
+  --slate-deco-line: rgb(125 211 252 / 0.22);
+  color-scheme: dark;
+}
+
+/* ============================================================
+   BLOOM THEME — Botanical, narrative growth backdrop
+   Source-of-truth mirror: src/themes/bloom.ts
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='bloom'] {
+  --slate-font-display: 'Fraunces', 'Georgia', serif;
+  --slate-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --slate-radius: 14px;
+  --slate-border-width: 1.5px;
+  --slate-title-weight: 500;
+  --slate-title-tracking: -0.01em;
+  --slate-title-line-height: 1.15;
+  --slate-title-size: clamp(1.9rem, 4.2vw, 3rem);
+  --slate-transform: none;
+}
+
+[data-slate-forms][data-theme-name='bloom'][data-theme='light'] {
+  --slate-bg: #fbf8f1;
+  --slate-bg-2: #f3eee2;
+  --slate-bg-3: #e8e1d0;
+  --slate-text: #22321f;
+  --slate-muted: #566a4f;
+  --slate-dim: #9aa890;
+  --slate-accent: #4c8a4a;
+  --slate-accent-rgb: 76 138 74;
+  --slate-accent-on-light: #3c7a3a;
+  --slate-accent-lo: rgb(76 138 74 / 0.08);
+  --slate-border: rgba(34, 50, 31, 0.12);
+  --slate-border-md: rgba(34, 50, 31, 0.2);
+  --slate-error: #d92d20;
+  /* leaf / petal / flower-center / stem */
+  --slate-deco-1: #74a96e;
+  --slate-deco-2: #e58aae;
+  --slate-deco-3: #f2c84b;
+  --slate-deco-line: rgb(60 90 50 / 0.45);
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='bloom'][data-theme='dark'] {
+  --slate-bg: #10160f;
+  --slate-bg-2: #172017;
+  --slate-bg-3: #1f2b1e;
+  --slate-text: #edf3e6;
+  --slate-muted: #a9bca0;
+  --slate-dim: #6a7c62;
+  --slate-accent: #88c07e;
+  --slate-accent-rgb: 136 192 126;
+  --slate-accent-on-light: #3c7a3a;
+  --slate-accent-lo: rgb(136 192 126 / 0.12);
+  --slate-border: rgba(237, 243, 230, 0.12);
+  --slate-border-md: rgba(237, 243, 230, 0.2);
+  --slate-error: #ff6b5e;
+  --slate-deco-1: #7fb56f;
+  --slate-deco-2: #e890b2;
+  --slate-deco-3: #f2c84b;
+  --slate-deco-line: rgb(180 210 170 / 0.40);
+  color-scheme: dark;
+}
+
+/* ============================================================
+   RISO THEME — Risograph duotone halftone overprint
+   Source-of-truth mirror: src/themes/riso.ts
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='riso'] {
+  --slate-font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --slate-radius: 4px;
+  --slate-border-width: 2px;
+  --slate-title-weight: 800;
+  --slate-title-tracking: -0.03em;
+  --slate-title-line-height: 1.1;
+  --slate-title-size: clamp(1.9rem, 4.4vw, 3rem);
+  --slate-transform: none;
+}
+
+[data-slate-forms][data-theme-name='riso'][data-theme='light'] {
+  --slate-bg: #fbf6ec;
+  --slate-bg-2: #f4eedf;
+  --slate-bg-3: #ebe3cf;
+  --slate-text: #1a1a1a;
+  --slate-muted: #5a5246;
+  --slate-dim: #9c9484;
+  --slate-accent: #e23472;
+  --slate-accent-rgb: 226 52 114;
+  --slate-accent-on-light: #e23472;
+  --slate-accent-lo: rgb(226 52 114 / 0.08);
+  --slate-border: rgba(26, 26, 26, 0.16);
+  --slate-border-md: rgba(26, 26, 26, 0.3);
+  --slate-error: #d92d20;
+  /* two inks + overprint blend */
+  --slate-deco-1: #ff4d8d;
+  --slate-deco-2: #2a5bff;
+  --slate-deco-blend: multiply;
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='riso'][data-theme='dark'] {
+  --slate-bg: #121012;
+  --slate-bg-2: #1a171a;
+  --slate-bg-3: #241f24;
+  --slate-text: #f4efe6;
+  --slate-muted: #bcb2a6;
+  --slate-dim: #7a7064;
+  --slate-accent: #ff6fa3;
+  --slate-accent-rgb: 255 111 163;
+  --slate-accent-on-light: #e23472;
+  --slate-accent-lo: rgb(255 111 163 / 0.14);
+  --slate-border: rgba(244, 239, 230, 0.16);
+  --slate-border-md: rgba(244, 239, 230, 0.3);
+  --slate-error: #ff6b5e;
+  --slate-deco-1: #ff6fa3;
+  --slate-deco-2: #5b86ff;
+  --slate-deco-blend: screen;
+  color-scheme: dark;
+}
+
+/* ============================================================
+   MEMPHIS THEME — Playful 80s confetti shapes
+   Source-of-truth mirror: src/themes/memphis.ts
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='memphis'] {
+  --slate-font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --slate-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --slate-radius: 16px;
+  --slate-border-width: 2px;
+  --slate-title-weight: 800;
+  --slate-title-tracking: -0.02em;
+  --slate-title-line-height: 1.12;
+  --slate-title-size: clamp(1.9rem, 4.4vw, 3rem);
+  --slate-transform: none;
+}
+
+[data-slate-forms][data-theme-name='memphis'][data-theme='light'] {
+  --slate-bg: #fdfbf6;
+  --slate-bg-2: #f6f2ea;
+  --slate-bg-3: #ece6da;
+  --slate-text: #1c1c28;
+  --slate-muted: #5b5b6e;
+  --slate-dim: #9a9aac;
+  --slate-accent: #ff3d7f;
+  --slate-accent-rgb: 255 61 127;
+  --slate-accent-on-light: #e22468;
+  --slate-accent-lo: rgb(255 61 127 / 0.08);
+  --slate-border: rgba(28, 28, 40, 0.14);
+  --slate-border-md: rgba(28, 28, 40, 0.26);
+  --slate-error: #d92d20;
+  /* confetti shape palette + squiggle stroke */
+  --slate-deco-1: #18b6c4;
+  --slate-deco-2: #ffc23d;
+  --slate-deco-3: #ff7a5c;
+  --slate-deco-line: #2a2a44;
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='memphis'][data-theme='dark'] {
+  --slate-bg: #16121e;
+  --slate-bg-2: #1e1929;
+  --slate-bg-3: #282234;
+  --slate-text: #f5f0ff;
+  --slate-muted: #b8aecc;
+  --slate-dim: #766c88;
+  --slate-accent: #ff6fa3;
+  --slate-accent-rgb: 255 111 163;
+  --slate-accent-on-light: #e22468;
+  --slate-accent-lo: rgb(255 111 163 / 0.14);
+  --slate-border: rgba(245, 240, 255, 0.14);
+  --slate-border-md: rgba(245, 240, 255, 0.26);
+  --slate-error: #ff6b5e;
+  --slate-deco-1: #2bd0de;
+  --slate-deco-2: #ffd166;
+  --slate-deco-3: #ff8e72;
+  --slate-deco-line: #d8d0ee;
   color-scheme: dark;
 }
 
 /* Backwards-compat alias for the toggle CSS in §8.2, which uses
    unprefixed `--text`, `--accent`, `--accent-rgb`, etc. The toggle
    is wrapper-scoped so these locally shadow nothing outside the form. */
-[data-psw-forms] {
-  --text: var(--psw-text);
-  --muted: var(--psw-muted);
-  --dim: var(--psw-dim);
-  --accent: var(--psw-accent);
-  --accent-rgb: var(--psw-accent-rgb);
-  --accent-on-light: var(--psw-accent-on-light);
-  --accent-lo: var(--psw-accent-lo);
-  --bg: var(--psw-bg);
-  --bg-2: var(--psw-bg-2);
-  --bg-3: var(--psw-bg-3);
-  --border: var(--psw-border);
-  --border-md: var(--psw-border-md);
+[data-slate-forms] {
+  --text: var(--slate-text);
+  --muted: var(--slate-muted);
+  --dim: var(--slate-dim);
+  --accent: var(--slate-accent);
+  --accent-rgb: var(--slate-accent-rgb);
+  --accent-on-light: var(--slate-accent-on-light);
+  --accent-lo: var(--slate-accent-lo);
+  --bg: var(--slate-bg);
+  --bg-2: var(--slate-bg-2);
+  --bg-3: var(--slate-bg-3);
+  --border: var(--slate-border);
+  --border-md: var(--slate-border-md);
+  /* Foreground on any `--slate-accent` fill. Always pairs with page bg so
+     light accents (mono dark) never get white-on-white. See ADR-024. */
+  --slate-on-accent: var(--slate-bg);
 }

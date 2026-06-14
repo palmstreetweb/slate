@@ -1,8 +1,8 @@
 /**
  * Center canvas — renders the currently-selected question exactly as a
  * respondent would see it. We bypass the full <Form> engine (no advance,
- * no submit, no navigation) and just mount the QuestionRenderer inside a
- * mock data-psw-forms wrapper with the schema's theme tokens.
+ * no submit, no navigation) but mount the same theme backdrop, chrome, and
+ * QuestionRenderer inside a mock data-slate-forms wrapper.
  *
  * Mode is resolved from schema.themeMode, with a small Light/Dark
  * override pill so designers can preview both modes quickly when the
@@ -12,6 +12,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Question, Schema, ThemeMode, ResolvedThemeMode } from '@/index.js';
 import { QuestionRenderer } from '@/components/questions/QuestionRenderer.js';
+import { TopBar } from '@/components/chrome/TopBar.js';
+import { ProgressBar } from '@/components/chrome/ProgressBar.js';
+import { FooterCounter } from '@/components/chrome/FooterCounter.js';
+import {
+  ThemeDecoration,
+  hasStepDecorationBackdrop,
+  resolveThemeDecoration,
+} from '@/components/ThemeDecoration.js';
+import { progress as progressFn, visibleQuestions } from '@/logic/progress.js';
+import { TYPE_LABEL } from '../questionTypeMeta.js';
+
+import '@/styles/tokens.css';
+import '@/styles/toggle.css';
+import '@/styles/animations.css';
+import '@/styles/base.css';
+import '@/styles/questions.css';
 
 type Props = {
   schema: Schema;
@@ -35,6 +51,16 @@ export function Canvas({ schema, selectedQuestion }: Props) {
   useEffect(() => {
     setMode(defaultMode(schema.themeMode));
   }, [schema.themeMode]);
+
+  const visible = useMemo(() => visibleQuestions(schema.questions, {}), [schema.questions]);
+
+  const stepIndex = useMemo(() => {
+    const idx = visible.findIndex((q) => q.id === selectedQuestion.id);
+    return idx >= 0 ? idx : 0;
+  }, [visible, selectedQuestion.id]);
+
+  const decoration = resolveThemeDecoration(schema.theme);
+  const progressPct = progressFn(visible, stepIndex);
 
   // Step number for the badge — count answer-bearing questions up to the
   // selected one so the user sees an accurate "02 →" preview.
@@ -63,25 +89,30 @@ export function Canvas({ schema, selectedQuestion }: Props) {
     [schema.questions],
   );
 
+  const isAnswerBearing =
+    selectedQuestion.type !== 'welcome' &&
+    selectedQuestion.type !== 'thanks' &&
+    selectedQuestion.type !== 'statement';
+
   const noop = () => {};
   const noopWith = () => {};
 
   return (
-    <section className="studio-canvas">
-      <div className="studio-canvas-toolbar">
-        <span className="studio-canvas-label">Live preview · {labelForQuestion(selectedQuestion)}</span>
+    <section className="slate-canvas">
+      <div className="slate-canvas-toolbar">
+        <span className="slate-canvas-label">Live preview · {labelForQuestion(selectedQuestion)}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {forced ? (
-            <span className="studio-badge" title="Schema forces this mode">
+            <span className="slate-badge" title="Schema forces this mode">
               {schema.themeMode === 'dark' ? 'Forced dark' : 'Forced light'}
             </span>
           ) : (
-            <div className="studio-tabs" role="tablist" aria-label="Preview mode">
+            <div className="slate-tabs" role="tablist" aria-label="Preview mode">
               <button
                 type="button"
                 role="tab"
                 aria-selected={mode === 'light'}
-                className={`studio-tab${mode === 'light' ? ' studio-tab--active' : ''}`}
+                className={`slate-tab${mode === 'light' ? ' slate-tab--active' : ''}`}
                 onClick={() => setMode('light')}
               >
                 Light
@@ -90,7 +121,7 @@ export function Canvas({ schema, selectedQuestion }: Props) {
                 type="button"
                 role="tab"
                 aria-selected={mode === 'dark'}
-                className={`studio-tab${mode === 'dark' ? ' studio-tab--active' : ''}`}
+                className={`slate-tab${mode === 'dark' ? ' slate-tab--active' : ''}`}
                 onClick={() => setMode('dark')}
               >
                 Dark
@@ -100,17 +131,22 @@ export function Canvas({ schema, selectedQuestion }: Props) {
         </div>
       </div>
 
-      <div className="studio-canvas-frame">
+      <div className="slate-canvas-frame">
         <div
-          data-psw-forms=""
+          data-slate-forms=""
           data-theme-name={schema.theme}
           data-theme={mode}
+          {...(hasStepDecorationBackdrop(decoration) ? { 'data-has-decoration': '' } : {})}
           style={{ height: '100%', width: '100%' }}
         >
-          <div className="psw-stage" style={{ minHeight: 'auto', padding: '48px 24px' }}>
+          <ThemeDecoration themeName={schema.theme} step={stepIndex} />
+          <ProgressBar value={progressPct} />
+          <TopBar brandName={schema.brand.name} showBack={false} onBack={noop} />
+
+          <div className="slate-stage" style={{ minHeight: 'auto', padding: '48px 24px' }}>
             <div
               key={selectedQuestion.id}
-              className="psw-stage-content"
+              className="slate-stage-content"
               style={{ minHeight: 'auto' }}
             >
               <QuestionRenderer
@@ -127,6 +163,10 @@ export function Canvas({ schema, selectedQuestion }: Props) {
               />
             </div>
           </div>
+
+          {isAnswerBearing && totalSteps > 0 && (
+            <FooterCounter current={stepNumber} total={totalSteps} />
+          )}
         </div>
       </div>
     </section>
@@ -134,8 +174,8 @@ export function Canvas({ schema, selectedQuestion }: Props) {
 }
 
 function labelForQuestion(q: Question): string {
-  if (q.type === 'welcome') return 'Welcome screen';
-  if (q.type === 'thanks') return 'Thank you screen';
-  if (q.type === 'statement') return 'Statement';
+  if (q.type === 'welcome' || q.type === 'thanks' || q.type === 'statement') {
+    return TYPE_LABEL[q.type];
+  }
   return q.id;
 }

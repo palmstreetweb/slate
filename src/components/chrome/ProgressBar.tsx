@@ -8,14 +8,14 @@ export function ProgressBar({ value }: Props) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
     <div
-      className="psw-progress"
+      className="slate-progress"
       role="progressbar"
       aria-label="Form progress"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(clamped)}
     >
-      <div className="psw-progress-bar" style={{ width: `${clamped}%` }} />
+      <div className="slate-progress-bar" style={{ width: `${clamped}%` }} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
  * Save-and-resume (ADR-017).
  *
  * Persists in-progress sessions to `localStorage` under
- * `psw-forms-resume:<formId>`. On mount, a previously saved session (if any)
+ * `slate-forms-resume:<formId>`. On mount, a previously saved session (if any)
  * is surfaced so the Form can offer a "resume where you left off?" prompt.
  * The save is cleared on successful submit or when the user declines.
  *
@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { ResumeSnapshot } from './useFormState.js';
 
-const KEY_PREFIX = 'psw-forms-resume:';
+const KEY_PREFIX = 'slate-forms-resume:';
 
 type SavedSession = ResumeSnapshot & { savedAt: string };
 

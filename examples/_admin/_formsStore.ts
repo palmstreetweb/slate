@@ -6,11 +6,13 @@
 
 import type { Schema } from '@/index.js';
 
-const STORAGE_KEY = 'psw-studio-forms';
+const STORAGE_KEY = 'slate-forms';
 
 export type FormRecord = {
   id: string;
   name: string;
+  /** URL segment for public share links (Slate). Falls back to slugified name. */
+  slug?: string;
   createdAt: string;
   updatedAt: string;
   schema: Schema;

@@ -13,11 +13,11 @@ type Props = {
 
 export function TopBar({ brandName, showBack, onBack, rightSlot }: Props) {
   return (
-    <div className="psw-topbar">
-      <div className="psw-brand">{brandName}</div>
+    <div className="slate-topbar">
+      <div className="slate-brand">{brandName}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {showBack && (
-          <button type="button" className="psw-back" onClick={onBack}>
+          <button type="button" className="slate-back" onClick={onBack}>
             ← back
           </button>
         )}

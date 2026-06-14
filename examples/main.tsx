@@ -9,8 +9,12 @@ import { FormEditor } from './_admin/pages/FormEditor.js';
 import { FormPreview } from './_admin/pages/FormPreview.js';
 import { FormSubmissions } from './_admin/pages/FormSubmissions.js';
 import { AdminShell } from './_admin/shell/AdminShell.js';
+import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
 
 import './_admin/_adminTheme.css';
+
+// One-time localStorage migration for the Slate rebrand (ADR-025).
+migrateSlateLocalStorageKeys();
 
 // Seed once if the store is empty.
 seedIfEmpty(seedForms);
@@ -30,9 +34,9 @@ function App() {
     case 'notfound':
       return (
         <AdminShell crumbs={null}>
-          <div className="studio-empty">
+          <div className="slate-empty">
             <p style={{ margin: '0 0 12px' }}>Page not found: {route.path}</p>
-            <a href="#/" className="studio-btn studio-btn--primary" style={{ textDecoration: 'none' }}>
+            <a href="#/" className="slate-btn slate-btn--primary" style={{ textDecoration: 'none' }}>
               Back to dashboard
             </a>
           </div>

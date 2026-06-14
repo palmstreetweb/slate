@@ -49,20 +49,20 @@ describe('<Form> — rendering', () => {
 
   it('editorial theme renders the grain decoration', () => {
     render(<Form schema={makeSchema()} onSubmit={vi.fn()} />);
-    expect(screen.getByTestId('psw-grain-decoration')).toBeInTheDocument();
+    expect(screen.getByTestId('slate-grain-decoration')).toBeInTheDocument();
   });
 
   it('swiss theme renders the geometric decoration', () => {
     const schema = { ...makeSchema(), theme: 'swiss' as const };
     render(<Form schema={schema} onSubmit={vi.fn()} />);
-    expect(screen.getByTestId('psw-swiss-decoration')).toBeInTheDocument();
+    expect(screen.getByTestId('slate-swiss-decoration')).toBeInTheDocument();
   });
 
   it('unknown custom theme renders no decoration', () => {
     const schema = { ...makeSchema(), theme: 'custom-acme' };
     render(<Form schema={schema} onSubmit={vi.fn()} />);
-    expect(screen.queryByTestId('psw-grain-decoration')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('psw-swiss-decoration')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('slate-grain-decoration')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('slate-swiss-decoration')).not.toBeInTheDocument();
   });
 });
 
@@ -313,7 +313,7 @@ describe('<Form> — piping, scoring, multiple endings (Phase 4)', () => {
 });
 
 describe('<Form> — save-and-resume (ADR-017)', () => {
-  const RESUME_KEY = 'psw-forms-resume:intake';
+  const RESUME_KEY = 'slate-forms-resume:intake';
 
   const resumableSchema = () =>
     defineSchema({

@@ -19,9 +19,11 @@ type Props = {
   selected: string | undefined;
   onSelect: (value: string) => void;
   onAdvance: () => void;
+  /** OK / Enter confirm — defaults to `onAdvance` when omitted. */
+  onSubmit?: () => void;
 };
 
-export function DropdownField({ question, answers, selected, onSelect, onAdvance }: Props) {
+export function DropdownField({ question, answers, selected, onSelect, onAdvance, onSubmit }: Props) {
   const selectedOption = question.options.find((o) => o.value === selected);
   const [query, setQuery] = useState(selectedOption?.label ?? '');
   const [open, setOpen] = useState(false);
@@ -60,7 +62,7 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
       return;
     }
     setError(null);
-    onAdvance();
+    (onSubmit ?? onAdvance)();
   };
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -85,7 +87,7 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
 
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
       <div style={{ marginTop: 24, position: 'relative' }}>
@@ -108,11 +110,11 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
           onFocus={() => setOpen(true)}
           onKeyDown={handleKey}
           placeholder={question.placeholder ?? 'Type or select an option...'}
-          className={`psw-input${error ? ' psw-input--error' : ''}`}
+          className={`slate-input${error ? ' slate-input--error' : ''}`}
           autoComplete="off"
         />
         {open && filtered.length > 0 && (
-          <ul id={listId} role="listbox" aria-labelledby={labelId} className="psw-dropdown-list">
+          <ul id={listId} role="listbox" aria-labelledby={labelId} className="slate-dropdown-list">
             {filtered.map((opt, i) => {
               const isSelected = selected === opt.value;
               const isHighlighted = i === highlight;
@@ -122,15 +124,15 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    className={`psw-dropdown-item${isHighlighted ? ' psw-dropdown-item--hl' : ''}${
-                      isSelected ? ' psw-dropdown-item--selected' : ''
+                    className={`slate-dropdown-item${isHighlighted ? ' slate-dropdown-item--hl' : ''}${
+                      isSelected ? ' slate-dropdown-item--selected' : ''
                     }`}
                     onMouseEnter={() => setHighlight(i)}
                     onClick={() => choose(opt.value)}
                   >
                     {opt.label}
                     {opt.description && (
-                      <span className="psw-choice-desc">{opt.description}</span>
+                      <span className="slate-choice-desc">{opt.description}</span>
                     )}
                   </button>
                 </li>
@@ -139,20 +141,20 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
           </ul>
         )}
         {open && filtered.length === 0 && (
-          <p className="psw-hint" style={{ marginTop: 12 }}>
+          <p className="slate-hint" style={{ marginTop: 12 }}>
             no matches
           </p>
         )}
         {error && (
-          <p className="psw-err" aria-live="polite">
+          <p className="slate-err" aria-live="polite">
             ! {error}
           </p>
         )}
-        <div className="psw-actions">
-          <button type="button" className="psw-ok-btn" onClick={submit}>
+        <div className="slate-actions">
+          <button type="button" className="slate-ok-btn" onClick={submit}>
             OK <span aria-hidden>✓</span>
           </button>
-          <span className="psw-hint">type to filter, ↑↓ + Enter to select</span>
+          <span className="slate-hint">type to filter, ↑↓ + Enter to select</span>
         </div>
       </div>
     </div>

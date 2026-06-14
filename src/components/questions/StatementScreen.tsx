@@ -12,11 +12,11 @@ type Props = {
 export function StatementScreen({ question, advance }: Props) {
   return (
     <div>
-      <h1 className="psw-title">{question.title}</h1>
-      {question.body && <p className="psw-subtitle">{question.body}</p>}
-      <button type="button" className="psw-cta" onClick={advance}>
+      <h1 className="slate-title">{question.title}</h1>
+      {question.body && <p className="slate-subtitle">{question.body}</p>}
+      <button type="button" className="slate-cta" onClick={advance}>
         {question.cta ?? 'Continue'}
-        <span className="psw-cta-hint">press Enter ↵</span>
+        <span className="slate-cta-hint">press Enter ↵</span>
       </button>
     </div>
   );

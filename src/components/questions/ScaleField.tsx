@@ -20,12 +20,12 @@ export function ScaleField({ question, answers, initialValue, onAnswer }: Props)
 
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
 
-      <div className="psw-scale" role="radiogroup" aria-labelledby={labelId}>
-        <div className="psw-scale-row">
+      <div className="slate-scale" role="radiogroup" aria-labelledby={labelId}>
+        <div className="slate-scale-row">
           {cells.map((v) => {
             const selected = initialValue === v;
             return (
@@ -35,7 +35,7 @@ export function ScaleField({ question, answers, initialValue, onAnswer }: Props)
                 role="radio"
                 aria-checked={selected}
                 onClick={() => onAnswer(v)}
-                className={`psw-scale-cell${selected ? ' psw-scale-cell--selected' : ''}`}
+                className={`slate-scale-cell${selected ? ' slate-scale-cell--selected' : ''}`}
               >
                 {v}
               </button>
@@ -43,15 +43,15 @@ export function ScaleField({ question, answers, initialValue, onAnswer }: Props)
           })}
         </div>
         {(question.minLabel || question.maxLabel) && (
-          <div className="psw-scale-labels">
+          <div className="slate-scale-labels">
             <span>{question.minLabel ?? ''}</span>
             <span>{question.maxLabel ?? ''}</span>
           </div>
         )}
       </div>
 
-      <div className="psw-actions">
-        <span className="psw-hint">press a number ↑</span>
+      <div className="slate-actions">
+        <span className="slate-hint">press a number ↑</span>
       </div>
     </div>
   );

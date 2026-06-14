@@ -56,15 +56,15 @@ export function RankingField({ question, answers, initialValue, onAnswer, onAdva
 
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
 
-      <ol className="psw-ranking" aria-labelledby={labelId}>
+      <ol className="slate-ranking" aria-labelledby={labelId}>
         {order.map((value, i) => (
           <li
             key={value}
-            className="psw-ranking-row"
+            className="slate-ranking-row"
             draggable
             onDragStart={() => {
               dragIndex.current = i;
@@ -80,12 +80,12 @@ export function RankingField({ question, answers, initialValue, onAnswer, onAdva
               dragIndex.current = null;
             }}
           >
-            <span className="psw-ranking-pos">{i + 1}</span>
-            <span className="psw-ranking-label">{labelFor(value)}</span>
-            <span className="psw-ranking-controls">
+            <span className="slate-ranking-pos">{i + 1}</span>
+            <span className="slate-ranking-label">{labelFor(value)}</span>
+            <span className="slate-ranking-controls">
               <button
                 type="button"
-                className="psw-ranking-btn"
+                className="slate-ranking-btn"
                 onClick={() => move(i, i - 1)}
                 disabled={i === 0}
                 aria-label={`Move ${labelFor(value)} up`}
@@ -94,7 +94,7 @@ export function RankingField({ question, answers, initialValue, onAnswer, onAdva
               </button>
               <button
                 type="button"
-                className="psw-ranking-btn"
+                className="slate-ranking-btn"
                 onClick={() => move(i, i + 1)}
                 disabled={i === order.length - 1}
                 aria-label={`Move ${labelFor(value)} down`}
@@ -106,11 +106,11 @@ export function RankingField({ question, answers, initialValue, onAnswer, onAdva
         ))}
       </ol>
 
-      <div className="psw-actions">
-        <button type="button" className="psw-ok-btn" onClick={submit}>
+      <div className="slate-actions">
+        <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>
         </button>
-        <span className="psw-hint">drag rows or use ↑↓ to reorder</span>
+        <span className="slate-hint">drag rows or use ↑↓ to reorder</span>
       </div>
     </div>
   );

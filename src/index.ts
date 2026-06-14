@@ -1,5 +1,5 @@
 /**
- * Public entry for `@palmstreetweb/forms`.
+ * Public entry for `@palmstreetweb/slate`.
  *
  * Consumers should only import from this barrel — anything not re-exported
  * here is internal and may move between minor versions.
@@ -11,9 +11,25 @@ import type { Schema } from './types/Schema.js';
 export type * from './types/index.js';
 export { isQuestionType } from './types/index.js';
 
-export { themes, editorial, swiss } from './themes/index.js';
+export {
+  themes,
+  classic,
+  editorial,
+  swiss,
+  midnight,
+  sunset,
+  terminal,
+  forest,
+  mono,
+  constellation,
+  bloom,
+  riso,
+  memphis,
+} from './themes/index.js';
 
 export { Form } from './components/Form.js';
+
+export { FORM_SOUND_OPTIONS } from './utils/formSounds.js';
 
 export { checkSchema, type SchemaIssue } from './logic/schemaCheck.js';
 

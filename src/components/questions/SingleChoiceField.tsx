@@ -17,11 +17,11 @@ export function SingleChoiceField({ question, answers, selected, onSelect }: Pro
   const labelId = useId();
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
 
-      <div className="psw-choices" role="radiogroup" aria-labelledby={labelId}>
+      <div className="slate-choices" role="radiogroup" aria-labelledby={labelId}>
         {question.options.map((opt, i) => {
           const isSelected = selected === opt.value;
           return (
@@ -31,20 +31,20 @@ export function SingleChoiceField({ question, answers, selected, onSelect }: Pro
               role="radio"
               aria-checked={isSelected}
               onClick={() => onSelect(opt.value)}
-              className={`psw-choice${isSelected ? ' psw-choice--selected' : ''}`}
+              className={`slate-choice${isSelected ? ' slate-choice--selected' : ''}`}
             >
-              <span className="psw-choice-badge">{CHOICE_LETTERS[i] ?? ''}</span>
+              <span className="slate-choice-badge">{CHOICE_LETTERS[i] ?? ''}</span>
               <span>
                 {opt.label}
                 {opt.description && (
-                  <span className="psw-choice-desc">{opt.description}</span>
+                  <span className="slate-choice-desc">{opt.description}</span>
                 )}
               </span>
             </button>
           );
         })}
       </div>
-      <p className="psw-hint" style={{ marginTop: 20 }}>
+      <p className="slate-hint" style={{ marginTop: 20 }}>
         tap a key (A, B, C, D) or click to select
       </p>
     </div>

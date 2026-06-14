@@ -7,71 +7,37 @@
 
 import { useRef, useState } from 'react';
 import type {
-  Question,
+  FormSound,
   QuestionType,
   Schema,
   ThemeMode,
   ThemeName,
 } from '@/index.js';
-
-const ADDABLE_TYPES: ReadonlyArray<{ type: QuestionType; label: string; group: string }> = [
-  { type: 'short_text', label: 'Short text', group: 'Inputs' },
-  { type: 'long_text', label: 'Long text', group: 'Inputs' },
-  { type: 'email', label: 'Email', group: 'Inputs' },
-  { type: 'phone', label: 'Phone', group: 'Inputs' },
-  { type: 'url', label: 'Website', group: 'Inputs' },
-  { type: 'number', label: 'Number', group: 'Inputs' },
-  { type: 'date', label: 'Date', group: 'Inputs' },
-  { type: 'file_upload', label: 'File upload', group: 'Inputs' },
-  { type: 'single_choice', label: 'Single choice', group: 'Choices' },
-  { type: 'multi_choice', label: 'Multi choice', group: 'Choices' },
-  { type: 'dropdown', label: 'Dropdown', group: 'Choices' },
-  { type: 'picture_choice', label: 'Picture choice', group: 'Choices' },
-  { type: 'yes_no', label: 'Yes / No', group: 'Choices' },
-  { type: 'scale', label: 'Scale', group: 'Choices' },
-  { type: 'nps', label: 'NPS (0–10)', group: 'Choices' },
-  { type: 'ranking', label: 'Ranking', group: 'Choices' },
-  { type: 'matrix', label: 'Matrix', group: 'Choices' },
-  { type: 'statement', label: 'Statement', group: 'Other' },
-  { type: 'legal', label: 'Legal / consent', group: 'Other' },
-  { type: 'review', label: 'Review answers', group: 'Other' },
-];
-
-const TYPE_GLYPH: Record<Question['type'], string> = {
-  welcome: '◐',
-  statement: '▤',
-  thanks: '◑',
-  short_text: 'T',
-  long_text: '¶',
-  email: '@',
-  phone: '☏',
-  url: '⌘',
-  number: '#',
-  date: '▦',
-  file_upload: '⇪',
-  single_choice: '◉',
-  multi_choice: '☑',
-  dropdown: '▼',
-  picture_choice: '▣',
-  ranking: '≡',
-  matrix: '⊞',
-  yes_no: '⊘',
-  legal: '§',
-  scale: '◇',
-  nps: '◈',
-  review: '☰',
-};
+import { FORM_SOUND_OPTIONS, resolveFormSound } from '@/utils/formSounds.js';
+import { ADDABLE_TYPES, TYPE_GLYPH } from '../questionTypeMeta.js';
+import { clampOutlineDropIndex } from '../outlineDropIndex.js';
+import { SlateSelect } from './SlateSelect.js';
 
 const THEMES: ReadonlyArray<{ value: ThemeName; label: string }> = [
+  { value: 'classic', label: 'Classic' },
   { value: 'editorial', label: 'Editorial' },
   { value: 'swiss', label: 'Swiss' },
+  { value: 'midnight', label: 'Midnight' },
+  { value: 'sunset', label: 'Sunset' },
+  { value: 'terminal', label: 'Terminal' },
+  { value: 'forest', label: 'Forest' },
+  { value: 'mono', label: 'Mono' },
+  { value: 'constellation', label: 'Constellation' },
+  { value: 'bloom', label: 'Bloom' },
+  { value: 'riso', label: 'Riso' },
+  { value: 'memphis', label: 'Memphis' },
 ];
 
 const MODES: ReadonlyArray<{ value: ThemeMode; label: string }> = [
-  { value: 'toggle', label: 'Toggle (let user pick)' },
-  { value: 'auto', label: 'Auto (follow OS)' },
-  { value: 'light', label: 'Force light' },
-  { value: 'dark', label: 'Force dark' },
+  { value: 'toggle', label: 'Toggle (Let User Pick)' },
+  { value: 'auto', label: 'Auto (Follow OS)' },
+  { value: 'light', label: 'Force Light' },
+  { value: 'dark', label: 'Force Dark' },
 ];
 
 type Props = {
@@ -90,6 +56,7 @@ type Props = {
   onBrandChange: (v: string) => void;
   onThemeChange: (v: ThemeName) => void;
   onThemeModeChange: (v: ThemeMode) => void;
+  onSoundChange: (v: FormSound) => void;
 };
 
 export function Outline({
@@ -106,12 +73,52 @@ export function Outline({
   onBrandChange,
   onThemeChange,
   onThemeModeChange,
+  onSoundChange,
 }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const dragId = useRef<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const clearDrag = () => {
+    dragId.current = null;
+    setDropIndex(null);
+  };
+
+  const handleDragOver = (
+    e: React.DragEvent,
+    index: number,
+    pinned: boolean,
+    pinnedType: 'welcome' | 'thanks' | null,
+  ) => {
+    if (dragId.current === null || selectMode) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    if (pinned && pinnedType === 'welcome') {
+      setDropIndex(clampOutlineDropIndex(schema.questions, 1));
+      return;
+    }
+    if (pinned && pinnedType === 'thanks') {
+      setDropIndex(clampOutlineDropIndex(schema.questions, schema.questions.length));
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const insertBefore = e.clientY < rect.top + rect.height / 2 ? index : index + 1;
+    setDropIndex(clampOutlineDropIndex(schema.questions, insertBefore));
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragId.current !== null && dropIndex !== null) {
+      onMove(dragId.current, dropIndex);
+    }
+    clearDrag();
+  };
 
   const toggleChecked = (id: string) => {
     setChecked((cur) => {
@@ -128,25 +135,25 @@ export function Outline({
   };
 
   return (
-    <aside className="studio-rail studio-rail--left">
+    <aside className="slate-rail slate-rail--left">
       {/* Form name */}
-      <div className="studio-rail-pad">
-        <label className="studio-label" htmlFor="form-name-input">
+      <div className="slate-rail-pad">
+        <label className="slate-label" htmlFor="form-name-input">
           Form
         </label>
         <input
           id="form-name-input"
-          className="studio-input"
+          className="slate-input"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="Untitled form"
+          placeholder="Untitled Form"
         />
       </div>
 
       <Divider />
 
       {/* Questions outline */}
-      <div className="studio-rail-pad" style={{ paddingTop: 8 }}>
+      <div className="slate-rail-pad" style={{ paddingTop: 8 }}>
         <div
           style={{
             display: 'flex',
@@ -155,12 +162,12 @@ export function Outline({
             marginBottom: 8,
           }}
         >
-          <p className="studio-label" style={{ margin: 0 }}>
+          <p className="slate-label" style={{ margin: 0 }}>
             Questions
           </p>
           <button
             type="button"
-            className="studio-btn studio-btn--ghost"
+            className="slate-btn slate-btn--ghost"
             style={{ fontSize: 10, padding: '2px 8px' }}
             onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
           >
@@ -169,12 +176,12 @@ export function Outline({
         </div>
         {selectMode && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 11, color: 'var(--psw-dim)' }}>
+            <span style={{ fontSize: 11, color: 'var(--slate-dim)' }}>
               {checked.size} selected
             </span>
             <button
               type="button"
-              className="studio-btn studio-btn--danger"
+              className="slate-btn slate-btn--danger"
               style={{ fontSize: 10, padding: '2px 8px' }}
               disabled={checked.size === 0}
               onClick={() => {
@@ -186,26 +193,27 @@ export function Outline({
             </button>
           </div>
         )}
-        <ul className="studio-outline-list">
+        <ul
+          ref={listRef}
+          className="slate-outline-list"
+          onDragLeave={(e) => {
+            if (!listRef.current?.contains(e.relatedTarget as Node)) {
+              setDropIndex(null);
+            }
+          }}
+        >
           {schema.questions.map((q, i) => {
             const isSelected = selectedId === q.id;
             const pinned = q.type === 'welcome' || q.type === 'thanks';
+            const pinnedType = q.type === 'welcome' || q.type === 'thanks' ? q.type : null;
             const titleText = typeof q.title === 'string' ? q.title : '(dynamic title)';
+            const canDrag = !pinned && !selectMode;
             return (
               <li
                 key={q.id}
-                draggable={!pinned && !selectMode}
-                onDragStart={() => {
-                  dragId.current = q.id;
-                }}
-                onDragOver={(e) => {
-                  if (dragId.current === null || dragId.current === q.id || pinned) return;
-                  e.preventDefault();
-                  onMove(dragId.current, i);
-                }}
-                onDragEnd={() => {
-                  dragId.current = null;
-                }}
+                className={dropIndex === i ? 'slate-outline-item--drop-before' : undefined}
+                onDragOver={(e) => handleDragOver(e, i, pinned, pinnedType)}
+                onDrop={handleDrop}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   {selectMode && !pinned && (
@@ -218,28 +226,36 @@ export function Outline({
                   )}
                   <button
                     type="button"
-                    className={`studio-outline-row${isSelected ? ' studio-outline-row--selected' : ''}`}
-                    style={{ flex: 1, cursor: !pinned && !selectMode ? 'grab' : undefined }}
+                    draggable={canDrag}
+                    className={`slate-outline-row${isSelected ? ' slate-outline-row--selected' : ''}`}
+                    style={{ flex: 1, cursor: canDrag ? 'grab' : undefined }}
                     onClick={() => (selectMode && !pinned ? toggleChecked(q.id) : onSelect(q.id))}
+                    onDragStart={(e) => {
+                      if (!canDrag) return;
+                      dragId.current = q.id;
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', q.id);
+                    }}
+                    onDragEnd={clearDrag}
                   >
-                    <span className="studio-outline-idx">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="studio-outline-glyph" aria-hidden>
+                    <span className="slate-outline-idx">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="slate-outline-glyph" aria-hidden>
                       {TYPE_GLYPH[q.type]}
                     </span>
-                    <span className="studio-outline-title">{titleText || '(no title)'}</span>
+                    <span className="slate-outline-title">{titleText || '(no title)'}</span>
                     {pinned && (
-                      <span className="studio-badge" style={{ fontSize: 9, padding: '0 5px' }}>
+                      <span className="slate-badge" style={{ fontSize: 9, padding: '0 5px' }}>
                         pinned
                       </span>
                     )}
                   </button>
                 </div>
                 {!pinned && !selectMode && (
-                  <div className="studio-outline-actions">
+                  <div className="slate-outline-actions">
                     {i > 0 && schema.questions[i - 1]?.type !== 'welcome' && (
                       <button
                         type="button"
-                        className="studio-icon-btn"
+                        className="slate-icon-btn"
                         onClick={() => onReorder(q.id, 'up')}
                         aria-label="Move up"
                         title="Move up"
@@ -250,7 +266,7 @@ export function Outline({
                     {i < schema.questions.length - 1 && schema.questions[i + 1]?.type !== 'thanks' && (
                       <button
                         type="button"
-                        className="studio-icon-btn"
+                        className="slate-icon-btn"
                         onClick={() => onReorder(q.id, 'down')}
                         aria-label="Move down"
                         title="Move down"
@@ -260,7 +276,7 @@ export function Outline({
                     )}
                     <button
                       type="button"
-                      className="studio-icon-btn"
+                      className="slate-icon-btn"
                       onClick={() => onDuplicate(q.id)}
                       aria-label="Duplicate"
                       title="Duplicate"
@@ -274,21 +290,21 @@ export function Outline({
           })}
         </ul>
 
-        {/* Add-question control */}
+        {/* Add control — questions, screens (welcome/thanks/statement), review */}
         <div style={{ marginTop: 10, position: 'relative' }}>
           {!addOpen ? (
             <button
               type="button"
-              className="studio-btn studio-btn--primary"
+              className="slate-btn slate-btn--primary"
               onClick={() => setAddOpen(true)}
               style={{ width: '100%', justifyContent: 'center' }}
             >
-              + Add question
+              + Add
             </button>
           ) : (
-            <div className="studio-popover">
-              <p className="studio-label" style={{ marginBottom: 6 }}>
-                Add a question
+            <div className="slate-popover">
+              <p className="slate-label" style={{ marginBottom: 6 }}>
+                Add to Form
               </p>
               {Array.from(new Set(ADDABLE_TYPES.map((t) => t.group))).map((group) => (
                 <div key={group} style={{ marginBottom: 8 }}>
@@ -296,10 +312,10 @@ export function Outline({
                     style={{
                       margin: '6px 0 4px',
                       fontSize: 10,
-                      color: 'var(--psw-dim)',
+                      color: 'var(--slate-dim)',
                       textTransform: 'uppercase',
                       letterSpacing: '0.06em',
-                      fontFamily: 'var(--psw-font-mono)',
+                      fontFamily: 'var(--slate-font-mono)',
                     }}
                   >
                     {group}
@@ -309,7 +325,7 @@ export function Outline({
                       <button
                         key={t.type}
                         type="button"
-                        className="studio-btn"
+                        className="slate-btn"
                         style={{
                           padding: '6px 8px',
                           fontSize: 12,
@@ -321,7 +337,7 @@ export function Outline({
                           setAddOpen(false);
                         }}
                       >
-                        <span style={{ fontFamily: 'var(--psw-font-mono)', opacity: 0.6, marginRight: 4 }}>
+                        <span style={{ fontFamily: 'var(--slate-font-mono)', opacity: 0.6, marginRight: 4 }}>
                           {TYPE_GLYPH[t.type]}
                         </span>
                         {t.label}
@@ -333,7 +349,7 @@ export function Outline({
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
-                  className="studio-btn studio-btn--ghost"
+                  className="slate-btn slate-btn--ghost"
                   onClick={() => setAddOpen(false)}
                   style={{ fontSize: 11, padding: '4px 8px' }}
                 >
@@ -348,54 +364,53 @@ export function Outline({
       <Divider />
 
       {/* Settings (collapsible) */}
-      <div className="studio-rail-pad">
+      <div className="slate-rail-pad">
         <button
           type="button"
-          className="studio-rail-toggle"
+          className="slate-rail-toggle"
           onClick={() => setSettingsOpen(!settingsOpen)}
           aria-expanded={settingsOpen}
         >
           <span style={{ fontSize: 11, opacity: 0.6 }}>{settingsOpen ? '▾' : '▸'}</span>
-          <span className="studio-label" style={{ margin: 0 }}>Settings</span>
+          <span className="slate-label" style={{ margin: 0 }}>Settings</span>
         </button>
 
         {settingsOpen && (
           <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
             <label>
-              <span className="studio-label">Brand name (shown to user)</span>
+              <span className="slate-label">Brand Name (Shown to User)</span>
               <input
-                className="studio-input"
+                className="slate-input"
                 value={schema.brand.name}
                 onChange={(e) => onBrandChange(e.target.value)}
               />
             </label>
             <label>
-              <span className="studio-label">Theme</span>
-              <select
-                className="studio-select"
-                value={String(schema.theme)}
-                onChange={(e) => onThemeChange(e.target.value as ThemeName)}
-              >
-                {THEMES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+              <span className="slate-label">Theme</span>
+              <SlateSelect
+                value={String(schema.theme) as ThemeName}
+                options={THEMES}
+                aria-label="Theme"
+                onChange={onThemeChange}
+              />
             </label>
             <label>
-              <span className="studio-label">Theme mode</span>
-              <select
-                className="studio-select"
+              <span className="slate-label">Theme Mode</span>
+              <SlateSelect
                 value={schema.themeMode}
-                onChange={(e) => onThemeModeChange(e.target.value as ThemeMode)}
-              >
-                {MODES.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
+                options={MODES}
+                aria-label="Theme mode"
+                onChange={onThemeModeChange}
+              />
+            </label>
+            <label>
+              <span className="slate-label">Step Sound</span>
+              <SlateSelect
+                value={resolveFormSound(schema.sound)}
+                options={FORM_SOUND_OPTIONS}
+                aria-label="Step sound"
+                onChange={onSoundChange}
+              />
             </label>
           </div>
         )}
@@ -407,7 +422,15 @@ export function Outline({
 function Divider() {
   return (
     <div
-      style={{ height: 1, background: 'var(--psw-border)', margin: '0 12px' }}
+      // The rail is a flex column; without flexShrink:0 a 1px item gets crushed
+      // to 0 (and flickers at sub-pixel heights) once the content overflows,
+      // e.g. when Settings expands.
+      style={{
+        height: 1,
+        flexShrink: 0,
+        background: 'var(--slate-border)',
+        margin: '0 12px',
+      }}
       aria-hidden
     />
   );

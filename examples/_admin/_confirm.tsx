@@ -1,6 +1,6 @@
 /**
  * Confirmation dialog provider + hook. Replaces browser `confirm()`
- * with a centered modal in the studio's design language.
+ * with a centered modal in the Slate's design language.
  *
  *   const confirm = useConfirm();
  *   const ok = await confirm({
@@ -39,12 +39,12 @@ type ConfirmFn = (opts: ConfirmOptions) => Promise<boolean>;
 
 const ConfirmContext = createContext<ConfirmFn | null>(null);
 
-/** Read the studio theme that's currently persisted, so the dialog renders
+/** Read Slate theme that's currently persisted, so the dialog renders
  *  in the same mode as the rest of the chrome. */
-function readStudioMode(): 'light' | 'dark' {
+function readSlateMode(): 'light' | 'dark' {
   if (typeof window === 'undefined') return 'dark';
   try {
-    const v = window.localStorage.getItem('psw-studio-theme');
+    const v = window.localStorage.getItem('slate-theme');
     if (v === 'light' || v === 'dark') return v;
   } catch {
     /* ignored */
@@ -128,39 +128,39 @@ function Dialog({
 
   // The portal renders outside the AdminShell's wrapper, so we wrap in our
   // own studio data attributes to pick up the same tokens.
-  const mode = readStudioMode();
+  const mode = readSlateMode();
 
   return createPortal(
-    <div data-psw-forms="" data-theme-name="studio" data-theme={mode}>
+    <div data-slate-forms="" data-theme-name="slate" data-theme={mode}>
       <div
-        className="studio-dialog-backdrop"
+        className="slate-dialog-backdrop"
         role="presentation"
         onClick={() => onClose(false)}
       >
         <div
-          className="studio-dialog"
+          className="slate-dialog"
           role="alertdialog"
           aria-modal="true"
-          aria-labelledby="studio-dialog-title"
-          aria-describedby={opts.message ? 'studio-dialog-message' : undefined}
+          aria-labelledby="slate-dialog-title"
+          aria-describedby={opts.message ? 'slate-dialog-message' : undefined}
           onClick={(e) => e.stopPropagation()}
         >
-          <h2 id="studio-dialog-title" className="studio-dialog-title">
+          <h2 id="slate-dialog-title" className="slate-dialog-title">
             {opts.title}
           </h2>
           {opts.message && (
-            <div id="studio-dialog-message" className="studio-dialog-message">
+            <div id="slate-dialog-message" className="slate-dialog-message">
               {opts.message}
             </div>
           )}
-          <div className="studio-dialog-actions">
-            <button type="button" className="studio-btn" onClick={() => onClose(false)}>
+          <div className="slate-dialog-actions">
+            <button type="button" className="slate-btn" onClick={() => onClose(false)}>
               {opts.cancelLabel ?? 'Cancel'}
             </button>
             <button
               ref={confirmBtnRef}
               type="button"
-              className={`studio-btn ${opts.danger ? 'studio-btn--danger-filled' : 'studio-btn--primary'}`}
+              className={`slate-btn ${opts.danger ? 'slate-btn--danger-filled' : 'slate-btn--primary'}`}
               onClick={() => onClose(true)}
             >
               {opts.confirmLabel ?? 'Confirm'}

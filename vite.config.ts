@@ -8,7 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '@palmstreetweb/forms': fileURLToPath(new URL('./src/index.ts', import.meta.url)),
+      '@palmstreetweb/slate': fileURLToPath(new URL('./src/index.ts', import.meta.url)),
     },
   },
   server: {

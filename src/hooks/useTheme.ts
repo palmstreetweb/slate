@@ -2,7 +2,7 @@
  * Toggle + mode resolution for the PSW theme system. Ports the vanilla JS
  * pattern from PSW's site (brief §8.3) to React, wrapper-scoped.
  *
- *   - localStorage key:    `psw-forms-theme`  (never `psw-theme`)
+ *   - localStorage key:    `slate-forms-theme`  (never `psw-theme`)
  *   - First-mount fallback: stored → host <html data-theme> → prefers-color-scheme → 'dark'
  *   - 'auto' mode:          reactively follows prefers-color-scheme, no toggle UI
  *   - 'toggle' mode:        full morph + view-transition + reduced-motion handling
@@ -14,7 +14,7 @@ import type { ResolvedThemeMode, ThemeMode } from '@/types/Theme.js';
 import { readHostTheme } from '@/utils/tokens.js';
 import { useReducedMotion } from './useReducedMotion.js';
 
-const STORAGE_KEY = 'psw-forms-theme';
+const STORAGE_KEY = 'slate-forms-theme';
 const MORPH_DURATION_MS = 620;
 const SUPPRESS_DURATION_MS = 550;
 

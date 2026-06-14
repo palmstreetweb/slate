@@ -10,11 +10,11 @@ type Props = {
 export function WelcomeScreen({ question, advance }: Props) {
   return (
     <div>
-      <h1 className="psw-title">{question.title}</h1>
-      {question.subtitle && <p className="psw-subtitle">{question.subtitle}</p>}
-      <button type="button" className="psw-cta" onClick={advance}>
+      <h1 className="slate-title">{question.title}</h1>
+      {question.subtitle && <p className="slate-subtitle">{question.subtitle}</p>}
+      <button type="button" className="slate-cta" onClick={advance}>
         {question.cta ?? 'Start'}
-        <span className="psw-cta-hint">press Enter ↵</span>
+        <span className="slate-cta-hint">press Enter ↵</span>
       </button>
     </div>
   );

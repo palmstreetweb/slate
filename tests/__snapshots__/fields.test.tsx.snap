@@ -3,20 +3,20 @@
 exports[`phase 3 question types > file_upload renders drop zone + snapshot 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_t_"
     >
       Upload your doc
@@ -31,25 +31,25 @@ exports[`phase 3 question types > file_upload renders drop zone + snapshot 1`] =
       />
       <button
         aria-describedby="_r_t_"
-        class="psw-upload-zone"
+        class="slate-upload-zone"
         type="button"
       >
         <span
-          class="psw-upload-cta"
+          class="slate-upload-cta"
         >
           choose a file
         </span>
         <span
-          class="psw-upload-hint"
+          class="slate-upload-hint"
         >
           or drag and drop it here
         </span>
       </button>
       <div
-        class="psw-actions"
+        class="slate-actions"
       >
         <button
-          class="psw-ok-btn"
+          class="slate-ok-btn"
           type="button"
         >
           OK 
@@ -60,7 +60,7 @@ exports[`phase 3 question types > file_upload renders drop zone + snapshot 1`] =
           </span>
         </button>
         <span
-          class="psw-hint"
+          class="slate-hint"
         >
           max 
           5
@@ -75,70 +75,70 @@ exports[`phase 3 question types > file_upload renders drop zone + snapshot 1`] =
 exports[`phase 3 question types > matrix renders + snapshot, single-select per row, required blocks gaps 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_16_"
     >
       Rate each
     </h1>
     <div
       aria-labelledby="_r_16_"
-      class="psw-matrix"
-      style="--psw-matrix-cols: 2;"
+      class="slate-matrix"
+      style="--slate-matrix-cols: 2;"
     >
       <div
         aria-hidden="true"
-        class="psw-matrix-head"
+        class="slate-matrix-head"
       >
         <span
-          class="psw-matrix-corner"
+          class="slate-matrix-corner"
         />
         <span
-          class="psw-matrix-colhead"
+          class="slate-matrix-colhead"
         >
           Poor
         </span>
         <span
-          class="psw-matrix-colhead"
+          class="slate-matrix-colhead"
         >
           Great
         </span>
       </div>
       <div
         aria-label="Quality"
-        class="psw-matrix-row"
+        class="slate-matrix-row"
         role="radiogroup"
       >
         <span
-          class="psw-matrix-rowlabel"
+          class="slate-matrix-rowlabel"
         >
           Quality
         </span>
         <button
           aria-checked="false"
           aria-label="Quality: Poor"
-          class="psw-matrix-cell"
+          class="slate-matrix-cell"
           role="radio"
           type="button"
         >
           <span
             aria-hidden="true"
-            class="psw-matrix-dot"
+            class="slate-matrix-dot"
           />
           <span
-            class="psw-matrix-cell-label"
+            class="slate-matrix-cell-label"
           >
             Poor
           </span>
@@ -146,16 +146,16 @@ exports[`phase 3 question types > matrix renders + snapshot, single-select per r
         <button
           aria-checked="false"
           aria-label="Quality: Great"
-          class="psw-matrix-cell"
+          class="slate-matrix-cell"
           role="radio"
           type="button"
         >
           <span
             aria-hidden="true"
-            class="psw-matrix-dot"
+            class="slate-matrix-dot"
           />
           <span
-            class="psw-matrix-cell-label"
+            class="slate-matrix-cell-label"
           >
             Great
           </span>
@@ -163,27 +163,27 @@ exports[`phase 3 question types > matrix renders + snapshot, single-select per r
       </div>
       <div
         aria-label="Speed"
-        class="psw-matrix-row"
+        class="slate-matrix-row"
         role="radiogroup"
       >
         <span
-          class="psw-matrix-rowlabel"
+          class="slate-matrix-rowlabel"
         >
           Speed
         </span>
         <button
           aria-checked="false"
           aria-label="Speed: Poor"
-          class="psw-matrix-cell"
+          class="slate-matrix-cell"
           role="radio"
           type="button"
         >
           <span
             aria-hidden="true"
-            class="psw-matrix-dot"
+            class="slate-matrix-dot"
           />
           <span
-            class="psw-matrix-cell-label"
+            class="slate-matrix-cell-label"
           >
             Poor
           </span>
@@ -191,16 +191,16 @@ exports[`phase 3 question types > matrix renders + snapshot, single-select per r
         <button
           aria-checked="false"
           aria-label="Speed: Great"
-          class="psw-matrix-cell"
+          class="slate-matrix-cell"
           role="radio"
           type="button"
         >
           <span
             aria-hidden="true"
-            class="psw-matrix-dot"
+            class="slate-matrix-dot"
           />
           <span
-            class="psw-matrix-cell-label"
+            class="slate-matrix-cell-label"
           >
             Great
           </span>
@@ -208,10 +208,10 @@ exports[`phase 3 question types > matrix renders + snapshot, single-select per r
       </div>
     </div>
     <div
-      class="psw-actions"
+      class="slate-actions"
     >
       <button
-        class="psw-ok-btn"
+        class="slate-ok-btn"
         type="button"
       >
         OK 
@@ -229,45 +229,45 @@ exports[`phase 3 question types > matrix renders + snapshot, single-select per r
 exports[`phase 3 question types > picture_choice renders the image grid + snapshot 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_12_"
     >
       Pick a pet
     </h1>
     <div
       aria-labelledby="_r_12_"
-      class="psw-picture-grid"
+      class="slate-picture-grid"
       role="radiogroup"
     >
       <button
         aria-checked="false"
-        class="psw-picture"
+        class="slate-picture"
         role="radio"
         type="button"
       >
         <img
           alt="Cat"
-          class="psw-picture-img"
+          class="slate-picture-img"
           src="https://example.com/cat.jpg"
         />
         <span
-          class="psw-picture-caption"
+          class="slate-picture-caption"
         >
           <span
-            class="psw-choice-badge"
+            class="slate-choice-badge"
           >
             A
           </span>
@@ -278,20 +278,20 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
       </button>
       <button
         aria-checked="false"
-        class="psw-picture"
+        class="slate-picture"
         role="radio"
         type="button"
       >
         <img
           alt="Dog"
-          class="psw-picture-img"
+          class="slate-picture-img"
           src="https://example.com/dog.jpg"
         />
         <span
-          class="psw-picture-caption"
+          class="slate-picture-caption"
         >
           <span
-            class="psw-choice-badge"
+            class="slate-choice-badge"
           >
             B
           </span>
@@ -302,20 +302,20 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
       </button>
       <button
         aria-checked="false"
-        class="psw-picture"
+        class="slate-picture"
         role="radio"
         type="button"
       >
         <img
           alt="Bird"
-          class="psw-picture-img"
+          class="slate-picture-img"
           src="https://example.com/bird.jpg"
         />
         <span
-          class="psw-picture-caption"
+          class="slate-picture-caption"
         >
           <span
-            class="psw-choice-badge"
+            class="slate-choice-badge"
           >
             C
           </span>
@@ -326,7 +326,7 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
       </button>
     </div>
     <p
-      class="psw-hint"
+      class="slate-hint"
       style="margin-top: 20px;"
     >
       tap a key (A, B, C) or click to select
@@ -338,48 +338,48 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
 exports[`phase 3 question types > ranking renders + snapshot, reorders via buttons, submits full order 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_15_"
     >
       Rank these
     </h1>
     <ol
       aria-labelledby="_r_15_"
-      class="psw-ranking"
+      class="slate-ranking"
     >
       <li
-        class="psw-ranking-row"
+        class="slate-ranking-row"
         draggable="true"
       >
         <span
-          class="psw-ranking-pos"
+          class="slate-ranking-pos"
         >
           1
         </span>
         <span
-          class="psw-ranking-label"
+          class="slate-ranking-label"
         >
           Alpha
         </span>
         <span
-          class="psw-ranking-controls"
+          class="slate-ranking-controls"
         >
           <button
             aria-label="Move Alpha up"
-            class="psw-ranking-btn"
+            class="slate-ranking-btn"
             disabled=""
             type="button"
           >
@@ -387,7 +387,7 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
           </button>
           <button
             aria-label="Move Alpha down"
-            class="psw-ranking-btn"
+            class="slate-ranking-btn"
             type="button"
           >
             ↓
@@ -395,32 +395,32 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
         </span>
       </li>
       <li
-        class="psw-ranking-row"
+        class="slate-ranking-row"
         draggable="true"
       >
         <span
-          class="psw-ranking-pos"
+          class="slate-ranking-pos"
         >
           2
         </span>
         <span
-          class="psw-ranking-label"
+          class="slate-ranking-label"
         >
           Beta
         </span>
         <span
-          class="psw-ranking-controls"
+          class="slate-ranking-controls"
         >
           <button
             aria-label="Move Beta up"
-            class="psw-ranking-btn"
+            class="slate-ranking-btn"
             type="button"
           >
             ↑
           </button>
           <button
             aria-label="Move Beta down"
-            class="psw-ranking-btn"
+            class="slate-ranking-btn"
             type="button"
           >
             ↓
@@ -428,32 +428,32 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
         </span>
       </li>
       <li
-        class="psw-ranking-row"
+        class="slate-ranking-row"
         draggable="true"
       >
         <span
-          class="psw-ranking-pos"
+          class="slate-ranking-pos"
         >
           3
         </span>
         <span
-          class="psw-ranking-label"
+          class="slate-ranking-label"
         >
           Gamma
         </span>
         <span
-          class="psw-ranking-controls"
+          class="slate-ranking-controls"
         >
           <button
             aria-label="Move Gamma up"
-            class="psw-ranking-btn"
+            class="slate-ranking-btn"
             type="button"
           >
             ↑
           </button>
           <button
             aria-label="Move Gamma down"
-            class="psw-ranking-btn"
+            class="slate-ranking-btn"
             disabled=""
             type="button"
           >
@@ -463,10 +463,10 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
       </li>
     </ol>
     <div
-      class="psw-actions"
+      class="slate-actions"
     >
       <button
-        class="psw-ok-btn"
+        class="slate-ok-btn"
         type="button"
       >
         OK 
@@ -477,7 +477,7 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
         </span>
       </button>
       <span
-        class="psw-hint"
+        class="slate-hint"
       >
         drag rows or use ↑↓ to reorder
       </span>
@@ -489,20 +489,20 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
 exports[`question types render > date 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_9_"
     >
       When?
@@ -512,13 +512,13 @@ exports[`question types render > date 1`] = `
     >
       <div
         aria-labelledby="_r_9_"
-        class="psw-date-row"
+        class="slate-date-row"
         role="group"
       >
         <input
           aria-invalid="false"
           aria-label="Month"
-          class="psw-input psw-date-seg"
+          class="slate-input slate-date-seg"
           inputmode="numeric"
           placeholder="MM"
           type="text"
@@ -526,14 +526,14 @@ exports[`question types render > date 1`] = `
         />
         <span
           aria-hidden="true"
-          class="psw-date-sep"
+          class="slate-date-sep"
         >
           /
         </span>
         <input
           aria-invalid="false"
           aria-label="Day"
-          class="psw-input psw-date-seg"
+          class="slate-input slate-date-seg"
           inputmode="numeric"
           placeholder="DD"
           type="text"
@@ -541,14 +541,14 @@ exports[`question types render > date 1`] = `
         />
         <span
           aria-hidden="true"
-          class="psw-date-sep"
+          class="slate-date-sep"
         >
           /
         </span>
         <input
           aria-invalid="false"
           aria-label="Year"
-          class="psw-input psw-date-seg psw-date-seg--year"
+          class="slate-input slate-date-seg slate-date-seg--year"
           inputmode="numeric"
           placeholder="YYYY"
           type="text"
@@ -556,10 +556,10 @@ exports[`question types render > date 1`] = `
         />
       </div>
       <div
-        class="psw-actions"
+        class="slate-actions"
       >
         <button
-          class="psw-ok-btn"
+          class="slate-ok-btn"
           type="button"
         >
           OK 
@@ -570,7 +570,7 @@ exports[`question types render > date 1`] = `
           </span>
         </button>
         <span
-          class="psw-hint"
+          class="slate-hint"
         >
           press Enter ↵
         </span>
@@ -583,20 +583,20 @@ exports[`question types render > date 1`] = `
 exports[`question types render > dropdown 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_a_"
     >
       State?
@@ -611,17 +611,17 @@ exports[`question types render > dropdown 1`] = `
         aria-invalid="false"
         aria-labelledby="_r_a_"
         autocomplete="off"
-        class="psw-input"
+        class="slate-input"
         placeholder="Type or select an option..."
         role="combobox"
         type="text"
         value=""
       />
       <div
-        class="psw-actions"
+        class="slate-actions"
       >
         <button
-          class="psw-ok-btn"
+          class="slate-ok-btn"
           type="button"
         >
           OK 
@@ -632,7 +632,7 @@ exports[`question types render > dropdown 1`] = `
           </span>
         </button>
         <span
-          class="psw-hint"
+          class="slate-hint"
         >
           type to filter, ↑↓ + Enter to select
         </span>
@@ -645,20 +645,20 @@ exports[`question types render > dropdown 1`] = `
 exports[`question types render > email 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_2_"
     >
       Email?
@@ -670,17 +670,17 @@ exports[`question types render > email 1`] = `
         aria-invalid="false"
         aria-labelledby="_r_2_"
         autocomplete="email"
-        class="psw-input"
+        class="slate-input"
         inputmode="email"
         placeholder="name@example.com"
         type="email"
         value=""
       />
       <div
-        class="psw-actions"
+        class="slate-actions"
       >
         <button
-          class="psw-ok-btn"
+          class="slate-ok-btn"
           type="button"
         >
           OK 
@@ -691,7 +691,7 @@ exports[`question types render > email 1`] = `
           </span>
         </button>
         <span
-          class="psw-hint"
+          class="slate-hint"
         >
           press Enter ↵
         </span>
@@ -704,42 +704,42 @@ exports[`question types render > email 1`] = `
 exports[`question types render > legal 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_d_"
     >
       Accept terms?
     </h1>
     <p
-      class="psw-subtitle"
+      class="slate-subtitle"
     >
       The fine print.
     </p>
     <div
       aria-labelledby="_r_d_"
-      class="psw-choices"
+      class="slate-choices"
       role="radiogroup"
     >
       <button
         aria-checked="false"
-        class="psw-choice"
+        class="slate-choice"
         role="radio"
         type="button"
       >
         <span
-          class="psw-choice-badge"
+          class="slate-choice-badge"
         >
           A
         </span>
@@ -749,12 +749,12 @@ exports[`question types render > legal 1`] = `
       </button>
       <button
         aria-checked="false"
-        class="psw-choice"
+        class="slate-choice"
         role="radio"
         type="button"
       >
         <span
-          class="psw-choice-badge"
+          class="slate-choice-badge"
         >
           B
         </span>
@@ -764,7 +764,7 @@ exports[`question types render > legal 1`] = `
       </button>
     </div>
     <p
-      class="psw-hint"
+      class="slate-hint"
       style="margin-top: 20px;"
     >
       tap a key (A, B) or click to select
@@ -776,20 +776,20 @@ exports[`question types render > legal 1`] = `
 exports[`question types render > long_text 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_1_"
     >
       Notes?
@@ -800,15 +800,15 @@ exports[`question types render > long_text 1`] = `
       <textarea
         aria-invalid="false"
         aria-labelledby="_r_1_"
-        class="psw-input"
+        class="slate-input"
         placeholder="Type your answer..."
         rows="3"
       />
       <div
-        class="psw-actions"
+        class="slate-actions"
       >
         <button
-          class="psw-ok-btn"
+          class="slate-ok-btn"
           type="button"
         >
           OK 
@@ -819,7 +819,7 @@ exports[`question types render > long_text 1`] = `
           </span>
         </button>
         <span
-          class="psw-hint"
+          class="slate-hint"
         >
           Shift + Enter for new line
         </span>
@@ -832,37 +832,37 @@ exports[`question types render > long_text 1`] = `
 exports[`question types render > multi_choice 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_6_"
     >
       Add-ons?
     </h1>
     <div
       aria-labelledby="_r_6_"
-      class="psw-choices"
+      class="slate-choices"
       role="group"
     >
       <button
         aria-checked="false"
-        class="psw-choice"
+        class="slate-choice"
         role="checkbox"
         type="button"
       >
         <span
-          class="psw-choice-badge"
+          class="slate-choice-badge"
         >
           A
         </span>
@@ -872,12 +872,12 @@ exports[`question types render > multi_choice 1`] = `
       </button>
       <button
         aria-checked="false"
-        class="psw-choice"
+        class="slate-choice"
         role="checkbox"
         type="button"
       >
         <span
-          class="psw-choice-badge"
+          class="slate-choice-badge"
         >
           B
         </span>
@@ -887,10 +887,10 @@ exports[`question types render > multi_choice 1`] = `
       </button>
     </div>
     <div
-      class="psw-actions"
+      class="slate-actions"
     >
       <button
-        class="psw-ok-btn"
+        class="slate-ok-btn"
         type="button"
       >
         OK 
@@ -901,7 +901,7 @@ exports[`question types render > multi_choice 1`] = `
         </span>
       </button>
       <span
-        class="psw-hint"
+        class="slate-hint"
       >
         tap keys to toggle, OK to continue
       </span>
@@ -913,35 +913,35 @@ exports[`question types render > multi_choice 1`] = `
 exports[`question types render > nps 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_e_"
     >
       Recommend us?
     </h1>
     <div
       aria-labelledby="_r_e_"
-      class="psw-scale"
+      class="slate-scale"
       role="radiogroup"
     >
       <div
-        class="psw-scale-row"
+        class="slate-scale-row"
       >
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -949,7 +949,7 @@ exports[`question types render > nps 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -957,7 +957,7 @@ exports[`question types render > nps 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -965,7 +965,7 @@ exports[`question types render > nps 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -973,7 +973,7 @@ exports[`question types render > nps 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -981,7 +981,7 @@ exports[`question types render > nps 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -989,7 +989,7 @@ exports[`question types render > nps 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -997,7 +997,7 @@ exports[`question types render > nps 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -1005,7 +1005,7 @@ exports[`question types render > nps 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -1013,7 +1013,7 @@ exports[`question types render > nps 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -1021,7 +1021,7 @@ exports[`question types render > nps 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -1029,7 +1029,7 @@ exports[`question types render > nps 1`] = `
         </button>
       </div>
       <div
-        class="psw-scale-labels"
+        class="slate-scale-labels"
       >
         <span>
           Not at all likely
@@ -1040,10 +1040,10 @@ exports[`question types render > nps 1`] = `
       </div>
     </div>
     <div
-      class="psw-actions"
+      class="slate-actions"
     >
       <span
-        class="psw-hint"
+        class="slate-hint"
       >
         press a number ↑
       </span>
@@ -1055,20 +1055,20 @@ exports[`question types render > nps 1`] = `
 exports[`question types render > number 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_4_"
     >
       Sq ft?
@@ -1079,7 +1079,7 @@ exports[`question types render > number 1`] = `
       <input
         aria-invalid="false"
         aria-labelledby="_r_4_"
-        class="psw-input"
+        class="slate-input"
         inputmode="decimal"
         pattern="[0-9]*[.]?[0-9]*"
         placeholder="0"
@@ -1087,10 +1087,10 @@ exports[`question types render > number 1`] = `
         value=""
       />
       <div
-        class="psw-actions"
+        class="slate-actions"
       >
         <button
-          class="psw-ok-btn"
+          class="slate-ok-btn"
           type="button"
         >
           OK 
@@ -1101,7 +1101,7 @@ exports[`question types render > number 1`] = `
           </span>
         </button>
         <span
-          class="psw-hint"
+          class="slate-hint"
         >
           press Enter ↵
         </span>
@@ -1114,20 +1114,20 @@ exports[`question types render > number 1`] = `
 exports[`question types render > phone 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_3_"
     >
       Phone?
@@ -1139,17 +1139,17 @@ exports[`question types render > phone 1`] = `
         aria-invalid="false"
         aria-labelledby="_r_3_"
         autocomplete="tel"
-        class="psw-input"
+        class="slate-input"
         inputmode="tel"
         placeholder="(555) 123-4567"
         type="tel"
         value=""
       />
       <div
-        class="psw-actions"
+        class="slate-actions"
       >
         <button
-          class="psw-ok-btn"
+          class="slate-ok-btn"
           type="button"
         >
           OK 
@@ -1160,7 +1160,7 @@ exports[`question types render > phone 1`] = `
           </span>
         </button>
         <span
-          class="psw-hint"
+          class="slate-hint"
         >
           press Enter ↵
         </span>
@@ -1173,35 +1173,35 @@ exports[`question types render > phone 1`] = `
 exports[`question types render > scale 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_7_"
     >
       Urgency?
     </h1>
     <div
       aria-labelledby="_r_7_"
-      class="psw-scale"
+      class="slate-scale"
       role="radiogroup"
     >
       <div
-        class="psw-scale-row"
+        class="slate-scale-row"
       >
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -1209,7 +1209,7 @@ exports[`question types render > scale 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -1217,7 +1217,7 @@ exports[`question types render > scale 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -1225,7 +1225,7 @@ exports[`question types render > scale 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -1233,7 +1233,7 @@ exports[`question types render > scale 1`] = `
         </button>
         <button
           aria-checked="false"
-          class="psw-scale-cell"
+          class="slate-scale-cell"
           role="radio"
           type="button"
         >
@@ -1241,7 +1241,7 @@ exports[`question types render > scale 1`] = `
         </button>
       </div>
       <div
-        class="psw-scale-labels"
+        class="slate-scale-labels"
       >
         <span>
           chill
@@ -1252,10 +1252,10 @@ exports[`question types render > scale 1`] = `
       </div>
     </div>
     <div
-      class="psw-actions"
+      class="slate-actions"
     >
       <span
-        class="psw-hint"
+        class="slate-hint"
       >
         press a number ↑
       </span>
@@ -1267,20 +1267,20 @@ exports[`question types render > scale 1`] = `
 exports[`question types render > short_text 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_0_"
     >
       Name?
@@ -1292,16 +1292,16 @@ exports[`question types render > short_text 1`] = `
         aria-invalid="false"
         aria-labelledby="_r_0_"
         autocomplete="off"
-        class="psw-input"
+        class="slate-input"
         placeholder="Jane"
         type="text"
         value=""
       />
       <div
-        class="psw-actions"
+        class="slate-actions"
       >
         <button
-          class="psw-ok-btn"
+          class="slate-ok-btn"
           type="button"
         >
           OK 
@@ -1312,7 +1312,7 @@ exports[`question types render > short_text 1`] = `
           </span>
         </button>
         <span
-          class="psw-hint"
+          class="slate-hint"
         >
           press Enter ↵
         </span>
@@ -1325,37 +1325,37 @@ exports[`question types render > short_text 1`] = `
 exports[`question types render > single_choice 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_5_"
     >
       Service?
     </h1>
     <div
       aria-labelledby="_r_5_"
-      class="psw-choices"
+      class="slate-choices"
       role="radiogroup"
     >
       <button
         aria-checked="false"
-        class="psw-choice"
+        class="slate-choice"
         role="radio"
         type="button"
       >
         <span
-          class="psw-choice-badge"
+          class="slate-choice-badge"
         >
           A
         </span>
@@ -1365,19 +1365,19 @@ exports[`question types render > single_choice 1`] = `
       </button>
       <button
         aria-checked="false"
-        class="psw-choice"
+        class="slate-choice"
         role="radio"
         type="button"
       >
         <span
-          class="psw-choice-badge"
+          class="slate-choice-badge"
         >
           B
         </span>
         <span>
           Two
           <span
-            class="psw-choice-desc"
+            class="slate-choice-desc"
           >
             the second
           </span>
@@ -1385,7 +1385,7 @@ exports[`question types render > single_choice 1`] = `
       </button>
     </div>
     <p
-      class="psw-hint"
+      class="slate-hint"
       style="margin-top: 20px;"
     >
       tap a key (A, B, C, D) or click to select
@@ -1398,22 +1398,22 @@ exports[`question types render > statement 1`] = `
 <div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
     >
       Quick note
     </h1>
     <p
-      class="psw-subtitle"
+      class="slate-subtitle"
     >
       We never share your data.
     </p>
     <button
-      class="psw-cta"
+      class="slate-cta"
       type="button"
     >
       Continue
       <span
-        class="psw-cta-hint"
+        class="slate-cta-hint"
       >
         press Enter ↵
       </span>
@@ -1426,12 +1426,12 @@ exports[`question types render > thanks 1`] = `
 <div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
     >
       Done.
     </h1>
     <p
-      class="psw-subtitle"
+      class="slate-subtitle"
     >
       Talk soon.
     </p>
@@ -1445,20 +1445,20 @@ exports[`question types render > thanks 1`] = `
 exports[`question types render > url 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_8_"
     >
       Website?
@@ -1471,7 +1471,7 @@ exports[`question types render > url 1`] = `
         aria-labelledby="_r_8_"
         autocapitalize="off"
         autocomplete="url"
-        class="psw-input"
+        class="slate-input"
         inputmode="url"
         placeholder="https://example.com"
         spellcheck="false"
@@ -1479,10 +1479,10 @@ exports[`question types render > url 1`] = `
         value=""
       />
       <div
-        class="psw-actions"
+        class="slate-actions"
       >
         <button
-          class="psw-ok-btn"
+          class="slate-ok-btn"
           type="button"
         >
           OK 
@@ -1493,7 +1493,7 @@ exports[`question types render > url 1`] = `
           </span>
         </button>
         <span
-          class="psw-hint"
+          class="slate-hint"
         >
           press Enter ↵
         </span>
@@ -1507,22 +1507,22 @@ exports[`question types render > welcome 1`] = `
 <div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
     >
       Hello.
     </h1>
     <p
-      class="psw-subtitle"
+      class="slate-subtitle"
     >
       Welcome aboard
     </p>
     <button
-      class="psw-cta"
+      class="slate-cta"
       type="button"
     >
       Begin
       <span
-        class="psw-cta-hint"
+        class="slate-cta-hint"
       >
         press Enter ↵
       </span>
@@ -1534,37 +1534,37 @@ exports[`question types render > welcome 1`] = `
 exports[`question types render > yes_no 1`] = `
 <div>
   <div
-    class="psw-step-badge"
+    class="slate-step-badge"
   >
     <span>
       01
     </span>
     <span
-      class="psw-step-sep"
+      class="slate-step-sep"
     >
       →
     </span>
   </div>
   <div>
     <h1
-      class="psw-title"
+      class="slate-title"
       id="_r_c_"
     >
       Insured?
     </h1>
     <div
       aria-labelledby="_r_c_"
-      class="psw-choices"
+      class="slate-choices"
       role="radiogroup"
     >
       <button
         aria-checked="false"
-        class="psw-choice"
+        class="slate-choice"
         role="radio"
         type="button"
       >
         <span
-          class="psw-choice-badge"
+          class="slate-choice-badge"
         >
           Y
         </span>
@@ -1574,12 +1574,12 @@ exports[`question types render > yes_no 1`] = `
       </button>
       <button
         aria-checked="false"
-        class="psw-choice"
+        class="slate-choice"
         role="radio"
         type="button"
       >
         <span
-          class="psw-choice-badge"
+          class="slate-choice-badge"
         >
           N
         </span>
@@ -1589,7 +1589,7 @@ exports[`question types render > yes_no 1`] = `
       </button>
     </div>
     <p
-      class="psw-hint"
+      class="slate-hint"
       style="margin-top: 20px;"
     >
       press Y or N, or click to select

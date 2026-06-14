@@ -1,4 +1,4 @@
-# `@palmstreetweb/forms` — Build Brief v1.0
+# `@palmstreetweb/slate` — Build Brief v1.0
 
 > The complete spec for building Palm Street Web's internal forms package. Read this end-to-end before writing a single line of code. Every decision is intentional — when in doubt, return here.
 
@@ -29,8 +29,8 @@ A small, opinionated form-rendering library. Schema in → Typeform-quality conv
 ## 3. Public API (Surface)
 
 ```ts
-import { Form, defineSchema, themes } from '@palmstreetweb/forms';
-import type { Schema, Answers, Theme } from '@palmstreetweb/forms';
+import { Form, defineSchema, themes } from '@palmstreetweb/slate';
+import type { Schema, Answers, Theme } from '@palmstreetweb/slate';
 
 const schema = defineSchema({
   brand: {
@@ -373,22 +373,22 @@ The toggle is a `<button>` with two SVGs inside (both always in DOM; CSS control
     0 0 0 1px rgba(0, 0, 0, 0.32);
 }
 
-@keyframes psw-morph-thumb-right {
+@keyframes slate-morph-thumb-right {
   from { transform: translateX(0); }
   to { transform: translateX(32px); }
 }
-@keyframes psw-morph-thumb-left {
+@keyframes slate-morph-thumb-left {
   from { transform: translateX(32px); }
   to { transform: translateX(0); }
 }
 
 .theme-toggle.is-morphing-to-light::before {
   transition: background 0.28s ease-out, box-shadow 0.24s ease-out;
-  animation: psw-morph-thumb-right 0.62s cubic-bezier(0.37, 0, 0.63, 1) forwards;
+  animation: slate-morph-thumb-right 0.62s cubic-bezier(0.37, 0, 0.63, 1) forwards;
 }
 .theme-toggle.is-morphing-to-dark::before {
   transition: background 0.28s ease-out, box-shadow 0.24s ease-out;
-  animation: psw-morph-thumb-left 0.62s cubic-bezier(0.37, 0, 0.63, 1) forwards;
+  animation: slate-morph-thumb-left 0.62s cubic-bezier(0.37, 0, 0.63, 1) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -445,7 +445,7 @@ PSW's vanilla JS pattern, adapted to React in `src/hooks/useTheme.ts`:
 function useTheme(initialMode: ThemeMode, themeName: string) {
   // 1. On first mount, determine initial theme:
   //    a. If `themeMode` is 'light' or 'dark' (forced) → use that, no toggle
-  //    b. If 'toggle': read localStorage('psw-forms-theme'); fallback to host's <html data-theme>; fallback to prefers-color-scheme; fallback to 'dark'
+  //    b. If 'toggle': read localStorage('slate-forms-theme'); fallback to host's <html data-theme>; fallback to prefers-color-scheme; fallback to 'dark'
   //    c. If 'auto': respect prefers-color-scheme always, no toggle
   
   // 2. Set `data-theme` on the form's WRAPPER element (NOT <html> — we don't own the host page)
@@ -456,15 +456,15 @@ function useTheme(initialMode: ThemeMode, themeName: string) {
   //    c. Add `is-morphing-to-{next}` class to .theme-toggle
   //    d. If document.startViewTransition exists, wrap commit in it
   //    e. Otherwise: set `data-theme-switching` on wrapper for 550ms (suppress transitions)
-  //    f. Commit: setState, localStorage.setItem('psw-forms-theme', next), remove morph class on animationend
+  //    f. Commit: setState, localStorage.setItem('slate-forms-theme', next), remove morph class on animationend
   //    g. Update aria-label on the toggle button
 }
 ```
 
 Critical implementation notes:
 - **Wrapper-scoped, not `<html>`-scoped** — the form may be embedded; don't touch the host page's `<html>` attributes.
-- **localStorage key:** `psw-forms-theme` (not `psw-theme` — that's PSW's site key).
-- **Host inheritance:** on first mount only, if `psw-forms-theme` is unset, peek at `document.documentElement.dataset.theme`. If host is in light mode, start light too.
+- **localStorage key:** `slate-forms-theme` (not `psw-theme` — that's PSW's site key).
+- **Host inheritance:** on first mount only, if `slate-forms-theme` is unset, peek at `document.documentElement.dataset.theme`. If host is in light mode, start light too.
 - **No FOUC for SSR:** the form is a client component (`'use client'`). Use `useLayoutEffect` for the initial theme application to avoid a flash.
 
 ### 8.4 Tokens (the swap mechanism)
@@ -701,7 +701,7 @@ Each of these gets an entry in `DECISIONS.md` marked "deferred to V2."
 
 V1 ships when:
 
-1. `@palmstreetweb/forms@1.0.0-beta.1` is published to private npm
+1. `@palmstreetweb/slate@1.0.0-beta.1` is published to private npm
 2. The `examples/basic-quote-form.tsx` runs as a real Next.js page locally with all 10 question types working
 3. Both themes (Editorial + Swiss), both modes (light + dark), the PSW toggle morphs identically to PSW.com
 4. Conditional logic works: `examples/conditional-logic.tsx` demonstrates branching

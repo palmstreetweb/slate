@@ -4,7 +4,7 @@ Operating manual for any AI agent working in this repo. Read this before touchin
 
 ## What this repo is
 
-`@palmstreetweb/forms` — internal conversational form-rendering library for Palm Street Web. Schema-in / form-out. The complete spec lives in [`BUILD_BRIEF.md`](./BUILD_BRIEF.md). When in doubt, **return to the brief.**
+`@palmstreetweb/slate` (Slate) — internal conversational form engine for Palm Street Web. Schema-in / form-out. The complete spec lives in [`BUILD_BRIEF.md`](./BUILD_BRIEF.md). When in doubt, **return to the brief.**
 
 ## Source-of-truth files (do not modify without explicit ask)
 
@@ -37,7 +37,7 @@ Every layer has one job. If a new file doesn't fit cleanly into one of the above
 - **`'use client'`** at the top of every component file (the lib is client-only).
 - **CSS via tokens.** Never hard-code color hex inside a component — read from `var(--accent)` etc. The only places that define colors are `themes/*.ts` and `styles/tokens.css`.
 - **Wrapper-scoped DOM.** Never touch `<html>`, `<body>`, or `document`-level state. The form is a guest in someone's page.
-- **`localStorage` key** is exactly `psw-forms-theme`. Never `psw-theme` (that's the PSW site's key).
+- **`localStorage` key** is exactly `slate-forms-theme`. Never `psw-theme` (that's the PSW site's key).
 - **Conventional Commits.** `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`. One commit per build phase minimum.
 
 ## What agents should never touch
@@ -60,8 +60,10 @@ Every layer has one job. If a new file doesn't fit cleanly into one of the above
 
 1. Create `src/themes/<name>.ts` exporting `{ light, dark }` token sets matching the `Theme` shape.
 2. Register it in `src/themes/index.ts`.
-3. Update README "Theme system" table.
-4. Add an example in `examples/` if the theme has unusual decoration.
+3. Mirror tokens in `src/styles/tokens.css`.
+4. Update README "Theme system" table.
+5. Add an example in `examples/` if the theme has unusual decoration.
+6. Run `npm run test` — `tests/themeContrast.test.ts` enforces ≥3:1 contrast between `accent` and `bg` in both modes (ADR-024). Accent fills in components always use `color: var(--slate-on-accent)`; never hardcode `#fff`.
 
 No engine changes should be needed.
 

@@ -97,7 +97,7 @@ export function FileUploadField({
 
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
       <div style={{ marginTop: 24 }}>
@@ -116,7 +116,7 @@ export function FileUploadField({
         {described === null ? (
           <button
             type="button"
-            className={`psw-upload-zone${dragOver ? ' psw-upload-zone--over' : ''}`}
+            className={`slate-upload-zone${dragOver ? ' slate-upload-zone--over' : ''}`}
             onClick={() => inputRef.current?.click()}
             onDragOver={(e) => {
               e.preventDefault();
@@ -135,17 +135,17 @@ export function FileUploadField({
               <span aria-live="polite">uploading...</span>
             ) : (
               <>
-                <span className="psw-upload-cta">choose a file</span>
-                <span className="psw-upload-hint">or drag and drop it here</span>
+                <span className="slate-upload-cta">choose a file</span>
+                <span className="slate-upload-hint">or drag and drop it here</span>
               </>
             )}
           </button>
         ) : (
-          <div className="psw-upload-file">
-            <span className="psw-upload-name">{described}</span>
+          <div className="slate-upload-file">
+            <span className="slate-upload-name">{described}</span>
             <button
               type="button"
-              className="psw-upload-remove"
+              className="slate-upload-remove"
               onClick={clear}
               aria-label="Remove file"
             >
@@ -155,16 +155,16 @@ export function FileUploadField({
         )}
 
         {error && (
-          <p className="psw-err" aria-live="polite">
+          <p className="slate-err" aria-live="polite">
             ! {error}
           </p>
         )}
-        <div className="psw-actions">
-          <button type="button" className="psw-ok-btn" onClick={submit} disabled={uploading}>
+        <div className="slate-actions">
+          <button type="button" className="slate-ok-btn" onClick={submit} disabled={uploading}>
             OK <span aria-hidden>✓</span>
           </button>
           {question.maxSizeMb !== undefined && (
-            <span className="psw-hint">max {question.maxSizeMb} MB</span>
+            <span className="slate-hint">max {question.maxSizeMb} MB</span>
           )}
         </div>
       </div>

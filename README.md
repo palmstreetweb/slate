@@ -1,6 +1,6 @@
-# `@palmstreetweb/forms`
+# Slate (`@palmstreetweb/slate`)
 
-> Conversational form-rendering library for Palm Street Web client projects. Schema in → Typeform-quality form out.
+> Slate — conversational form engine for Palm Street Web client projects. Schema in → Typeform-quality form out.
 
 **Status:** `1.0.0-beta.1`. Internal Palm Street Web tooling — restricted npm scope.
 
@@ -9,21 +9,21 @@
 ## Install
 
 ```bash
-npm install @palmstreetweb/forms
+npm install @palmstreetweb/slate
 ```
 
 You also need React ≥ 18 (the package declares it as a peer dep) and the bundled stylesheet:
 
 ```ts
-import '@palmstreetweb/forms/styles.css';
+import '@palmstreetweb/slate/styles.css';
 ```
 
 ## 30-second quickstart
 
 ```tsx
 'use client';
-import { Form, defineSchema } from '@palmstreetweb/forms';
-import '@palmstreetweb/forms/styles.css';
+import { Form, defineSchema } from '@palmstreetweb/slate';
+import '@palmstreetweb/slate/styles.css';
 
 const schema = defineSchema({
   brand: { name: '805 Sealcoating' },
@@ -73,7 +73,7 @@ export default function QuotePage() {
 | `hiddenFields` | `Record<string, unknown>` |  | Passed through to `meta.hiddenFields`. Never rendered. |
 | `errorMessage` | `string` |  | Fallback shown when `onSubmit` rejects (default: "Something went wrong submitting your form. Please try again."). |
 | `onFileUpload` | `(file, questionId) => Promise<string>` |  | Host-controlled storage for `file_upload` questions. Resolved string is stored as the answer; omit it to receive raw `File` objects in `onSubmit`. See `DECISIONS.md` ADR-012. |
-| `resume` | `boolean` |  | Save-and-resume (ADR-017). Autosaves progress to `localStorage` under `psw-forms-resume:<schema.id>`, prompts to resume on remount, clears on submit. Requires `schema.id`. |
+| `resume` | `boolean` |  | Save-and-resume (ADR-017). Autosaves progress to `localStorage` under `slate-forms-resume:<schema.id>`, prompts to resume on remount, clears on submit. Requires `schema.id`. |
 | `onPartialChange` | `(answers, meta) => void` |  | Fires on every answer change with the visibility-filtered answers — abandonment capture. `meta` carries `startedAt`, `lastQuestionId`, `questionsVisited`, `hiddenFields`, `score`. |
 
 ### `defineSchema(schema)`
@@ -84,9 +84,12 @@ Identity helper — returns the schema unchanged but freezes literal types via T
 
 ```ts
 type Schema = {
+  id?: string;
   brand: { name: string; logo?: string };
-  theme: 'editorial' | 'swiss' | (string & {});
+  theme: 'classic' | 'editorial' | 'swiss' | (string & {});
   themeMode: 'auto' | 'light' | 'dark' | 'toggle';
+  /** Opt-in step sound: `'off'` or one of ten built-in presets (ADR-023). */
+  sound?: FormSound | boolean;
   questions: ReadonlyArray<Question>;
 };
 ```
@@ -97,7 +100,7 @@ type Schema = {
 |---|---|
 | `'auto'` | Reactively follows `prefers-color-scheme`. No toggle. |
 | `'light'` \| `'dark'` | Forced. No toggle. |
-| `'toggle'` | Reads `localStorage['psw-forms-theme']` → host page `<html data-theme>` → `prefers-color-scheme` → `'dark'`. Renders the PSW pill toggle. |
+| `'toggle'` | Reads `localStorage['slate-forms-theme']` → host page `<html data-theme>` → `prefers-color-scheme` → `'dark'`. Renders the PSW pill toggle. |
 
 ### Question types
 
@@ -177,10 +180,10 @@ Jumps change navigation only; skipped questions keep their `visibleIf`-based inc
 
 ### Schema sanity checking
 
-`checkSchema(questions)` is a pure helper that returns `SchemaIssue[]` — duplicate ids, `visibleIf`/jump conditions referencing unknown questions, and dangling or self jump targets. The engine is forgiving at runtime (bad refs fall through to normal flow); use this in CI or on save to catch authoring mistakes early. The PSW Studio surfaces these in an editor banner.
+`checkSchema(questions)` is a pure helper that returns `SchemaIssue[]` — duplicate ids, `visibleIf`/jump conditions referencing unknown questions, and dangling or self jump targets. The engine is forgiving at runtime (bad refs fall through to normal flow); use this in CI or on save to catch authoring mistakes early. Slate surfaces these in an editor banner.
 
 ```ts
-import { checkSchema } from '@palmstreetweb/forms';
+import { checkSchema } from '@palmstreetweb/slate';
 const issues = checkSchema(schema.questions); // [] when clean
 ```
 
@@ -220,27 +223,50 @@ type SubmitMeta = {
 
 ## Theme system
 
-Two themes ship built-in, each with light and dark token sets:
+Twelve themes ship built-in, each with light and dark token sets:
 
-| Theme | Vibe | Display font | Body font | Accent (light → dark) |
-|---|---|---|---|---|
-| `editorial` | Refined serif, warm cream | Fraunces | Fraunces | `#2D5BFF` → `#6E8FFF` |
-| `swiss` | Bold geometric, lowercase | Inter (900) | Inter | `#DC2626` → `#F87171` |
+| Theme | Vibe | Display font | Body font | Accent (light → dark) | Decoration |
+|---|---|---|---|---|---|
+| `classic` | Calm, full-screen, conversational (default) | Inter (500) | Inter | `#2C6EF2` → `#5B9BFF` | none |
+| `editorial` | Refined serif, warm cream | Fraunces | Fraunces | `#2D5BFF` → `#6E8FFF` | grain |
+| `swiss` | Bold geometric, lowercase | Inter (900) | Inter | `#DC2626` → `#F87171` | shapes |
+| `midnight` | Indigo night, aurora glow | Inter (600) | Inter | `#6366F1` → `#818CF8` | aurora |
+| `sunset` | Warm coral, amber glow | Inter (600) | Inter | `#F4683C` → `#FF8A5C` | aurora |
+| `terminal` | Monospace phosphor, blueprint | JetBrains Mono | JetBrains Mono | `#0E8C44` → `#36F58C` | grid |
+| `forest` | Earthy sage, soft grain | Fraunces | Inter | `#3F7A3A` → `#7FB76B` | grain |
+| `mono` | Brutalist black & white | Inter (800) | Inter | `#111111` → `#FFFFFF` | shapes |
+| `constellation` | Cosmic; star map completes as you go | Inter (600) | Inter | `#4F46E5` → `#7DD3FC` | constellation |
+| `bloom` | Botanical; vine flowers as you finish | Fraunces | Inter | `#4C8A4A` → `#88C07E` | growth |
+| `riso` | Risograph duotone halftone | Inter (800) | Inter | `#FF4D8D` → `#FF6FA3` | riso |
+| `memphis` | Playful 80s confetti shapes | Inter (800) | Inter | `#FF3D7F` → `#FF6FA3` | memphis |
 
-(Swiss originally shipped with Archivo Black; it was swapped for Inter as a closer Akzidenz-Grotesk substitute — see `DECISIONS.md` ADR-009.)
+(Swiss originally shipped with Archivo Black; it was swapped for Inter as a closer Akzidenz-Grotesk substitute — see `DECISIONS.md` ADR-009. The five themes after Swiss were added per ADR-021; the four narrative/print themes per ADR-022.)
 
-Each theme can carry a `decoration` hint: `editorial` renders a subtle grain overlay; `swiss` renders a rotating set of geometric poster compositions behind each step.
+Each theme can carry a `decoration` hint, rendered behind the form. Most vary **per question step** (the step index drives the composition):
 
-Both are wrapper-scoped on `[data-psw-forms]` — the package never writes to your host page's `<html>`. The PSW theme toggle is a 1:1 visual port of palmstreetweb.com (same morph, same easing).
+- `none` — clean, intentional whitespace (`classic`).
+- `grain` — static fractal-noise texture, no per-step variation (`editorial`, `forest`).
+- `shapes` — geometric poster compositions; uses the `--slate-deco-red/yellow/blue/ink` tokens, so `mono` reuses it with a grayscale palette (`swiss`, `mono`).
+- `aurora` — soft, blurred gradient blobs; uses `--slate-deco-1/2/3` (`midnight`, `sunset`).
+- `grid` — a faint technical line grid with a per-step accent cell; uses `--slate-deco-line` + the accent (`terminal`).
+- `riso` — duotone halftone blobs that overprint and mis-register like a real risograph; uses `--slate-deco-1/2` + `--slate-deco-blend` (`riso`).
+- `memphis` — scattered 80s squiggles, zigzags, arcs and triangles; uses `--slate-deco-1/2/3` + `--slate-deco-line` (`memphis`).
+
+Two decorations are **narrative** — instead of reshuffling, the picture *builds cumulatively* as the respondent advances, so finishing the form completes the artwork:
+
+- `constellation` — each step lights the next star and draws its connector, completing a star map; uses `--slate-deco-1` + `--slate-deco-line` (`constellation`).
+- `growth` — a vine climbs one segment per step and breaks into flower at the end; uses `--slate-deco-1/2/3` + `--slate-deco-line` (`bloom`).
+
+Both are wrapper-scoped on `[data-slate-forms]` — the package never writes to your host page's `<html>`. The PSW theme toggle is a 1:1 visual port of palmstreetweb.com (same morph, same easing).
 
 ### Customizing tokens
 
 Override per-token via CSS specificity at the wrapper level:
 
 ```css
-[data-psw-forms][data-theme-name='editorial'] {
-  --psw-accent: #ff5500;
-  --psw-radius: 8px;
+[data-slate-forms][data-theme-name='editorial'] {
+  --slate-accent: #ff5500;
+  --slate-radius: 8px;
 }
 ```
 
@@ -248,10 +274,11 @@ A custom-theme registry API ships in V1.1 (`themes.register()`).
 
 ## Examples
 
-The `examples/` folder isn't published. It hosts **PSW Studio**, a supported internal dev tool (ADR-018) for building and previewing forms:
+The `examples/` folder isn't published. It hosts **Slate**, a supported internal dev tool (ADR-018) for building and previewing forms:
 
 - Dashboard listing locally-stored form definitions (with two seed schemas).
 - Three-pane editor (outline / canvas / inspector) with drag-and-drop reordering, duplication, bulk delete, a visual logic editor (conditions, jumps, scores), and a schema-issue banner powered by `checkSchema`.
+- **Share panel** — copy link + QR for dev preview; optional public URL when `VITE_PUBLIC_FORM_BASE` is set (see `.env.example`).
 - Live `<Form>` preview (with save-and-resume on) and a responses inbox with CSV export and per-question summaries, all backed by `localStorage`.
 
 Run `npm run dev` and open the printed URL to use it.

@@ -1,5 +1,5 @@
 /**
- * Top-level studio shell. Holds the theme state for the admin chrome
+ * Top-level Slate shell. Holds the theme state for the admin chrome
  * (separate from any rendered form's own theme), the header, and the
  * routed page content.
  */
@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ResolvedThemeMode } from '@/index.js';
 import { Header } from './Header.js';
 
-const STORAGE_KEY = 'psw-studio-theme';
+const STORAGE_KEY = 'slate-theme';
 
 function detectInitial(): ResolvedThemeMode {
   if (typeof window === 'undefined') return 'dark';
@@ -26,7 +26,7 @@ type Props = {
   crumbs: ReactNode;
   rightSlot?: ReactNode;
   children: ReactNode;
-  /** Apply `studio-content--full-bleed` to drop max-width + padding (editor uses this). */
+  /** Apply `slate-content--full-bleed` to drop max-width + padding (editor uses this). */
   fullBleed?: boolean;
 };
 
@@ -47,13 +47,13 @@ export function AdminShell({ crumbs, rightSlot, children, fullBleed }: Props) {
   return (
     <div
       ref={wrapperRef}
-      data-psw-forms=""
-      data-theme-name="studio"
+      data-slate-forms=""
+      data-theme-name="slate"
       data-theme={mode}
     >
-      <div className="studio-app">
+      <div className="slate-app">
         <Header crumbs={crumbs} rightSlot={rightSlot} mode={mode} onToggle={toggle} />
-        <main className={`studio-content${fullBleed ? ' studio-content--full-bleed' : ''}`}>
+        <main className={`slate-content${fullBleed ? ' slate-content--full-bleed' : ''}`}>
           {children}
         </main>
       </div>

@@ -15,8 +15,9 @@
  * a stale schema.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
+  FormSound,
   Question,
   QuestionType,
   Schema,
@@ -24,6 +25,7 @@ import type {
   ThemeName,
 } from '@/index.js';
 import { checkSchema, defineSchema } from '@/index.js';
+import { playFormSound } from '@/utils/formSounds.js';
 import { createForm, getForm, updateForm, type FormRecord } from '../_formsStore.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
@@ -31,6 +33,9 @@ import { AdminShell } from '../shell/AdminShell.js';
 import { Outline } from '../components/Outline.js';
 import { Canvas } from '../components/Canvas.js';
 import { Inspector } from '../components/Inspector.js';
+import { SharePanel } from '../components/SharePanel.js';
+import { useEditorHistory } from '../useEditorHistory.js';
+import { slugify } from '../shareUrls.js';
 
 type Props = {
   formId: string | null;
@@ -45,7 +50,7 @@ export function FormEditor({ formId }: Props) {
         schema: defineSchema({
           // Brand mirrors form name so the sync below picks up renames.
           brand: { name: 'Untitled form' },
-          theme: 'editorial',
+          theme: 'classic',
           themeMode: 'toggle',
           questions: [
             { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
@@ -66,7 +71,7 @@ export function FormEditor({ formId }: Props) {
   if (formId === null) {
     return (
       <AdminShell crumbs={null} fullBleed>
-        <div className="studio-empty">Creating…</div>
+        <div className="slate-empty">Creating…</div>
       </AdminShell>
     );
   }
@@ -76,6 +81,12 @@ export function FormEditor({ formId }: Props) {
 function FormEditorBody({ formId }: { formId: string }) {
   const initial: FormRecord | null = useMemo(() => getForm(formId), [formId]);
   const [name, setName] = useState<string>(initial?.name ?? 'Untitled form');
+  const [slug, setSlug] = useState<string>(() => {
+    if (initial?.slug?.trim()) return slugify(initial.slug);
+    if (initial?.name) return slugify(initial.name);
+    return '';
+  });
+  const [shareOpen, setShareOpen] = useState(false);
   const [schema, setSchema] = useState<Schema | null>(initial?.schema ?? null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [selectedId, setSelectedId] = useState<string>(() => {
@@ -84,13 +95,40 @@ function FormEditorBody({ formId }: { formId: string }) {
   });
   const confirm = useConfirm();
 
+  const getSnapshot = useCallback(
+    () => ({
+      name,
+      schema: schema!,
+      selectedId,
+    }),
+    [name, schema, selectedId],
+  );
+
+  const restoreSnapshot = useCallback(
+    (snap: { name: string; schema: Schema; selectedId: string }) => {
+      setName(snap.name);
+      setSchema(snap.schema);
+      setSelectedId(snap.selectedId);
+    },
+    [],
+  );
+
+  const { pushHistory } = useEditorHistory({
+    getSnapshot,
+    restore: restoreSnapshot,
+  });
+
   // SYNCHRONOUS auto-save — every change writes immediately, so clicking
   // Preview right after a setting change never reads stale localStorage.
   useEffect(() => {
     if (!schema) return;
-    const updated = updateForm(formId, { name, schema });
+    const updated = updateForm(formId, {
+      name,
+      slug: slug || undefined,
+      schema,
+    });
     if (updated) setSavedAt(new Date());
-  }, [name, schema, formId]);
+  }, [name, slug, schema, formId]);
 
   // If the selected question was deleted (or doesn't exist after a schema
   // mutation), fall back to the first question.
@@ -106,19 +144,19 @@ function FormEditorBody({ formId }: { formId: string }) {
     return (
       <AdminShell
         crumbs={
-          <span className="studio-crumb">
-            <button type="button" className="studio-link" onClick={() => navigate('/')}>
+          <span className="slate-crumb">
+            <button type="button" className="slate-link" onClick={() => navigate('/')}>
               Forms
             </button>
             {' / Not found'}
           </span>
         }
       >
-        <div className="studio-empty">
+        <div className="slate-empty">
           <p style={{ margin: '0 0 12px' }}>Form not found.</p>
           <button
             type="button"
-            className="studio-btn studio-btn--primary"
+            className="slate-btn slate-btn--primary"
             onClick={() => navigate('/')}
           >
             Back to dashboard
@@ -138,6 +176,7 @@ function FormEditorBody({ formId }: { formId: string }) {
   /* ---------- mutations ---------- */
 
   const patchSchema = (patch: Partial<Schema>) => {
+    pushHistory();
     setSchema((s) => (s ? { ...s, ...patch } : s));
   };
 
@@ -150,13 +189,18 @@ function FormEditorBody({ formId }: { formId: string }) {
    * stop syncing.
    */
   const handleNameChange = (next: string) => {
+    pushHistory();
     if (schema && schema.brand.name === name) {
       setSchema({ ...schema, brand: { ...schema.brand, name: next } });
     }
     setName(next);
+    if (slug === slugify(name)) {
+      setSlug(slugify(next));
+    }
   };
 
   const updateQuestion = (id: string, patch: Partial<Question>) => {
+    pushHistory();
     setSchema((s) => {
       if (!s) return s;
       return {
@@ -169,6 +213,7 @@ function FormEditorBody({ formId }: { formId: string }) {
   };
 
   const removeQuestion = (id: string) => {
+    pushHistory();
     setSchema((s) => {
       if (!s) return s;
       return { ...s, questions: s.questions.filter((q) => q.id !== id) };
@@ -176,6 +221,7 @@ function FormEditorBody({ formId }: { formId: string }) {
   };
 
   const reorder = (id: string, dir: 'up' | 'down') => {
+    pushHistory();
     setSchema((s) => {
       if (!s) return s;
       const arr = [...s.questions];
@@ -193,24 +239,33 @@ function FormEditorBody({ formId }: { formId: string }) {
 
   /** Drag-and-drop reorder — move a question to an absolute index. */
   const moveTo = (id: string, toIndex: number) => {
+    if (!schema) return;
+    const arr = [...schema.questions];
+    const from = arr.findIndex((q) => q.id === id);
+    if (from === -1 || arr[from]!.type === 'welcome' || arr[from]!.type === 'thanks') return;
+
+    const min = arr[0]?.type === 'welcome' ? 1 : 0;
+    const thanksIdx = arr.findIndex((q) => q.type === 'thanks');
+    const max = thanksIdx === -1 ? arr.length : thanksIdx;
+    const to = Math.max(min, Math.min(toIndex, max));
+    if (to === from) return;
+
+    pushHistory();
     setSchema((s) => {
       if (!s) return s;
-      const arr = [...s.questions];
-      const from = arr.findIndex((q) => q.id === id);
-      if (from === -1 || arr[from]!.type === 'welcome' || arr[from]!.type === 'thanks') return s;
-      // Clamp inside the pinned welcome/thanks slots.
-      const min = arr[0]?.type === 'welcome' ? 1 : 0;
-      const max =
-        arr[arr.length - 1]?.type === 'thanks' ? arr.length - 2 : arr.length - 1;
-      const to = Math.max(min, Math.min(toIndex, max));
-      if (to === from) return s;
-      const [moved] = arr.splice(from, 1);
-      arr.splice(to, 0, moved!);
-      return { ...s, questions: arr };
+      const next = [...s.questions];
+      const fromIdx = next.findIndex((q) => q.id === id);
+      if (fromIdx === -1) return s;
+      const [moved] = next.splice(fromIdx, 1);
+      const thanksAt = next.findIndex((q) => q.type === 'thanks');
+      const clamped = Math.max(min, Math.min(to, thanksAt === -1 ? next.length : thanksAt));
+      next.splice(clamped, 0, moved!);
+      return { ...s, questions: next };
     });
   };
 
   const duplicateQuestion = (id: string) => {
+    pushHistory();
     setSchema((s) => {
       if (!s) return s;
       const idx = s.questions.findIndex((q) => q.id === id);
@@ -238,6 +293,7 @@ function FormEditorBody({ formId }: { formId: string }) {
       danger: true,
     });
     if (!ok) return;
+    pushHistory();
     setSchema((s) => {
       if (!s) return s;
       return {
@@ -261,6 +317,7 @@ function FormEditorBody({ formId }: { formId: string }) {
 
     const baseId = `q_${Date.now().toString(36).slice(-5)}`;
     const newQ = makeDefaultQuestion(type, baseId);
+    pushHistory();
     setSchema((s) => {
       if (!s) return s;
       // Always insert just before the thanks screen (or at the end).
@@ -283,12 +340,12 @@ function FormEditorBody({ formId }: { formId: string }) {
     <AdminShell
       fullBleed
       crumbs={
-        <span className="studio-crumb">
-          <button type="button" className="studio-link" onClick={() => navigate('/')}>
+        <span className="slate-crumb">
+          <button type="button" className="slate-link" onClick={() => navigate('/')}>
             Forms
           </button>
           {' / '}
-          <span style={{ color: 'var(--psw-text)' }}>{name}</span>
+          <span style={{ color: 'var(--slate-text)' }}>{name}</span>
         </span>
       }
       rightSlot={
@@ -296,23 +353,26 @@ function FormEditorBody({ formId }: { formId: string }) {
           <span
             style={{
               fontSize: 11,
-              color: 'var(--psw-dim)',
+              color: 'var(--slate-dim)',
               marginRight: 8,
-              fontFamily: 'var(--psw-font-mono)',
+              fontFamily: 'var(--slate-font-mono)',
             }}
           >
             {savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved'}
           </span>
           <button
             type="button"
-            className="studio-btn"
+            className="slate-btn"
             onClick={() => navigate(`/forms/${formId}/submissions`)}
           >
             Responses
           </button>
+          <button type="button" className="slate-btn" onClick={() => setShareOpen(true)}>
+            Share
+          </button>
           <button
             type="button"
-            className="studio-btn studio-btn--primary"
+            className="slate-btn slate-btn--primary"
             onClick={() => navigate(`/forms/${formId}`)}
           >
             Preview ↗
@@ -320,6 +380,14 @@ function FormEditorBody({ formId }: { formId: string }) {
         </>
       }
     >
+      <SharePanel
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        formId={formId}
+        formName={name}
+        slug={slug}
+        onSlugChange={setSlug}
+      />
       {issues.length > 0 && (
         <div
           role="alert"
@@ -334,14 +402,14 @@ function FormEditorBody({ formId }: { formId: string }) {
             fontSize: 12,
           }}
         >
-          <strong style={{ color: 'var(--psw-error, #dc2626)' }}>
+          <strong style={{ color: 'var(--slate-error, #dc2626)' }}>
             {issues.length} schema {issues.length === 1 ? 'issue' : 'issues'}:
           </strong>
           {issues.map((issue, i) => (
             <button
               key={i}
               type="button"
-              className="studio-link"
+              className="slate-link"
               style={{ fontSize: 12 }}
               onClick={() => setSelectedId(issue.questionId)}
             >
@@ -351,7 +419,7 @@ function FormEditorBody({ formId }: { formId: string }) {
         </div>
       )}
 
-      <div className="studio-editor">
+      <div className="slate-editor">
         <Outline
           schema={schema}
           selectedId={selectedQuestion.id}
@@ -366,6 +434,10 @@ function FormEditorBody({ formId }: { formId: string }) {
           onBrandChange={(v) => patchSchema({ brand: { ...schema.brand, name: v } })}
           onThemeChange={(v: ThemeName) => patchSchema({ theme: v })}
           onThemeModeChange={(v: ThemeMode) => patchSchema({ themeMode: v })}
+          onSoundChange={(v: FormSound) => {
+            patchSchema({ sound: v === 'off' ? undefined : v });
+            if (v !== 'off') playFormSound(v);
+          }}
         />
 
         <Canvas schema={schema} selectedQuestion={selectedQuestion} />
@@ -380,14 +452,14 @@ function FormEditorBody({ formId }: { formId: string }) {
                 ? selectedQuestion.title
                 : selectedQuestion.id;
             const ok = await confirm({
-              title: 'Delete this question?',
+              title: 'Delete this item?',
               message: (
                 <>
                   Removes <strong>{titleText}</strong> from this form. Existing responses
-                  for this question stay in localStorage but won&apos;t be collected anymore.
+                  for it stay in localStorage but won&apos;t be collected anymore.
                 </>
               ),
-              confirmLabel: 'Delete question',
+              confirmLabel: 'Delete',
               danger: true,
             });
             if (ok) removeQuestion(selectedQuestion.id);
@@ -402,7 +474,7 @@ function FormEditorBody({ formId }: { formId: string }) {
 /**
  * Clone a question one level deep — copies option/row/column arrays so the
  * duplicate can be edited independently. Function titles (code-authored
- * schemas only; the studio stores JSON) pass through by reference.
+ * schemas only; Slate stores JSON) pass through by reference.
  */
 function cloneQuestion(q: Question, id: string): Question {
   const cloned: Record<string, unknown> = {};

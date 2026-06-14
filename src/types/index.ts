@@ -1,4 +1,4 @@
-/** Public type barrel for `@palmstreetweb/forms`. */
+/** Public type barrel for `@palmstreetweb/slate`. */
 
 export type {
   Question,
@@ -53,5 +53,7 @@ export type {
   ThemeColorTokens,
   ThemeStaticTokens,
 } from './Theme.js';
+
+export type { FormSound, FormSoundId } from './Sound.js';
 
 export type { Schema, FormProps, SubmitMeta, PartialMeta, BrandConfig } from './Schema.js';

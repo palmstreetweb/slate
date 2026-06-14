@@ -5,7 +5,7 @@
 
 import type { Answers, SubmitMeta } from '@/index.js';
 
-const STORAGE_KEY = 'psw-studio-submissions';
+const STORAGE_KEY = 'slate-submissions';
 
 export type StoredSubmission = {
   id: string;

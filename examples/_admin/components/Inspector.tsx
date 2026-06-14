@@ -6,32 +6,9 @@
  */
 
 import type { Option, PictureOption, Question } from '@/index.js';
+import { TYPE_GLYPH, TYPE_LABEL } from '../questionTypeMeta.js';
 import { ConditionBuilder, JumpRulesEditor } from './LogicEditor.js';
-
-const TYPE_LABEL: Record<Question['type'], string> = {
-  welcome: 'Welcome screen',
-  statement: 'Statement',
-  thanks: 'Thank you screen',
-  short_text: 'Short text',
-  long_text: 'Long text',
-  email: 'Email',
-  phone: 'Phone',
-  url: 'Website',
-  number: 'Number',
-  date: 'Date',
-  file_upload: 'File upload',
-  single_choice: 'Single choice',
-  multi_choice: 'Multi choice',
-  dropdown: 'Dropdown',
-  picture_choice: 'Picture choice',
-  ranking: 'Ranking',
-  matrix: 'Matrix',
-  yes_no: 'Yes / No',
-  legal: 'Legal / consent',
-  scale: 'Scale',
-  nps: 'NPS (0–10)',
-  review: 'Review screen',
-};
+import { SlateSelect } from './SlateSelect.js';
 
 type Props = {
   question: Question;
@@ -43,80 +20,47 @@ type Props = {
 };
 
 export function Inspector({ question, allQuestions, onChange, onDelete, canDelete }: Props) {
-  // Chrome screens (welcome, statement, thanks) aren't answer-bearing and
-  // can't be referenced by visibleIf — their internal `id` is irrelevant
-  // to the form author, so we hide all the ID UI for them. Input questions
-  // still expose the ID since it's the key in onSubmit's answers payload.
-  const showId =
-    question.type !== 'welcome' &&
-    question.type !== 'statement' &&
-    question.type !== 'review' &&
-    question.type !== 'thanks';
-
+  // Question IDs are auto-generated and stable; they're not surfaced in the
+  // Inspector (kept clean per product direction). They remain the answers
+  // key in onSubmit and the reference target for logic/piping under the hood.
   return (
-    <aside className="studio-rail studio-rail--right">
-      <div className="studio-rail-pad">
-        <p className="studio-label" style={{ marginBottom: 4 }}>
-          Question type
+    <aside className="slate-rail slate-rail--right">
+      <div className="slate-rail-pad">
+        <p className="slate-label" style={{ marginBottom: 4 }}>
+          Question Type
         </p>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '6px 10px',
-            background: 'var(--psw-bg-3)',
-            borderRadius: 'var(--studio-radius-sm)',
-            fontSize: 13,
-            fontWeight: 500,
-          }}
-        >
+        <div className="slate-type-chip">
+          <span className="slate-outline-glyph" aria-hidden>
+            {TYPE_GLYPH[question.type]}
+          </span>
           <span>{TYPE_LABEL[question.type]}</span>
-          {showId && (
-            <span style={{ fontSize: 11, color: 'var(--psw-dim)', fontFamily: 'var(--psw-font-mono)' }}>
-              id: {question.id}
-            </span>
-          )}
         </div>
       </div>
 
       <Divider />
 
-      <div className="studio-rail-pad" style={{ display: 'grid', gap: 14 }}>
-        {showId && (
-          <Field label="Question ID" hint="Used as the answers key in onSubmit. Letters/numbers/underscore.">
-            <input
-              className="studio-input"
-              value={question.id}
-              onChange={(e) =>
-                onChange({ id: e.target.value.replace(/[^a-zA-Z0-9_]/g, '_') } as Partial<Question>)
-              }
-            />
-          </Field>
-        )}
-
+      <div className="slate-rail-pad" style={{ display: 'grid', gap: 14 }}>
         {'title' in question && typeof question.title === 'string' && (
           <Field label="Title">
-            <textarea
-              className="studio-textarea"
+            <input
+              className="slate-input"
               value={question.title}
               onChange={(e) => onChange({ title: e.target.value } as Partial<Question>)}
-              rows={2}
             />
           </Field>
         )}
         {'title' in question && typeof question.title === 'function' && (
-          <Field label="Title (dynamic function)">
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--psw-muted)' }}>
+          <Field label="Title (Dynamic Function)">
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-muted)' }}>
               This title is a function — edit the schema in code to change it, or replace with a static string.
             </p>
           </Field>
         )}
 
         {'subtitle' in question && (
-          <Field label="Subtitle (optional)">
+          <Field label="Subtitle (Optional)">
             <textarea
-              className="studio-textarea"
+              className="slate-textarea"
               value={question.subtitle ?? ''}
               onChange={(e) =>
                 onChange({ subtitle: e.target.value || undefined } as Partial<Question>)
@@ -129,7 +73,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         {question.type === 'statement' && (
           <Field label="Body">
             <textarea
-              className="studio-textarea"
+              className="slate-textarea"
               value={question.body ?? ''}
               onChange={(e) => onChange({ body: e.target.value || undefined } as Partial<Question>)}
               rows={3}
@@ -141,9 +85,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
           question.type === 'statement' ||
           question.type === 'review' ||
           question.type === 'thanks') && (
-          <Field label="Button label">
+          <Field label="Button Label">
             <input
-              className="studio-input"
+              className="slate-input"
               value={question.cta ?? ''}
               placeholder={
                 question.type === 'welcome'
@@ -182,7 +126,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
               question.type === 'dropdown') && (
               <Field label="Placeholder">
                 <input
-                  className="studio-input"
+                  className="slate-input"
                   value={question.placeholder ?? ''}
                   onChange={(e) =>
                     onChange({ placeholder: e.target.value || undefined } as Partial<Question>)
@@ -206,26 +150,25 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {question.type === 'date' && (
           <Field label="Format">
-            <select
-              className="studio-select"
+            <SlateSelect
               value={question.format ?? 'MM/DD/YYYY'}
-              onChange={(e) =>
-                onChange({
-                  format: e.target.value as 'MM/DD/YYYY' | 'DD/MM/YYYY',
-                } as Partial<Question>)
+              options={[
+                { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
+                { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
+              ]}
+              aria-label="Date format"
+              onChange={(format) =>
+                onChange({ format } as Partial<Question>)
               }
-            >
-              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-            </select>
+            />
           </Field>
         )}
 
         {question.type === 'yes_no' && (
           <Row>
-            <Field label="Yes label">
+            <Field label="Yes Label">
               <input
-                className="studio-input"
+                className="slate-input"
                 value={question.yesLabel ?? ''}
                 placeholder="Yes"
                 onChange={(e) =>
@@ -233,9 +176,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                 }
               />
             </Field>
-            <Field label="No label">
+            <Field label="No Label">
               <input
-                className="studio-input"
+                className="slate-input"
                 value={question.noLabel ?? ''}
                 placeholder="No"
                 onChange={(e) =>
@@ -248,9 +191,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {question.type === 'legal' && (
           <>
-            <Field label="Terms / consent copy">
+            <Field label="Terms / Consent Copy">
               <textarea
-                className="studio-textarea"
+                className="slate-textarea"
                 value={question.body ?? ''}
                 onChange={(e) =>
                   onChange({ body: e.target.value || undefined } as Partial<Question>)
@@ -259,9 +202,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
               />
             </Field>
             <Row>
-              <Field label="Accept label">
+              <Field label="Accept Label">
                 <input
-                  className="studio-input"
+                  className="slate-input"
                   value={question.acceptLabel ?? ''}
                   placeholder="I accept"
                   onChange={(e) =>
@@ -269,9 +212,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                   }
                 />
               </Field>
-              <Field label="Decline label">
+              <Field label="Decline Label">
                 <input
-                  className="studio-input"
+                  className="slate-input"
                   value={question.declineLabel ?? ''}
                   placeholder="I don't accept"
                   onChange={(e) =>
@@ -285,9 +228,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {question.type === 'nps' && (
           <Row>
-            <Field label="Low anchor">
+            <Field label="Low Anchor">
               <input
-                className="studio-input"
+                className="slate-input"
                 value={question.minLabel ?? ''}
                 placeholder="Not at all likely"
                 onChange={(e) =>
@@ -295,9 +238,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                 }
               />
             </Field>
-            <Field label="High anchor">
+            <Field label="High Anchor">
               <input
-                className="studio-input"
+                className="slate-input"
                 value={question.maxLabel ?? ''}
                 placeholder="Extremely likely"
                 onChange={(e) =>
@@ -309,9 +252,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         )}
 
         {(question.type === 'short_text' || question.type === 'long_text') && (
-          <Field label="Max length (characters)">
+          <Field label="Max Length (Characters)">
             <input
-              className="studio-input"
+              className="slate-input"
               type="number"
               value={question.maxLength ?? ''}
               onChange={(e) =>
@@ -324,9 +267,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         )}
 
         {question.type === 'phone' && (
-          <Field label="Default country (ISO 3166-1 alpha-2)">
+          <Field label="Default Country (ISO 3166-1 Alpha-2)">
             <input
-              className="studio-input"
+              className="slate-input"
               value={question.defaultCountry ?? 'US'}
               maxLength={2}
               onChange={(e) =>
@@ -340,7 +283,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
           <Row>
             <Field label="Min">
               <input
-                className="studio-input"
+                className="slate-input"
                 type="number"
                 value={question.min ?? ''}
                 onChange={(e) =>
@@ -352,7 +295,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
             </Field>
             <Field label="Max">
               <input
-                className="studio-input"
+                className="slate-input"
                 type="number"
                 value={question.max ?? ''}
                 onChange={(e) =>
@@ -368,17 +311,17 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         {question.type === 'scale' && (
           <>
             <Row>
-              <Field label="Min value">
+              <Field label="Min Value">
                 <input
-                  className="studio-input"
+                  className="slate-input"
                   type="number"
                   value={question.min}
                   onChange={(e) => onChange({ min: Number(e.target.value) } as Partial<Question>)}
                 />
               </Field>
-              <Field label="Max value">
+              <Field label="Max Value">
                 <input
-                  className="studio-input"
+                  className="slate-input"
                   type="number"
                   value={question.max}
                   onChange={(e) => onChange({ max: Number(e.target.value) } as Partial<Question>)}
@@ -386,18 +329,18 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
               </Field>
             </Row>
             <Row>
-              <Field label="Min label">
+              <Field label="Min Label">
                 <input
-                  className="studio-input"
+                  className="slate-input"
                   value={question.minLabel ?? ''}
                   onChange={(e) =>
                     onChange({ minLabel: e.target.value || undefined } as Partial<Question>)
                   }
                 />
               </Field>
-              <Field label="Max label">
+              <Field label="Max Label">
                 <input
-                  className="studio-input"
+                  className="slate-input"
                   value={question.maxLabel ?? ''}
                   onChange={(e) =>
                     onChange({ maxLabel: e.target.value || undefined } as Partial<Question>)
@@ -410,18 +353,18 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {question.type === 'file_upload' && (
           <Row>
-            <Field label="Accept (file types)" hint="e.g. image/*,.pdf">
+            <Field label="Accept (File Types)" hint="e.g. image/*,.pdf">
               <input
-                className="studio-input"
+                className="slate-input"
                 value={question.accept ?? ''}
                 onChange={(e) =>
                   onChange({ accept: e.target.value || undefined } as Partial<Question>)
                 }
               />
             </Field>
-            <Field label="Max size (MB)">
+            <Field label="Max Size (MB)">
               <input
-                className="studio-input"
+                className="slate-input"
                 type="number"
                 value={question.maxSizeMb ?? ''}
                 onChange={(e) =>
@@ -438,10 +381,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
           question.type === 'multi_choice' ||
           question.type === 'dropdown' ||
           question.type === 'ranking') && (
-          <Field
-            label="Options"
-            hint={question.type === 'ranking' ? undefined : 'pts feed the {{score}} total.'}
-          >
+          <Field label="Options">
             <OptionsEditor
               options={question.options as Option[]}
               onChange={(opts) => onChange({ options: opts } as Partial<Question>)}
@@ -455,9 +395,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
             <Checkbox
               checked={Boolean(question.multiple)}
               onChange={(v) => onChange({ multiple: v } as Partial<Question>)}
-              label="Allow multiple selections"
+              label="Allow Multiple Selections"
             />
-            <Field label="Options (label / value / image URL)">
+            <Field label="Options (Label / Image URL)">
               <PictureOptionsEditor
                 options={question.options as PictureOption[]}
                 onChange={(opts) => onChange({ options: opts } as Partial<Question>)}
@@ -465,9 +405,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
             </Field>
             {question.multiple && (
               <Row>
-                <Field label="Min selections">
+                <Field label="Min Selections">
                   <input
-                    className="studio-input"
+                    className="slate-input"
                     type="number"
                     value={question.min ?? ''}
                     onChange={(e) =>
@@ -477,9 +417,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                     }
                   />
                 </Field>
-                <Field label="Max selections">
+                <Field label="Max Selections">
                   <input
-                    className="studio-input"
+                    className="slate-input"
                     type="number"
                     value={question.max ?? ''}
                     onChange={(e) =>
@@ -499,7 +439,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
             <Checkbox
               checked={Boolean(question.multiple)}
               onChange={(v) => onChange({ multiple: v } as Partial<Question>)}
-              label="Allow multiple per row"
+              label="Allow Multiple Per Row"
             />
             <Field label="Rows">
               <OptionsEditor
@@ -518,9 +458,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {question.type === 'multi_choice' && (
           <Row>
-            <Field label="Min selections">
+            <Field label="Min Selections">
               <input
-                className="studio-input"
+                className="slate-input"
                 type="number"
                 value={question.min ?? ''}
                 onChange={(e) =>
@@ -530,9 +470,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                 }
               />
             </Field>
-            <Field label="Max selections">
+            <Field label="Max Selections">
               <input
-                className="studio-input"
+                className="slate-input"
                 type="number"
                 value={question.max ?? ''}
                 onChange={(e) =>
@@ -547,11 +487,11 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {question.type === 'thanks' && (
           <Field
-            label="Redirect URL (optional)"
+            label="Redirect URL (Optional)"
             hint="Navigate here after a successful submit."
           >
             <input
-              className="studio-input"
+              className="slate-input"
               value={question.redirectUrl ?? ''}
               placeholder="https://example.com/thank-you"
               onChange={(e) =>
@@ -563,9 +503,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {question.type !== 'welcome' && (
           <>
-            <div style={{ height: 1, background: 'var(--psw-border)', margin: '8px 0' }} />
+            <div style={{ height: 1, background: 'var(--slate-border)', margin: '8px 0' }} />
             <Field
-              label={question.type === 'thanks' ? 'Show this ending when…' : 'Show this question when…'}
+              label={question.type === 'thanks' ? 'Show This Ending When…' : 'Show This Question When…'}
               hint="Leave empty to always show."
             >
               <ConditionBuilder
@@ -579,7 +519,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {question.type !== 'welcome' && question.type !== 'thanks' && question.type !== 'review' && (
           <Field
-            label="Logic jumps"
+            label="Logic Jumps"
             hint="On advance, the first matching rule wins. No match = next question."
           >
             <JumpRulesEditor
@@ -593,9 +533,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {canDelete && (
           <>
-            <div style={{ height: 1, background: 'var(--psw-border)', margin: '8px 0' }} />
-            <button type="button" className="studio-btn studio-btn--danger" onClick={onDelete}>
-              Delete question
+            <div style={{ height: 1, background: 'var(--slate-border)', margin: '8px 0' }} />
+            <button type="button" className="slate-btn slate-btn--danger" onClick={onDelete}>
+              Delete
             </button>
           </>
         )}
@@ -619,9 +559,9 @@ function Field({
 }) {
   return (
     <label style={{ display: 'block' }}>
-      <span className="studio-label">{label}</span>
+      <span className="slate-label">{label}</span>
       {children}
-      {hint && <p className="studio-help">{hint}</p>}
+      {hint && <p className="slate-help">{hint}</p>}
     </label>
   );
 }
@@ -636,7 +576,7 @@ function Checkbox({
   label: string;
 }) {
   return (
-    <label className="studio-checkbox" style={{ alignSelf: 'end', marginBottom: 6 }}>
+    <label className="slate-checkbox" style={{ alignSelf: 'end', marginBottom: 6 }}>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       {label}
     </label>
@@ -650,9 +590,14 @@ function OptionsEditor({
 }: {
   options: Option[];
   onChange: (opts: Option[]) => void;
-  /** Show a per-option points column (feeds the {{score}} total, ADR-016). */
+  /** Whether scoring is applicable for this question type (feeds {{score}}, ADR-016). */
   withScore?: boolean;
 }) {
+  // Scoring is opt-in: the points column only appears once the form actually
+  // uses it (any option has a numeric score). Derived from data — no local
+  // state — so it stays correct when switching between questions.
+  const scoring = withScore && options.some((o) => typeof o.score === 'number');
+
   const update = (i: number, patch: Partial<Option>) => {
     onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
   };
@@ -671,6 +616,15 @@ function OptionsEditor({
       { label: `Option ${String.fromCharCode(65 + i)}`, value: `opt_${i + 1}` },
     ]);
   };
+  const enableScoring = () => onChange(options.map((o) => ({ ...o, score: o.score ?? 0 })));
+  const disableScoring = () =>
+    onChange(
+      options.map((o) => {
+        const next = { ...o };
+        delete next.score;
+        return next;
+      }),
+    );
 
   return (
     <div style={{ display: 'grid', gap: 4 }}>
@@ -679,32 +633,21 @@ function OptionsEditor({
           key={i}
           style={{
             display: 'grid',
-            gridTemplateColumns: withScore ? '1fr 90px 52px auto' : '1fr 110px auto',
+            gridTemplateColumns: scoring ? '1fr 56px auto' : '1fr auto',
             gap: 4,
             alignItems: 'center',
           }}
         >
           <input
-            className="studio-input"
+            className="slate-input"
             value={opt.label}
             placeholder="Label"
             onChange={(e) => update(i, { label: e.target.value })}
             style={{ padding: '6px 8px', fontSize: 12 }}
           />
-          <input
-            className="studio-input"
-            value={opt.value}
-            placeholder="value"
-            style={{
-              padding: '6px 8px',
-              fontFamily: 'var(--psw-font-mono)',
-              fontSize: 11,
-            }}
-            onChange={(e) => update(i, { value: e.target.value.replace(/\s+/g, '_') })}
-          />
-          {withScore && (
+          {scoring && (
             <input
-              className="studio-input"
+              className="slate-input"
               type="number"
               value={opt.score ?? ''}
               placeholder="pts"
@@ -718,7 +661,7 @@ function OptionsEditor({
           <div style={{ display: 'flex', gap: 0 }}>
             <button
               type="button"
-              className="studio-icon-btn"
+              className="slate-icon-btn"
               onClick={() => move(i, 'up')}
               disabled={i === 0}
               aria-label="Move up"
@@ -727,7 +670,7 @@ function OptionsEditor({
             </button>
             <button
               type="button"
-              className="studio-icon-btn"
+              className="slate-icon-btn"
               onClick={() => move(i, 'down')}
               disabled={i === options.length - 1}
               aria-label="Move down"
@@ -736,7 +679,7 @@ function OptionsEditor({
             </button>
             <button
               type="button"
-              className="studio-icon-btn"
+              className="slate-icon-btn"
               onClick={() => remove(i)}
               aria-label="Remove option"
             >
@@ -745,14 +688,26 @@ function OptionsEditor({
           </div>
         </div>
       ))}
-      <button
-        type="button"
-        className="studio-btn studio-btn--ghost"
-        onClick={add}
-        style={{ justifySelf: 'start', fontSize: 12, padding: '4px 8px', marginTop: 4 }}
-      >
-        + Add option
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+        <button
+          type="button"
+          className="slate-btn slate-btn--ghost"
+          onClick={add}
+          style={{ fontSize: 12, padding: '4px 8px' }}
+        >
+          + Add Option
+        </button>
+        {withScore && (
+          <button
+            type="button"
+            className="slate-link"
+            style={{ fontSize: 11 }}
+            onClick={scoring ? disableScoring : enableScoring}
+          >
+            {scoring ? 'Remove Scoring' : 'Add Scoring'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -764,6 +719,9 @@ function PictureOptionsEditor({
   options: PictureOption[];
   onChange: (opts: PictureOption[]) => void;
 }) {
+  // Scoring is opt-in here too — points only appear once used (ADR-016).
+  const scoring = options.some((o) => typeof o.score === 'number');
+
   const update = (i: number, patch: Partial<PictureOption>) => {
     onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
   };
@@ -779,6 +737,15 @@ function PictureOptionsEditor({
       },
     ]);
   };
+  const enableScoring = () => onChange(options.map((o) => ({ ...o, score: o.score ?? 0 })));
+  const disableScoring = () =>
+    onChange(
+      options.map((o) => {
+        const next = { ...o };
+        delete next.score;
+        return next;
+      }),
+    );
 
   return (
     <div style={{ display: 'grid', gap: 8 }}>
@@ -789,39 +756,40 @@ function PictureOptionsEditor({
             display: 'grid',
             gap: 4,
             padding: 8,
-            border: '1px solid var(--psw-border)',
-            borderRadius: 'var(--studio-radius-sm)',
+            border: '1px solid var(--slate-border)',
+            borderRadius: 'var(--slate-radius-sm)',
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 52px auto', gap: 4 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: scoring ? '1fr 56px auto' : '1fr auto',
+              gap: 4,
+            }}
+          >
             <input
-              className="studio-input"
+              className="slate-input"
               value={opt.label}
               placeholder="Label"
               onChange={(e) => update(i, { label: e.target.value })}
               style={{ padding: '6px 8px', fontSize: 12 }}
             />
-            <input
-              className="studio-input"
-              value={opt.value}
-              placeholder="value"
-              style={{ padding: '6px 8px', fontFamily: 'var(--psw-font-mono)', fontSize: 11 }}
-              onChange={(e) => update(i, { value: e.target.value.replace(/\s+/g, '_') })}
-            />
-            <input
-              className="studio-input"
-              type="number"
-              value={opt.score ?? ''}
-              placeholder="pts"
-              aria-label="Score points"
-              style={{ padding: '6px 6px', fontSize: 11 }}
-              onChange={(e) =>
-                update(i, { score: e.target.value === '' ? undefined : Number(e.target.value) })
-              }
-            />
+            {scoring && (
+              <input
+                className="slate-input"
+                type="number"
+                value={opt.score ?? ''}
+                placeholder="pts"
+                aria-label="Score points"
+                style={{ padding: '6px 6px', fontSize: 11 }}
+                onChange={(e) =>
+                  update(i, { score: e.target.value === '' ? undefined : Number(e.target.value) })
+                }
+              />
+            )}
             <button
               type="button"
-              className="studio-icon-btn"
+              className="slate-icon-btn"
               onClick={() => remove(i)}
               aria-label="Remove option"
             >
@@ -829,22 +797,32 @@ function PictureOptionsEditor({
             </button>
           </div>
           <input
-            className="studio-input"
+            className="slate-input"
             value={opt.src}
             placeholder="https://image-url..."
-            style={{ padding: '6px 8px', fontFamily: 'var(--psw-font-mono)', fontSize: 11 }}
+            style={{ padding: '6px 8px', fontFamily: 'var(--slate-font-mono)', fontSize: 11 }}
             onChange={(e) => update(i, { src: e.target.value })}
           />
         </div>
       ))}
-      <button
-        type="button"
-        className="studio-btn studio-btn--ghost"
-        onClick={add}
-        style={{ justifySelf: 'start', fontSize: 12, padding: '4px 8px' }}
-      >
-        + Add option
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button
+          type="button"
+          className="slate-btn slate-btn--ghost"
+          onClick={add}
+          style={{ fontSize: 12, padding: '4px 8px' }}
+        >
+          + Add Option
+        </button>
+        <button
+          type="button"
+          className="slate-link"
+          style={{ fontSize: 11 }}
+          onClick={scoring ? disableScoring : enableScoring}
+        >
+          {scoring ? 'Remove Scoring' : 'Add Scoring'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -852,7 +830,7 @@ function PictureOptionsEditor({
 function Divider() {
   return (
     <div
-      style={{ height: 1, background: 'var(--psw-border)', margin: '0 12px' }}
+      style={{ height: 1, background: 'var(--slate-border)', margin: '0 12px' }}
       aria-hidden
     />
   );

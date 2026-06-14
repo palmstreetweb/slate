@@ -61,14 +61,16 @@ export type QuestionRendererProps = {
   visibleList?: ReadonlyArray<Question>;
   /** Jump back to a question for editing (review screen). */
   onEditQuestion?: (questionId: string) => void;
+  /** Play the schema step-sound on discrete interactions (choices, OK, etc.). */
+  playInteractionSound?: () => void;
 };
 
 function StepBadge({ step, total }: { step: number; total: number }) {
   if (step <= 0 || total <= 0) return null;
   return (
-    <div className="psw-step-badge">
+    <div className="slate-step-badge">
       <span>{String(step).padStart(2, '0')}</span>
-      <span className="psw-step-sep">→</span>
+      <span className="slate-step-sep">→</span>
     </div>
   );
 }
@@ -88,6 +90,7 @@ export function QuestionRenderer({
   score = 0,
   visibleList,
   onEditQuestion,
+  playInteractionSound,
 }: QuestionRendererProps) {
   // Resolve {{field:id}} / {{score}} piping (and function-style DynamicTitle)
   // once here, so every field component receives ready-to-render copy.
@@ -96,22 +99,35 @@ export function QuestionRenderer({
     [rawQuestion, answers, score],
   );
 
+  const ping = () => playInteractionSound?.();
+  const advanceWithSound = () => {
+    ping();
+    advance();
+  };
+
   // Auto-advance helper for single_choice — fire after a brief pause so
   // the selected highlight is visible before the transition starts.
   const selectAndAdvance = (id: string, value: string) => {
+    ping();
+    setAnswer(id, value);
+    window.setTimeout(() => advance(), 220);
+  };
+
+  const selectScaleAndAdvance = (id: string, value: number) => {
+    ping();
     setAnswer(id, value);
     window.setTimeout(() => advance(), 220);
   };
 
   switch (question.type) {
     case 'welcome':
-      return <WelcomeScreen question={question} advance={advance} />;
+      return <WelcomeScreen question={question} advance={advanceWithSound} />;
 
     case 'statement':
       return (
         <StatementScreen
           question={question}
-          advance={advance}
+          advance={advanceWithSound}
           stepBadge={stepNumber}
           totalSteps={totalSteps}
         />
@@ -124,7 +140,7 @@ export function QuestionRenderer({
           visible={visibleList ?? []}
           answers={answers}
           onEdit={(id) => onEditQuestion?.(id)}
-          onAdvance={advance}
+          onAdvance={advanceWithSound}
         />
       );
 
@@ -148,7 +164,7 @@ export function QuestionRenderer({
             answers={answers}
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advance}
+            onAdvance={advanceWithSound}
           />
         </>
       );
@@ -162,7 +178,7 @@ export function QuestionRenderer({
             answers={answers}
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advance}
+            onAdvance={advanceWithSound}
           />
         </>
       );
@@ -176,7 +192,7 @@ export function QuestionRenderer({
             answers={answers}
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advance}
+            onAdvance={advanceWithSound}
           />
         </>
       );
@@ -190,7 +206,7 @@ export function QuestionRenderer({
             answers={answers}
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advance}
+            onAdvance={advanceWithSound}
           />
         </>
       );
@@ -204,7 +220,7 @@ export function QuestionRenderer({
             answers={answers}
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advance}
+            onAdvance={advanceWithSound}
           />
         </>
       );
@@ -218,7 +234,7 @@ export function QuestionRenderer({
             answers={answers}
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advance}
+            onAdvance={advanceWithSound}
           />
         </>
       );
@@ -232,7 +248,7 @@ export function QuestionRenderer({
             answers={answers}
             initialValue={answers[question.id] as number | undefined}
             onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advance}
+            onAdvance={advanceWithSound}
           />
         </>
       );
@@ -245,10 +261,7 @@ export function QuestionRenderer({
             question={question}
             answers={answers}
             initialValue={answers[question.id] as number | undefined}
-            onAnswer={(v) => {
-              setAnswer(question.id, v);
-              window.setTimeout(() => advance(), 220);
-            }}
+            onAnswer={(v) => selectScaleAndAdvance(question.id, v)}
           />
         </>
       );
@@ -274,8 +287,11 @@ export function QuestionRenderer({
             question={question}
             answers={answers}
             selected={(answers[question.id] as string[] | undefined) ?? []}
-            onSelect={(vs) => setAnswer(question.id, vs)}
-            onAdvance={advance}
+            onSelect={(vs) => {
+              ping();
+              setAnswer(question.id, vs);
+            }}
+            onAdvance={advanceWithSound}
           />
         </>
       );
@@ -288,8 +304,12 @@ export function QuestionRenderer({
             question={question}
             answers={answers}
             selected={answers[question.id] as string | undefined}
-            onSelect={(v) => setAnswer(question.id, v)}
+            onSelect={(v) => {
+              ping();
+              setAnswer(question.id, v);
+            }}
             onAdvance={advance}
+            onSubmit={advanceWithSound}
           />
         </>
       );
@@ -328,10 +348,7 @@ export function QuestionRenderer({
             question={question}
             answers={answers}
             initialValue={answers[question.id] as number | undefined}
-            onAnswer={(v) => {
-              setAnswer(question.id, v);
-              window.setTimeout(() => advance(), 220);
-            }}
+            onAnswer={(v) => selectScaleAndAdvance(question.id, v)}
           />
         </>
       );
@@ -345,7 +362,7 @@ export function QuestionRenderer({
             answers={answers}
             initialValue={answers[question.id] as File | string | undefined}
             onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advance}
+            onAdvance={advanceWithSound}
             onFileUpload={onFileUpload}
           />
         </>
@@ -360,8 +377,11 @@ export function QuestionRenderer({
             answers={answers}
             selected={answers[question.id] as string | string[] | undefined}
             onSelectSingle={(v) => selectAndAdvance(question.id, v)}
-            onSelectMulti={(vs) => setAnswer(question.id, vs)}
-            onAdvance={advance}
+            onSelectMulti={(vs) => {
+              ping();
+              setAnswer(question.id, vs);
+            }}
+            onAdvance={advanceWithSound}
           />
         </>
       );
@@ -375,7 +395,7 @@ export function QuestionRenderer({
             answers={answers}
             initialValue={answers[question.id] as string[] | undefined}
             onAnswer={(order) => setAnswer(question.id, order)}
-            onAdvance={advance}
+            onAdvance={advanceWithSound}
           />
         </>
       );
@@ -388,8 +408,11 @@ export function QuestionRenderer({
             question={question}
             answers={answers}
             initialValue={answers[question.id] as MatrixAnswer | undefined}
-            onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advance}
+            onAnswer={(v) => {
+              ping();
+              setAnswer(question.id, v);
+            }}
+            onAdvance={advanceWithSound}
           />
         </>
       );

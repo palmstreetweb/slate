@@ -15,31 +15,31 @@ import type { Theme, ThemeName, ResolvedThemeMode } from '@/types/Theme.js';
 import { themes as builtinThemes } from '@/themes/index.js';
 
 const STATIC_TOKEN_MAP: ReadonlyArray<[keyof Theme['static'], string]> = [
-  ['fontDisplay', '--psw-font-display'],
-  ['fontBody', '--psw-font-body'],
-  ['fontMono', '--psw-font-mono'],
-  ['radius', '--psw-radius'],
-  ['borderWidth', '--psw-border-width'],
-  ['titleWeight', '--psw-title-weight'],
-  ['titleTracking', '--psw-title-tracking'],
-  ['titleLineHeight', '--psw-title-line-height'],
-  ['titleSize', '--psw-title-size'],
-  ['transform', '--psw-transform'],
+  ['fontDisplay', '--slate-font-display'],
+  ['fontBody', '--slate-font-body'],
+  ['fontMono', '--slate-font-mono'],
+  ['radius', '--slate-radius'],
+  ['borderWidth', '--slate-border-width'],
+  ['titleWeight', '--slate-title-weight'],
+  ['titleTracking', '--slate-title-tracking'],
+  ['titleLineHeight', '--slate-title-line-height'],
+  ['titleSize', '--slate-title-size'],
+  ['transform', '--slate-transform'],
 ];
 
 const COLOR_TOKEN_MAP: ReadonlyArray<[keyof Theme['light'], string]> = [
-  ['bg', '--psw-bg'],
-  ['bg2', '--psw-bg-2'],
-  ['bg3', '--psw-bg-3'],
-  ['text', '--psw-text'],
-  ['muted', '--psw-muted'],
-  ['dim', '--psw-dim'],
-  ['accent', '--psw-accent'],
-  ['accentRgb', '--psw-accent-rgb'],
-  ['accentOnLight', '--psw-accent-on-light'],
-  ['accentLo', '--psw-accent-lo'],
-  ['border', '--psw-border'],
-  ['borderMd', '--psw-border-md'],
+  ['bg', '--slate-bg'],
+  ['bg2', '--slate-bg-2'],
+  ['bg3', '--slate-bg-3'],
+  ['text', '--slate-text'],
+  ['muted', '--slate-muted'],
+  ['dim', '--slate-dim'],
+  ['accent', '--slate-accent'],
+  ['accentRgb', '--slate-accent-rgb'],
+  ['accentOnLight', '--slate-accent-on-light'],
+  ['accentLo', '--slate-accent-lo'],
+  ['border', '--slate-border'],
+  ['borderMd', '--slate-border-md'],
 ];
 
 function isBuiltin(name: string): name is ThemeName {

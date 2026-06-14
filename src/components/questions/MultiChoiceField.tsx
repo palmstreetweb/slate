@@ -45,11 +45,11 @@ export function MultiChoiceField({
 
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
 
-      <div className="psw-choices" role="group" aria-labelledby={labelId}>
+      <div className="slate-choices" role="group" aria-labelledby={labelId}>
         {question.options.map((opt, i) => {
           const isSelected = selected.includes(opt.value);
           return (
@@ -59,13 +59,13 @@ export function MultiChoiceField({
               role="checkbox"
               aria-checked={isSelected}
               onClick={() => toggle(opt.value)}
-              className={`psw-choice${isSelected ? ' psw-choice--selected' : ''}`}
+              className={`slate-choice${isSelected ? ' slate-choice--selected' : ''}`}
             >
-              <span className="psw-choice-badge">{CHOICE_LETTERS[i] ?? ''}</span>
+              <span className="slate-choice-badge">{CHOICE_LETTERS[i] ?? ''}</span>
               <span>
                 {opt.label}
                 {opt.description && (
-                  <span className="psw-choice-desc">{opt.description}</span>
+                  <span className="slate-choice-desc">{opt.description}</span>
                 )}
               </span>
             </button>
@@ -74,16 +74,16 @@ export function MultiChoiceField({
       </div>
 
       {error && (
-        <p className="psw-err" aria-live="polite">
+        <p className="slate-err" aria-live="polite">
           ! {error}
         </p>
       )}
 
-      <div className="psw-actions">
-        <button type="button" className="psw-ok-btn" onClick={submit}>
+      <div className="slate-actions">
+        <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>
         </button>
-        <span className="psw-hint">tap keys to toggle, OK to continue</span>
+        <span className="slate-hint">tap keys to toggle, OK to continue</span>
       </div>
     </div>
   );

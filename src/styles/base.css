@@ -1,17 +1,17 @@
-/* Base styles for [data-psw-forms] — resets that don't belong in tokens.css. */
+/* Base styles for [data-slate-forms] — resets that don't belong in tokens.css. */
 
-[data-psw-forms] {
+[data-slate-forms] {
   position: relative;
   width: 100%;
   min-height: 100vh;
-  background: var(--psw-bg);
-  color: var(--psw-text);
-  font-family: var(--psw-font-body);
+  background: var(--slate-bg);
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
   overflow-x: hidden;
 }
 
 /* Theme decorations — absolutely positioned behind the stage (z 0 < 5). */
-[data-psw-forms] .psw-decoration {
+[data-slate-forms] .slate-decoration {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -20,8 +20,23 @@
   pointer-events: none;
 }
 
+/* Intensity caps for the busier decorations so they stay a backdrop, never
+   competing with the question content layered above them. */
+[data-slate-forms][data-theme-name='riso'] .slate-decoration {
+  opacity: 0.5;
+}
+[data-slate-forms][data-theme-name='memphis'] .slate-decoration {
+  opacity: 0.55;
+}
+[data-slate-forms][data-theme-name='constellation'] .slate-decoration {
+  opacity: 0.9;
+}
+[data-slate-forms][data-theme-name='bloom'] .slate-decoration {
+  opacity: 0.7;
+}
+
 /* Editorial grain overlay — fractal-noise texture from the prototype. */
-[data-psw-forms] .psw-grain {
+[data-slate-forms] .slate-grain {
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -30,7 +45,7 @@
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-[data-psw-forms] .psw-stage {
+[data-slate-forms] .slate-stage {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -44,35 +59,58 @@
   z-index: 5;
 }
 
-[data-psw-forms] .psw-stage-content {
+[data-slate-forms] .slate-stage-content {
   width: 100%;
   max-width: 720px;
   position: relative;
 }
 
-[data-psw-forms] .psw-title {
-  font-family: var(--psw-font-display);
-  font-size: var(--psw-title-size);
-  font-weight: var(--psw-title-weight);
-  letter-spacing: var(--psw-title-tracking);
-  line-height: var(--psw-title-line-height);
-  text-transform: var(--psw-transform);
-  margin: 0 0 0.6rem 0;
-  color: var(--psw-text);
+/* Per-step decorations sit at z-index 0; the stage is above them but
+   transparent, so bold backdrop art (Swiss circles, riso blobs, etc.)
+   still shows through. Headlines get a soft text-shadow halo when
+   decorations are active (`data-has-decoration` on the wrapper — set in
+   Form.tsx). Text inputs stay bare underline fields. Choice/matrix
+   controls still get opaque surfaces. */
+[data-slate-forms][data-has-decoration] .slate-stage-content {
+  isolation: isolate;
 }
 
-[data-psw-forms] .psw-subtitle {
+[data-slate-forms][data-has-decoration] .slate-title,
+[data-slate-forms][data-has-decoration] .slate-subtitle,
+[data-slate-forms][data-has-decoration] .slate-step-badge,
+[data-slate-forms][data-has-decoration] .slate-review-q,
+[data-slate-forms][data-has-decoration] .slate-review-a,
+[data-slate-forms][data-has-decoration] .slate-hint,
+[data-slate-forms][data-has-decoration] .slate-err {
+  text-shadow:
+    0 0 1px var(--slate-bg),
+    0 0 16px var(--slate-bg),
+    0 0 32px var(--slate-bg);
+}
+
+[data-slate-forms] .slate-title {
+  font-family: var(--slate-font-display);
+  font-size: var(--slate-title-size);
+  font-weight: var(--slate-title-weight);
+  letter-spacing: var(--slate-title-tracking);
+  line-height: var(--slate-title-line-height);
+  text-transform: var(--slate-transform);
+  margin: 0 0 0.6rem 0;
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-subtitle {
   font-size: clamp(1.05rem, 1.9vw, 1.2rem);
   line-height: 1.5;
   opacity: 0.65;
   max-width: 560px;
   margin: 0 0 32px 0;
-  color: var(--psw-text);
-  text-transform: var(--psw-transform);
+  color: var(--slate-text);
+  text-transform: var(--slate-transform);
 }
 
 /* Top chrome bar — brand + back button. */
-[data-psw-forms] .psw-topbar {
+[data-slate-forms] .slate-topbar {
   position: absolute;
   top: 0;
   left: 0;
@@ -85,46 +123,46 @@
   gap: 16px;
 }
 
-[data-psw-forms] .psw-brand {
+[data-slate-forms] .slate-brand {
   font-size: 12px;
   letter-spacing: 0.18em;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   font-weight: 500;
-  color: var(--psw-text);
-  text-transform: var(--psw-transform);
+  color: var(--slate-text);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-brand {
+[data-slate-forms][data-theme-name='swiss'] .slate-brand {
   font-weight: 700;
   font-size: 13px;
 }
 
-[data-psw-forms] .psw-back {
+[data-slate-forms] .slate-back {
   background: transparent;
   border: none;
   cursor: pointer;
   font-size: 11px;
   letter-spacing: 0.18em;
-  font-family: var(--psw-font-mono);
-  color: var(--psw-text);
+  font-family: var(--slate-font-mono);
+  color: var(--slate-text);
   opacity: 0.55;
   transition: opacity 0.15s ease-out;
   padding: 4px 8px;
-  text-transform: var(--psw-transform);
+  text-transform: var(--slate-transform);
 }
 
-[data-psw-forms] .psw-back:hover,
-[data-psw-forms] .psw-back:focus-visible {
+[data-slate-forms] .slate-back:hover,
+[data-slate-forms] .slate-back:focus-visible {
   opacity: 1;
   outline: none;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-back {
+[data-slate-forms][data-theme-name='swiss'] .slate-back {
   font-weight: 700;
 }
 
 /* Top progress bar. */
-[data-psw-forms] .psw-progress {
+[data-slate-forms] .slate-progress {
   position: absolute;
   top: 0;
   left: 0;
@@ -135,65 +173,119 @@
   overflow: hidden;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-progress {
+[data-slate-forms][data-theme-name='swiss'] .slate-progress {
   height: 4px;
   background: rgba(0, 0, 0, 0.08);
 }
 
-[data-psw-forms] .psw-progress-bar {
+[data-slate-forms] .slate-progress-bar {
   height: 100%;
-  background: var(--psw-accent);
+  background: var(--slate-accent);
   transition: width 600ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-progress-bar {
-  background: var(--psw-text);
+[data-slate-forms][data-theme-name='swiss'] .slate-progress-bar {
+  background: var(--slate-text);
   transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Bottom-right footer counter "n / m". opacity bumped from 0.4 → 0.6 to clear
    WCAG AA 4.5:1 contrast against both light and dark theme backgrounds. */
-[data-psw-forms] .psw-footer {
+[data-slate-forms] .slate-footer {
   position: absolute;
   bottom: 20px;
   right: 24px;
   font-size: 11px;
   letter-spacing: 0.15em;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   opacity: 0.6;
-  color: var(--psw-text);
+  color: var(--slate-text);
   z-index: 10;
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-footer {
+[data-slate-forms][data-theme-name='swiss'] .slate-footer {
   font-weight: 700;
 }
 
 /* Question step badge ("01 →"). */
-[data-psw-forms] .psw-step-badge {
+[data-slate-forms] .slate-step-badge {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 20px;
   font-size: 13px;
-  font-family: var(--psw-font-mono);
-  color: var(--psw-accent);
+  font-family: var(--slate-font-mono);
+  color: var(--slate-accent);
 }
 
-[data-psw-forms][data-theme-name='swiss'] .psw-step-badge {
+[data-slate-forms][data-theme-name='swiss'] .slate-step-badge {
   font-size: 15px;
-  color: var(--psw-text);
+  color: var(--slate-text);
   font-weight: 900;
   letter-spacing: 0.05em;
 }
 
-[data-psw-forms] .psw-step-sep {
+[data-slate-forms] .slate-step-sep {
   opacity: 0.5;
+}
+
+/* ============================================================
+   CLASSIC THEME chrome — old Typeform: quiet, minimal, deferential.
+   The form should feel like a conversation, not a branded poster, so
+   the brand, step number, and progress track all recede.
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='classic'] .slate-brand {
+  font-family: var(--slate-font-body);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0;
+  opacity: 0.65;
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-back {
+  font-family: var(--slate-font-body);
+  letter-spacing: 0.04em;
+  font-size: 12px;
+}
+
+/* Invisible track — only the accent fill reads, like classic Typeform. */
+[data-slate-forms][data-theme-name='classic'] .slate-progress {
+  background: transparent;
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-step-badge {
+  font-family: var(--slate-font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--slate-accent);
+  opacity: 0.9;
+  margin-bottom: 14px;
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-footer {
+  font-family: var(--slate-font-body);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-subtitle {
+  opacity: 0.7;
+}
+
+/* Theme toggle sized down ~15% from the verbatim PSW port (ADR-020).
+   Applied as a uniform transform on a wrapper so toggle.css stays a 1:1
+   port and the toggle's own :active / morph transforms are preserved. */
+[data-slate-forms] .slate-toggle-scale {
+  display: inline-flex;
+  transform: scale(0.85);
+  transform-origin: right center;
 }
 
 /* ---------- save-and-resume banner (ADR-017) ---------- */
 
-[data-psw-forms] .psw-resume-banner {
+[data-slate-forms] .slate-resume-banner {
   position: absolute;
   top: 64px;
   left: 50%;
@@ -203,39 +295,39 @@
   align-items: center;
   gap: 16px;
   padding: 10px 16px;
-  background: var(--psw-bg-2);
-  border: 1px solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
+  background: var(--slate-bg-2);
+  border: 1px solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
 }
 
-[data-psw-forms] .psw-resume-text {
-  font-family: var(--psw-font-body);
+[data-slate-forms] .slate-resume-text {
+  font-family: var(--slate-font-body);
   font-size: 14px;
-  color: var(--psw-text);
+  color: var(--slate-text);
   white-space: nowrap;
 }
 
-[data-psw-forms] .psw-resume-actions {
+[data-slate-forms] .slate-resume-actions {
   display: flex;
   gap: 8px;
 }
 
-[data-psw-forms] .psw-resume-btn {
+[data-slate-forms] .slate-resume-btn {
   padding: 6px 14px;
-  font-family: var(--psw-font-mono);
+  font-family: var(--slate-font-mono);
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
   background: none;
-  color: var(--psw-text);
-  border: var(--psw-border-width) solid var(--psw-border-md);
-  border-radius: var(--psw-radius);
+  color: var(--slate-text);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
 }
 
-[data-psw-forms] .psw-resume-btn--primary {
-  background: var(--psw-accent);
-  border-color: var(--psw-accent);
-  color: var(--psw-bg);
+[data-slate-forms] .slate-resume-btn--primary {
+  background: var(--slate-accent);
+  border-color: var(--slate-accent);
+  color: var(--slate-on-accent);
 }

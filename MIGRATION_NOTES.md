@@ -1,6 +1,6 @@
 # Migration Notes
 
-Versioning protocol and upgrade guidance for `@palmstreetweb/forms`.
+Versioning protocol and upgrade guidance for `@palmstreetweb/slate`.
 
 ## Semver protocol
 
@@ -46,7 +46,38 @@ Every major version bump must include an entry in this file using the template b
 
 | From | To | Effort |
 |---|---|---|
-| _(no upgrades yet — initial beta)_ | | |
+| `@palmstreetweb/forms@1.0.0-beta.1` | `@palmstreetweb/slate@1.0.0-beta.1` | Medium — see below |
+
+## v1.0.0-beta.1 — 2026-06-14 (Slate rebrand)
+
+### Breaking
+- **Package renamed** `@palmstreetweb/forms` → `@palmstreetweb/slate`.
+  - **Before:** `import { Form } from '@palmstreetweb/forms'`
+  - **After:** `import { Form } from '@palmstreetweb/slate'`
+  - **Why:** ADR-025 — unified Slate product identity.
+  - **Migration:** Update `package.json` dependency + all imports/stylesheet paths. CSS: `@palmstreetweb/slate/styles.css`.
+- **DOM/CSS tokens renamed** `psw-*` → `slate-*`.
+  - **Before:** `[data-psw-forms]`, `.psw-input`, `--psw-accent`
+  - **After:** `[data-slate-forms]`, `.slate-input`, `--slate-accent`
+  - **Migration:** Update any host-page CSS overrides. In-progress resume sessions migrate automatically via the built-in localStorage shim (legacy keys copied on first load).
+- **Dev-tool brand** Studio → Slate (examples only; not published).
+
+### Added
+- `migrateSlateLocalStorageKeys()` shim (temporary; remove ~2026-07-15).
+
+### Changed
+- Admin localStorage keys: `psw-studio-*` → `slate-theme`, `slate-forms`, `slate-submissions`.
+
+### Fixed
+- _(none)_
+
+---
+
+## Upgrade matrix (legacy)
+
+| From | To | Effort |
+|---|---|---|
+| _(no other upgrades yet)_ | | |
 
 ## Pre-release path
 

@@ -10,7 +10,7 @@ Always read [`DECISIONS.md`](./DECISIONS.md) end-to-end before proposing a chang
 - Adds a runtime dependency.
 - Changes the public API exported from `src/index.ts`.
 - Touches the PSW theme toggle CSS in `src/styles/toggle.css` (verbatim port; tweaks need a new ADR).
-- Changes the `localStorage` key (`psw-forms-theme`) or any user-visible config name.
+- Changes the `localStorage` key (`slate-forms-theme`) or any user-visible config name.
 
 If an ADR already covers the area, follow it. If not, propose a new ADR in your response *before* writing the code.
 
@@ -28,7 +28,7 @@ Inside `src/components/**`, the only color values allowed are CSS variable refer
 
 ## Wrapper-scoped, always
 
-The form is embedded in someone else's page. We **read** `document.documentElement.dataset.theme` on first mount for inheritance, but we **never write** to `<html>` or any element outside our wrapper. The wrapper is the element with `data-psw-forms` attached.
+The form is embedded in someone else's page. We **read** `document.documentElement.dataset.theme` on first mount for inheritance, but we **never write** to `<html>` or any element outside our wrapper. The wrapper is the element with `data-slate-forms` attached.
 
 ## When tests break
 

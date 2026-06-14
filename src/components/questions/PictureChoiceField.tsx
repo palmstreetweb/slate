@@ -63,12 +63,12 @@ export function PictureChoiceField({
 
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
 
       <div
-        className="psw-picture-grid"
+        className="slate-picture-grid"
         role={multiple ? 'group' : 'radiogroup'}
         aria-labelledby={labelId}
       >
@@ -81,11 +81,11 @@ export function PictureChoiceField({
               role={multiple ? 'checkbox' : 'radio'}
               aria-checked={isSelected}
               onClick={() => (multiple ? toggle(opt.value) : onSelectSingle(opt.value))}
-              className={`psw-picture${isSelected ? ' psw-picture--selected' : ''}`}
+              className={`slate-picture${isSelected ? ' slate-picture--selected' : ''}`}
             >
-              <img src={opt.src} alt={opt.alt ?? opt.label} className="psw-picture-img" />
-              <span className="psw-picture-caption">
-                <span className="psw-choice-badge">{CHOICE_LETTERS[i] ?? ''}</span>
+              <img src={opt.src} alt={opt.alt ?? opt.label} className="slate-picture-img" />
+              <span className="slate-picture-caption">
+                <span className="slate-choice-badge">{CHOICE_LETTERS[i] ?? ''}</span>
                 <span>{opt.label}</span>
               </span>
             </button>
@@ -94,20 +94,20 @@ export function PictureChoiceField({
       </div>
 
       {error && (
-        <p className="psw-err" aria-live="polite">
+        <p className="slate-err" aria-live="polite">
           ! {error}
         </p>
       )}
 
       {multiple ? (
-        <div className="psw-actions">
-          <button type="button" className="psw-ok-btn" onClick={submit}>
+        <div className="slate-actions">
+          <button type="button" className="slate-ok-btn" onClick={submit}>
             OK <span aria-hidden>✓</span>
           </button>
-          <span className="psw-hint">tap keys to toggle, OK to continue</span>
+          <span className="slate-hint">tap keys to toggle, OK to continue</span>
         </div>
       ) : (
-        <p className="psw-hint" style={{ marginTop: 20 }}>
+        <p className="slate-hint" style={{ marginTop: 20 }}>
           tap a key (A, B, C) or click to select
         </p>
       )}

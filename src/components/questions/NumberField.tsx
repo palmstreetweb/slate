@@ -51,7 +51,7 @@ export function NumberField({ question, answers, initialValue, onAnswer, onAdvan
 
   return (
     <div>
-      <h1 id={labelId} className="psw-title">
+      <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
       <div style={{ marginTop: 24 }}>
@@ -69,18 +69,18 @@ export function NumberField({ question, answers, initialValue, onAnswer, onAdvan
           placeholder={question.placeholder ?? '0'}
           aria-labelledby={labelId}
           aria-invalid={Boolean(error)}
-          className={`psw-input${error ? ' psw-input--error' : ''}`}
+          className={`slate-input${error ? ' slate-input--error' : ''}`}
         />
         {error && (
-          <p className="psw-err" aria-live="polite">
+          <p className="slate-err" aria-live="polite">
             ! {error}
           </p>
         )}
-        <div className="psw-actions">
-          <button type="button" className="psw-ok-btn" onClick={submit}>
+        <div className="slate-actions">
+          <button type="button" className="slate-ok-btn" onClick={submit}>
             OK <span aria-hidden>✓</span>
           </button>
-          <span className="psw-hint">press Enter ↵</span>
+          <span className="slate-hint">press Enter ↵</span>
         </div>
       </div>
     </div>

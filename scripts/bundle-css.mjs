@@ -2,7 +2,7 @@
 /**
  * Concatenate src/styles/*.css into a single dist/styles.css in the correct
  * order. We do this instead of letting tsup copy individual hashed files
- * because the public export is `@palmstreetweb/forms/styles.css` — one
+ * because the public export is `@palmstreetweb/slate/styles.css` — one
  * import, not five.
  */
 
@@ -19,7 +19,7 @@ const ORDER = ['tokens.css', 'base.css', 'animations.css', 'toggle.css', 'questi
 
 async function main() {
   const parts = [];
-  parts.push('/* @palmstreetweb/forms — bundled stylesheet */\n');
+  parts.push('/* @palmstreetweb/slate — bundled stylesheet */\n');
   for (const file of ORDER) {
     const path = join(SRC_STYLES, file);
     const content = await readFile(path, 'utf8');
