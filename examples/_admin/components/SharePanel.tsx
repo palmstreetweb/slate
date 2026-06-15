@@ -9,6 +9,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { useFocusTrap } from '../useFocusTrap.js';
+import type { Schema } from '@/index.js';
 import {
   buildDevPreviewUrl,
   buildPublicShareUrl,
@@ -17,6 +18,10 @@ import {
   resolveFormSlug,
   slugify,
 } from '../shareUrls.js';
+import {
+  buildPortableShareUrl,
+  canEncodePortableSchema,
+} from '../portableShare.js';
 import { readSlateMode } from '../slateMode.js';
 
 type Props = {
@@ -25,6 +30,7 @@ type Props = {
   formId: string;
   formName: string;
   slug: string;
+  schema: Schema;
   onSlugChange: (slug: string) => void;
 };
 
@@ -34,6 +40,7 @@ export function SharePanel({
   formId,
   formName,
   slug,
+  schema,
   onSlugChange,
 }: Props) {
   const titleId = useId();
@@ -42,10 +49,14 @@ export function SharePanel({
   const effectiveSlug = resolveFormSlug({ slug, name: formName, id: formId });
   const publicUrl = buildPublicShareUrl(effectiveSlug);
   const previewUrl = buildDevPreviewUrl(formId);
+  const portableUrl = canEncodePortableSchema(schema)
+    ? buildPortableShareUrl(schema, { formId, name: formName })
+    : null;
 
   const [publicQr, setPublicQr] = useState<string | null>(null);
   const [previewQr, setPreviewQr] = useState<string | null>(null);
-  const [copied, setCopied] = useState<'public' | 'preview' | null>(null);
+  const [portableQr, setPortableQr] = useState<string | null>(null);
+  const [copied, setCopied] = useState<'public' | 'preview' | 'portable' | null>(null);
 
   useFocusTrap(panelRef, open, onClose);
 
@@ -104,7 +115,29 @@ export function SharePanel({
     };
   }, [open, previewUrl]);
 
-  const doCopy = useCallback(async (which: 'public' | 'preview', text: string) => {
+  useEffect(() => {
+    if (!open || !portableUrl) {
+      setPortableQr(null);
+      return;
+    }
+    let cancelled = false;
+    QRCode.toDataURL(portableUrl, {
+      width: 168,
+      margin: 1,
+      color: { dark: '#2A2520', light: '#FAF6EE' },
+    })
+      .then((data) => {
+        if (!cancelled) setPortableQr(data);
+      })
+      .catch(() => {
+        if (!cancelled) setPortableQr(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, portableUrl]);
+
+  const doCopy = useCallback(async (which: 'public' | 'preview' | 'portable', text: string) => {
     const ok = await copyText(text);
     if (ok) {
       setCopied(which);
@@ -177,14 +210,34 @@ export function SharePanel({
                 </p>
                 <p className="slate-share-hint" style={{ margin: 0 }}>
                   Set <code className="slate-share-code">VITE_PUBLIC_FORM_BASE</code> in{' '}
-                  <code className="slate-share-code">.env.local</code> for a live URL.
+                  <code className="slate-share-code">.env.local</code> for a client-site embed URL.
+                </p>
+              </div>
+            )}
+
+            {portableUrl ? (
+              <ShareBlock
+                title="Shareable Link"
+                hint="Anyone can open and fill this form. Responses appear in Responses when filled on your device, or under a portable id."
+                url={portableUrl}
+                qr={portableQr}
+                copied={copied === 'portable'}
+                onCopy={() => void doCopy('portable', portableUrl)}
+              />
+            ) : (
+              <div className="slate-share-callout">
+                <p className="slate-label" style={{ margin: '0 0 4px' }}>
+                  Shareable Link
+                </p>
+                <p className="slate-share-hint" style={{ margin: 0 }}>
+                  This form is too large for a portable link. Use a client embed URL or Dev Preview.
                 </p>
               </div>
             )}
 
             <ShareBlock
               title="Dev Preview"
-              hint="This device only."
+              hint="This device only — reads from localStorage on this browser."
               url={previewUrl}
               qr={previewQr}
               copied={copied === 'preview'}

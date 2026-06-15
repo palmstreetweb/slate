@@ -248,6 +248,7 @@ function FormCard({
         formId={form.id}
         formName={form.name}
         slug={slug}
+        schema={form.schema}
         onSlugChange={(next) => {
           updateForm(form.id, { slug: slugify(next) });
         }}

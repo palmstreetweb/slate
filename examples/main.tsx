@@ -8,6 +8,7 @@ import { Dashboard } from './_admin/pages/Dashboard.js';
 import { FormEditor } from './_admin/pages/FormEditor.js';
 import { FormPreview } from './_admin/pages/FormPreview.js';
 import { FormSubmissions } from './_admin/pages/FormSubmissions.js';
+import { PublicRespond } from './_admin/pages/PublicRespond.js';
 import { AdminShell } from './_admin/shell/AdminShell.js';
 import { PageTransition } from './_admin/shell/PageTransition.js';
 import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
@@ -39,6 +40,9 @@ function App() {
       break;
     case 'submissions':
       page = <FormSubmissions formId={route.formId} />;
+      break;
+    case 'respond':
+      page = <PublicRespond token={route.token} />;
       break;
     case 'notfound':
       page = (

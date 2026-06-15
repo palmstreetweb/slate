@@ -3,5 +3,9 @@
   "buildCommand": "npm run build:examples",
   "outputDirectory": "examples/dist",
   "installCommand": "npm install",
-  "framework": "vite"
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/brand", "destination": "/brand/index.html" },
+    { "source": "/brand/", "destination": "/brand/index.html" }
+  ]
 }

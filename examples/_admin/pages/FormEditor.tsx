@@ -404,6 +404,7 @@ function FormEditorBody({ formId }: { formId: string }) {
         formId={formId}
         formName={name}
         slug={slug}
+        schema={schema}
         onSlugChange={setSlug}
       />
       <div className="slate-editor-shell">
