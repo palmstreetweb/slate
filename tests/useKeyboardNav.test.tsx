@@ -91,6 +91,15 @@ describe('useKeyboardNav', () => {
     expect(onSelectScale).not.toHaveBeenCalled();
   });
 
+  it('scale step rejects off-step keyboard values', () => {
+    const stepped: Question = { id: 's', type: 'scale', title: 'Rate', min: 0, max: 10, step: 2 };
+    const { onSelectScale } = setup(stepped);
+    fireEvent.keyDown(window, { key: '5' });
+    expect(onSelectScale).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: '4' });
+    expect(onSelectScale).toHaveBeenCalledWith(4);
+  });
+
   it('Esc is a no-op by default, fires onBack when escapeBack is set', () => {
     const first = setup(welcome);
     fireEvent.keyDown(window, { key: 'Escape' });
@@ -125,12 +134,18 @@ describe('useKeyboardNav', () => {
     expect(onSelectChoice).toHaveBeenCalledTimes(1);
   });
 
-  it('digits 0–9 select NPS values', () => {
+  it('digits 0–9 select NPS values; 10 via composed 1 then 0', async () => {
     const { onSelectScale } = setup(nps);
     fireEvent.keyDown(window, { key: '0' });
     expect(onSelectScale).toHaveBeenCalledWith(0);
+    onSelectScale.mockClear();
     fireEvent.keyDown(window, { key: '9' });
     expect(onSelectScale).toHaveBeenCalledWith(9);
+    onSelectScale.mockClear();
+    fireEvent.keyDown(window, { key: '1' });
+    expect(onSelectScale).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: '0' });
+    expect(onSelectScale).toHaveBeenCalledWith(10);
   });
 
   it('modifier keys suppress shortcuts', () => {

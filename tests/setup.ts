@@ -24,12 +24,24 @@ function makeMemoryStorage(): Storage {
   };
 }
 
-if (typeof window !== 'undefined' && !window.localStorage) {
-  Object.defineProperty(window, 'localStorage', {
-    value: makeMemoryStorage(),
-    writable: false,
-    configurable: true,
-  });
+if (typeof window !== 'undefined') {
+  const probe = (): boolean => {
+    try {
+      const k = '__slate_storage_probe__';
+      window.localStorage.setItem(k, '1');
+      window.localStorage.removeItem(k);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (!window.localStorage || !probe()) {
+    Object.defineProperty(window, 'localStorage', {
+      value: makeMemoryStorage(),
+      writable: false,
+      configurable: true,
+    });
+  }
 }
 
 // jsdom doesn't implement matchMedia; useTheme/useReducedMotion need it for

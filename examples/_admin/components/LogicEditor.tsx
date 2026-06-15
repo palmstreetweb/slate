@@ -42,6 +42,11 @@ function isAnswerBearing(q: Question): boolean {
   return q.type !== 'welcome' && q.type !== 'statement' && q.type !== 'thanks';
 }
 
+function defaultConditionField(questions: ReadonlyArray<Question>): string {
+  const bearing = questions.find(isAnswerBearing);
+  return bearing?.id ?? questions[0]?.id ?? '';
+}
+
 /** Human-readable name for a question — its title, never the internal id. */
 function displayName(q: Question): string {
   const title = 'title' in q && typeof q.title === 'string' ? q.title.trim() : '';
@@ -238,8 +243,7 @@ export function ConditionBuilder({
         This condition uses nested groups or in/not_in — edit it in the schema code, or{' '}
         <button
           type="button"
-          className="slate-btn slate-btn--ghost"
-          style={{ fontSize: 12, padding: '2px 6px' }}
+          className="slate-btn slate-btn--ghost slate-btn--compact"
           onClick={() => onChange(undefined)}
         >
           clear it
@@ -282,11 +286,16 @@ export function ConditionBuilder({
       ))}
       <button
         type="button"
-        className="slate-btn slate-btn--ghost"
-        style={{ justifySelf: 'start', fontSize: 12, padding: '4px 8px' }}
-        onClick={() => emit(combinator, [...leaves, { field: '', op: 'equals', value: '' }])}
+        className="slate-btn slate-btn--ghost slate-btn--compact"
+        style={{ justifySelf: 'start' }}
+        onClick={() =>
+          emit(combinator, [
+            ...leaves,
+            { field: defaultConditionField(questions), op: 'equals', value: '' },
+          ])
+        }
       >
-        + Add rule
+        <span className="slate-btn-plus">+</span> Add rule
       </button>
     </div>
   );
@@ -335,9 +344,18 @@ export function JumpRulesEditor({
                 onRemove={() => emit(rules.filter((_, idx) => idx !== i))}
               />
             ) : (
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-muted)' }}>
-                Composite condition — edit in schema code.
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-muted)' }}>
+                  Composite condition — edit in schema code.
+                </p>
+                <button
+                  type="button"
+                  className="slate-btn slate-btn--ghost slate-btn--compact"
+                  onClick={() => emit(rules.filter((_, idx) => idx !== i))}
+                >
+                  Remove
+                </button>
+              </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
               <span>→ jump to</span>
@@ -360,13 +378,13 @@ export function JumpRulesEditor({
       })}
       <button
         type="button"
-        className="slate-btn slate-btn--ghost"
-        style={{ justifySelf: 'start', fontSize: 12, padding: '4px 8px' }}
+        className="slate-btn slate-btn--ghost slate-btn--compact"
+        style={{ justifySelf: 'start' }}
         onClick={() =>
           emit([...rules, { if: { field: currentId, op: 'equals', value: '' }, goTo: '' }])
         }
       >
-        + Add jump rule
+        <span className="slate-btn-plus">+</span> Add jump rule
       </button>
     </div>
   );

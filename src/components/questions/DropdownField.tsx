@@ -11,6 +11,7 @@ import type { DropdownQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { focusAfter } from '@/utils/focus.js';
+import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -32,6 +33,8 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
   const inputRef = useRef<HTMLInputElement>(null);
   const labelId = useId();
   const listId = useId();
+  const optionId = (value: string) => `${listId}-opt-${value}`;
+  const { schedule: scheduleAutoAdvance } = useAutoAdvanceTimer(question.id);
 
   useEffect(() => {
     return focusAfter(inputRef.current);
@@ -52,16 +55,27 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
     setOpen(false);
     setError(null);
     onSelect(value);
-    window.setTimeout(() => onAdvance(), 220);
+    scheduleAutoAdvance(() => onAdvance());
+  };
+
+  const resolveValueFromQuery = (): string | undefined => {
+    const q = query.trim();
+    if (q === '') return undefined;
+    if (selectedOption && q.toLowerCase() === selectedOption.label.toLowerCase()) {
+      return selected;
+    }
+    return question.options.find((o) => o.label.toLowerCase() === q.toLowerCase())?.value;
   };
 
   const submit = () => {
-    const err = validate(question, selected);
+    const value = resolveValueFromQuery();
+    const err = validate(question, value);
     if (err) {
       setError(err.message);
       return;
     }
     setError(null);
+    if (value) onSelect(value);
     (onSubmit ?? onAdvance)();
   };
 
@@ -100,12 +114,18 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
           aria-autocomplete="list"
           aria-labelledby={labelId}
           aria-invalid={Boolean(error)}
+          aria-activedescendant={
+            open && filtered[highlight] ? optionId(filtered[highlight].value) : undefined
+          }
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
             setHighlight(0);
             if (error) setError(null);
+            if (selectedOption && e.target.value !== selectedOption.label) {
+              onSelect('');
+            }
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKey}
@@ -123,6 +143,7 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
                   <button
                     type="button"
                     role="option"
+                    id={optionId(opt.value)}
                     aria-selected={isSelected}
                     className={`slate-dropdown-item${isHighlighted ? ' slate-dropdown-item--hl' : ''}${
                       isSelected ? ' slate-dropdown-item--selected' : ''

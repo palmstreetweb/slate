@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
 import { pipeQuestionCopy } from '@/logic/piping.js';
+import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 
 import { WelcomeScreen } from './WelcomeScreen.js';
 import { StatementScreen } from './StatementScreen.js';
@@ -99,6 +100,8 @@ export function QuestionRenderer({
     [rawQuestion, answers, score],
   );
 
+  const { schedule: scheduleAutoAdvance } = useAutoAdvanceTimer(rawQuestion.id);
+
   const ping = () => playInteractionSound?.();
   const advanceWithSound = () => {
     ping();
@@ -110,13 +113,13 @@ export function QuestionRenderer({
   const selectAndAdvance = (id: string, value: string) => {
     ping();
     setAnswer(id, value);
-    window.setTimeout(() => advance(), 220);
+    scheduleAutoAdvance(() => advance());
   };
 
   const selectScaleAndAdvance = (id: string, value: number) => {
     ping();
     setAnswer(id, value);
-    window.setTimeout(() => advance(), 220);
+    scheduleAutoAdvance(() => advance());
   };
 
   switch (question.type) {

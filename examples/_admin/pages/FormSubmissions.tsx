@@ -11,6 +11,12 @@ import {
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
 import { AdminShell } from '../shell/AdminShell.js';
+import {
+  formatAnswerForQuestion,
+  formatSubmittedAt,
+  leadPreview,
+  titleOf,
+} from '../responsesFormat.js';
 
 type Props = { formId: string };
 
@@ -102,16 +108,14 @@ export function FormSubmissions({ formId }: Props) {
           <div style={{ display: 'flex', gap: 4, marginTop: 12 }}>
             <button
               type="button"
-              className={`slate-btn${view === 'list' ? ' slate-btn--primary' : ''}`}
-              style={{ fontSize: 12, padding: '4px 12px' }}
+              className={`slate-btn slate-btn--compact${view === 'list' ? ' slate-btn--primary' : ''}`}
               onClick={() => setView('list')}
             >
               Responses
             </button>
             <button
               type="button"
-              className={`slate-btn${view === 'summary' ? ' slate-btn--primary' : ''}`}
-              style={{ fontSize: 12, padding: '4px 12px' }}
+              className={`slate-btn slate-btn--compact${view === 'summary' ? ' slate-btn--primary' : ''}`}
               onClick={() => setView('summary')}
             >
               Summary
@@ -132,7 +136,7 @@ export function FormSubmissions({ formId }: Props) {
             <ResponseRow
               key={s.id}
               sub={s}
-              questionIds={answerQuestions(form.schema.questions).map((q) => q.id)}
+              questions={answerQuestions(form.schema.questions)}
               expanded={open === s.id}
               onToggle={() => setOpen(open === s.id ? null : s.id)}
               onDelete={async () => {
@@ -200,10 +204,6 @@ function downloadCsv(
 }
 
 /* ---------- summary view ---------- */
-
-function titleOf(q: Question): string {
-  return typeof q.title === 'string' ? q.title : q.id;
-}
 
 /** Distribution counts of option values across submissions. */
 function distribution(
@@ -383,19 +383,19 @@ function Muted({ children }: { children: React.ReactNode }) {
 
 function ResponseRow({
   sub,
-  questionIds,
+  questions,
   expanded,
   onToggle,
   onDelete,
 }: {
   sub: StoredSubmission;
-  questionIds: string[];
+  questions: Question[];
   expanded: boolean;
   onToggle: () => void;
   onDelete: () => void;
 }) {
   const a = sub.answers;
-  const summary = questionIds.slice(0, 2).map((qid) => formatValue(a[qid]));
+  const preview = leadPreview(questions, a);
   const when = new Date(sub.receivedAt);
 
   return (
@@ -404,6 +404,7 @@ function ResponseRow({
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
+        aria-label={`${expanded ? 'Collapse' : 'Expand'} response from ${timeAgo(when)}`}
         style={{
           width: '100%',
           padding: '12px 16px',
@@ -421,10 +422,10 @@ function ResponseRow({
         }}
       >
         <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {summary[0] || '—'}
+          {preview.primary}
         </span>
         <span style={{ color: 'var(--slate-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {summary[1] || '—'}
+          {preview.secondary}
         </span>
         <span style={{ color: 'var(--slate-dim)', fontSize: 11 }}>{humanizeMs(sub.meta.durationMs)}</span>
         <span style={{ color: 'var(--slate-dim)', fontSize: 11, textAlign: 'right' }}>
@@ -434,42 +435,24 @@ function ResponseRow({
 
       {expanded && (
         <div style={{ borderTop: '1px solid var(--slate-border)', padding: 16, display: 'grid', gap: 14 }}>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {questionIds.map((qid) => {
-              const v = a[qid];
+          <p style={{ margin: 0, fontSize: 11, color: 'var(--slate-dim)' }}>
+            Submitted {formatSubmittedAt(sub.receivedAt)} · took {humanizeMs(sub.meta.durationMs)}
+          </p>
+          <div style={{ display: 'grid', gap: 14 }}>
+            {questions.map((q) => {
+              const v = a[q.id];
               return (
-                <div key={qid} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12 }}>
-                  <span style={{ fontSize: 11, color: 'var(--slate-dim)', fontFamily: 'var(--slate-font-mono)', paddingTop: 2 }}>
-                    {qid}
+                <div key={q.id} style={{ display: 'grid', gap: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--slate-text)' }}>
+                    {titleOf(q)}
                   </span>
-                  <span style={{ fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                    {formatValue(v)}
+                  <span style={{ fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--slate-muted)' }}>
+                    {formatAnswerForQuestion(q, v)}
                   </span>
                 </div>
               );
             })}
           </div>
-
-          <details>
-            <summary style={{ cursor: 'pointer', fontSize: 11, color: 'var(--slate-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Meta + raw payload
-            </summary>
-            <pre
-              style={{
-                marginTop: 8,
-                background: 'var(--slate-bg)',
-                border: '1px solid var(--slate-border)',
-                padding: 12,
-                borderRadius: 6,
-                fontSize: 11,
-                lineHeight: 1.5,
-                overflow: 'auto',
-                maxHeight: 280,
-              }}
-            >
-{JSON.stringify({ answers: a, meta: sub.meta }, null, 2)}
-            </pre>
-          </details>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--slate-border)', paddingTop: 12 }}>
             <button type="button" className="slate-btn slate-btn--danger" onClick={onDelete}>
@@ -480,21 +463,6 @@ function ResponseRow({
       )}
     </div>
   );
-}
-
-function formatValue(v: unknown): string {
-  if (v === undefined || v === null || v === '') return '—';
-  if (Array.isArray(v)) return v.join(', ');
-  if (typeof File !== 'undefined' && v instanceof File) {
-    return `${v.name} (${Math.round(v.size / 1024)} KB)`;
-  }
-  if (typeof v === 'object') {
-    // Matrix answers: row → column(s).
-    return Object.entries(v as Record<string, unknown>)
-      .map(([row, col]) => `${row}: ${Array.isArray(col) ? col.join(', ') : String(col)}`)
-      .join(' · ');
-  }
-  return String(v);
 }
 
 function humanizeMs(ms: number): string {

@@ -33,6 +33,28 @@ function read(): StoredSubmission[] {
   }
 }
 
+export function probeSubmissionsStorage(): 'ok' | 'corrupt' {
+  if (typeof window === 'undefined') return 'ok';
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return 'ok';
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? 'ok' : 'corrupt';
+  } catch {
+    return 'corrupt';
+  }
+}
+
+export function resetSubmissionsStorage(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignored
+  }
+  listeners.forEach((l) => l([]));
+}
+
 function write(subs: StoredSubmission[]): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(subs));

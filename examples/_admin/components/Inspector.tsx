@@ -316,7 +316,12 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                   className="slate-input"
                   type="number"
                   value={question.min}
-                  onChange={(e) => onChange({ min: Number(e.target.value) } as Partial<Question>)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') return;
+                    const n = Number(raw);
+                    if (!Number.isNaN(n)) onChange({ min: n } as Partial<Question>);
+                  }}
                 />
               </Field>
               <Field label="Max Value">
@@ -324,7 +329,12 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                   className="slate-input"
                   type="number"
                   value={question.max}
-                  onChange={(e) => onChange({ max: Number(e.target.value) } as Partial<Question>)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') return;
+                    const n = Number(raw);
+                    if (!Number.isNaN(n)) onChange({ max: n } as Partial<Question>);
+                  }}
                 />
               </Field>
             </Row>
@@ -691,11 +701,10 @@ function OptionsEditor({
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
         <button
           type="button"
-          className="slate-btn slate-btn--ghost"
+          className="slate-btn slate-btn--ghost slate-btn--compact"
           onClick={add}
-          style={{ fontSize: 12, padding: '4px 8px' }}
         >
-          + Add Option
+          <span className="slate-btn-plus">+</span> Add Option
         </button>
         {withScore && (
           <button
@@ -808,11 +817,10 @@ function PictureOptionsEditor({
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button
           type="button"
-          className="slate-btn slate-btn--ghost"
+          className="slate-btn slate-btn--ghost slate-btn--compact"
           onClick={add}
-          style={{ fontSize: 12, padding: '4px 8px' }}
         >
-          + Add Option
+          <span className="slate-btn-plus">+</span> Add Option
         </button>
         <button
           type="button"

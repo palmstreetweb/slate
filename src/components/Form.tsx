@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormProps, PartialMeta, Schema, SubmitMeta } from '@/types/Schema.js';
 import { useFormState } from '@/hooks/useFormState.js';
+import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 import { useAutosave } from '@/hooks/useAutosave.js';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
 import { useTheme } from '@/hooks/useTheme.js';
@@ -78,6 +79,10 @@ export function Form<S extends Schema>({
     hydrate,
   } = useFormState(schema);
 
+  const { schedule: scheduleAutoAdvance, clear: clearAutoAdvance } = useAutoAdvanceTimer(
+    currentQuestion?.id,
+  );
+
   /* ---------- save-and-resume (ADR-017) ---------- */
 
   const resumeEnabled = Boolean(resume && schema.id);
@@ -114,6 +119,11 @@ export function Form<S extends Schema>({
     next();
   }, [playInteractionSound, next]);
 
+  const backWithClear = useCallback(() => {
+    clearAutoAdvance();
+    back();
+  }, [clearAutoAdvance, back]);
+
   /* ---------- keyboard handlers ---------- */
 
   const onSelectChoice = useCallback(
@@ -125,7 +135,7 @@ export function Form<S extends Schema>({
         playInteractionSound();
         setAnswer(currentQuestion.id, opt.value);
         // Auto-advance per brief §5.
-        window.setTimeout(() => next(), 220);
+        scheduleAutoAdvance(() => next());
       } else if (currentQuestion.type === 'picture_choice') {
         const opt = currentQuestion.options[idx];
         if (!opt) return;
@@ -139,16 +149,16 @@ export function Form<S extends Schema>({
           });
         } else {
           setAnswer(currentQuestion.id, opt.value);
-          window.setTimeout(() => next(), 220);
+          scheduleAutoAdvance(() => next());
         }
       } else if (currentQuestion.type === 'yes_no') {
         playInteractionSound();
         setAnswer(currentQuestion.id, idx === 0 ? 'yes' : 'no');
-        window.setTimeout(() => next(), 220);
+        scheduleAutoAdvance(() => next());
       } else if (currentQuestion.type === 'legal') {
         playInteractionSound();
         setAnswer(currentQuestion.id, idx === 0 ? 'accept' : 'decline');
-        window.setTimeout(() => next(), 220);
+        scheduleAutoAdvance(() => next());
       } else if (currentQuestion.type === 'multi_choice') {
         const opt = currentQuestion.options[idx];
         if (!opt) return;
@@ -162,7 +172,7 @@ export function Form<S extends Schema>({
         });
       }
     },
-    [currentQuestion, setAnswer, next, playInteractionSound],
+    [currentQuestion, setAnswer, next, playInteractionSound, scheduleAutoAdvance],
   );
 
   const onSelectScale = useCallback(
@@ -171,15 +181,15 @@ export function Form<S extends Schema>({
       if (currentQuestion.type !== 'scale' && currentQuestion.type !== 'nps') return;
       playInteractionSound();
       setAnswer(currentQuestion.id, value);
-      window.setTimeout(() => next(), 220);
+      scheduleAutoAdvance(() => next());
     },
-    [currentQuestion, setAnswer, next, playInteractionSound],
+    [currentQuestion, setAnswer, next, playInteractionSound, scheduleAutoAdvance],
   );
 
   useKeyboardNav({
     currentQ: currentQuestion,
     onAdvance: advanceWithSound,
-    onBack: back,
+    onBack: backWithClear,
     onSelectChoice,
     onSelectScale,
   });
@@ -213,6 +223,7 @@ export function Form<S extends Schema>({
   /* ---------- onSubmit (fires exactly once on entering thanks) ---------- */
 
   const submittedRef = useRef(false);
+  const submitGenRef = useRef(0);
 
   // `submitStatus` is a dependency so that retrySubmit (which resets the
   // ref and flips status back to 'idle') re-triggers this effect — without
@@ -220,6 +231,7 @@ export function Form<S extends Schema>({
   useEffect(() => {
     if (currentQuestion?.type !== 'thanks' || submittedRef.current) return;
     submittedRef.current = true;
+    const generation = ++submitGenRef.current;
 
     const meta: SubmitMeta = {
       startedAt: state.startedAt,
@@ -242,6 +254,7 @@ export function Form<S extends Schema>({
     // success state on the second mount.
     Promise.resolve(onSubmit(getSubmitAnswers() as never, meta))
       .then(() => {
+        if (generation !== submitGenRef.current) return;
         setSubmitStatus('success');
         // Completed — drop the save-and-resume snapshot (ADR-017).
         if (resumeEnabled) clearAutosave();
@@ -249,6 +262,7 @@ export function Form<S extends Schema>({
         if (redirectUrl) window.location.assign(redirectUrl);
       })
       .catch((err: unknown) => {
+        if (generation !== submitGenRef.current) return;
         setSubmitStatus('error');
         const msg = err instanceof Error ? err.message : null;
         setSubmitErrorMsg(msg ?? errorMessage);
@@ -269,16 +283,19 @@ export function Form<S extends Schema>({
 
   const retrySubmit = useCallback(() => {
     submittedRef.current = false;
+    submitGenRef.current += 1;
     setSubmitStatus('idle');
     setSubmitErrorMsg(null);
   }, []);
 
   const restartForm = useCallback(() => {
+    clearAutoAdvance();
     submittedRef.current = false;
+    submitGenRef.current += 1;
     setSubmitStatus('idle');
     setSubmitErrorMsg(null);
     restart();
-  }, [restart]);
+  }, [clearAutoAdvance, restart]);
 
   /* ---------- derived UI counts ---------- */
 
@@ -314,7 +331,7 @@ export function Form<S extends Schema>({
       <TopBar
         brandName={schema.brand.name}
         showBack={showBack}
-        onBack={back}
+        onBack={backWithClear}
         rightSlot={
           toggleable ? <ThemeToggle mode={themeMode} onToggle={toggle} ref={toggleRef} /> : null
         }

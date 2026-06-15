@@ -5,9 +5,10 @@
 
 'use client';
 
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
+import { useFocusTrap } from '../useFocusTrap.js';
 import {
   buildDevPreviewUrl,
   buildPublicShareUrl,
@@ -36,6 +37,7 @@ export function SharePanel({
   onSlugChange,
 }: Props) {
   const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
   const publicBase = getPublicFormBase();
   const effectiveSlug = resolveFormSlug({ slug, name: formName, id: formId });
   const publicUrl = buildPublicShareUrl(effectiveSlug);
@@ -45,22 +47,18 @@ export function SharePanel({
   const [previewQr, setPreviewQr] = useState<string | null>(null);
   const [copied, setCopied] = useState<'public' | 'preview' | null>(null);
 
+  useFocusTrap(panelRef, open, onClose);
+
   useEffect(() => {
     if (!open) return;
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
 
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     return () => {
-      window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, onClose]);
+  }, [open]);
 
   useEffect(() => {
     if (!open || !publicUrl) {
@@ -128,6 +126,7 @@ export function SharePanel({
         }}
       >
         <div
+          ref={panelRef}
           className="slate-share-panel"
           role="dialog"
           aria-modal="true"
