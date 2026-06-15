@@ -20,8 +20,11 @@ type AuthState = {
 };
 
 type AuthContextValue = AuthState & {
+  authError: string | null;
   signInWithEmail: (email: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  clearAuthError: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -38,10 +41,21 @@ async function canSignIn(email: string): Promise<boolean> {
   return Boolean(data);
 }
 
+function authRedirectUrl(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const path = window.location.pathname || '/';
+  return `${window.location.origin}${path}`;
+}
+
+const UNAUTHORIZED_MSG =
+  'This email is not authorized for Slate. Ask a PSW admin to add you.';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(isSupabaseConfigured());
+  const [checkingTeam, setCheckingTeam] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [isTeam, setIsTeam] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -71,11 +85,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     let mounted = true;
-    void canSignIn(session.user.email).then((ok) => {
-      if (mounted) setIsTeam(ok);
-    });
+    setCheckingTeam(true);
+    void canSignIn(session.user.email)
+      .then(async (ok) => {
+        if (!mounted) return;
+        if (!ok) {
+          setAuthError(UNAUTHORIZED_MSG);
+          await getSupabase().auth.signOut();
+          return;
+        }
+        setAuthError(null);
+        setIsTeam(true);
+      })
+      .finally(() => {
+        if (mounted) setCheckingTeam(false);
+      });
     return () => {
       mounted = false;
+      setCheckingTeam(false);
     };
   }, [session]);
 
@@ -86,16 +113,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const trimmed = email.trim().toLowerCase();
     const allowed = await canSignIn(trimmed);
     if (!allowed) {
-      return { error: 'This email is not authorized for Slate. Ask a PSW admin to add you.' };
+      return { error: UNAUTHORIZED_MSG };
     }
     const supabase = getSupabase();
-    const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined;
+    const redirectTo = authRedirectUrl();
     const { error } = await supabase.auth.signInWithOtp({
       email: trimmed,
       options: { emailRedirectTo: redirectTo },
     });
     return { error: error?.message ?? null };
   }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      return { error: 'Supabase is not configured.' };
+    }
+    setAuthError(null);
+    const supabase = getSupabase();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: authRedirectUrl(),
+        queryParams: { prompt: 'select_account' },
+      },
+    });
+    return { error: error?.message ?? null };
+  }, []);
+
+  const clearAuthError = useCallback(() => setAuthError(null), []);
 
   const signOut = useCallback(async () => {
     if (!isSupabaseConfigured()) return;
@@ -104,14 +149,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      loading,
+      loading: loading || checkingTeam,
       session,
       user: session?.user ?? null,
       isPswTeam: isTeam,
+      authError,
       signInWithEmail,
+      signInWithGoogle,
       signOut,
+      clearAuthError,
     }),
-    [loading, session, isTeam, signInWithEmail, signOut],
+    [loading, checkingTeam, session, isTeam, authError, signInWithEmail, signInWithGoogle, signOut, clearAuthError],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
