@@ -15,15 +15,13 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] {
-  /* Body / UI: Inter for density. Display / page titles: Fraunces serif
-     to match palmstreetweb.com's editorial feel — see _seedForms etc.
-     The studio is the same brand as the marketing site, just admin-shaped. */
-  --slate-font-display: 'Fraunces', Georgia, serif;
+  /* Admin chrome is sans-first (matches brand/index.html). Inter for all UI + headings. */
+  --slate-font-display: 'Inter', system-ui, sans-serif;
   --slate-font-body: 'Inter', system-ui, sans-serif;
   --slate-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --slate-radius: 8px;
   --slate-border-width: 1px;
-  --slate-title-weight: 500;
+  --slate-title-weight: 600;
   --slate-title-tracking: -0.025em;
   --slate-title-line-height: 1.08;
   --slate-title-size: clamp(1.75rem, 2.6vw, 2rem);
@@ -227,9 +225,10 @@
 
 /* ---------- inputs ---------- */
 
-[data-slate-forms][data-theme-name='slate'] .slate-input,
-[data-slate-forms][data-theme-name='slate'] .slate-textarea,
-[data-slate-forms][data-theme-name='slate'] .slate-select {
+/* Respondent Form output nests inside the shell — keep engine underline fields there. */
+[data-slate-forms][data-theme-name='slate'] .slate-input:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-input),
+[data-slate-forms][data-theme-name='slate'] .slate-textarea:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-textarea),
+[data-slate-forms][data-theme-name='slate'] .slate-select:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-select) {
   width: 100%;
   padding: 8px 12px;
   font-family: inherit;
@@ -243,9 +242,9 @@
   transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-input:focus,
-[data-slate-forms][data-theme-name='slate'] .slate-textarea:focus,
-[data-slate-forms][data-theme-name='slate'] .slate-select:focus,
+[data-slate-forms][data-theme-name='slate'] .slate-input:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-input):focus,
+[data-slate-forms][data-theme-name='slate'] .slate-textarea:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-textarea):focus,
+[data-slate-forms][data-theme-name='slate'] .slate-select:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-select):focus,
 [data-slate-forms][data-theme-name='slate'] .slate-select-trigger:focus-visible,
 [data-slate-forms][data-theme-name='slate'] .slate-select-trigger--open {
   border-color: var(--slate-accent);
@@ -526,8 +525,7 @@
   font-family: var(--slate-font-mono);
 }
 
-/* Big page heading (Fraunces serif) — Dashboard's "Your forms",
-   FormSubmissions's "Responses", etc. */
+/* Page heading — Dashboard "Your forms", submissions title, etc. */
 [data-slate-forms][data-theme-name='slate'] .slate-page-title {
   font-family: var(--slate-font-display);
   font-size: var(--slate-title-size);
@@ -643,6 +641,22 @@
   to { opacity: 1; }
 }
 
+@keyframes slate-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slate-page {
+  min-height: 100vh;
+  animation: slate-page-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @keyframes slate-dialog-in {
   from {
     opacity: 0;
@@ -692,7 +706,7 @@
   margin: 0 0 8px;
   font-family: var(--slate-font-display);
   font-size: 22px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
   color: var(--slate-text);
@@ -727,6 +741,10 @@
 @media (prefers-reduced-motion: reduce) {
   [data-slate-forms][data-theme-name='slate'] .slate-dialog-backdrop,
   [data-slate-forms][data-theme-name='slate'] .slate-dialog {
+    animation: none;
+  }
+
+  .slate-page {
     animation: none;
   }
 }
@@ -805,13 +823,64 @@
   left: 4px;
   right: 4px;
   height: 2px;
-  background: var(--slate-accent);
+  background: var(--chrome-red);
   border-radius: 1px;
   pointer-events: none;
   z-index: 2;
+  opacity: 1;
+  transition: opacity 120ms ease;
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-outline-row[draggable='true']:active {
+[data-slate-forms][data-theme-name='slate'] .slate-outline-item--drop-after::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: var(--chrome-red);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 1;
+  transition: opacity 120ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row--source {
+  visibility: hidden;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row--pending-drag {
+  cursor: grabbing;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  margin: 0;
+  filter: drop-shadow(0 10px 28px rgb(0 0 0 / 0.22)) drop-shadow(0 2px 8px rgb(0 0 0 / 0.1));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row--lifted {
+  width: 100%;
+  cursor: grabbing;
+  background: var(--chrome-panel);
+  border: 1px solid var(--chrome-line);
+  color: var(--chrome-ink);
+  box-shadow: none;
+  transform: scale(1.02) rotate(-0.4deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slate-forms][data-theme-name='slate'] .slate-outline-row--lifted {
+    transform: none;
+  }
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row[draggable='true']:active,
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row--pending-drag,
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row--lifted {
   cursor: grabbing;
 }
 
@@ -829,11 +898,18 @@
   text-align: left;
   font-family: inherit;
   font-size: 13px;
-  color: var(--slate-text);
+  color: var(--chrome-ink);
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row:active:not(.slate-outline-row--source) {
+  background: var(--chrome-panel-2);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-row:hover {
-  background: var(--slate-bg-3);
+  background: var(--chrome-panel-2);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-row--selected {
