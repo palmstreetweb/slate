@@ -58,9 +58,6 @@ export function useOutlineDrag(
   const questionsRef = useRef(questions);
   const onMoveRef = useRef(onMove);
 
-  questionsRef.current = questions;
-  onMoveRef.current = onMove;
-
   const dragActive = phase === 'tracking';
   const isSettling = phase === 'settling' || phase === 'canceling';
   const showDropLine = (dragActive || isSettling) && lineY !== null;
@@ -118,6 +115,16 @@ export function useOutlineDrag(
     setDropIndex(next);
     syncDropLine(next);
   };
+
+  const finishSettleRef = useRef(finishSettle);
+  const resetRef = useRef(reset);
+  const updateDropTargetRef = useRef(updateDropTarget);
+  finishSettleRef.current = finishSettle;
+  resetRef.current = reset;
+  updateDropTargetRef.current = updateDropTarget;
+
+  questionsRef.current = questions;
+  onMoveRef.current = onMove;
 
   const beginPointerDrag = (
     id: string,
@@ -178,7 +185,7 @@ export function useOutlineDrag(
 
     const armFallback = () => {
       clearTimer();
-      timerRef.current = window.setTimeout(finishSettle, SETTLE_FALLBACK_MS);
+      timerRef.current = window.setTimeout(() => finishSettleRef.current(), SETTLE_FALLBACK_MS);
     };
 
     const onTransitionEnd = (event: TransitionEvent) => {
@@ -186,7 +193,7 @@ export function useOutlineDrag(
       if (!node || event.target !== node || event.propertyName !== 'transform') return;
       node.removeEventListener('transitionend', onTransitionEnd);
       clearTimer();
-      finishSettle();
+      finishSettleRef.current();
     };
 
     requestAnimationFrame(() => {
@@ -233,20 +240,20 @@ export function useOutlineDrag(
         width: session.origin.width,
         height: session.origin.height,
       });
-      updateDropTarget(e.clientY);
+      updateDropTargetRef.current(e.clientY);
     };
 
     const onPointerUp = () => {
       const session = sessionRef.current;
       if (!session?.active) {
-        reset();
+        resetRef.current();
         return;
       }
 
       const targetIndex = dropIndexRef.current;
       const release = ghostRef.current;
       if (targetIndex === null || !release) {
-        reset();
+        resetRef.current();
         return;
       }
 
@@ -265,7 +272,7 @@ export function useOutlineDrag(
     };
 
     const onPointerCancel = () => {
-      reset();
+      resetRef.current();
     };
 
     window.addEventListener('pointermove', onPointerMove);

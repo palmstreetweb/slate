@@ -5,6 +5,7 @@
  */
 
 import type { Schema } from '@/index.js';
+import { clearSubmissions } from './_submissionStore.js';
 
 const STORAGE_KEY = 'slate-forms';
 
@@ -33,13 +34,37 @@ function read(): FormRecord[] {
   }
 }
 
-function write(forms: FormRecord[]): void {
+/** Probe whether stored forms JSON is unreadable (without mutating). */
+export function probeFormsStorage(): 'ok' | 'corrupt' {
+  if (typeof window === 'undefined') return 'ok';
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(forms));
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return 'ok';
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? 'ok' : 'corrupt';
+  } catch {
+    return 'corrupt';
+  }
+}
+
+export function resetFormsStorage(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
   } catch {
     // ignored
   }
-  listeners.forEach((l) => l(forms));
+  listeners.forEach((l) => l([]));
+}
+
+function write(forms: FormRecord[]): boolean {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(forms));
+    listeners.forEach((l) => l(forms));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function id(): string {
@@ -54,7 +79,7 @@ export function getForm(formId: string): FormRecord | null {
   return read().find((f) => f.id === formId) ?? null;
 }
 
-export function createForm(opts: { name: string; schema: Schema }): FormRecord {
+export function createForm(opts: { name: string; schema: Schema }): FormRecord | null {
   const now = new Date().toISOString();
   const record: FormRecord = {
     id: id(),
@@ -63,14 +88,16 @@ export function createForm(opts: { name: string; schema: Schema }): FormRecord {
     updatedAt: now,
     schema: opts.schema,
   };
-  write([record, ...read()]);
-  return record;
+  return write([record, ...read()]) ? record : null;
 }
 
-export function updateForm(formId: string, patch: Partial<Omit<FormRecord, 'id' | 'createdAt'>>): FormRecord | null {
+export function updateForm(
+  formId: string,
+  patch: Partial<Omit<FormRecord, 'id' | 'createdAt'>>,
+): [FormRecord | null, boolean] {
   const all = read();
   const idx = all.findIndex((f) => f.id === formId);
-  if (idx === -1) return null;
+  if (idx === -1) return [null, false];
   const next: FormRecord = {
     ...all[idx]!,
     ...patch,
@@ -80,12 +107,12 @@ export function updateForm(formId: string, patch: Partial<Omit<FormRecord, 'id' 
   };
   const copy = [...all];
   copy[idx] = next;
-  write(copy);
-  return next;
+  return [next, write(copy)];
 }
 
-export function deleteForm(formId: string): void {
-  write(read().filter((f) => f.id !== formId));
+export function deleteForm(formId: string): boolean {
+  clearSubmissions(formId);
+  return write(read().filter((f) => f.id !== formId));
 }
 
 export function duplicateForm(formId: string): FormRecord | null {

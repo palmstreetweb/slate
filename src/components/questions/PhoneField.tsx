@@ -37,6 +37,7 @@ export function PhoneField({ question, answers, initialValue, onAnswer, onAdvanc
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const submittingRef = useRef(false);
   const labelId = useId();
 
   useEffect(() => {
@@ -44,22 +45,22 @@ export function PhoneField({ question, answers, initialValue, onAnswer, onAdvanc
   }, [question.id]);
 
   const submit = async () => {
-    // Engine-level required check first (cheap).
-    const presence = validate(question, value);
-    if (presence) {
-      setError(presence.message);
-      return;
-    }
-    if (!value.trim() && !question.required) {
-      onAnswer('');
-      onAdvance();
-      return;
-    }
-
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
+      // Engine-level required check first (cheap).
+      const presence = validate(question, value);
+      if (presence) {
+        setError(presence.message);
+        return;
+      }
+      if (!value.trim() && !question.required) {
+        onAnswer('');
+        onAdvance();
+        return;
+      }
+
       const lib = await loadLib();
-      // libphonenumber-js types accept a string country code; cast it to its
-      // CountryCode union without bringing the type into the public surface.
       const country = (question.defaultCountry ?? 'US') as Parameters<
         typeof lib.parsePhoneNumberFromString
       >[1];
@@ -73,6 +74,8 @@ export function PhoneField({ question, answers, initialValue, onAnswer, onAdvanc
       onAdvance();
     } catch {
       setError('Could not parse that phone number');
+    } finally {
+      submittingRef.current = false;
     }
   };
 

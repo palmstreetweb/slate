@@ -97,7 +97,7 @@ function Dialog({
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
-  // ESC closes; Enter confirms. Trap focus to the dialog.
+  // ESC closes. Confirm button is focused on open — Enter activates it natively.
   useEffect(() => {
     previouslyFocused.current = document.activeElement as HTMLElement | null;
     confirmBtnRef.current?.focus({ preventScroll: true });
@@ -106,9 +106,6 @@ function Dialog({
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose(false);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        onClose(true);
       }
     };
     window.addEventListener('keydown', onKey);

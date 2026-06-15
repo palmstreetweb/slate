@@ -15,7 +15,7 @@
  * a stale schema.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   FormSound,
   Question,
@@ -26,7 +26,7 @@ import type {
 } from '@/index.js';
 import { checkSchema, defineSchema } from '@/index.js';
 import { playFormSound } from '@/utils/formSounds.js';
-import { createForm, getForm, updateForm, type FormRecord } from '../_formsStore.js';
+import { createForm, getForm, subscribe, updateForm, type FormRecord } from '../_formsStore.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
 import { AdminShell } from '../shell/AdminShell.js';
@@ -43,30 +43,33 @@ type Props = {
 };
 
 export function FormEditor({ formId }: Props) {
+  const creatingRef = useRef(false);
+
   // /forms/new → create + redirect.
   useEffect(() => {
-    if (formId === null) {
-      const created = createForm({
-        name: 'Untitled form',
-        schema: defineSchema({
-          // Brand mirrors form name so the sync below picks up renames.
-          brand: { name: 'Untitled form' },
-          theme: 'classic',
-          themeMode: 'toggle',
-          questions: [
-            { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
-            { id: 'q1', type: 'short_text', title: 'First question?', required: true },
-            {
-              id: 'done',
-              type: 'thanks',
-              title: "You're all set.",
-              cta: 'Submit another',
-            },
-          ],
-        }),
-      });
-      navigate(`/forms/${created.id}/edit`);
-    }
+    if (formId !== null) return;
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+    const created = createForm({
+      name: 'Untitled form',
+      schema: defineSchema({
+        // Brand mirrors form name so the sync below picks up renames.
+        brand: { name: 'Untitled form' },
+        theme: 'classic',
+        themeMode: 'toggle',
+        questions: [
+          { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
+          { id: 'q1', type: 'short_text', title: 'First question?', required: true },
+          {
+            id: 'done',
+            type: 'thanks',
+            title: "You're all set.",
+            cta: 'Submit another',
+          },
+        ],
+      }),
+    });
+    if (created) navigate(`/forms/${created.id}/edit`);
   }, [formId]);
 
   if (formId === null) {
@@ -81,6 +84,7 @@ export function FormEditor({ formId }: Props) {
 
 function FormEditorBody({ formId }: { formId: string }) {
   const initial: FormRecord | null = useMemo(() => getForm(formId), [formId]);
+  const [formExists, setFormExists] = useState(() => getForm(formId) !== null);
   const [name, setName] = useState<string>(initial?.name ?? 'Untitled form');
   const [slug, setSlug] = useState<string>(() => {
     if (initial?.slug?.trim()) return slugify(initial.slug);
@@ -90,11 +94,18 @@ function FormEditorBody({ formId }: { formId: string }) {
   const [shareOpen, setShareOpen] = useState(false);
   const [schema, setSchema] = useState<Schema | null>(initial?.schema ?? null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string>(() => {
     const first = initial?.schema.questions[0];
     return first?.id ?? '';
   });
   const confirm = useConfirm();
+
+  useEffect(() => {
+    const sync = () => setFormExists(getForm(formId) !== null);
+    sync();
+    return subscribe(sync);
+  }, [formId]);
 
   const getSnapshot = useCallback(
     () => ({
@@ -123,12 +134,21 @@ function FormEditorBody({ formId }: { formId: string }) {
   // Preview right after a setting change never reads stale localStorage.
   useEffect(() => {
     if (!schema) return;
-    const updated = updateForm(formId, {
+    const [updated, persisted] = updateForm(formId, {
       name,
       slug: slug || undefined,
       schema,
     });
-    if (updated) setSavedAt(new Date());
+    if (!updated) {
+      setSaveError('This form was deleted or could not be found.');
+      return;
+    }
+    if (persisted) {
+      setSavedAt(new Date());
+      setSaveError(null);
+    } else {
+      setSaveError('Could not save — localStorage may be full or unavailable.');
+    }
   }, [name, slug, schema, formId]);
 
   // If the selected question was deleted (or doesn't exist after a schema
@@ -141,7 +161,7 @@ function FormEditorBody({ formId }: { formId: string }) {
     }
   }, [schema, selectedId]);
 
-  if (!schema || !initial) {
+  if (!schema || !initial || !formExists) {
     return (
       <AdminShell
         crumbs={
@@ -281,15 +301,15 @@ function FormEditorBody({ formId }: { formId: string }) {
     });
   };
 
-  const bulkDelete = async (ids: string[]) => {
-    if (ids.length === 0) return;
+  const bulkDelete = async (ids: string[]): Promise<boolean> => {
+    if (ids.length === 0) return false;
     const ok = await confirm({
       title: `Delete ${ids.length} ${ids.length === 1 ? 'question' : 'questions'}?`,
       message: 'Removes them from this form. Existing responses keep their data in localStorage.',
       confirmLabel: 'Delete',
       danger: true,
     });
-    if (!ok) return;
+    if (!ok) return false;
     pushHistory();
     setSchema((s) => {
       if (!s) return s;
@@ -300,6 +320,7 @@ function FormEditorBody({ formId }: { formId: string }) {
         ),
       };
     });
+    return true;
   };
 
   const addQuestion = (type: QuestionType) => {
@@ -350,12 +371,12 @@ function FormEditorBody({ formId }: { formId: string }) {
           <span
             style={{
               fontSize: 11,
-              color: 'var(--slate-dim)',
+              color: saveError ? 'var(--slate-error)' : 'var(--slate-dim)',
               marginRight: 8,
               fontFamily: 'var(--slate-font-mono)',
             }}
           >
-            {savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved'}
+            {saveError ?? (savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved')}
           </span>
           <button
             type="button"
@@ -385,38 +406,25 @@ function FormEditorBody({ formId }: { formId: string }) {
         slug={slug}
         onSlugChange={setSlug}
       />
-      {issues.length > 0 && (
-        <div
-          role="alert"
-          style={{
-            margin: '0 0 0',
-            padding: '8px 16px',
-            background: 'rgb(220 38 38 / 0.08)',
-            borderBottom: '1px solid rgb(220 38 38 / 0.25)',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '4px 16px',
-            fontSize: 12,
-          }}
-        >
-          <strong style={{ color: 'var(--slate-error, #dc2626)' }}>
-            {issues.length} schema {issues.length === 1 ? 'issue' : 'issues'}:
-          </strong>
-          {issues.map((issue, i) => (
-            <button
-              key={i}
-              type="button"
-              className="slate-link"
-              style={{ fontSize: 12 }}
-              onClick={() => setSelectedId(issue.questionId)}
-            >
-              {issue.message}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="slate-editor-shell">
+        {issues.length > 0 && (
+          <div className="slate-editor-alert" role="alert">
+            <strong>{issues.length} schema {issues.length === 1 ? 'issue' : 'issues'}:</strong>
+            {issues.map((issue, i) => (
+              <button
+                key={i}
+                type="button"
+                className="slate-link"
+                style={{ fontSize: 12 }}
+                onClick={() => setSelectedId(issue.questionId)}
+              >
+                {issue.message}
+              </button>
+            ))}
+          </div>
+        )}
 
-      <div className="slate-editor">
+        <div className="slate-editor">
         <Outline
           schema={schema}
           selectedId={selectedQuestion.id}
@@ -425,7 +433,7 @@ function FormEditorBody({ formId }: { formId: string }) {
           onReorder={reorder}
           onMove={moveTo}
           onDuplicate={duplicateQuestion}
-          onBulkDelete={(ids) => void bulkDelete(ids)}
+          onBulkDelete={bulkDelete}
           name={name}
           onNameChange={handleNameChange}
           onBrandChange={(v) => patchSchema({ brand: { ...schema.brand, name: v } })}
@@ -463,6 +471,7 @@ function FormEditorBody({ formId }: { formId: string }) {
           }}
           canDelete={canDelete}
         />
+      </div>
       </div>
     </AdminShell>
   );

@@ -210,6 +210,11 @@
   font-weight: 700;
 }
 
+[data-slate-forms][data-theme-name='slate'] .slate-btn--ghost .slate-btn-plus {
+  color: var(--chrome-red);
+  font-weight: 700;
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-btn--new:hover {
   border-color: var(--chrome-red);
   background: var(--chrome-panel-2);
@@ -240,6 +245,19 @@
 [data-slate-forms][data-theme-name='slate'] .slate-btn--ghost:hover {
   background: var(--chrome-panel-2);
   color: var(--chrome-ink);
+  border-color: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--compact {
+  min-height: 0;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--compact.slate-btn--xs {
+  padding: 2px 8px;
+  font-size: 10px;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--danger {
@@ -394,7 +412,8 @@
   min-width: 0;
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-select-option:hover {
+[data-slate-forms][data-theme-name='slate'] .slate-select-option:hover,
+[data-slate-forms][data-theme-name='slate'] .slate-select-option--highlighted {
   background: var(--slate-bg-3);
 }
 
@@ -815,10 +834,30 @@
   padding: 0;
 }
 
+[data-slate-forms][data-theme-name='slate'] .slate-editor-shell {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--slate-header-h));
+  min-height: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-editor-alert {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  background: rgb(220 38 38 / 0.08);
+  border-bottom: 1px solid rgb(220 38 38 / 0.25);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 12px;
+  color: var(--slate-error, #dc2626);
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-editor {
   display: grid;
   grid-template-columns: 280px 1fr 340px;
-  height: calc(100vh - var(--slate-header-h));
+  flex: 1;
+  min-height: 0;
   background: var(--chrome-bg);
 }
 
@@ -1162,7 +1201,9 @@
 /* Reveal on row hover only. We intentionally omit :focus-within — selecting a
    row focuses its button, which would otherwise keep that row's controls
    stuck visible after the mouse leaves. */
-[data-slate-forms][data-theme-name='slate'] .slate-outline-list > li:hover .slate-outline-actions {
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > li:hover .slate-outline-actions,
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > li:focus-within .slate-outline-actions,
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > li:has(.slate-outline-row--selected) .slate-outline-actions {
   display: flex;
 }
 
@@ -1216,6 +1257,13 @@
   border-radius: var(--slate-radius-md);
   padding: 10px;
   box-shadow: var(--slate-shadow-card);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-popover--portal {
+  position: fixed;
+  z-index: 200;
+  max-height: min(70vh, 420px);
+  overflow-y: auto;
 }
 
 /* ----- canvas ----- */

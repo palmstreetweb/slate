@@ -124,6 +124,12 @@ describe('validation — scale', () => {
     expect(validate(q, -1)?.code).toBe('min');
     expect(validate(q, 11)?.code).toBe('max');
   });
+
+  it('rejects off-step values when step is set', () => {
+    const q: ScaleQuestion = { id: 'r', type: 'scale', title: 'Rate', min: 0, max: 10, step: 2 };
+    expect(validate(q, 4)).toBeNull();
+    expect(validate(q, 5)?.code).toBe('step');
+  });
 });
 
 describe('validation — single_choice', () => {

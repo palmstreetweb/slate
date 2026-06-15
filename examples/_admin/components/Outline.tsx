@@ -5,7 +5,8 @@
  * mode, brand) live at the top and bottom of this rail.
  */
 
-import { useState, type PointerEvent } from 'react';
+import { useState, useRef, useLayoutEffect, useEffect, type PointerEvent, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import type {
   FormSound,
   QuestionType,
@@ -49,7 +50,7 @@ type Props = {
   /** Drag-and-drop — move a question to an absolute index. */
   onMove: (id: string, toIndex: number) => void;
   onDuplicate: (id: string) => void;
-  onBulkDelete: (ids: string[]) => void;
+  onBulkDelete: (ids: string[]) => void | Promise<boolean>;
   // Form-level controls
   name: string;
   onNameChange: (v: string) => void;
@@ -76,6 +77,9 @@ export function Outline({
   onSoundChange,
 }: Props) {
   const [addOpen, setAddOpen] = useState(false);
+  const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({ visibility: 'hidden' });
+  const addAnchorRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -121,6 +125,130 @@ export function Outline({
 
   const showDragChrome = dragActive || isSettling;
 
+  const portalRoot =
+    addAnchorRef.current?.closest('[data-slate-forms][data-theme-name="slate"]') ?? document.body;
+
+  const repositionPopover = () => {
+    const anchor = addAnchorRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const width = Math.max(rect.width, 260);
+    const left = Math.min(rect.left, window.innerWidth - width - 8);
+    const spaceBelow = window.innerHeight - rect.bottom - 8;
+    const maxHeight = Math.min(420, Math.max(160, spaceBelow));
+    setPopoverStyle({
+      position: 'fixed',
+      top: rect.bottom + 6,
+      left,
+      width,
+      maxHeight,
+      visibility: 'visible',
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!addOpen) return;
+    repositionPopover();
+  }, [addOpen]);
+
+  useEffect(() => {
+    if (!addOpen) return;
+
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (addAnchorRef.current?.contains(t) || popoverRef.current?.contains(t)) return;
+      setAddOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAddOpen(false);
+    };
+    const onReposition = () => repositionPopover();
+
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onReposition);
+    window.addEventListener('scroll', onReposition, true);
+
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onReposition);
+      window.removeEventListener('scroll', onReposition, true);
+    };
+  }, [addOpen]);
+
+  const addPopover =
+    addOpen &&
+    createPortal(
+      <div
+        ref={popoverRef}
+        className="slate-popover slate-popover--portal"
+        style={popoverStyle}
+        role="dialog"
+        aria-label="Add question"
+      >
+        <p className="slate-label" style={{ marginBottom: 6 }}>
+          Add to Form
+        </p>
+        {Array.from(new Set(ADDABLE_TYPES.map((t) => t.group))).map((group) => (
+          <div key={group} style={{ marginBottom: 8 }}>
+            <p
+              style={{
+                margin: '6px 0 4px',
+                fontSize: 10,
+                color: 'var(--slate-dim)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                fontFamily: 'var(--slate-font-mono)',
+              }}
+            >
+              {group}
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+              {ADDABLE_TYPES.filter((t) => t.group === group).map((t) => (
+                <button
+                  key={t.type}
+                  type="button"
+                  className="slate-btn"
+                  style={{
+                    padding: '6px 8px',
+                    fontSize: 12,
+                    justifyContent: 'flex-start',
+                    minHeight: 30,
+                  }}
+                  onClick={() => {
+                    onAddQuestion(t.type);
+                    setAddOpen(false);
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'var(--slate-font-mono)',
+                      opacity: 0.6,
+                      marginRight: 4,
+                    }}
+                  >
+                    {TYPE_GLYPH[t.type]}
+                  </span>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            className="slate-btn slate-btn--ghost slate-btn--compact"
+            onClick={() => setAddOpen(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>,
+      portalRoot,
+    );
+
   return (
     <>
       <aside className="slate-rail slate-rail--left">
@@ -153,8 +281,7 @@ export function Outline({
             </p>
             <button
               type="button"
-              className="slate-btn slate-btn--ghost"
-              style={{ fontSize: 10, padding: '2px 8px' }}
+              className="slate-btn slate-btn--ghost slate-btn--compact slate-btn--xs"
               onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
             >
               {selectMode ? 'Done' : 'Select'}
@@ -167,12 +294,11 @@ export function Outline({
               </span>
               <button
                 type="button"
-                className="slate-btn slate-btn--danger"
-                style={{ fontSize: 10, padding: '2px 8px' }}
+                className="slate-btn slate-btn--danger slate-btn--compact slate-btn--xs"
                 disabled={checked.size === 0}
-                onClick={() => {
-                  onBulkDelete([...checked]);
-                  exitSelectMode();
+                onClick={async () => {
+                  const ok = await onBulkDelete([...checked]);
+                  if (ok) exitSelectMode();
                 }}
               >
                 Delete selected
@@ -322,79 +448,15 @@ export function Outline({
             ) : null}
           </div>
 
-          <div style={{ marginTop: 10, position: 'relative' }}>
-            {!addOpen ? (
-              <button
-                type="button"
-                className="slate-btn slate-btn--primary"
-                onClick={() => setAddOpen(true)}
-                style={{ width: '100%', justifyContent: 'center' }}
-              >
-                + Add
-              </button>
-            ) : (
-              <div className="slate-popover">
-                <p className="slate-label" style={{ marginBottom: 6 }}>
-                  Add to Form
-                </p>
-                {Array.from(new Set(ADDABLE_TYPES.map((t) => t.group))).map((group) => (
-                  <div key={group} style={{ marginBottom: 8 }}>
-                    <p
-                      style={{
-                        margin: '6px 0 4px',
-                        fontSize: 10,
-                        color: 'var(--slate-dim)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        fontFamily: 'var(--slate-font-mono)',
-                      }}
-                    >
-                      {group}
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-                      {ADDABLE_TYPES.filter((t) => t.group === group).map((t) => (
-                        <button
-                          key={t.type}
-                          type="button"
-                          className="slate-btn"
-                          style={{
-                            padding: '6px 8px',
-                            fontSize: 12,
-                            justifyContent: 'flex-start',
-                            minHeight: 30,
-                          }}
-                          onClick={() => {
-                            onAddQuestion(t.type);
-                            setAddOpen(false);
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontFamily: 'var(--slate-font-mono)',
-                              opacity: 0.6,
-                              marginRight: 4,
-                            }}
-                          >
-                            {TYPE_GLYPH[t.type]}
-                          </span>
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    className="slate-btn slate-btn--ghost"
-                    onClick={() => setAddOpen(false)}
-                    style={{ fontSize: 11, padding: '4px 8px' }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+          <div ref={addAnchorRef} style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              className="slate-btn slate-btn--primary"
+              onClick={() => setAddOpen(true)}
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              + Add
+            </button>
           </div>
         </div>
 
@@ -470,6 +532,7 @@ export function Outline({
           </div>
         </div>
       ) : null}
+      {addPopover}
     </>
   );
 }

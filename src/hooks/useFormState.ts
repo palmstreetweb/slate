@@ -26,8 +26,8 @@ export type FormState = {
   visible: Question[];
   /** All answers, including those for now-hidden questions (per ADR-005). */
   answers: LooseAnswers;
-  /** Stack of step indices for back navigation. */
-  history: number[];
+  /** Stack of question IDs for back navigation. */
+  history: string[];
   /** Last navigation direction, used by the transition layer. */
   direction: AnimDirection;
   /** True between transition start and end. */
@@ -74,7 +74,7 @@ export type UseFormStateApi = {
 type RawState = {
   step: number;
   answers: LooseAnswers;
-  history: number[];
+  history: string[];
   direction: AnimDirection;
   isAnimating: boolean;
   visitedIds: string[];
@@ -104,9 +104,15 @@ function makeReducer(allQuestions: ReadonlyArray<Question>) {
         const prev = s.answers[a.id];
         const resolved = typeof a.value === 'function' ? a.value(prev) : a.value;
         const newAnswers = { ...s.answers, [a.id]: resolved };
+        const oldVisible = visibleQuestions(allQuestions, s.answers);
         const newVisible = visibleQuestions(allQuestions, newAnswers);
-        const clampedStep = Math.min(s.step, Math.max(newVisible.length - 1, 0));
-        return { ...s, answers: newAnswers, step: clampedStep };
+        const currentId = oldVisible[Math.min(s.step, Math.max(oldVisible.length - 1, 0))]?.id;
+        let newStep = Math.min(s.step, Math.max(newVisible.length - 1, 0));
+        if (currentId) {
+          const idx = newVisible.findIndex((q) => q.id === currentId);
+          newStep = idx >= 0 ? idx : Math.min(s.step, Math.max(newVisible.length - 1, 0));
+        }
+        return { ...s, answers: newAnswers, step: newStep };
       }
       case 'go_next': {
         const visible = visibleQuestions(allQuestions, s.answers);
@@ -121,7 +127,7 @@ function makeReducer(allQuestions: ReadonlyArray<Question>) {
         if (next === s.step) return s;
         return {
           ...s,
-          history: [...s.history, s.step],
+          history: current ? [...s.history, current.id] : s.history,
           step: next,
           direction: next > s.step ? 'forward' : 'backward',
           isAnimating: true,
@@ -129,8 +135,13 @@ function makeReducer(allQuestions: ReadonlyArray<Question>) {
       }
       case 'go_back': {
         if (s.history.length === 0 && s.step === 0) return s;
+        const visible = visibleQuestions(allQuestions, s.answers);
         const popped = s.history.length > 0 ? s.history[s.history.length - 1] : undefined;
-        const target = popped ?? Math.max(s.step - 1, 0);
+        let target = Math.max(s.step - 1, 0);
+        if (popped) {
+          const idx = visible.findIndex((q) => q.id === popped);
+          if (idx >= 0) target = idx;
+        }
         return {
           ...s,
           history: s.history.slice(0, -1),
@@ -143,8 +154,10 @@ function makeReducer(allQuestions: ReadonlyArray<Question>) {
         const visible = visibleQuestions(allQuestions, s.answers);
         const target = Math.max(0, Math.min(a.step, visible.length - 1));
         if (target === s.step) return s;
+        const current = visible[Math.min(s.step, visible.length - 1)];
         return {
           ...s,
+          history: current ? [...s.history, current.id] : s.history,
           step: target,
           direction: a.direction,
           isAnimating: true,

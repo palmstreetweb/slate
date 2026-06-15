@@ -8,6 +8,7 @@
  */
 
 import type { Question } from '@/types/Question.js';
+import { isScaleStepValue } from '@/utils/scaleStep.js';
 
 export type ValidationError = { code: string; message: string };
 
@@ -156,6 +157,10 @@ export function validate(question: Question, answer: unknown): ValidationResult 
         }
         if (answer > question.max) {
           return { code: 'max', message: `Maximum is ${question.max}` };
+        }
+        const step = question.step ?? 1;
+        if (!isScaleStepValue(answer, question.min, question.max, step)) {
+          return { code: 'step', message: `Pick a value in steps of ${step}` };
         }
       }
       return null;

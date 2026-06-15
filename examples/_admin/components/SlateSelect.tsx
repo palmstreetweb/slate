@@ -12,6 +12,7 @@
 'use client';
 
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -52,6 +53,7 @@ export function SlateSelect<T extends string>({
   className,
 }: Props<T>) {
   const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({ visibility: 'hidden' });
   const [placement, setPlacement] = useState<MenuPlacement>('below');
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -61,6 +63,16 @@ export function SlateSelect<T extends string>({
 
   const selected = options.find((o) => o.value === value);
   const displayLabel = selected?.label ?? placeholder ?? value;
+
+  const selectIndex = useCallback(
+    (index: number) => {
+      const opt = options[index];
+      if (!opt) return;
+      onChange(opt.value);
+      setOpen(false);
+    },
+    [onChange, options],
+  );
 
   const repositionMenu = () => {
     const trigger = triggerRef.current;
@@ -114,11 +126,18 @@ export function SlateSelect<T extends string>({
 
   useLayoutEffect(() => {
     if (!open) return;
+    const idx = options.findIndex((o) => o.value === value);
+    setHighlight(idx >= 0 ? idx : 0);
     repositionMenu();
     menuRef.current
       ?.querySelector('.slate-select-option--selected')
       ?.scrollIntoView({ block: 'nearest' });
-  }, [open, options.length]);
+  }, [open, options.length, value, options]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    repositionMenu();
+  }, [highlight, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -129,7 +148,28 @@ export function SlateSelect<T extends string>({
       setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        return;
+      }
+      if (!open) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlight((h) => Math.min(h + 1, options.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlight((h) => Math.max(h - 1, 0));
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        setHighlight(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        setHighlight(Math.max(options.length - 1, 0));
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectIndex(highlight);
+      }
     };
     const onReposition = () => repositionMenu();
 
@@ -144,7 +184,7 @@ export function SlateSelect<T extends string>({
       window.removeEventListener('resize', onReposition);
       window.removeEventListener('scroll', onReposition, true);
     };
-  }, [open]);
+  }, [open, options, highlight, selectIndex]);
 
   const menu =
     open &&
@@ -157,19 +197,20 @@ export function SlateSelect<T extends string>({
         aria-label={ariaLabel}
         style={menuStyle}
       >
-        {options.map((opt) => {
+        {options.map((opt, i) => {
           const isSelected = opt.value === value;
+          const isHighlighted = i === highlight;
           return (
             <li key={opt.value || '__empty'} role="none">
               <button
                 type="button"
                 role="option"
                 aria-selected={isSelected}
-                className={`slate-select-option${isSelected ? ' slate-select-option--selected' : ''}`}
-                onClick={() => {
-                  onChange(opt.value);
-                  setOpen(false);
-                }}
+                className={`slate-select-option${isSelected ? ' slate-select-option--selected' : ''}${
+                  isHighlighted ? ' slate-select-option--highlighted' : ''
+                }`}
+                onMouseEnter={() => setHighlight(i)}
+                onClick={() => selectIndex(i)}
               >
                 <span className="slate-select-option-label">{opt.label}</span>
                 {isSelected && <span className="slate-select-check" aria-hidden />}
@@ -197,6 +238,12 @@ export function SlateSelect<T extends string>({
           aria-controls={listId}
           aria-label={ariaLabel}
           onClick={() => setOpen((cur) => !cur)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (!open) setOpen(true);
+            }
+          }}
         >
           <span className="slate-select-value">{displayLabel}</span>
           <span className="slate-select-chevron" aria-hidden />

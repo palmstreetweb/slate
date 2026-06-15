@@ -16,9 +16,12 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Question } from '@/types/Question.js';
 import { indexFromLetter } from '@/utils/letters.js';
+import { isScaleStepValue } from '@/utils/scaleStep.js';
+
+const DIGIT_COMPOSE_MS = 350;
 
 type Opts = {
   currentQ: Question | null;
@@ -47,8 +50,19 @@ export function useKeyboardNav({
   onSelectChoice,
   onSelectScale,
 }: Opts): void {
+  const digitBufferRef = useRef('');
+  const digitTimerRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!enabled || !currentQ) return undefined;
+
+    const clearDigitBuffer = () => {
+      digitBufferRef.current = '';
+      if (digitTimerRef.current !== null) {
+        window.clearTimeout(digitTimerRef.current);
+        digitTimerRef.current = null;
+      }
+    };
 
     const handler = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -123,15 +137,50 @@ export function useKeyboardNav({
         }
       }
 
-      // Scale / NPS selection — 0–9 (within the question's range).
+      // Scale / NPS — single digits and composed two-digit values (e.g. 10).
       if ((currentQ.type === 'scale' || currentQ.type === 'nps') && onSelectScale && !typing) {
         if (/^[0-9]$/.test(e.key)) {
-          const value = Number.parseInt(e.key, 10);
           const min = currentQ.type === 'nps' ? 0 : currentQ.min;
           const max = currentQ.type === 'nps' ? 10 : currentQ.max;
-          if (value >= min && value <= max) {
+          const step = currentQ.type === 'scale' ? (currentQ.step ?? 1) : 1;
+          const aligned = (v: number) => isScaleStepValue(v, min, max, step);
+
+          const nextBuf = digitBufferRef.current + e.key;
+
+          if (nextBuf.length === 2) {
+            const composed = Number.parseInt(nextBuf, 10);
+            if (aligned(composed)) {
+              e.preventDefault();
+              clearDigitBuffer();
+              onSelectScale(composed);
+              return;
+            }
+          }
+
+          const single = Number.parseInt(e.key, 10);
+          const minLead = Math.max(1, Math.ceil(min / 10));
+          const maxLead = Math.floor(max / 10);
+          const couldPrefixDouble = max >= 10 && single >= minLead && single <= maxLead;
+
+          if (couldPrefixDouble && digitBufferRef.current === '') {
             e.preventDefault();
-            onSelectScale(value);
+            digitBufferRef.current = e.key;
+            if (digitTimerRef.current !== null) {
+              window.clearTimeout(digitTimerRef.current);
+            }
+            digitTimerRef.current = window.setTimeout(() => {
+              const v = Number.parseInt(digitBufferRef.current, 10);
+              digitBufferRef.current = '';
+              digitTimerRef.current = null;
+              if (aligned(v)) onSelectScale(v);
+            }, DIGIT_COMPOSE_MS);
+            return;
+          }
+
+          if (aligned(single)) {
+            e.preventDefault();
+            clearDigitBuffer();
+            onSelectScale(single);
             return;
           }
         }
@@ -139,6 +188,9 @@ export function useKeyboardNav({
     };
 
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      clearDigitBuffer();
+    };
   }, [currentQ, enabled, escapeBack, onAdvance, onBack, onSelectChoice, onSelectScale]);
 }

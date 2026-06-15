@@ -5,11 +5,13 @@ import {
   deleteForm,
   duplicateForm,
   listForms,
+  probeFormsStorage,
+  resetFormsStorage,
   subscribe,
   updateForm,
   type FormRecord,
 } from '../_formsStore.js';
-import { countSubmissions, lastSubmissionAt } from '../_submissionStore.js';
+import { countSubmissions, lastSubmissionAt, probeSubmissionsStorage, resetSubmissionsStorage } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
 import { SharePanel } from '../components/SharePanel.js';
@@ -18,6 +20,16 @@ import { AdminShell } from '../shell/AdminShell.js';
 
 export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
+  const [storageIssue, setStorageIssue] = useState<'forms' | 'submissions' | 'both' | null>(
+    () => {
+      const formsBad = probeFormsStorage() === 'corrupt';
+      const subsBad = probeSubmissionsStorage() === 'corrupt';
+      if (formsBad && subsBad) return 'both';
+      if (formsBad) return 'forms';
+      if (subsBad) return 'submissions';
+      return null;
+    },
+  );
   const confirm = useConfirm();
 
   useEffect(() => subscribe(setForms), []);
@@ -39,7 +51,7 @@ export function Dashboard() {
         ],
       }),
     });
-    navigate(`/forms/${created.id}/edit`);
+    if (created) navigate(`/forms/${created.id}/edit`);
   };
 
   return (
@@ -51,6 +63,51 @@ export function Dashboard() {
         </button>
       }
     >
+      {storageIssue && (
+        <div
+          role="alert"
+          className="slate-card"
+          style={{
+            marginBottom: 20,
+            padding: 16,
+            borderColor: 'var(--slate-error)',
+            background: 'color-mix(in srgb, var(--slate-error) 8%, var(--chrome-panel))',
+          }}
+        >
+          <p style={{ margin: '0 0 8px', fontWeight: 600, color: 'var(--slate-error)' }}>
+            localStorage data could not be read
+          </p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--slate-muted)' }}>
+            {storageIssue === 'both'
+              ? 'Saved forms and responses appear corrupted. You can reset storage to start fresh.'
+              : storageIssue === 'forms'
+                ? 'Saved forms appear corrupted. Responses may still be intact.'
+                : 'Saved responses appear corrupted. Your forms may still be intact.'}
+          </p>
+          <button
+            type="button"
+            className="slate-btn slate-btn--danger"
+            onClick={async () => {
+              const ok = await confirm({
+                title: 'Reset local storage?',
+                message: 'Deletes all forms and responses saved in this browser. There is no undo.',
+                confirmLabel: 'Reset storage',
+                danger: true,
+              });
+              if (!ok) return;
+              if (storageIssue === 'forms' || storageIssue === 'both') resetFormsStorage();
+              if (storageIssue === 'submissions' || storageIssue === 'both') {
+                resetSubmissionsStorage();
+              }
+              setForms(listForms());
+              setStorageIssue(null);
+            }}
+          >
+            Reset storage
+          </button>
+        </div>
+      )}
+
       <div style={{ marginBottom: 28 }}>
         <h1 className="slate-page-title">Your forms</h1>
         <p className="slate-page-sub">
@@ -191,7 +248,9 @@ function FormCard({
         formId={form.id}
         formName={form.name}
         slug={slug}
-        onSlugChange={(next) => updateForm(form.id, { slug: slugify(next) })}
+        onSlugChange={(next) => {
+          updateForm(form.id, { slug: slugify(next) });
+        }}
       />
     </div>
   );
