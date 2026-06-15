@@ -1824,3 +1824,225 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- login (standalone — outside AdminShell) ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgb(var(--slate-accent-rgb) / 0.08), transparent 70%),
+    var(--chrome-bg);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-card {
+  width: min(420px, 100%);
+  padding: 36px 32px 32px;
+  background: var(--chrome-panel);
+  border: 1px solid var(--chrome-hair);
+  border-radius: var(--slate-radius-lg);
+  box-shadow: var(--slate-shadow-card);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--slate-fs-2xs);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-bars {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-bars i {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--chrome-ink);
+  opacity: 0.65;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-bars i:nth-child(1) {
+  width: 11px;
+  background: var(--chrome-red);
+  opacity: 1;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-bars i:nth-child(2) {
+  width: 18px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-bars i:nth-child(3) {
+  width: 14px;
+  opacity: 0.45;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-title {
+  margin: 0;
+  font-size: var(--slate-fs-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-lead {
+  margin: 6px 0 0;
+  font-size: var(--slate-fs-sm);
+  line-height: 1.55;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-field .slate-label {
+  font-size: var(--slate-fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-field .slate-input {
+  padding: 12px 14px;
+  font-size: var(--slate-fs-md);
+  background: var(--chrome-panel-2);
+  border: 1px solid var(--chrome-line);
+  border-radius: var(--slate-radius-md);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-field .slate-input:focus {
+  outline: none;
+  border-color: var(--chrome-red);
+  box-shadow: 0 0 0 3px rgb(var(--slate-accent-rgb) / 0.15);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-submit {
+  margin-top: 4px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 18px;
+  font-family: inherit;
+  font-size: var(--slate-fs-md);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #fff;
+  background: var(--chrome-red);
+  border: 1px solid color-mix(in srgb, var(--chrome-red) 88%, #000);
+  border-radius: var(--slate-radius-md);
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    filter 0.15s ease,
+    opacity 0.15s ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-submit:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-foot {
+  margin: 18px 0 0;
+  font-size: var(--slate-fs-xs);
+  line-height: 1.5;
+  color: var(--chrome-muted);
+  text-align: center;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-message {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  font-size: var(--slate-fs-sm);
+  line-height: 1.5;
+  border-radius: var(--slate-radius-md);
+  border: 1px solid var(--chrome-line);
+  background: var(--chrome-panel-2);
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-message--error {
+  border-color: color-mix(in srgb, var(--slate-error) 35%, var(--chrome-line));
+  background: color-mix(in srgb, var(--slate-error) 8%, var(--chrome-panel-2));
+  color: var(--slate-error);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-message--success {
+  border-color: color-mix(in srgb, var(--slate-success) 35%, var(--chrome-line));
+  background: color-mix(in srgb, var(--slate-success) 8%, var(--chrome-panel-2));
+  color: var(--slate-success);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-sent {
+  text-align: center;
+  padding: 8px 0 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-sent-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  font-size: 22px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--slate-success) 14%, var(--chrome-panel-2));
+  color: var(--slate-success);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-back {
+  margin-top: 20px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--slate-fs-sm);
+  color: var(--chrome-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-back:hover {
+  color: var(--chrome-ink);
+}
+

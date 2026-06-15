@@ -8,6 +8,8 @@ const repoRoot = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   root: 'examples',
+  /** Load `.env*` from repo root (where `.env.example` lives), not `examples/`. */
+  envDir: repoRoot,
   plugins: [
     react(),
     {
