@@ -6,17 +6,33 @@ import {
   duplicateForm,
   listForms,
   probeFormsStorage,
+  replaceAllForms,
   resetFormsStorage,
   subscribe,
   updateForm,
   type FormRecord,
 } from '../_formsStore.js';
-import { countSubmissions, lastSubmissionAt, probeSubmissionsStorage, resetSubmissionsStorage } from '../_submissionStore.js';
+import {
+  countSubmissions,
+  lastSubmissionAt,
+  listSubmissions,
+  probeSubmissionsStorage,
+  replaceAllSubmissions,
+  resetSubmissionsStorage,
+} from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
 import { SharePanel } from '../components/SharePanel.js';
 import { slugify } from '../shareUrls.js';
 import { AdminShell } from '../shell/AdminShell.js';
+import {
+  buildBackup,
+  downloadBackupJson,
+  parseBackup,
+  pickBackupFile,
+} from '../dataBackup.js';
+
+const WORKFLOW_TIP_KEY = 'slate-workflow-tip-dismissed';
 
 export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
@@ -31,6 +47,10 @@ export function Dashboard() {
     },
   );
   const confirm = useConfirm();
+  const [tipDismissed, setTipDismissed] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem(WORKFLOW_TIP_KEY) === '1';
+  });
 
   useEffect(() => subscribe(setForms), []);
 
@@ -54,13 +74,60 @@ export function Dashboard() {
     if (created) navigate(`/forms/${created.id}/edit`);
   };
 
+  const onExportBackup = () => {
+    const backup = buildBackup(listForms(), listSubmissions());
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadBackupJson(backup, `slate-backup-${stamp}.json`);
+  };
+
+  const onImportBackup = async () => {
+    const raw = await pickBackupFile();
+    if (!raw) return;
+    const backup = parseBackup(raw);
+    if (!backup) {
+      await confirm({
+        title: 'Import failed',
+        message: 'That file is not a valid Slate backup.',
+        confirmLabel: 'OK',
+        danger: false,
+      });
+      return;
+    }
+    const ok = await confirm({
+      title: 'Import backup?',
+      message: `Replace all forms and responses in this browser with ${backup.forms.length} form(s) and ${backup.submissions.length} response(s) from ${new Date(backup.exportedAt).toLocaleString()}?`,
+      confirmLabel: 'Import',
+      danger: true,
+    });
+    if (!ok) return;
+    replaceAllSubmissions(backup.submissions);
+    const persisted = replaceAllForms(backup.forms);
+    setForms(listForms());
+    if (!persisted) {
+      await confirm({
+        title: 'Import incomplete',
+        message: 'Responses imported, but forms could not be saved — localStorage may be full.',
+        confirmLabel: 'OK',
+        danger: false,
+      });
+    }
+  };
+
   return (
     <AdminShell
       crumbs={null}
       rightSlot={
-        <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
-          <span className="slate-btn-plus">+</span> New form
-        </button>
+        <>
+          <button type="button" className="slate-btn" onClick={onExportBackup}>
+            Export backup
+          </button>
+          <button type="button" className="slate-btn" onClick={() => void onImportBackup()}>
+            Import backup
+          </button>
+          <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
+            <span className="slate-btn-plus">+</span> New form
+          </button>
+        </>
       }
     >
       {storageIssue && (
@@ -104,6 +171,31 @@ export function Dashboard() {
             }}
           >
             Reset storage
+          </button>
+        </div>
+      )}
+
+      {!tipDismissed && (
+        <div
+          className="slate-card"
+          style={{ marginBottom: 20, padding: 16 }}
+          role="note"
+        >
+          <p style={{ margin: '0 0 8px', fontWeight: 600 }}>How Slate works on this site</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--slate-muted)', lineHeight: 1.5 }}>
+            Forms and responses save in this browser only — use the same browser and URL (
+            slateforms.vercel.app). To send a form to someone, use Share → Shareable Link. Export
+            backup occasionally so nothing is lost.
+          </p>
+          <button
+            type="button"
+            className="slate-btn"
+            onClick={() => {
+              window.localStorage.setItem(WORKFLOW_TIP_KEY, '1');
+              setTipDismissed(true);
+            }}
+          >
+            Got it
           </button>
         </div>
       )}

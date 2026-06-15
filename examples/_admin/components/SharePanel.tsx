@@ -195,6 +195,26 @@ export function SharePanel({
               </div>
             </label>
 
+            {portableUrl ? (
+              <ShareBlock
+                title="Shareable Link"
+                hint="Send this to respondents — works on any device. Responses show under Responses on this browser."
+                url={portableUrl}
+                qr={portableQr}
+                copied={copied === 'portable'}
+                onCopy={() => void doCopy('portable', portableUrl)}
+              />
+            ) : (
+              <div className="slate-share-callout">
+                <p className="slate-label" style={{ margin: '0 0 4px' }}>
+                  Shareable Link
+                </p>
+                <p className="slate-share-hint" style={{ margin: 0 }}>
+                  This form is too large for a portable link. Shorten the form or use a client embed URL.
+                </p>
+              </div>
+            )}
+
             {publicUrl ? (
               <ShareBlock
                 title="Public Link"
@@ -211,26 +231,6 @@ export function SharePanel({
                 <p className="slate-share-hint" style={{ margin: 0 }}>
                   Set <code className="slate-share-code">VITE_PUBLIC_FORM_BASE</code> in{' '}
                   <code className="slate-share-code">.env.local</code> for a client-site embed URL.
-                </p>
-              </div>
-            )}
-
-            {portableUrl ? (
-              <ShareBlock
-                title="Shareable Link"
-                hint="Anyone can open and fill this form. Responses appear in Responses when filled on your device, or under a portable id."
-                url={portableUrl}
-                qr={portableQr}
-                copied={copied === 'portable'}
-                onCopy={() => void doCopy('portable', portableUrl)}
-              />
-            ) : (
-              <div className="slate-share-callout">
-                <p className="slate-label" style={{ margin: '0 0 4px' }}>
-                  Shareable Link
-                </p>
-                <p className="slate-share-hint" style={{ margin: 0 }}>
-                  This form is too large for a portable link. Use a client embed URL or Dev Preview.
                 </p>
               </div>
             )}

@@ -57,6 +57,11 @@ export function resetFormsStorage(): void {
   listeners.forEach((l) => l([]));
 }
 
+/** Replace all stored forms (backup restore). Returns false on write failure. */
+export function replaceAllForms(forms: FormRecord[]): boolean {
+  return write(forms);
+}
+
 function write(forms: FormRecord[]): boolean {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(forms));

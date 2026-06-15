@@ -6,7 +6,7 @@
 
 **Live demo:** [slateforms.vercel.app](https://slateforms.vercel.app) — also `npm run dev` locally
 
-**Brand reference:** static page in [`brand/`](./brand/) (open `brand/index.html` locally; not deployed separately)
+**Brand reference:** [slateforms.vercel.app/brand](https://slateforms.vercel.app/brand) (static page in [`brand/`](./brand/))
 
 ---
 

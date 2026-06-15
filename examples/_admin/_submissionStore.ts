@@ -55,6 +55,11 @@ export function resetSubmissionsStorage(): void {
   listeners.forEach((l) => l([]));
 }
 
+/** Replace all stored submissions (backup restore). */
+export function replaceAllSubmissions(subs: StoredSubmission[]): void {
+  write(subs);
+}
+
 function write(subs: StoredSubmission[]): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(subs));
