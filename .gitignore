@@ -26,3 +26,6 @@ coverage/
 .tsup/
 .vite/
 .cache/
+
+# Vercel CLI link (local only)
+.vercel

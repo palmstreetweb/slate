@@ -4,7 +4,9 @@
 
 **Status:** `1.0.0-beta.1`. Internal Palm Street Web tooling — restricted npm scope.
 
-**Brand guide:** [`brand/`](./brand/) — live at [slateforms.vercel.app](https://slateforms.vercel.app).
+**Brand guide:** [`brand/`](./brand/) — [slateforms.vercel.app](https://slateforms.vercel.app)
+
+**Admin builder (demo):** [slate-tawny-theta.vercel.app](https://slate-tawny-theta.vercel.app) — run locally with `npm run dev`
 
 ---
 
