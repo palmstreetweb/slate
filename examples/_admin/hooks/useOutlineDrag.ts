@@ -182,8 +182,9 @@ export function useOutlineDrag(
     };
 
     const onTransitionEnd = (event: TransitionEvent) => {
-      if (event.target !== el || event.propertyName !== 'transform') return;
-      el.removeEventListener('transitionend', onTransitionEnd);
+      const node = ghostElRef.current;
+      if (!node || event.target !== node || event.propertyName !== 'transform') return;
+      node.removeEventListener('transitionend', onTransitionEnd);
       clearTimer();
       finishSettle();
     };
