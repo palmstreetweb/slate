@@ -502,12 +502,68 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-card-footer {
   border-top: 1px solid var(--chrome-hair);
-  padding: 12px 24px;
+  padding: 12px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
   background: var(--chrome-panel);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-body-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-body-btn:hover .slate-card-title {
+  color: var(--chrome-red);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-menu {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--chrome-ink);
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-menu-item:hover {
+  background: color-mix(in srgb, var(--chrome-red) 10%, transparent);
+  color: var(--chrome-red);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-menu-item--danger:hover {
+  background: color-mix(in srgb, var(--slate-error) 12%, transparent);
+  color: var(--slate-error);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-card-actions {

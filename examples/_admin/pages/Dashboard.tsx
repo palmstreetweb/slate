@@ -23,6 +23,7 @@ import {
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
 import { SharePanel } from '../components/SharePanel.js';
+import { FormCardMoreMenu } from '../components/FormCardMoreMenu.js';
 import { slugify } from '../shareUrls.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import {
@@ -264,74 +265,57 @@ function FormCard({
 
   return (
     <div className="slate-card">
-      <div className="slate-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div>
-          <button
-            type="button"
-            className="slate-link slate-card-title"
-            onClick={() => navigate(`/forms/${form.id}/edit`)}
-          >
-            {form.name}
-          </button>
-          <p className="slate-card-meta">
-            {form.schema.brand.name} · {String(form.schema.theme)}
-          </p>
-        </div>
+      <button
+        type="button"
+        className="slate-card-body-btn"
+        onClick={() => navigate(`/forms/${form.id}/edit`)}
+        aria-label={`Open ${form.name}`}
+      >
+        <div className="slate-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <span className="slate-card-title">{form.name}</span>
+            <p className="slate-card-meta">
+              {form.schema.brand.name} · {String(form.schema.theme)}
+            </p>
+          </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <span className="slate-badge">{qCount} {qCount === 1 ? 'question' : 'questions'}</span>
-          <span className="slate-badge">
-            {subCount} {subCount === 1 ? 'response' : 'responses'}
-          </span>
-          {lastAt && (
-            <span className="slate-badge">last {timeAgo(new Date(lastAt))}</span>
-          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <span className="slate-badge">{qCount} {qCount === 1 ? 'question' : 'questions'}</span>
+            <span className={`slate-badge${subCount > 0 ? ' slate-badge--accent' : ''}`}>
+              {subCount} {subCount === 1 ? 'response' : 'responses'}
+            </span>
+            {lastAt && (
+              <span className="slate-badge">last {timeAgo(new Date(lastAt))}</span>
+            )}
+          </div>
         </div>
-      </div>
+      </button>
 
       <div className="slate-card-footer">
-        <div className="slate-card-actions">
+        <div className="slate-card-toolbar">
           <button
             type="button"
-            className="slate-card-action"
+            className="slate-btn slate-btn--primary slate-btn--compact"
             onClick={() => navigate(`/forms/${form.id}/edit`)}
           >
             Edit
           </button>
-          <button
-            type="button"
-            className="slate-card-action"
-            onClick={() => navigate(`/forms/${form.id}`)}
-          >
-            Preview
-          </button>
-          <button
-            type="button"
-            className="slate-card-action"
-            onClick={() => navigate(`/forms/${form.id}/submissions`)}
-          >
-            Responses
-            {subCount > 0 && (
-              <span
-                className="slate-badge slate-badge--accent"
-                style={{ padding: '0 6px', fontSize: 10, marginLeft: 6 }}
-              >
-                {subCount}
-              </span>
-            )}
-          </button>
-          <button type="button" className="slate-card-action" onClick={() => setShareOpen(true)}>
+          <button type="button" className="slate-btn slate-btn--ghost slate-btn--compact" onClick={() => setShareOpen(true)}>
             Share
           </button>
-        </div>
-        <div className="slate-card-icons">
-          <button type="button" className="slate-card-icon-btn" onClick={onDuplicate} aria-label="Duplicate" title="Duplicate">
-            <DuplicateIcon />
+          <button
+            type="button"
+            className="slate-btn slate-btn--ghost slate-btn--compact"
+            onClick={() => navigate(`/forms/${form.id}/submissions`)}
+          >
+            Responses{subCount > 0 ? ` (${subCount})` : ''}
           </button>
-          <button type="button" className="slate-card-icon-btn" onClick={onDelete} aria-label="Delete" title="Delete">
-            <TrashIcon />
-          </button>
         </div>
+        <FormCardMoreMenu
+          onPreview={() => navigate(`/forms/${form.id}`)}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+        />
       </div>
 
       <SharePanel
@@ -359,21 +343,4 @@ function timeAgo(d: Date): string {
   if (h < 24) return `${h}h ago`;
   const days = Math.floor(h / 24);
   return `${days}d ago`;
-}
-
-function DuplicateIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
 }
