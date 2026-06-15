@@ -55,7 +55,7 @@ export function FormPreview({ formId }: Props) {
         </>
       }
     >
-      <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--slate-muted)' }}>
+      <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--slate-muted)' }}>
         Live preview. Submissions you make here are saved to localStorage and visible under{' '}
         <button type="button" className="slate-link" onClick={() => navigate(`/forms/${formId}/submissions`)}>
           Responses

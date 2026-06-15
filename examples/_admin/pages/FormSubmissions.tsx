@@ -126,7 +126,7 @@ export function FormSubmissions({ formId }: Props) {
 
       {subs.length === 0 ? (
         <div className="slate-empty">
-          <p style={{ margin: 0, fontSize: 14 }}>Empty inbox.</p>
+          <p style={{ margin: 0, fontSize: 15 }}>Empty inbox.</p>
         </div>
       ) : view === 'summary' ? (
         <SummaryView questions={answerQuestions(form.schema.questions)} subs={subs} />
@@ -280,7 +280,7 @@ function QuestionSummary({ question, subs }: { question: Question; subs: StoredS
     } else {
       const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
       body = (
-        <p style={{ margin: 0, fontSize: 13 }}>
+        <p style={{ margin: 0, fontSize: 14 }}>
           avg <strong>{avg.toFixed(1)}</strong> · min {Math.min(...nums)} · max{' '}
           {Math.max(...nums)} · {nums.length} answered
         </p>
@@ -305,11 +305,11 @@ function QuestionSummary({ question, subs }: { question: Question; subs: StoredS
         })
         .sort((a, b) => a.avg - b.avg);
       body = (
-        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, display: 'grid', gap: 2 }}>
+        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 14, display: 'grid', gap: 2 }}>
           {rows.map((r) => (
             <li key={r.label}>
               {r.label}{' '}
-              <span style={{ color: 'var(--slate-dim)', fontSize: 11 }}>
+              <span style={{ color: 'var(--slate-dim)', fontSize: 12 }}>
                 (avg position {Number.isFinite(r.avg) ? r.avg.toFixed(1) : '—'})
               </span>
             </li>
@@ -319,7 +319,7 @@ function QuestionSummary({ question, subs }: { question: Question; subs: StoredS
     }
   } else {
     body = (
-      <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
+      <p style={{ margin: 0, fontSize: 14, color: 'var(--slate-muted)' }}>
         {answered} of {subs.length} answered
       </p>
     );
@@ -328,8 +328,8 @@ function QuestionSummary({ question, subs }: { question: Question; subs: StoredS
   return (
     <div className="slate-card" style={{ padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
-        <strong style={{ fontSize: 13 }}>{titleOf(question)}</strong>
-        <span style={{ fontSize: 11, color: 'var(--slate-dim)', fontFamily: 'var(--slate-font-mono)' }}>
+        <strong style={{ fontSize: 14 }}>{titleOf(question)}</strong>
+        <span style={{ fontSize: 12, color: 'var(--slate-dim)', fontFamily: 'var(--slate-font-mono)' }}>
           {question.id} · {answered}/{subs.length}
         </span>
       </div>
@@ -354,7 +354,7 @@ function DistributionBars({
           key={r.label}
           style={{ display: 'grid', gridTemplateColumns: '140px 1fr 60px', gap: 8, alignItems: 'center' }}
         >
-          <span style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {r.label}
           </span>
           <div style={{ background: 'var(--slate-bg)', borderRadius: 4, overflow: 'hidden', height: 14 }}>
@@ -368,7 +368,7 @@ function DistributionBars({
               }}
             />
           </div>
-          <span style={{ fontSize: 11, color: 'var(--slate-dim)', textAlign: 'right' }}>
+          <span style={{ fontSize: 12, color: 'var(--slate-dim)', textAlign: 'right' }}>
             {r.count} ({total > 0 ? Math.round((r.count / total) * 100) : 0}%)
           </span>
         </div>
@@ -378,7 +378,7 @@ function DistributionBars({
 }
 
 function Muted({ children }: { children: React.ReactNode }) {
-  return <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>{children}</p>;
+  return <p style={{ margin: 0, fontSize: 14, color: 'var(--slate-muted)' }}>{children}</p>;
 }
 
 function ResponseRow({
@@ -418,7 +418,7 @@ function ResponseRow({
           gridTemplateColumns: '1.5fr 1.5fr 1fr auto',
           gap: 16,
           alignItems: 'center',
-          fontSize: 13,
+          fontSize: 14,
         }}
       >
         <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -427,15 +427,15 @@ function ResponseRow({
         <span style={{ color: 'var(--slate-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {preview.secondary}
         </span>
-        <span style={{ color: 'var(--slate-dim)', fontSize: 11 }}>{humanizeMs(sub.meta.durationMs)}</span>
-        <span style={{ color: 'var(--slate-dim)', fontSize: 11, textAlign: 'right' }}>
+        <span style={{ color: 'var(--slate-dim)', fontSize: 12 }}>{humanizeMs(sub.meta.durationMs)}</span>
+        <span style={{ color: 'var(--slate-dim)', fontSize: 12, textAlign: 'right' }}>
           {timeAgo(when)}
         </span>
       </button>
 
       {expanded && (
         <div style={{ borderTop: '1px solid var(--slate-border)', padding: 16, display: 'grid', gap: 14 }}>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--slate-dim)' }}>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-dim)' }}>
             Submitted {formatSubmittedAt(sub.receivedAt)} · took {humanizeMs(sub.meta.durationMs)}
           </p>
           <div style={{ display: 'grid', gap: 14 }}>
@@ -443,10 +443,10 @@ function ResponseRow({
               const v = a[q.id];
               return (
                 <div key={q.id} style={{ display: 'grid', gap: 4 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--slate-text)' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--slate-text)' }}>
                     {titleOf(q)}
                   </span>
-                  <span style={{ fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--slate-muted)' }}>
+                  <span style={{ fontSize: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--slate-muted)' }}>
                     {formatAnswerForQuestion(q, v)}
                   </span>
                 </div>

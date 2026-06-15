@@ -41,7 +41,7 @@ export function PublicRespond({ token }: Props) {
           style={{
             margin: 0,
             padding: '8px 16px',
-            fontSize: 11,
+            fontSize: 12,
             color: 'var(--slate-muted)',
             textAlign: 'center',
           }}

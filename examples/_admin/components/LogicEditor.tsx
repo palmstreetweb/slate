@@ -213,7 +213,7 @@ function LeafRow({
                 className="slate-input"
                 value={leaf.value}
                 placeholder="value"
-                style={{ padding: '6px 8px', fontSize: 12 }}
+                style={{ padding: '6px 8px', fontSize: 13 }}
                 onChange={(e) => onChange({ ...leaf, value: e.target.value })}
               />
             ))}
@@ -239,7 +239,7 @@ export function ConditionBuilder({
 
   if (!parsed.editable) {
     return (
-      <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-muted)' }}>
+      <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
         This condition uses nested groups or in/not_in — edit it in the schema code, or{' '}
         <button
           type="button"
@@ -260,7 +260,7 @@ export function ConditionBuilder({
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       {leaves.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <span>Match</span>
           <SlateSelect
             className="slate-select-wrap--auto"
@@ -345,7 +345,7 @@ export function JumpRulesEditor({
               />
             ) : (
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-muted)' }}>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
                   Composite condition — edit in schema code.
                 </p>
                 <button
@@ -357,7 +357,7 @@ export function JumpRulesEditor({
                 </button>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
               <span>→ jump to</span>
               <SlateSelect
                 value={rule.goTo}

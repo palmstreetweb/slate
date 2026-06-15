@@ -195,7 +195,7 @@ export function Outline({
             <p
               style={{
                 margin: '6px 0 4px',
-                fontSize: 10,
+                fontSize: 11,
                 color: 'var(--slate-dim)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.06em',
@@ -212,7 +212,7 @@ export function Outline({
                   className="slate-btn"
                   style={{
                     padding: '6px 8px',
-                    fontSize: 12,
+                    fontSize: 13,
                     justifyContent: 'flex-start',
                     minHeight: 30,
                   }}
@@ -289,7 +289,7 @@ export function Outline({
           </div>
           {selectMode && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: 'var(--slate-dim)' }}>
+              <span style={{ fontSize: 12, color: 'var(--slate-dim)' }}>
                 {checked.size} selected
               </span>
               <button
@@ -469,7 +469,7 @@ export function Outline({
             onClick={() => setSettingsOpen(!settingsOpen)}
             aria-expanded={settingsOpen}
           >
-            <span style={{ fontSize: 11, opacity: 0.6 }}>{settingsOpen ? '▾' : '▸'}</span>
+            <span style={{ fontSize: 12, opacity: 0.6 }}>{settingsOpen ? '▾' : '▸'}</span>
             <span className="slate-label" style={{ margin: 0 }}>
               Settings
             </span>

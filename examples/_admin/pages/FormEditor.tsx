@@ -370,7 +370,7 @@ function FormEditorBody({ formId }: { formId: string }) {
         <>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               color: saveError ? 'var(--slate-error)' : 'var(--slate-dim)',
               marginRight: 8,
               fontFamily: 'var(--slate-font-mono)',
@@ -416,7 +416,7 @@ function FormEditorBody({ formId }: { formId: string }) {
                 key={i}
                 type="button"
                 className="slate-link"
-                style={{ fontSize: 12 }}
+                style={{ fontSize: 13 }}
                 onClick={() => setSelectedId(issue.questionId)}
               >
                 {issue.message}

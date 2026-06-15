@@ -153,7 +153,7 @@ export function Dashboard() {
           <p style={{ margin: '0 0 8px', fontWeight: 600, color: 'var(--slate-error)' }}>
             localStorage data could not be read
           </p>
-          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--slate-muted)' }}>
+          <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--slate-muted)' }}>
             {storageIssue === 'both'
               ? 'Saved forms and responses appear corrupted. You can reset storage to start fresh.'
               : storageIssue === 'forms'
@@ -191,7 +191,7 @@ export function Dashboard() {
           role="note"
         >
           <p style={{ margin: '0 0 8px', fontWeight: 600 }}>How Slate works on this site</p>
-          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--slate-muted)', lineHeight: 1.5 }}>
+          <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--slate-muted)', lineHeight: 1.5 }}>
             Forms and responses save in this browser only — use the same browser and URL (
             slateforms.vercel.app). To send a form to someone, use Share → Shareable Link. Export
             backup occasionally so nothing is lost.
@@ -218,7 +218,7 @@ export function Dashboard() {
 
       {forms.length === 0 ? (
         <div className="slate-empty">
-          <p style={{ margin: '0 0 12px', fontSize: 14 }}>No forms yet.</p>
+          <p style={{ margin: '0 0 12px', fontSize: 15 }}>No forms yet.</p>
           <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
             <span className="slate-btn-plus">+</span> Create your first form
           </button>

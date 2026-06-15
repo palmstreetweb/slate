@@ -24,18 +24,30 @@
   --slate-title-weight: 600;
   --slate-title-tracking: -0.025em;
   --slate-title-line-height: 1.08;
-  --slate-title-size: clamp(1.75rem, 2.6vw, 2rem);
+  --slate-title-size: clamp(1.875rem, 2.8vw, 2.125rem);
   --slate-transform: none;
 
-  /* Layout tokens specific to admin chrome */
-  --slate-header-h: 64px;
-  --slate-sidebar-w: 240px;
-  --slate-content-pad: 32px;
-  --slate-card-pad: 24px;
-  --slate-gap: 12px;
-  --slate-radius-sm: 6px;
-  --slate-radius-md: 10px;
-  --slate-radius-lg: 14px;
+  /* Type scale — one step up from prior defaults */
+  --slate-fs-2xs: 11px;
+  --slate-fs-xs: 12px;
+  --slate-fs-sm: 13px;
+  --slate-fs-md: 14px;
+  --slate-fs-lg: 15px;
+  --slate-fs-xl: 20px;
+  --slate-fs-2xl: 23px;
+
+  /* Layout tokens specific to admin chrome (+1 step) */
+  --slate-header-h: 72px;
+  --slate-sidebar-w: 260px;
+  --slate-content-pad: 36px;
+  --slate-card-pad: 28px;
+  --slate-gap: 14px;
+  --slate-btn-h: 36px;
+  --slate-icon-btn: 36px;
+  --slate-card-icon-btn: 40px;
+  --slate-radius-sm: 8px;
+  --slate-radius-md: 12px;
+  --slate-radius-lg: 16px;
   --slate-shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.04);
 }
 
@@ -63,7 +75,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 32px;
+  padding: 0 var(--slate-content-pad);
   z-index: 50;
 }
 
@@ -93,7 +105,7 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-crumb {
   color: var(--chrome-muted);
-  font-size: 13px;
+  font-size: var(--slate-fs-md);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -180,9 +192,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
+  padding: 8px 16px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--slate-fs-md);
   font-weight: 500;
   border-radius: var(--slate-radius-sm);
   border: 1px solid var(--slate-border-md);
@@ -190,7 +202,7 @@
   color: var(--slate-text);
   cursor: pointer;
   transition: background 120ms ease-out, border-color 120ms ease-out, transform 120ms ease-out;
-  min-height: 32px;
+  min-height: var(--slate-btn-h);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn:hover {
@@ -250,14 +262,14 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--compact {
   min-height: 0;
-  padding: 5px 10px;
-  font-size: 12px;
+  padding: 6px 12px;
+  font-size: var(--slate-fs-sm);
   line-height: 1.2;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--compact.slate-btn--xs {
-  padding: 2px 8px;
-  font-size: 10px;
+  padding: 3px 10px;
+  font-size: var(--slate-fs-2xs);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--danger {
@@ -273,8 +285,8 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--icon {
   padding: 0;
-  width: 32px;
-  height: 32px;
+  width: var(--slate-icon-btn);
+  height: var(--slate-icon-btn);
   justify-content: center;
 }
 
@@ -285,9 +297,9 @@
 [data-slate-forms][data-theme-name='slate'] .slate-textarea:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-textarea),
 [data-slate-forms][data-theme-name='slate'] .slate-select:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-select) {
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--slate-fs-md);
   line-height: 1.5;
   color: var(--slate-text);
   background: var(--slate-bg-2);
@@ -327,9 +339,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--slate-fs-md);
   line-height: 1.5;
   color: var(--slate-text);
   background: var(--slate-bg-2);
@@ -397,7 +409,7 @@
   gap: 8px;
   padding: 8px 10px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--slate-fs-md);
   line-height: 1.4;
   color: var(--slate-text);
   background: transparent;
@@ -439,7 +451,7 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-label {
   display: block;
-  font-size: 11px;
+  font-size: var(--slate-fs-xs);
   font-weight: 600;
   color: var(--slate-muted);
   text-transform: uppercase;
@@ -448,7 +460,7 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-help {
-  font-size: 11px;
+  font-size: var(--slate-fs-xs);
   color: var(--slate-dim);
   margin-top: 6px;
   line-height: 1.4;
@@ -458,7 +470,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--slate-fs-md);
   color: var(--slate-text);
   cursor: pointer;
   user-select: none;
@@ -521,8 +533,8 @@
   align-items: center;
   justify-content: center;
   position: relative;
-  width: 36px;
-  height: 36px;
+  width: var(--slate-card-icon-btn);
+  height: var(--slate-card-icon-btn);
   padding: 0;
   border: none;
   border-radius: 10px;
@@ -561,7 +573,7 @@
   border-radius: 999px;
   background: var(--chrome-red);
   color: var(--slate-on-accent, #fff);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 14px;
   text-align: center;
@@ -588,7 +600,7 @@
   display: block;
   text-align: left;
   font-family: var(--slate-font-display);
-  font-size: 19px;
+  font-size: var(--slate-fs-xl);
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
@@ -596,12 +608,12 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-card-meta {
   margin: 4px 0 0;
-  font-size: 12px;
+  font-size: var(--slate-fs-sm);
   color: var(--chrome-muted);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-section-title {
-  font-size: 11px;
+  font-size: var(--slate-fs-xs);
   font-weight: 600;
   color: var(--slate-muted);
   text-transform: uppercase;
@@ -623,7 +635,7 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-page-sub {
   margin: 6px 0 0;
-  font-size: 14px;
+  font-size: var(--slate-fs-lg);
   color: var(--chrome-muted);
 }
 
@@ -634,7 +646,7 @@
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: var(--slate-fs-xs);
   font-weight: 500;
   font-family: var(--slate-font-body);
   border-radius: 999px;
@@ -672,7 +684,7 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-tab {
   padding: 5px 12px;
-  font-size: 12px;
+  font-size: var(--slate-fs-sm);
   font-weight: 500;
   color: var(--slate-muted);
   background: transparent;
@@ -810,7 +822,7 @@
 [data-slate-forms][data-theme-name='slate'] .slate-dialog-title {
   margin: 0 0 8px;
   font-family: var(--slate-font-display);
-  font-size: 22px;
+  font-size: var(--slate-fs-2xl);
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
@@ -819,7 +831,7 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-dialog-message {
   margin: 0 0 20px;
-  font-size: 14px;
+  font-size: var(--slate-fs-lg);
   line-height: 1.55;
   color: var(--slate-muted);
 }
@@ -878,13 +890,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
-  font-size: 12px;
+  font-size: var(--slate-fs-sm);
   color: var(--slate-error, #dc2626);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-editor {
   display: grid;
-  grid-template-columns: 280px 1fr 340px;
+  grid-template-columns: 300px 1fr 360px;
   flex: 1;
   min-height: 0;
   background: var(--chrome-bg);
@@ -930,11 +942,11 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-list-wrap {
   position: relative;
-  --slate-outline-grip-w: 22px;
-  --slate-outline-inner-gap: 3px;
-  --slate-outline-idx-w: 26px;
-  --slate-outline-glyph-w: 22px;
-  --slate-outline-row-gap: 10px;
+  --slate-outline-grip-w: 24px;
+  --slate-outline-inner-gap: 4px;
+  --slate-outline-idx-w: 28px;
+  --slate-outline-glyph-w: 24px;
+  --slate-outline-row-gap: 12px;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-list {
@@ -962,7 +974,7 @@
   align-items: center;
   justify-content: center;
   width: var(--slate-outline-grip-w);
-  height: 32px;
+  height: var(--slate-icon-btn);
   padding: 0;
   margin: 0;
   border: none;
@@ -1090,8 +1102,8 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-ghost-label {
   margin: 0;
-  padding: 8px 12px;
-  font-size: 13px;
+  padding: 10px 12px;
+  font-size: var(--slate-fs-md);
   font-weight: 500;
   color: var(--chrome-ink);
   white-space: nowrap;
@@ -1141,7 +1153,7 @@
   cursor: pointer;
   text-align: left;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--slate-fs-md);
   color: var(--chrome-ink);
   appearance: none;
   -webkit-appearance: none;
@@ -1169,13 +1181,13 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-idx {
   font-family: var(--slate-font-mono);
-  font-size: 11px;
+  font-size: var(--slate-fs-xs);
   color: var(--slate-dim);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-glyph {
   font-family: var(--slate-font-mono);
-  font-size: 13px;
+  font-size: var(--slate-fs-md);
   color: var(--slate-muted);
   text-align: center;
   flex-shrink: 0;
@@ -1189,7 +1201,7 @@
   padding: 6px 10px;
   background: var(--slate-bg-3);
   border-radius: var(--slate-radius-sm);
-  font-size: 13px;
+  font-size: var(--slate-fs-md);
   font-weight: 500;
 }
 
@@ -1244,7 +1256,7 @@
   cursor: pointer;
   color: var(--slate-muted);
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--slate-fs-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1307,7 +1319,7 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-canvas-label {
-  font-size: 11px;
+  font-size: var(--slate-fs-xs);
   font-family: var(--slate-font-mono);
   color: var(--chrome-muted);
   text-transform: uppercase;
@@ -1385,7 +1397,7 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-sub {
   margin: 4px 0 0;
-  font-size: 13px;
+  font-size: var(--slate-fs-md);
   color: var(--slate-muted);
 }
 
@@ -1409,7 +1421,7 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-slug-prefix {
   font-family: var(--slate-font-mono);
-  font-size: 12px;
+  font-size: var(--slate-fs-sm);
   color: var(--slate-dim);
   padding: 8px 0 8px 10px;
   white-space: nowrap;
@@ -1421,7 +1433,7 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-hint {
-  font-size: 12px;
+  font-size: var(--slate-fs-sm);
   color: var(--slate-dim);
   line-height: 1.4;
 }
@@ -1435,7 +1447,7 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-code {
   font-family: var(--slate-font-mono);
-  font-size: 11px;
+  font-size: var(--slate-fs-xs);
   background: var(--slate-bg-3);
   padding: 1px 5px;
   border-radius: 4px;
@@ -1458,7 +1470,7 @@
   flex: 1;
   min-width: 0;
   font-family: var(--slate-font-mono);
-  font-size: 12px;
+  font-size: var(--slate-fs-sm);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-qr {

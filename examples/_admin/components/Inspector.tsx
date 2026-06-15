@@ -51,7 +51,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         )}
         {'title' in question && typeof question.title === 'function' && (
           <Field label="Title (Dynamic Function)">
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-muted)' }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
               This title is a function — edit the schema in code to change it, or replace with a static string.
             </p>
           </Field>
@@ -653,7 +653,7 @@ function OptionsEditor({
             value={opt.label}
             placeholder="Label"
             onChange={(e) => update(i, { label: e.target.value })}
-            style={{ padding: '6px 8px', fontSize: 12 }}
+            style={{ padding: '6px 8px', fontSize: 13 }}
           />
           {scoring && (
             <input
@@ -662,7 +662,7 @@ function OptionsEditor({
               value={opt.score ?? ''}
               placeholder="pts"
               aria-label="Score points"
-              style={{ padding: '6px 6px', fontSize: 11 }}
+              style={{ padding: '6px 6px', fontSize: 12 }}
               onChange={(e) =>
                 update(i, { score: e.target.value === '' ? undefined : Number(e.target.value) })
               }
@@ -710,7 +710,7 @@ function OptionsEditor({
           <button
             type="button"
             className="slate-link"
-            style={{ fontSize: 11 }}
+            style={{ fontSize: 12 }}
             onClick={scoring ? disableScoring : enableScoring}
           >
             {scoring ? 'Remove Scoring' : 'Add Scoring'}
@@ -781,7 +781,7 @@ function PictureOptionsEditor({
               value={opt.label}
               placeholder="Label"
               onChange={(e) => update(i, { label: e.target.value })}
-              style={{ padding: '6px 8px', fontSize: 12 }}
+              style={{ padding: '6px 8px', fontSize: 13 }}
             />
             {scoring && (
               <input
@@ -790,7 +790,7 @@ function PictureOptionsEditor({
                 value={opt.score ?? ''}
                 placeholder="pts"
                 aria-label="Score points"
-                style={{ padding: '6px 6px', fontSize: 11 }}
+                style={{ padding: '6px 6px', fontSize: 12 }}
                 onChange={(e) =>
                   update(i, { score: e.target.value === '' ? undefined : Number(e.target.value) })
                 }
@@ -809,7 +809,7 @@ function PictureOptionsEditor({
             className="slate-input"
             value={opt.src}
             placeholder="https://image-url..."
-            style={{ padding: '6px 8px', fontFamily: 'var(--slate-font-mono)', fontSize: 11 }}
+            style={{ padding: '6px 8px', fontFamily: 'var(--slate-font-mono)', fontSize: 12 }}
             onChange={(e) => update(i, { src: e.target.value })}
           />
         </div>
@@ -825,7 +825,7 @@ function PictureOptionsEditor({
         <button
           type="button"
           className="slate-link"
-          style={{ fontSize: 11 }}
+          style={{ fontSize: 12 }}
           onClick={scoring ? disableScoring : enableScoring}
         >
           {scoring ? 'Remove Scoring' : 'Add Scoring'}
