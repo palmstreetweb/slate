@@ -59,9 +59,20 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
       return Array.isArray(value) ? value.join(', ') : String(value);
 
     case 'matrix':
-      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      if (typeof value === 'object' && value !== null && !Array.isArray(value) && 'rows' in question) {
         return Object.entries(value as Record<string, unknown>)
-          .map(([row, col]) => `${row}: ${Array.isArray(col) ? col.join(', ') : String(col)}`)
+          .map(([rowVal, col]) => {
+            const rowLabel =
+              question.rows.find((r) => r.value === rowVal)?.label ?? String(rowVal);
+            const colVal = Array.isArray(col) ? col[0] : col;
+            const colLabel =
+              typeof colVal === 'string' && 'columns' in question
+                ? question.columns.find((c) => c.value === colVal)?.label ?? String(colVal)
+                : Array.isArray(col)
+                  ? col.join(', ')
+                  : String(col ?? '');
+            return `${rowLabel}: ${colLabel}`;
+          })
           .join('\n');
       }
       return String(value);
@@ -125,6 +136,33 @@ export function formatSubmittedAt(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+/** Human label for how many people answered a question in Summary. */
+export function completionLabel(answered: number, total: number): string {
+  if (total === 0) return 'No responses yet';
+  if (answered === 0) return total === 1 ? 'Not answered' : `Not answered · ${total} responses`;
+  if (answered === total) {
+    return total === 1 ? 'Answered' : `All ${total} answered`;
+  }
+  return `${answered} of ${total} answered`;
+}
+
+/** Compact duration for exports and list rows. */
+export function formatDurationMs(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s} sec`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem > 0 ? `${m} min ${rem} sec` : `${m} min`;
+}
+
+/** Spreadsheet-friendly answer text — labels, no em dashes, single-line cells. */
+export function formatAnswerForCsv(question: Question, value: unknown): string {
+  const formatted = formatAnswerForQuestion(question, value);
+  if (formatted === '—') return '';
+  return formatted.replace(/\n/g, '; ');
 }
 
 export { titleOf };

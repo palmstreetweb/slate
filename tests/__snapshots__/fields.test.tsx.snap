@@ -17,7 +17,7 @@ exports[`phase 3 question types > file_upload renders drop zone + snapshot 1`] =
   <div>
     <h1
       class="slate-title"
-      id="_r_t_"
+      id="_r_u_"
     >
       Upload your doc
     </h1>
@@ -25,12 +25,12 @@ exports[`phase 3 question types > file_upload renders drop zone + snapshot 1`] =
       style="margin-top: 24px;"
     >
       <input
-        aria-labelledby="_r_t_"
+        aria-labelledby="_r_u_"
         style="display: none;"
         type="file"
       />
       <button
-        aria-describedby="_r_t_"
+        aria-describedby="_r_u_"
         class="slate-upload-zone"
         type="button"
       >
@@ -89,12 +89,12 @@ exports[`phase 3 question types > matrix renders + snapshot, single-select per r
   <div>
     <h1
       class="slate-title"
-      id="_r_16_"
+      id="_r_17_"
     >
       Rate each
     </h1>
     <div
-      aria-labelledby="_r_16_"
+      aria-labelledby="_r_17_"
       class="slate-matrix"
       style="--slate-matrix-cols: 2;"
     >
@@ -243,12 +243,12 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
   <div>
     <h1
       class="slate-title"
-      id="_r_12_"
+      id="_r_13_"
     >
       Pick a pet
     </h1>
     <div
-      aria-labelledby="_r_12_"
+      aria-labelledby="_r_13_"
       class="slate-picture-grid"
       role="radiogroup"
     >
@@ -352,12 +352,12 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
   <div>
     <h1
       class="slate-title"
-      id="_r_15_"
+      id="_r_16_"
     >
       Rank these
     </h1>
     <ol
-      aria-labelledby="_r_15_"
+      aria-labelledby="_r_16_"
       class="slate-ranking"
     >
       <li
@@ -479,7 +479,7 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
       <span
         class="slate-hint"
       >
-        drag rows or use ↑↓ to reorder
+        drag rows or use ↑↓, press Enter ↵
       </span>
     </div>
   </div>
@@ -903,7 +903,7 @@ exports[`question types render > multi_choice 1`] = `
       <span
         class="slate-hint"
       >
-        tap keys to toggle, OK to continue
+        tap keys to toggle, press Enter ↵
       </span>
     </div>
   </div>

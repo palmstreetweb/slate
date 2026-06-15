@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { NumberQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { resolveTitle } from './_resolveTitle.js';
 
@@ -25,7 +26,7 @@ export function NumberField({ question, answers, initialValue, onAnswer, onAdvan
     return focusAfter(inputRef.current);
   }, [question.id]);
 
-  const submit = () => {
+  const submit = useCallback(() => {
     const trimmed = text.trim();
     const num = trimmed === '' ? undefined : Number(trimmed);
     if (trimmed !== '' && Number.isNaN(num)) {
@@ -40,7 +41,9 @@ export function NumberField({ question, answers, initialValue, onAnswer, onAdvan
     setError(null);
     onAnswer(num);
     onAdvance();
-  };
+  }, [question, text, onAnswer, onAdvance]);
+
+  useRegisterFormConfirm(submit);
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

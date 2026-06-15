@@ -5,7 +5,8 @@ import { addSubmission } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import { hostFileUpload } from '../hostFileUpload.js';
-import { getLocalUploadMeta } from '../localFileStore.js';
+import { resolveUploadMeta } from '../resolveUploadMeta.js';
+import { setUploadContext, clearUploadContext } from '../uploadContext.js';
 
 type Props = { formId: string };
 
@@ -15,7 +16,12 @@ export function FormPreview({ formId }: Props) {
   // Re-fetch when the formId changes or another tab edits the schema.
   useEffect(() => {
     setForm(getForm(formId));
-    return subscribe(() => setForm(getForm(formId)));
+    setUploadContext(formId);
+    const unsub = subscribe(() => setForm(getForm(formId)));
+    return () => {
+      unsub();
+      clearUploadContext();
+    };
   }, [formId]);
 
   if (!form) {
@@ -71,7 +77,7 @@ export function FormPreview({ formId }: Props) {
         <Form
           schema={form.schema}
           onFileUpload={hostFileUpload}
-          resolveFileUploadMeta={getLocalUploadMeta}
+          resolveFileUploadMeta={resolveUploadMeta}
           onSubmit={async (answers, meta) => {
             await new Promise((r) => setTimeout(r, 250));
             addSubmission(formId, answers, meta);

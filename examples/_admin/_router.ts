@@ -20,7 +20,20 @@ export type Route =
   | { name: 'preview'; formId: string }
   | { name: 'submissions'; formId: string }
   | { name: 'respond'; token: string }
+  | { name: 'fill'; slug: string }
   | { name: 'notfound'; path: string };
+
+/** Map a bare pathname (e.g. `/settings`) to `#/settings` on first load. */
+export function syncHashFromPathname(): void {
+  if (typeof window === 'undefined') return;
+  const { pathname, hash, search } = window.location;
+  if (hash && hash !== '#' && hash !== '#/') return;
+  if (pathname === '/' || pathname === '/index.html') return;
+
+  const path =
+    pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
+  window.location.replace(`${window.location.origin}/${search}#${path}`);
+}
 
 function normalizePath(): string {
   if (typeof window === 'undefined') return '/';
@@ -49,6 +62,11 @@ function matchRoute(path: string): Route {
     const token = hashSearchParams().get('d')?.trim();
     if (token) return { name: 'respond', token };
     return { name: 'notfound', path };
+  }
+
+  const fillMatch = /^\/f\/([^/]+)$/.exec(path);
+  if (fillMatch && fillMatch[1]) {
+    return { name: 'fill', slug: decodeURIComponent(fillMatch[1]) };
   }
 
   const submissionsMatch = /^\/forms\/([^/]+)\/submissions$/.exec(path);
@@ -84,6 +102,8 @@ export function routeKey(route: Route): string {
       return `/forms/${route.formId}/submissions`;
     case 'respond':
       return '/r';
+    case 'fill':
+      return `/f/${route.slug}`;
     case 'notfound':
       return route.path;
   }

@@ -6,10 +6,11 @@
 
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { PhoneQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { resolveTitle } from './_resolveTitle.js';
 
@@ -44,7 +45,7 @@ export function PhoneField({ question, answers, initialValue, onAnswer, onAdvanc
     return focusAfter(inputRef.current);
   }, [question.id]);
 
-  const submit = async () => {
+  const submit = useCallback(async () => {
     if (submittingRef.current) return;
     submittingRef.current = true;
     try {
@@ -77,7 +78,11 @@ export function PhoneField({ question, answers, initialValue, onAnswer, onAdvanc
     } finally {
       submittingRef.current = false;
     }
-  };
+  }, [question, value, onAnswer, onAdvance]);
+
+  useRegisterFormConfirm(() => {
+    void submit();
+  });
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

@@ -1,0 +1,5 @@
+# Minimal Supabase config for Edge Functions (ADR-028).
+# Run migrations via SQL in supabase/migrations/ or `supabase db push`.
+
+[functions.submit-response]
+verify_jwt = false

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { FileUploadQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import {
   describeFileUploadAnswer,
   formatBytes,
@@ -105,7 +106,7 @@ export function FileUploadField({
     if (inputRef.current) inputRef.current.value = '';
   };
 
-  const submit = () => {
+  const submit = useCallback(() => {
     if (uploading) return;
     const err = validate(question, value);
     if (err) {
@@ -114,7 +115,9 @@ export function FileUploadField({
     }
     setError(null);
     onAdvance();
-  };
+  }, [uploading, question, value, onAdvance]);
+
+  useRegisterFormConfirm(submit);
 
   const described = describeFileUploadAnswer(value, meta);
 

@@ -1,7 +1,8 @@
 /**
  * Global keyboard handler for the form engine. See BUILD_BRIEF.md §10.3.
  *
- *   Enter (in body)            → advance from welcome/statement
+ *   Enter (in body)            → advance from welcome/statement/review, or
+ *                                confirm OK steps (multi_choice, text fields, …)
  *   A–F (any focus)            → select choice option N (auto-advance for single_choice — caller decides)
  *   Y / N (in body)            → select yes_no answer (A/B also work)
  *   A / B (in body)            → select legal accept/decline
@@ -29,6 +30,8 @@ type Opts = {
   escapeBack?: boolean;
   onAdvance: () => void;
   onBack: () => void;
+  /** OK / submit for the active step. Return true when handled (suppresses default). */
+  onConfirm?: () => boolean;
   onSelectChoice?: (optionIndex: number) => void;
   onSelectScale?: (value: number) => void;
 };
@@ -47,6 +50,7 @@ export function useKeyboardNav({
   escapeBack = false,
   onAdvance,
   onBack,
+  onConfirm,
   onSelectChoice,
   onSelectScale,
 }: Opts): void {
@@ -76,18 +80,21 @@ export function useKeyboardNav({
 
       const typing = isTypingTarget(e.target);
 
-      // Enter advances chrome screens regardless of focus (button, link, body).
-      if (
-        e.key === 'Enter' &&
-        !e.shiftKey &&
-        (currentQ.type === 'welcome' ||
+      // Enter — chrome screens advance; OK steps confirm via the registered handler.
+      if (e.key === 'Enter' && !e.shiftKey && !typing) {
+        if (
+          currentQ.type === 'welcome' ||
           currentQ.type === 'statement' ||
-          currentQ.type === 'review') &&
-        !typing
-      ) {
-        e.preventDefault();
-        onAdvance();
-        return;
+          currentQ.type === 'review'
+        ) {
+          e.preventDefault();
+          onAdvance();
+          return;
+        }
+        if (onConfirm?.()) {
+          e.preventDefault();
+          return;
+        }
       }
 
       // Choice selection — A–F.
@@ -187,10 +194,10 @@ export function useKeyboardNav({
       }
     };
 
-    window.addEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, true);
     return () => {
-      window.removeEventListener('keydown', handler);
+      window.removeEventListener('keydown', handler, true);
       clearDigitBuffer();
     };
-  }, [currentQ, enabled, escapeBack, onAdvance, onBack, onSelectChoice, onSelectScale]);
+  }, [currentQ, enabled, escapeBack, onAdvance, onBack, onConfirm, onSelectChoice, onSelectScale]);
 }

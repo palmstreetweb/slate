@@ -1,5 +1,5 @@
 /**
- * Slate Share panel — shareable link + QR. Portaled modal; examples/ only.
+ * Slate Share panel — publish link + portable fallback. Portaled modal; examples/ only.
  */
 
 'use client';
@@ -12,6 +12,9 @@ import type { Schema } from '@/index.js';
 import { copyText } from '../shareUrls.js';
 import { buildPortableShareUrl, canEncodePortableSchema } from '../portableShare.js';
 import { readSlateMode } from '../slateMode.js';
+import { getForm, publishForm, unpublishForm, subscribe } from '../_formsStore.js';
+import { isSupabaseConfigured } from '../supabase/env.js';
+import { publicFillUrl } from '../supabase/publicApi.js';
 
 type Props = {
   open: boolean;
@@ -24,14 +27,27 @@ type Props = {
 export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const shareUrl = canEncodePortableSchema(schema)
-    ? buildPortableShareUrl(schema, { formId, name: formName })
-    : null;
-
   const [qr, setQr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    return subscribe(() => setTick((t) => t + 1));
+  }, [open]);
 
   useFocusTrap(panelRef, open, onClose);
+
+  const form = getForm(formId);
+  const isPublished = form?.status === 'published';
+  const slug = form?.slug ?? formId;
+
+  const productionUrl = isSupabaseConfigured() && isPublished ? publicFillUrl(slug) : null;
+  const portableUrl = canEncodePortableSchema(schema)
+    ? buildPortableShareUrl(schema, { formId, name: formName })
+    : null;
+  const shareUrl = productionUrl ?? portableUrl;
 
   useEffect(() => {
     if (!open) return;
@@ -73,9 +89,22 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
     }
   }, [shareUrl]);
 
+  const onPublish = () => {
+    setPublishing(true);
+    publishForm(formId);
+    setPublishing(false);
+  };
+
+  const onUnpublish = () => {
+    setPublishing(true);
+    unpublishForm(formId);
+    setPublishing(false);
+  };
+
   if (!open || typeof document === 'undefined') return null;
 
   const mode = readSlateMode();
+  const cloud = isSupabaseConfigured();
 
   return createPortal(
     <div data-slate-forms="" data-theme-name="slate" data-theme={mode}>
@@ -107,10 +136,43 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
           </header>
 
           <div className="slate-share-body">
+            {cloud ? (
+              <section className="slate-share-block" style={{ marginBottom: 16 }}>
+                <p className="slate-label" style={{ margin: '0 0 8px' }}>
+                  Production link
+                </p>
+                {isPublished ? (
+                  <p className="slate-share-hint" style={{ margin: '0 0 8px' }}>
+                    Published — clients can submit at this URL. Responses sync to Slate cloud.
+                  </p>
+                ) : (
+                  <p className="slate-share-hint" style={{ margin: '0 0 8px' }}>
+                    Publish to enable the public fill link. Draft edits are not visible until you publish again.
+                  </p>
+                )}
+                <div className="slate-share-row" style={{ marginBottom: 8 }}>
+                  {isPublished ? (
+                    <button type="button" className="slate-btn" onClick={onUnpublish} disabled={publishing}>
+                      Unpublish
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="slate-btn slate-btn--primary"
+                      onClick={onPublish}
+                      disabled={publishing}
+                    >
+                      Publish
+                    </button>
+                  )}
+                </div>
+              </section>
+            ) : null}
+
             {shareUrl ? (
               <section className="slate-share-block">
                 <p className="slate-label" style={{ margin: 0 }}>
-                  Shareable Link
+                  {productionUrl ? 'Public fill link' : 'Portable link (demo)'}
                 </p>
                 <div className="slate-share-row">
                   <input className="slate-input slate-share-url" readOnly value={shareUrl} />
@@ -140,10 +202,12 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
             ) : (
               <div className="slate-share-callout">
                 <p className="slate-label" style={{ margin: '0 0 4px' }}>
-                  Shareable Link
+                  Shareable link
                 </p>
                 <p className="slate-share-hint" style={{ margin: 0 }}>
-                  This form is too large for a shareable link. Remove questions or shorten copy and try again.
+                  {cloud && !isPublished
+                    ? 'Publish this form to get a public fill link.'
+                    : 'This form is too large for a portable link. Remove questions or shorten copy and try again.'}
                 </p>
               </div>
             )}

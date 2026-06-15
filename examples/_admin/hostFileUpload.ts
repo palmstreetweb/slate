@@ -1,18 +1,26 @@
 /**
  * Default Slate admin / public-respond file upload handler.
- * Optimizes images like 805 Sealcoating, then stores locally (IndexedDB) or
+ * Optimizes images, then stores in IndexedDB, Supabase Storage, or
  * POSTs to `VITE_UPLOAD_URL` when configured.
  */
 
 import { createFileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import { saveLocalUpload } from './localFileStore.js';
+import { isSupabaseConfigured, getSupabase } from './supabase/env.js';
+import { uploadToSupabaseStorage } from './storageUpload.js';
 
 async function uploadToRemote(
   file: File,
   questionId: string,
   _ctx?: { maxSizeMb?: number },
 ): Promise<string> {
+  if (isSupabaseConfigured()) {
+    const { data } = await getSupabase().auth.getSession();
+    const scope = data.session ? 'draft' : 'public';
+    return uploadToSupabaseStorage(file, { scope });
+  }
+
   const base = import.meta.env.VITE_UPLOAD_URL?.trim();
   if (!base) {
     return saveLocalUpload(file);

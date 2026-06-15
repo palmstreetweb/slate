@@ -7,7 +7,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ResolvedThemeMode } from '@/index.js';
 import { Header } from './Header.js';
+import { SettingsFab } from './SettingsFab.js';
 import { AdminThemeProvider } from '../adminThemeContext.js';
+import {
+  ADMIN_UI_THEME_STORAGE_KEY,
+  detectAdminUiTheme,
+  type AdminUiTheme,
+} from '../adminUiTheme.js';
 
 const STORAGE_KEY = 'slate-theme';
 
@@ -33,6 +39,7 @@ type Props = {
 
 export function AdminShell({ crumbs, rightSlot, children, fullBleed }: Props) {
   const [mode, setMode] = useState<ResolvedThemeMode>(() => detectInitial());
+  const [uiTheme, setUiTheme] = useState<AdminUiTheme>(() => detectAdminUiTheme());
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,14 +50,23 @@ export function AdminShell({ crumbs, rightSlot, children, fullBleed }: Props) {
     }
   }, [mode]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ADMIN_UI_THEME_STORAGE_KEY, uiTheme);
+    } catch {
+      // ignored
+    }
+  }, [uiTheme]);
+
   const toggle = () => setMode((m) => (m === 'dark' ? 'light' : 'dark'));
 
   return (
-    <AdminThemeProvider value={{ mode, setMode, toggle }}>
+    <AdminThemeProvider value={{ mode, setMode, toggle, uiTheme, setUiTheme }}>
       <div
         ref={wrapperRef}
         data-slate-forms=""
         data-theme-name="slate"
+        data-admin-ui={uiTheme}
         data-theme={mode}
       >
         <div className="slate-app">
@@ -58,6 +74,7 @@ export function AdminShell({ crumbs, rightSlot, children, fullBleed }: Props) {
           <main className={`slate-content${fullBleed ? ' slate-content--full-bleed' : ''}`}>
             {children}
           </main>
+          <SettingsFab />
         </div>
       </div>
     </AdminThemeProvider>

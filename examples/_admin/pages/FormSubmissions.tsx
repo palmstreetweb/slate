@@ -2,10 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Question } from '@/index.js';
 import { getForm } from '../_formsStore.js';
 import {
-  clearSubmissions,
-  deleteSubmission,
+  emptyTrash,
   listSubmissions,
+  listTrashedSubmissions,
+  permanentlyDeleteSubmission,
+  restoreSubmission,
+  restoreSubmissions,
   subscribe,
+  trashSubmission,
+  trashSubmissions,
   type StoredSubmission,
 } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
@@ -13,22 +18,30 @@ import { useConfirm } from '../_confirm.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import {
   formatAnswerForQuestion,
+  formatDurationMs,
   formatSubmittedAt,
+  completionLabel,
   leadPreview,
   titleOf,
 } from '../responsesFormat.js';
+import { downloadResponsesCsv } from '../csvExport.js';
 
 type Props = { formId: string };
 
 export function FormSubmissions({ formId }: Props) {
   const form = useMemo(() => getForm(formId), [formId]);
   const [subs, setSubs] = useState<StoredSubmission[]>(() => listSubmissions(formId));
+  const [trashed, setTrashed] = useState<StoredSubmission[]>(() => listTrashedSubmissions(formId));
   const [open, setOpen] = useState<string | null>(null);
-  const [view, setView] = useState<'list' | 'summary'>('list');
+  const [view, setView] = useState<'list' | 'summary' | 'trash'>('list');
   const confirm = useConfirm();
 
   useEffect(
-    () => subscribe(() => setSubs(listSubmissions(formId))),
+    () =>
+      subscribe(() => {
+        setSubs(listSubmissions(formId));
+        setTrashed(listTrashedSubmissions(formId));
+      }),
     [formId],
   );
 
@@ -72,7 +85,7 @@ export function FormSubmissions({ formId }: Props) {
             <button
               type="button"
               className="slate-btn"
-              onClick={() => downloadCsv(form.name, answerQuestions(form.schema.questions), subs)}
+              onClick={() => downloadResponsesCsv(form.name, answerQuestions(form.schema.questions), subs)}
             >
               Export CSV
             </button>
@@ -83,15 +96,15 @@ export function FormSubmissions({ formId }: Props) {
               className="slate-btn slate-btn--danger"
               onClick={async () => {
                 const ok = await confirm({
-                  title: `Clear ${subs.length} ${subs.length === 1 ? 'response' : 'responses'}?`,
-                  message: `Permanently deletes all responses for "${form.name}" from localStorage. The form itself is kept.`,
-                  confirmLabel: 'Clear all',
+                  title: `Move ${subs.length} ${subs.length === 1 ? 'response' : 'responses'} to trash?`,
+                  message: `Responses for "${form.name}" will leave the inbox but stay in Trash until you empty it.`,
+                  confirmLabel: 'Move to trash',
                   danger: true,
                 });
-                if (ok) clearSubmissions(formId);
+                if (ok) trashSubmissions(formId);
               }}
             >
-              Clear all
+              Move all to trash
             </button>
           )}
         </>
@@ -100,33 +113,123 @@ export function FormSubmissions({ formId }: Props) {
       <div style={{ marginBottom: 24 }}>
         <h1 className="slate-page-title">Responses</h1>
         <p className="slate-page-sub">
-          {subs.length === 0
+          {subs.length === 0 && trashed.length === 0
             ? 'Nothing yet — open Preview and submit one to see it here.'
-            : `${subs.length} ${subs.length === 1 ? 'response' : 'responses'}`}
+            : subs.length === 0
+              ? `Inbox empty · ${trashed.length} in trash`
+              : `${subs.length} ${subs.length === 1 ? 'response' : 'responses'}${trashed.length > 0 ? ` · ${trashed.length} in trash` : ''}`}
         </p>
-        {subs.length > 0 && (
-          <div style={{ display: 'flex', gap: 4, marginTop: 12 }}>
+        {(subs.length > 0 || trashed.length > 0) && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 12, flexWrap: 'wrap' }}>
             <button
               type="button"
               className={`slate-btn slate-btn--compact${view === 'list' ? ' slate-btn--primary' : ''}`}
               onClick={() => setView('list')}
             >
-              Responses
+              Responses{subs.length > 0 ? ` (${subs.length})` : ''}
             </button>
+            {subs.length > 0 && (
+              <button
+                type="button"
+                className={`slate-btn slate-btn--compact${view === 'summary' ? ' slate-btn--primary' : ''}`}
+                onClick={() => setView('summary')}
+              >
+                Summary
+              </button>
+            )}
             <button
               type="button"
-              className={`slate-btn slate-btn--compact${view === 'summary' ? ' slate-btn--primary' : ''}`}
-              onClick={() => setView('summary')}
+              className={`slate-btn slate-btn--compact${view === 'trash' ? ' slate-btn--primary' : ''}`}
+              onClick={() => setView('trash')}
             >
-              Summary
+              Trash{trashed.length > 0 ? ` (${trashed.length})` : ''}
             </button>
           </div>
         )}
       </div>
 
-      {subs.length === 0 ? (
+      {view === 'trash' ? (
+        trashed.length === 0 ? (
+          <div className="slate-empty">
+            <p style={{ margin: 0, fontSize: 15 }}>Trash is empty.</p>
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginBottom: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <button
+                type="button"
+                className="slate-btn"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Restore ${trashed.length} ${trashed.length === 1 ? 'response' : 'responses'}?`,
+                    message: 'Moves everything in Trash back to the inbox.',
+                    confirmLabel: 'Restore all',
+                  });
+                  if (ok) restoreSubmissions(formId);
+                }}
+              >
+                Restore all
+              </button>
+              <button
+                type="button"
+                className="slate-btn slate-btn--danger"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Delete ${trashed.length} ${trashed.length === 1 ? 'response' : 'responses'} forever?`,
+                    message: 'Permanently removes trashed responses from localStorage. This cannot be undone.',
+                    confirmLabel: 'Empty trash',
+                    danger: true,
+                  });
+                  if (ok) emptyTrash(formId);
+                }}
+              >
+                Empty trash
+              </button>
+            </div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {trashed.map((s) => (
+                <ResponseRow
+                  key={s.id}
+                  sub={s}
+                  questions={answerQuestions(form.schema.questions)}
+                  expanded={open === s.id}
+                  onToggle={() => setOpen(open === s.id ? null : s.id)}
+                  trashed
+                  onRestore={async () => {
+                    const ok = await confirm({
+                      title: 'Restore this response?',
+                      message: 'Moves it back to the inbox.',
+                      confirmLabel: 'Restore',
+                    });
+                    if (ok) restoreSubmission(s.id);
+                  }}
+                  onDelete={async () => {
+                    const ok = await confirm({
+                      title: 'Delete forever?',
+                      message: 'Permanently removes this response from localStorage.',
+                      confirmLabel: 'Delete forever',
+                      danger: true,
+                    });
+                    if (ok) permanentlyDeleteSubmission(s.id);
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )
+      ) : subs.length === 0 ? (
         <div className="slate-empty">
-          <p style={{ margin: 0, fontSize: 15 }}>Empty inbox.</p>
+          <p style={{ margin: 0, fontSize: 15 }}>
+            {trashed.length > 0 ? 'Inbox is empty. Check Trash to restore responses.' : 'Empty inbox.'}
+          </p>
         </div>
       ) : view === 'summary' ? (
         <SummaryView questions={answerQuestions(form.schema.questions)} subs={subs} />
@@ -141,12 +244,12 @@ export function FormSubmissions({ formId }: Props) {
               onToggle={() => setOpen(open === s.id ? null : s.id)}
               onDelete={async () => {
                 const ok = await confirm({
-                  title: 'Delete this response?',
-                  message: "Removes a single submission. Won't affect other responses.",
-                  confirmLabel: 'Delete',
+                  title: 'Move to trash?',
+                  message: 'You can restore this response from Trash later.',
+                  confirmLabel: 'Move to trash',
                   danger: true,
                 });
-                if (ok) deleteSubmission(s.id);
+                if (ok) trashSubmission(s.id);
               }}
             />
           ))}
@@ -162,45 +265,6 @@ const CHROME_TYPES = new Set(['welcome', 'statement', 'review', 'thanks']);
 
 function answerQuestions(questions: ReadonlyArray<Question>): Question[] {
   return questions.filter((q) => !CHROME_TYPES.has(q.type));
-}
-
-/* ---------- CSV export ---------- */
-
-function csvCell(v: unknown): string {
-  const s =
-    v === undefined || v === null
-      ? ''
-      : Array.isArray(v)
-        ? v.join('; ')
-        : typeof v === 'object'
-          ? Object.entries(v as Record<string, unknown>)
-              .map(([row, col]) => `${row}: ${Array.isArray(col) ? col.join('; ') : String(col)}`)
-              .join(' | ')
-          : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-function downloadCsv(
-  formName: string,
-  questions: Question[],
-  subs: StoredSubmission[],
-): void {
-  const headers = ['submitted_at', 'duration_ms', 'score', ...questions.map((q) => q.id)];
-  const rows = subs.map((s) => [
-    s.receivedAt,
-    String(s.meta.durationMs),
-    String(s.meta.score ?? 0),
-    ...questions.map((q) => s.answers[q.id]),
-  ]);
-  const csv = [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
-
-  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${formName.replace(/[^a-z0-9-_ ]/gi, '').trim() || 'responses'}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 /* ---------- summary view ---------- */
@@ -320,7 +384,7 @@ function QuestionSummary({ question, subs }: { question: Question; subs: StoredS
   } else {
     body = (
       <p style={{ margin: 0, fontSize: 14, color: 'var(--slate-muted)' }}>
-        {answered} of {subs.length} answered
+        {completionLabel(answered, subs.length)}
       </p>
     );
   }
@@ -329,8 +393,8 @@ function QuestionSummary({ question, subs }: { question: Question; subs: StoredS
     <div className="slate-card" style={{ padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
         <strong style={{ fontSize: 14 }}>{titleOf(question)}</strong>
-        <span style={{ fontSize: 12, color: 'var(--slate-dim)', fontFamily: 'var(--slate-font-mono)' }}>
-          {question.id} · {answered}/{subs.length}
+        <span style={{ fontSize: 12, color: 'var(--slate-dim)' }}>
+          {completionLabel(answered, subs.length)}
         </span>
       </div>
       {body}
@@ -387,12 +451,16 @@ function ResponseRow({
   expanded,
   onToggle,
   onDelete,
+  trashed = false,
+  onRestore,
 }: {
   sub: StoredSubmission;
   questions: Question[];
   expanded: boolean;
   onToggle: () => void;
   onDelete: () => void;
+  trashed?: boolean;
+  onRestore?: () => void;
 }) {
   const a = sub.answers;
   const preview = leadPreview(questions, a);
@@ -427,7 +495,7 @@ function ResponseRow({
         <span style={{ color: 'var(--slate-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {preview.secondary}
         </span>
-        <span style={{ color: 'var(--slate-dim)', fontSize: 12 }}>{humanizeMs(sub.meta.durationMs)}</span>
+        <span style={{ color: 'var(--slate-dim)', fontSize: 12 }}>{formatDurationMs(sub.meta.durationMs)}</span>
         <span style={{ color: 'var(--slate-dim)', fontSize: 12, textAlign: 'right' }}>
           {timeAgo(when)}
         </span>
@@ -436,7 +504,8 @@ function ResponseRow({
       {expanded && (
         <div style={{ borderTop: '1px solid var(--slate-border)', padding: 16, display: 'grid', gap: 14 }}>
           <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-dim)' }}>
-            Submitted {formatSubmittedAt(sub.receivedAt)} · took {humanizeMs(sub.meta.durationMs)}
+            Submitted {formatSubmittedAt(sub.receivedAt)} · took {formatDurationMs(sub.meta.durationMs)}
+            {trashed && sub.deletedAt ? ` · trashed ${timeAgo(new Date(sub.deletedAt))}` : ''}
           </p>
           <div style={{ display: 'grid', gap: 14 }}>
             {questions.map((q) => {
@@ -454,23 +523,20 @@ function ResponseRow({
             })}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--slate-border)', paddingTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--slate-border)', paddingTop: 12 }}>
+            {trashed && onRestore && (
+              <button type="button" className="slate-btn" onClick={onRestore}>
+                Restore
+              </button>
+            )}
             <button type="button" className="slate-btn slate-btn--danger" onClick={onDelete}>
-              Delete response
+              {trashed ? 'Delete forever' : 'Move to trash'}
             </button>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-function humanizeMs(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  return `${m}m ${s % 60}s`;
 }
 
 function timeAgo(d: Date): string {

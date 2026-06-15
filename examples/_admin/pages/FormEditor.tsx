@@ -36,6 +36,7 @@ import { Inspector } from '../components/Inspector.js';
 import { SharePanel } from '../components/SharePanel.js';
 import { useEditorHistory } from '../useEditorHistory.js';
 import { clampOutlineDropIndex, resolveOutlineInsertIndex } from '../outlineDropIndex.js';
+import { uniqueQuestionId } from '../questionIds.js';
 import { slugify } from '../shareUrls.js';
 
 type Props = {
@@ -55,7 +56,7 @@ export function FormEditor({ formId }: Props) {
       schema: defineSchema({
         // Brand mirrors form name so the sync below picks up renames.
         brand: { name: 'Untitled form' },
-        theme: 'classic',
+        theme: 'swiss',
         themeMode: 'toggle',
         questions: [
           { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
@@ -288,12 +289,12 @@ function FormEditorBody({ formId }: { formId: string }) {
       const idx = s.questions.findIndex((q) => q.id === id);
       const original = s.questions[idx];
       if (!original || original.type === 'welcome' || original.type === 'thanks') return s;
-      let copyId = `${original.id}_copy`;
-      let n = 2;
-      while (s.questions.some((q) => q.id === copyId)) {
-        copyId = `${original.id}_copy${n}`;
-        n += 1;
-      }
+      const title =
+        typeof original.title === 'string' ? `${original.title} (copy)` : 'Question (copy)';
+      const copyId = uniqueQuestionId(
+        title,
+        new Set(s.questions.map((q) => q.id)),
+      );
       const next = [...s.questions];
       next.splice(idx + 1, 0, cloneQuestion(original, copyId));
       setSelectedId(copyId);
@@ -333,8 +334,10 @@ function FormEditorBody({ formId }: { formId: string }) {
       return;
     }
 
-    const baseId = `q_${Date.now().toString(36).slice(-5)}`;
-    const newQ = makeDefaultQuestion(type, baseId);
+    const draft = makeDefaultQuestion(type, 'placeholder');
+    const title = typeof draft.title === 'string' ? draft.title : type;
+    const id = uniqueQuestionId(title, new Set(schema.questions.map((q) => q.id)));
+    const newQ = { ...draft, id };
     pushHistory();
     setSchema((s) => {
       if (!s) return s;

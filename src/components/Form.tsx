@@ -21,6 +21,7 @@ import { useFormState } from '@/hooks/useFormState.js';
 import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 import { useAutosave } from '@/hooks/useAutosave.js';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
+import { FormConfirmRefContext } from '@/hooks/useRegisterFormConfirm.js';
 import { useTheme } from '@/hooks/useTheme.js';
 import { progress as progressFn } from '@/logic/progress.js';
 import { computeScore } from '@/logic/scoring.js';
@@ -56,6 +57,7 @@ export function Form<S extends Schema>({
 }: FormProps<S>) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const confirmStepRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     migrateSlateLocalStorageKeys();
@@ -191,6 +193,11 @@ export function Form<S extends Schema>({
     currentQ: currentQuestion,
     onAdvance: advanceWithSound,
     onBack: backWithClear,
+    onConfirm: () => {
+      if (!confirmStepRef.current) return false;
+      confirmStepRef.current();
+      return true;
+    },
     onSelectChoice,
     onSelectScale,
   });
@@ -364,36 +371,38 @@ export function Form<S extends Schema>({
       )}
 
       <div className="slate-stage">
-        <div
-          key={currentQuestion?.id ?? 'empty'}
-          className="slate-q-enter slate-stage-content"
-          data-direction={state.direction}
-          onAnimationEnd={animationEnd}
-        >
-          {currentQuestion ? (
-            <QuestionRenderer
-              question={currentQuestion}
-              answers={state.answers}
-              setAnswer={setAnswer}
-              advance={next}
-              stepNumber={stepNumber}
-              totalSteps={counted}
-              submitStatus={currentQuestion.type === 'thanks' ? submitStatus : 'idle'}
-              submitError={submitErrorMsg}
-              onRetrySubmit={retrySubmit}
-              onRestart={restartForm}
-              onFileUpload={onFileUpload}
-              resolveFileUploadMeta={resolveFileUploadMeta}
-              score={score}
-              visibleList={state.visible}
-              onEditQuestion={(id) => {
-                const idx = state.visible.findIndex((q) => q.id === id);
-                if (idx >= 0) goTo(idx, 'backward');
-              }}
-              playInteractionSound={playInteractionSound}
-            />
-          ) : null}
-        </div>
+        <FormConfirmRefContext.Provider value={confirmStepRef}>
+          <div
+            key={currentQuestion?.id ?? 'empty'}
+            className="slate-q-enter slate-stage-content"
+            data-direction={state.direction}
+            onAnimationEnd={animationEnd}
+          >
+            {currentQuestion ? (
+              <QuestionRenderer
+                question={currentQuestion}
+                answers={state.answers}
+                setAnswer={setAnswer}
+                advance={next}
+                stepNumber={stepNumber}
+                totalSteps={counted}
+                submitStatus={currentQuestion.type === 'thanks' ? submitStatus : 'idle'}
+                submitError={submitErrorMsg}
+                onRetrySubmit={retrySubmit}
+                onRestart={restartForm}
+                onFileUpload={onFileUpload}
+                resolveFileUploadMeta={resolveFileUploadMeta}
+                score={score}
+                visibleList={state.visible}
+                onEditQuestion={(id) => {
+                  const idx = state.visible.findIndex((q) => q.id === id);
+                  if (idx >= 0) goTo(idx, 'backward');
+                }}
+                playInteractionSound={playInteractionSound}
+              />
+            ) : null}
+          </div>
+        </FormConfirmRefContext.Provider>
       </div>
 
       {isAnswerBearing && counted > 0 && (

@@ -20,4 +20,17 @@ test.describe('Slate admin smoke', () => {
     await page.goto(portableUrl);
     await expect(page.getByRole('button', { name: 'Start' })).toBeVisible();
   });
+
+  test('form can be filled and submitted in preview', async ({ page }) => {
+    await page.goto('/#/forms/new');
+    await page.waitForURL(/#\/forms\/[^/]+\/edit/);
+    const formId = page.url().match(/forms\/([^/]+)\/edit/)?.[1];
+    expect(formId).toBeTruthy();
+    await page.goto(`/#/forms/${formId}`);
+    const preview = page.locator('.slate-preview');
+    await preview.getByRole('button', { name: 'Start' }).click();
+    await preview.getByRole('textbox').fill('Playwright test');
+    await preview.getByRole('button', { name: 'OK' }).click();
+    await expect(preview.getByText(/you're all set/i)).toBeVisible();
+  });
 });

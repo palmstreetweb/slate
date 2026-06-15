@@ -6,9 +6,10 @@
 
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 import type { RankingQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -49,10 +50,12 @@ export function RankingField({ question, answers, initialValue, onAnswer, onAdva
     });
   };
 
-  const submit = () => {
+  const submit = useCallback(() => {
     onAnswer(order);
     onAdvance();
-  };
+  }, [onAnswer, onAdvance, order]);
+
+  useRegisterFormConfirm(submit);
 
   return (
     <div>
@@ -110,7 +113,7 @@ export function RankingField({ question, answers, initialValue, onAnswer, onAdva
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>
         </button>
-        <span className="slate-hint">drag rows or use ↑↓ to reorder</span>
+        <span className="slate-hint">drag rows or use ↑↓, press Enter ↵</span>
       </div>
     </div>
   );

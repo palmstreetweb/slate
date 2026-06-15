@@ -1,11 +1,12 @@
 /* ============================================================
    Slate admin CHROME tokens — separate from src/styles/tokens.css.
-   Binds to AdminShell's existing data-theme light/dark toggle
-   (localStorage key: slate-theme). Semantic chrome vars map into
-   the legacy --slate-* names used across _adminTheme.css.
+   Binds to AdminShell data-theme (light/dark) + data-admin-ui palette.
+   localStorage: slate-theme, slate-ui-theme.
    ============================================================ */
 
-[data-slate-forms][data-theme-name='slate'][data-theme='light'] {
+/* ---------- Warm (default Slate brand) ---------- */
+
+[data-slate-forms][data-theme-name='slate'][data-admin-ui='warm'][data-theme='light'] {
   --chrome-bg: #f2efe8;
   --chrome-panel: #ffffff;
   --chrome-panel-2: #fbfaf6;
@@ -40,7 +41,7 @@
   --border-md: var(--slate-border-md);
 }
 
-[data-slate-forms][data-theme-name='slate'][data-theme='dark'] {
+[data-slate-forms][data-theme-name='slate'][data-admin-ui='warm'][data-theme='dark'] {
   --chrome-bg: #15181d;
   --chrome-panel: #1e232b;
   --chrome-panel-2: #23282f;
@@ -63,6 +64,150 @@
   --slate-accent-on-light: var(--chrome-red);
   --slate-accent-lo: rgb(226 59 45 / 0.12);
   --slate-error: #ff6b3d;
+  --slate-success: #4ade80;
+  --slate-warn: #facc15;
+  color-scheme: dark;
+
+  --text: var(--slate-text);
+  --muted: var(--slate-muted);
+  --accent: var(--slate-accent);
+  --accent-rgb: var(--slate-accent-rgb);
+  --bg-3: var(--slate-bg-3);
+  --border-md: var(--slate-border-md);
+}
+
+/* ---------- Neutral (zinc grayscale) ---------- */
+
+[data-slate-forms][data-theme-name='slate'][data-admin-ui='neutral'][data-theme='light'] {
+  --chrome-bg: #f4f4f5;
+  --chrome-panel: #ffffff;
+  --chrome-panel-2: #fafafa;
+  --chrome-ink: #18181b;
+  --chrome-muted: #71717a;
+  --chrome-line: #e4e4e7;
+  --chrome-hair: #ebebed;
+  --chrome-red: #18181b;
+
+  --slate-bg: var(--chrome-bg);
+  --slate-bg-2: var(--chrome-panel);
+  --slate-bg-3: var(--chrome-panel-2);
+  --slate-text: var(--chrome-ink);
+  --slate-muted: var(--chrome-muted);
+  --slate-dim: var(--chrome-muted);
+  --slate-border: var(--chrome-line);
+  --slate-border-md: var(--chrome-line);
+  --slate-accent: var(--chrome-red);
+  --slate-accent-rgb: 24 24 27;
+  --slate-accent-on-light: var(--chrome-red);
+  --slate-accent-lo: rgb(24 24 27 / 0.06);
+  --slate-error: #b91c1c;
+  --slate-success: #15803d;
+  --slate-warn: #a16207;
+  color-scheme: light;
+
+  --text: var(--slate-text);
+  --muted: var(--slate-muted);
+  --accent: var(--slate-accent);
+  --accent-rgb: var(--slate-accent-rgb);
+  --bg-3: var(--slate-bg-3);
+  --border-md: var(--slate-border-md);
+}
+
+[data-slate-forms][data-theme-name='slate'][data-admin-ui='neutral'][data-theme='dark'] {
+  --chrome-bg: #09090b;
+  --chrome-panel: #18181b;
+  --chrome-panel-2: #27272a;
+  --chrome-ink: #fafafa;
+  --chrome-muted: #a1a1aa;
+  --chrome-line: #3f3f46;
+  --chrome-hair: #27272a;
+  --chrome-red: #fafafa;
+
+  --slate-bg: var(--chrome-bg);
+  --slate-bg-2: var(--chrome-panel);
+  --slate-bg-3: var(--chrome-panel-2);
+  --slate-text: var(--chrome-ink);
+  --slate-muted: var(--chrome-muted);
+  --slate-dim: var(--chrome-muted);
+  --slate-border: var(--chrome-line);
+  --slate-border-md: var(--chrome-line);
+  --slate-accent: var(--chrome-red);
+  --slate-accent-rgb: 250 250 250;
+  --slate-accent-on-light: var(--chrome-red);
+  --slate-accent-lo: rgb(250 250 250 / 0.08);
+  --slate-error: #f87171;
+  --slate-success: #4ade80;
+  --slate-warn: #facc15;
+  color-scheme: dark;
+
+  --text: var(--slate-text);
+  --muted: var(--slate-muted);
+  --accent: var(--slate-accent);
+  --accent-rgb: var(--slate-accent-rgb);
+  --bg-3: var(--slate-bg-3);
+  --border-md: var(--slate-border-md);
+}
+
+/* ---------- Cool (blue-gray studio) ---------- */
+
+[data-slate-forms][data-theme-name='slate'][data-admin-ui='cool'][data-theme='light'] {
+  --chrome-bg: #f0f4f8;
+  --chrome-panel: #ffffff;
+  --chrome-panel-2: #f8fafc;
+  --chrome-ink: #0f172a;
+  --chrome-muted: #64748b;
+  --chrome-line: #e2e8f0;
+  --chrome-hair: #e8edf3;
+  --chrome-red: #2563eb;
+
+  --slate-bg: var(--chrome-bg);
+  --slate-bg-2: var(--chrome-panel);
+  --slate-bg-3: var(--chrome-panel-2);
+  --slate-text: var(--chrome-ink);
+  --slate-muted: var(--chrome-muted);
+  --slate-dim: var(--chrome-muted);
+  --slate-border: var(--chrome-line);
+  --slate-border-md: var(--chrome-line);
+  --slate-accent: var(--chrome-red);
+  --slate-accent-rgb: 37 99 235;
+  --slate-accent-on-light: var(--chrome-red);
+  --slate-accent-lo: rgb(37 99 235 / 0.08);
+  --slate-error: #dc2626;
+  --slate-success: #16a34a;
+  --slate-warn: #ca8a04;
+  color-scheme: light;
+
+  --text: var(--slate-text);
+  --muted: var(--slate-muted);
+  --accent: var(--slate-accent);
+  --accent-rgb: var(--slate-accent-rgb);
+  --bg-3: var(--slate-bg-3);
+  --border-md: var(--slate-border-md);
+}
+
+[data-slate-forms][data-theme-name='slate'][data-admin-ui='cool'][data-theme='dark'] {
+  --chrome-bg: #0f1419;
+  --chrome-panel: #1a2332;
+  --chrome-panel-2: #1e293b;
+  --chrome-ink: #f1f5f9;
+  --chrome-muted: #94a3b8;
+  --chrome-line: #334155;
+  --chrome-hair: #1e293b;
+  --chrome-red: #3b82f6;
+
+  --slate-bg: var(--chrome-bg);
+  --slate-bg-2: var(--chrome-panel);
+  --slate-bg-3: var(--chrome-panel-2);
+  --slate-text: var(--chrome-ink);
+  --slate-muted: var(--chrome-muted);
+  --slate-dim: var(--chrome-muted);
+  --slate-border: var(--chrome-line);
+  --slate-border-md: var(--chrome-line);
+  --slate-accent: var(--chrome-red);
+  --slate-accent-rgb: 59 130 246;
+  --slate-accent-on-light: var(--chrome-red);
+  --slate-accent-lo: rgb(59 130 246 / 0.12);
+  --slate-error: #f87171;
   --slate-success: #4ade80;
   --slate-warn: #facc15;
   color-scheme: dark;

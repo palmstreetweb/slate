@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { UrlQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { resolveTitle } from './_resolveTitle.js';
 
@@ -32,7 +33,7 @@ export function UrlField({ question, answers, initialValue, onAnswer, onAdvance 
     return focusAfter(inputRef.current);
   }, [question.id]);
 
-  const submit = () => {
+  const submit = useCallback(() => {
     const err = validate(question, value);
     if (err) {
       setError(err.message);
@@ -41,7 +42,9 @@ export function UrlField({ question, answers, initialValue, onAnswer, onAdvance 
     setError(null);
     onAnswer(normalizeUrl(value));
     onAdvance();
-  };
+  }, [question, value, onAnswer, onAdvance]);
+
+  useRegisterFormConfirm(submit);
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

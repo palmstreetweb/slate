@@ -6,10 +6,11 @@
 
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { DropdownQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 import { resolveTitle } from './_resolveTitle.js';
@@ -67,7 +68,7 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
     return question.options.find((o) => o.label.toLowerCase() === q.toLowerCase())?.value;
   };
 
-  const submit = () => {
+  const submit = useCallback(() => {
     const value = resolveValueFromQuery();
     const err = validate(question, value);
     if (err) {
@@ -77,7 +78,9 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
     setError(null);
     if (value) onSelect(value);
     (onSubmit ?? onAdvance)();
-  };
+  }, [question, query, selected, selectedOption, onSelect, onSubmit, onAdvance]);
+
+  useRegisterFormConfirm(submit);
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {

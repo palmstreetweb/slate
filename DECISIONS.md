@@ -382,6 +382,20 @@ Alternatives:
 Consequences: `heic2any` counts toward bundle budget but loads on demand. `<Form>` gains optional `resolveFileUploadMeta` for display of opaque refs. Backup/export of submissions includes refs only — blob sidecar in IndexedDB is not in JSON backups yet.
 Revisit when: backup format should embed files, or upload progress UI is needed beyond the field's uploading state.
 
+Revisit when: backup format should embed files, or upload progress UI is needed beyond the field's uploading state.
+
+## ADR-028 — Production Slate admin: Supabase persistence + PSW auth
+Date: 2026-06-15
+Status: accepted
+Context: ADR-018 scoped Slate as a localStorage-backed internal dev tool with no backend. The studio is now deployed at slateforms.vercel.app and needs real persistence: PSW team auth, centralized submissions from public fill links, file storage, and email alerts. The form engine package (`src/`) stays host-agnostic per the brief.
+Decision: (1) Add Supabase (Postgres + Auth + Storage + Edge Functions) as the production backend for `examples/_admin` only — not a runtime dep of `@palmstreetweb/slate`. (2) Auth-gate the admin SPA: only `@palmstreetweb.com` (or allowlisted) emails via Supabase Auth magic link / OAuth. (3) `forms` and `submissions` tables with soft-delete (`deleted_at`), draft vs `published_schema` + `status`. (4) Public fill at `#/f/{slug}` via `get_form_by_slug` RPC; anonymous submit via `submit-response` Edge Function (rate-limited, no open RLS insert). (5) File uploads to private `form-uploads` bucket; refs in answers. (6) `submit-response` triggers Resend notification when configured. (7) When `VITE_SUPABASE_URL` is unset, admin falls back to localStorage (tests + offline dev).
+Alternatives:
+- Multi-tenant SaaS with client logins. Rejected for v1 — PSW ops only.
+- Bake Supabase into the npm engine. Rejected — ADR-012; hosts own storage.
+- Vercel Postgres + custom API routes. Rejected — Supabase matches 805 patterns and ships Auth + Storage.
+Consequences: `@supabase/supabase-js` is a devDependency (examples build only). New `supabase/migrations/` and Edge Functions in repo. ADR-018's "no backend ambitions" is superseded for the **deployed admin app** only; the published package is unchanged. RLS must be audited before production credentials ship.
+Revisit when: multi-tenant client workspaces, real-time collaborative editing, or embedding admin in the npm package.
+
 ---
 
 ## Deferred to V2

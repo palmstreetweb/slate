@@ -7,10 +7,11 @@
 
 'use client';
 
-import { useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import type { MatrixQuestion } from '@/types/Question.js';
 import type { LooseAnswers, MatrixAnswer } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -48,7 +49,7 @@ export function MatrixField({ question, answers, initialValue, onAnswer, onAdvan
     if (error) setError(null);
   };
 
-  const submit = () => {
+  const submit = useCallback(() => {
     const err = validate(question, value);
     if (err) {
       setError(err.message);
@@ -57,7 +58,9 @@ export function MatrixField({ question, answers, initialValue, onAnswer, onAdvan
     setError(null);
     onAnswer(value);
     onAdvance();
-  };
+  }, [question, value, onAnswer, onAdvance]);
+
+  useRegisterFormConfirm(submit);
 
   const colCount = question.columns.length;
 

@@ -32,6 +32,15 @@ const picture: Question = {
     { label: 'Dog', value: 'dog', src: 'dog.jpg' },
   ],
 };
+const multi: Question = {
+  id: 'pick',
+  type: 'multi_choice',
+  title: 'Pick any',
+  options: [
+    { label: 'Option A', value: 'a' },
+    { label: 'Option B', value: 'b' },
+  ],
+};
 
 function setup(currentQ: Question, extra: Partial<Parameters<typeof useKeyboardNav>[0]> = {}) {
   const onAdvance = vi.fn();
@@ -60,6 +69,20 @@ describe('useKeyboardNav', () => {
     const { onAdvance } = setup(welcome);
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onAdvance).toHaveBeenCalledTimes(1);
+  });
+
+  it('Enter calls onConfirm for OK steps such as multi_choice', () => {
+    const onConfirm = vi.fn(() => true);
+    setup(multi, { onConfirm });
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('Enter does not call onConfirm while typing in an input', () => {
+    const onConfirm = vi.fn(() => true);
+    setup(multi, { onConfirm });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it('Enter does not advance while typing in an input', () => {

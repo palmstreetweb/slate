@@ -2,18 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 import { defineSchema } from '@/index.js';
 import {
   createForm,
-  deleteForm,
   duplicateForm,
+  emptyFormTrash,
+  listAllForms,
   listForms,
+  listTrashedForms,
+  permanentlyDeleteForm,
   probeFormsStorage,
+  replaceAllForms,
   resetFormsStorage,
+  restoreAllForms,
+  restoreForm,
   subscribe,
+  trashForm,
   type FormRecord,
 } from '../_formsStore.js';
 import {
   countSubmissions,
   lastSubmissionAt,
+  listAllSubmissions,
   probeSubmissionsStorage,
+  replaceAllSubmissions,
   resetSubmissionsStorage,
 } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
@@ -31,13 +40,22 @@ import {
 import { AdminShell } from '../shell/AdminShell.js';
 import { dismissWorkflowTip, WORKFLOW_TIP_KEY } from '../_siteSettings.js';
 import {
+  buildBackup,
+  downloadBackupJson,
+  parseBackup,
+  pickBackupFile,
+} from '../dataBackup.js';
+import {
   animateFormGridDuplicate,
   captureFormCardRects,
   shouldAnimateFormGrid,
 } from '../formGridFlip.js';
+import { isSupabaseConfigured } from '../supabase/env.js';
 
 export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
+  const [trashed, setTrashed] = useState<FormRecord[]>(() => listTrashedForms());
+  const [view, setView] = useState<'forms' | 'trash'>('forms');
   const [storageIssue, setStorageIssue] = useState<'forms' | 'submissions' | 'both' | null>(
     () => {
       const formsBad = probeFormsStorage() === 'corrupt';
@@ -55,7 +73,14 @@ export function Dashboard() {
     return window.localStorage.getItem(WORKFLOW_TIP_KEY) === '1';
   });
 
-  useEffect(() => subscribe(setForms), []);
+  useEffect(
+    () =>
+      subscribe(() => {
+        setForms(listForms());
+        setTrashed(listTrashedForms());
+      }),
+    [],
+  );
 
   const handleDuplicate = (sourceId: string) => {
     const grid = gridRef.current;
@@ -79,7 +104,7 @@ export function Dashboard() {
         // FormEditor can detect "user hasn't customized brand" and follow
         // along when they rename the form. See FormEditorBody.handleNameChange.
         brand: { name: 'Untitled form' },
-        theme: 'editorial',
+        theme: 'swiss',
         themeMode: 'toggle',
         questions: [
           { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
@@ -91,13 +116,60 @@ export function Dashboard() {
     if (created) navigate(`/forms/${created.id}/edit`);
   };
 
+  const onExportBackup = () => {
+    const backup = buildBackup(listAllForms(), listAllSubmissions());
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadBackupJson(backup, `slate-backup-${stamp}.json`);
+  };
+
+  const onImportBackup = async () => {
+    const raw = await pickBackupFile();
+    if (!raw) return;
+    const backup = parseBackup(raw);
+    if (!backup) {
+      await confirm({
+        title: 'Import failed',
+        message: 'That file is not a valid Slate backup.',
+        confirmLabel: 'OK',
+        danger: false,
+      });
+      return;
+    }
+    const ok = await confirm({
+      title: 'Import backup?',
+      message: `Replace all forms and responses in this browser with ${backup.forms.length} form(s) and ${backup.submissions.length} response(s) from ${new Date(backup.exportedAt).toLocaleString()}?`,
+      confirmLabel: 'Import',
+      danger: true,
+    });
+    if (!ok) return;
+    replaceAllSubmissions(backup.submissions);
+    const persisted = replaceAllForms(backup.forms);
+    setForms(listForms());
+    if (!persisted) {
+      await confirm({
+        title: 'Import incomplete',
+        message: 'Responses imported, but forms could not be saved — localStorage may be full.',
+        confirmLabel: 'OK',
+        danger: false,
+      });
+    }
+  };
+
   return (
     <AdminShell
       crumbs={null}
       rightSlot={
-        <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
-          <span className="slate-btn-plus">+</span> New form
-        </button>
+        <>
+          <button type="button" className="slate-btn" onClick={onExportBackup}>
+            Export backup
+          </button>
+          <button type="button" className="slate-btn" onClick={() => void onImportBackup()}>
+            Import backup
+          </button>
+          <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
+            <span className="slate-btn-plus">+</span> New form
+          </button>
+        </>
       }
     >
       {storageIssue && (
@@ -143,9 +215,6 @@ export function Dashboard() {
             >
               Reset storage
             </button>
-            <button type="button" className="slate-btn" onClick={() => navigate('/settings')}>
-              Open settings
-            </button>
           </div>
         </div>
       )}
@@ -158,9 +227,9 @@ export function Dashboard() {
         >
           <p style={{ margin: '0 0 8px', fontWeight: 600 }}>How Slate works on this site</p>
           <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--slate-muted)', lineHeight: 1.5 }}>
-            Forms and responses save in this browser only — use the same browser and URL (
-            slateforms.vercel.app). To send a form to someone, use Share → Shareable Link. Export
-            backup occasionally so nothing is lost.
+            {isSupabaseConfigured()
+              ? 'Forms and responses sync to Slate cloud. Publish a form, then Share → public fill link for clients. Export backup occasionally for safety.'
+              : 'Forms and responses save in this browser only — use the same browser and URL (slateforms.vercel.app). To send a form to someone, use Share → Shareable Link. Export backup occasionally so nothing is lost.'}
           </p>
           <button
             type="button"
@@ -176,15 +245,118 @@ export function Dashboard() {
       )}
 
       <div style={{ marginBottom: 28 }}>
-        <h1 className="slate-page-title">Your forms</h1>
+        <h1 className="slate-page-title">{view === 'trash' ? 'Trash' : 'Your forms'}</h1>
         <p className="slate-page-sub">
-          {forms.length === 0 ? 'No forms yet.' : `${forms.length} ${forms.length === 1 ? 'form' : 'forms'}`}
+          {view === 'trash'
+            ? trashed.length === 0
+              ? 'No deleted forms.'
+              : `${trashed.length} deleted ${trashed.length === 1 ? 'form' : 'forms'}`
+            : forms.length === 0 && trashed.length === 0
+              ? 'No forms yet.'
+              : forms.length === 0
+                ? `No active forms · ${trashed.length} in trash`
+                : `${forms.length} ${forms.length === 1 ? 'form' : 'forms'}${trashed.length > 0 ? ` · ${trashed.length} in trash` : ''}`}
         </p>
+        {(forms.length > 0 || trashed.length > 0) && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 12, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={`slate-btn slate-btn--compact${view === 'forms' ? ' slate-btn--primary' : ''}`}
+              onClick={() => setView('forms')}
+            >
+              Forms{forms.length > 0 ? ` (${forms.length})` : ''}
+            </button>
+            <button
+              type="button"
+              className={`slate-btn slate-btn--compact${view === 'trash' ? ' slate-btn--primary' : ''}`}
+              onClick={() => setView('trash')}
+            >
+              Trash{trashed.length > 0 ? ` (${trashed.length})` : ''}
+            </button>
+          </div>
+        )}
       </div>
 
-      {forms.length === 0 ? (
+      {view === 'trash' ? (
+        trashed.length === 0 ? (
+          <div className="slate-empty">
+            <p style={{ margin: 0, fontSize: 15 }}>Trash is empty.</p>
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginBottom: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <button
+                type="button"
+                className="slate-btn"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Restore ${trashed.length} ${trashed.length === 1 ? 'form' : 'forms'}?`,
+                    message: 'Moves everything in Trash back to your forms list.',
+                    confirmLabel: 'Restore all',
+                  });
+                  if (ok) restoreAllForms();
+                }}
+              >
+                Restore all
+              </button>
+              <button
+                type="button"
+                className="slate-btn slate-btn--danger"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `Delete ${trashed.length} ${trashed.length === 1 ? 'form' : 'forms'} forever?`,
+                    message:
+                      'Permanently removes trashed forms and their responses from localStorage. This cannot be undone.',
+                    confirmLabel: 'Empty trash',
+                    danger: true,
+                  });
+                  if (ok) emptyFormTrash();
+                }}
+              >
+                Empty trash
+              </button>
+            </div>
+            <div className="slate-form-grid">
+              {trashed.map((f) => (
+                <TrashedFormCard
+                  key={f.id}
+                  form={f}
+                  onRestore={async () => {
+                    const ok = await confirm({
+                      title: `Restore "${f.name}"?`,
+                      message: 'Moves this form and its responses back to your dashboard.',
+                      confirmLabel: 'Restore',
+                    });
+                    if (ok) restoreForm(f.id);
+                  }}
+                  onDeleteForever={async () => {
+                    const ok = await confirm({
+                      title: `Delete "${f.name}" forever?`,
+                      message:
+                        'Permanently removes this form and all its responses from localStorage.',
+                      confirmLabel: 'Delete forever',
+                      danger: true,
+                    });
+                    if (ok) permanentlyDeleteForm(f.id);
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )
+      ) : forms.length === 0 ? (
         <div className="slate-empty">
-          <p style={{ margin: '0 0 12px', fontSize: 15 }}>No forms yet.</p>
+          <p style={{ margin: '0 0 12px', fontSize: 15 }}>
+            {trashed.length > 0 ? 'No active forms. Check Trash to restore.' : 'No forms yet.'}
+          </p>
           <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
             <span className="slate-btn-plus">+</span> Create your first form
           </button>
@@ -198,19 +370,61 @@ export function Dashboard() {
               onDuplicate={() => handleDuplicate(f.id)}
               onDelete={async () => {
                 const ok = await confirm({
-                  title: `Delete "${f.name}"?`,
+                  title: `Move "${f.name}" to trash?`,
                   message:
-                    'This also deletes its responses in localStorage. There is no undo.',
-                  confirmLabel: 'Delete form',
+                    'The form and its responses stay in Trash until you empty it. You can restore later.',
+                  confirmLabel: 'Move to trash',
                   danger: true,
                 });
-                if (ok) deleteForm(f.id);
+                if (ok) trashForm(f.id);
               }}
             />
           ))}
         </div>
       )}
     </AdminShell>
+  );
+}
+
+function TrashedFormCard({
+  form,
+  onRestore,
+  onDeleteForever,
+}: {
+  form: FormRecord;
+  onRestore: () => void;
+  onDeleteForever: () => void;
+}) {
+  const subCount = countSubmissions(form.id);
+  const trashedAt = form.deletedAt ? timeAgo(new Date(form.deletedAt)) : null;
+
+  return (
+    <div className="slate-card">
+      <div className="slate-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <span className="slate-card-title">{form.name}</span>
+          <p className="slate-card-meta">
+            {form.schema.brand.name} · {String(form.schema.theme)}
+            {trashedAt ? ` · trashed ${trashedAt}` : ''}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span className="slate-badge">
+            {subCount} {subCount === 1 ? 'response' : 'responses'} kept
+          </span>
+        </div>
+      </div>
+      <div className="slate-card-footer">
+        <div className="slate-card-toolbar" role="toolbar" aria-label={`Trash actions for ${form.name}`}>
+          <button type="button" className="slate-btn slate-btn--compact" onClick={onRestore}>
+            Restore
+          </button>
+          <button type="button" className="slate-btn slate-btn--compact slate-btn--danger" onClick={onDeleteForever}>
+            Delete forever
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -279,7 +493,7 @@ function FormCard({
           <FormCardIconBtn label="Duplicate" onClick={onDuplicate}>
             <IconDuplicate />
           </FormCardIconBtn>
-          <FormCardIconBtn label="Delete" danger onClick={onDelete}>
+          <FormCardIconBtn label="Move to trash" danger onClick={onDelete}>
             <IconDelete />
           </FormCardIconBtn>
         </div>

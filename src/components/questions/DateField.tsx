@@ -6,10 +6,11 @@
 
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { DateQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { resolveTitle } from './_resolveTitle.js';
 
@@ -57,7 +58,7 @@ export function DateField({ question, answers, initialValue, onAnswer, onAdvance
     if (full && nextRef?.current) nextRef.current.focus();
   };
 
-  const submit = () => {
+  const submit = useCallback(() => {
     const iso = toIso(seg);
     const err = validate(question, iso);
     if (err) {
@@ -67,7 +68,9 @@ export function DateField({ question, answers, initialValue, onAnswer, onAdvance
     setError(null);
     onAnswer(iso);
     onAdvance();
-  };
+  }, [question, seg, onAnswer, onAdvance]);
+
+  useRegisterFormConfirm(submit);
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

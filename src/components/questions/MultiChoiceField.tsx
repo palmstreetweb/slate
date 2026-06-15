@@ -1,9 +1,10 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import type { MultiChoiceQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
 import { resolveTitle } from './_resolveTitle.js';
 
@@ -33,7 +34,7 @@ export function MultiChoiceField({
     if (error) setError(null);
   };
 
-  const submit = () => {
+  const submit = useCallback(() => {
     const err = validate(question, selected);
     if (err) {
       setError(err.message);
@@ -41,7 +42,9 @@ export function MultiChoiceField({
     }
     setError(null);
     onAdvance();
-  };
+  }, [question, selected, onAdvance]);
+
+  useRegisterFormConfirm(submit);
 
   return (
     <div>
@@ -83,7 +86,7 @@ export function MultiChoiceField({
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>
         </button>
-        <span className="slate-hint">tap keys to toggle, OK to continue</span>
+        <span className="slate-hint">tap keys to toggle, press Enter ↵</span>
       </div>
     </div>
   );

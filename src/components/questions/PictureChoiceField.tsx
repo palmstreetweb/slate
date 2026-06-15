@@ -6,10 +6,11 @@
 
 'use client';
 
-import { useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import type { PictureChoiceQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
 import { resolveTitle } from './_resolveTitle.js';
 
@@ -51,7 +52,7 @@ export function PictureChoiceField({
     if (error) setError(null);
   };
 
-  const submit = () => {
+  const submit = useCallback(() => {
     const err = validate(question, multiple ? selectedArr : selectedArr[0]);
     if (err) {
       setError(err.message);
@@ -59,7 +60,9 @@ export function PictureChoiceField({
     }
     setError(null);
     onAdvance();
-  };
+  }, [question, multiple, selectedArr, onAdvance]);
+
+  useRegisterFormConfirm(submit, multiple);
 
   return (
     <div>
@@ -104,7 +107,7 @@ export function PictureChoiceField({
           <button type="button" className="slate-ok-btn" onClick={submit}>
             OK <span aria-hidden>✓</span>
           </button>
-          <span className="slate-hint">tap keys to toggle, OK to continue</span>
+          <span className="slate-hint">tap keys to toggle, press Enter ↵</span>
         </div>
       ) : (
         <p className="slate-hint" style={{ marginTop: 20 }}>

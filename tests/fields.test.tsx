@@ -7,9 +7,55 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useRef } from 'react';
 import { QuestionRenderer } from '@/components/questions/QuestionRenderer.js';
+import { FormConfirmRefContext } from '@/hooks/useRegisterFormConfirm.js';
+import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
 import type { Question } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
+
+function QuestionHarness({
+  question,
+  answers,
+  setAnswer,
+  advance,
+  onFileUpload,
+}: {
+  question: Question;
+  answers: LooseAnswers;
+  setAnswer: ReturnType<typeof vi.fn>;
+  advance: ReturnType<typeof vi.fn>;
+  onFileUpload?: (file: File, questionId: string) => Promise<string>;
+}) {
+  const confirmRef = useRef<(() => void) | null>(null);
+  useKeyboardNav({
+    currentQ: question,
+    onAdvance: advance,
+    onBack: vi.fn(),
+    onConfirm: () => {
+      if (!confirmRef.current) return false;
+      confirmRef.current();
+      return true;
+    },
+  });
+  return (
+    <FormConfirmRefContext.Provider value={confirmRef}>
+      <QuestionRenderer
+        question={question}
+        answers={answers}
+        setAnswer={setAnswer}
+        advance={advance}
+        stepNumber={1}
+        totalSteps={3}
+        submitStatus="idle"
+        submitError={null}
+        onRetrySubmit={vi.fn()}
+        onRestart={vi.fn()}
+        onFileUpload={onFileUpload}
+      />
+    </FormConfirmRefContext.Provider>
+  );
+}
 
 function renderQuestion(
   question: Question,
@@ -19,17 +65,11 @@ function renderQuestion(
   const setAnswer = vi.fn();
   const advance = vi.fn();
   const utils = render(
-    <QuestionRenderer
+    <QuestionHarness
       question={question}
       answers={answers}
       setAnswer={setAnswer}
       advance={advance}
-      stepNumber={1}
-      totalSteps={3}
-      submitStatus="idle"
-      submitError={null}
-      onRetrySubmit={vi.fn()}
-      onRestart={vi.fn()}
       onFileUpload={onFileUpload}
     />,
   );
@@ -240,6 +280,24 @@ describe('field interactions', () => {
 
     await user.click(screen.getByRole('checkbox', { name: /a/i }));
     expect(setAnswer).toHaveBeenCalledWith('addons', ['a']);
+  });
+
+  it('multi_choice advances on Enter when at least one option is selected', () => {
+    const { advance } = renderQuestion(
+      {
+        id: 'addons',
+        type: 'multi_choice',
+        title: 'Add-ons?',
+        min: 1,
+        options: [
+          { label: 'A', value: 'a' },
+          { label: 'B', value: 'b' },
+        ],
+      },
+      { addons: ['a'] },
+    );
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(advance).toHaveBeenCalledTimes(1);
   });
 
   it('number rejects out-of-range values', async () => {

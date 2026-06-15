@@ -2,11 +2,14 @@
 
 import { createContext, useContext, type ReactNode } from 'react';
 import type { ResolvedThemeMode } from '@/index.js';
+import type { AdminUiTheme } from './adminUiTheme.js';
 
 type AdminThemeContextValue = {
   mode: ResolvedThemeMode;
   setMode: (mode: ResolvedThemeMode) => void;
   toggle: () => void;
+  uiTheme: AdminUiTheme;
+  setUiTheme: (theme: AdminUiTheme) => void;
 };
 
 const AdminThemeContext = createContext<AdminThemeContextValue | null>(null);
