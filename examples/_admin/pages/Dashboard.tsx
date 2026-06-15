@@ -6,11 +6,14 @@ import {
   duplicateForm,
   listForms,
   subscribe,
+  updateForm,
   type FormRecord,
 } from '../_formsStore.js';
 import { countSubmissions, lastSubmissionAt } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
+import { SharePanel } from '../components/SharePanel.js';
+import { slugify } from '../shareUrls.js';
 import { AdminShell } from '../shell/AdminShell.js';
 
 export function Dashboard() {
@@ -41,10 +44,10 @@ export function Dashboard() {
 
   return (
     <AdminShell
-      crumbs={<span className="slate-crumb">Forms</span>}
+      crumbs={null}
       rightSlot={
-        <button type="button" className="slate-btn slate-btn--primary" onClick={onNew}>
-          + New form
+        <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
+          <span className="slate-btn-plus">+</span> New form
         </button>
       }
     >
@@ -58,8 +61,8 @@ export function Dashboard() {
       {forms.length === 0 ? (
         <div className="slate-empty">
           <p style={{ margin: '0 0 12px', fontSize: 14 }}>No forms yet.</p>
-          <button type="button" className="slate-btn slate-btn--primary" onClick={onNew}>
-            Create your first form
+          <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
+            <span className="slate-btn-plus">+</span> Create your first form
           </button>
         </div>
       ) : (
@@ -102,11 +105,13 @@ function FormCard({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const [shareOpen, setShareOpen] = useState(false);
   const subCount = countSubmissions(form.id);
   const lastAt = lastSubmissionAt(form.id);
   const qCount = form.schema.questions.filter(
     (q) => q.type !== 'welcome' && q.type !== 'thanks' && q.type !== 'statement',
   ).length;
+  const slug = form.slug?.trim() ? slugify(form.slug) : slugify(form.name);
 
   return (
     <div className="slate-card">
@@ -114,22 +119,12 @@ function FormCard({
         <div>
           <button
             type="button"
-            className="slate-link"
-            style={{
-              fontFamily: 'var(--slate-font-display)',
-              fontSize: 19,
-              fontWeight: 500,
-              letterSpacing: '-0.02em',
-              color: 'var(--slate-text)',
-              display: 'block',
-              textAlign: 'left',
-              lineHeight: 1.15,
-            }}
+            className="slate-link slate-card-title"
             onClick={() => navigate(`/forms/${form.id}/edit`)}
           >
             {form.name}
           </button>
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--slate-dim)' }}>
+          <p className="slate-card-meta">
             {form.schema.brand.name} · {String(form.schema.theme)}
           </p>
         </div>
@@ -145,57 +140,59 @@ function FormCard({
         </div>
       </div>
 
-      <div
-        style={{
-          borderTop: '1px solid var(--slate-border)',
-          padding: '10px 14px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 8,
-          background: 'var(--slate-bg)',
-        }}
-      >
-        <div style={{ display: 'flex', gap: 4 }}>
+      <div className="slate-card-footer">
+        <div className="slate-card-actions">
           <button
             type="button"
-            className="slate-btn slate-btn--ghost"
+            className="slate-card-action"
             onClick={() => navigate(`/forms/${form.id}/edit`)}
           >
             Edit
           </button>
           <button
             type="button"
-            className="slate-btn slate-btn--ghost"
+            className="slate-card-action"
             onClick={() => navigate(`/forms/${form.id}`)}
           >
             Preview
           </button>
           <button
             type="button"
-            className="slate-btn slate-btn--ghost"
+            className="slate-card-action"
             onClick={() => navigate(`/forms/${form.id}/submissions`)}
           >
             Responses
             {subCount > 0 && (
               <span
                 className="slate-badge slate-badge--accent"
-                style={{ padding: '0 6px', fontSize: 10, marginLeft: 4 }}
+                style={{ padding: '0 6px', fontSize: 10, marginLeft: 6 }}
               >
                 {subCount}
               </span>
             )}
           </button>
+          <button type="button" className="slate-card-action" onClick={() => setShareOpen(true)}>
+            Share
+          </button>
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button type="button" className="slate-btn slate-btn--ghost slate-btn--icon" onClick={onDuplicate} aria-label="Duplicate" title="Duplicate">
+        <div className="slate-card-icons">
+          <button type="button" className="slate-card-icon-btn" onClick={onDuplicate} aria-label="Duplicate" title="Duplicate">
             <DuplicateIcon />
           </button>
-          <button type="button" className="slate-btn slate-btn--ghost slate-btn--icon" onClick={onDelete} aria-label="Delete" title="Delete">
+          <button type="button" className="slate-card-icon-btn" onClick={onDelete} aria-label="Delete" title="Delete">
             <TrashIcon />
           </button>
         </div>
       </div>
+
+      <SharePanel
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        formId={form.id}
+        formName={form.name}
+        slug={slug}
+        onSlugChange={(next) => updateForm(form.id, { slug: slugify(next) })}
+      />
     </div>
   );
 }

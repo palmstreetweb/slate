@@ -1,6 +1,6 @@
 /**
  * Custom dropdown for Slate admin UI. Native `<select>` menus are
- * OS-rendered and can't match our cream/serif design — this component
+ * can't match our chrome token design — this component
  * styles both the closed trigger and the open list.
  *
  * The menu is portaled to `document.body` with fixed coordinates so it

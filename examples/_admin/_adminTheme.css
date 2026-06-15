@@ -15,25 +15,23 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] {
-  /* Body / UI: Inter for density. Display / page titles: Fraunces serif
-     to match palmstreetweb.com's editorial feel — see _seedForms etc.
-     The studio is the same brand as the marketing site, just admin-shaped. */
-  --slate-font-display: 'Fraunces', Georgia, serif;
+  /* Admin chrome is sans-first (matches brand/index.html). Inter for all UI + headings. */
+  --slate-font-display: 'Inter', system-ui, sans-serif;
   --slate-font-body: 'Inter', system-ui, sans-serif;
   --slate-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --slate-radius: 8px;
   --slate-border-width: 1px;
-  --slate-title-weight: 500;
+  --slate-title-weight: 600;
   --slate-title-tracking: -0.025em;
   --slate-title-line-height: 1.08;
   --slate-title-size: clamp(1.75rem, 2.6vw, 2rem);
   --slate-transform: none;
 
   /* Layout tokens specific to admin chrome */
-  --slate-header-h: 56px;
+  --slate-header-h: 64px;
   --slate-sidebar-w: 240px;
   --slate-content-pad: 32px;
-  --slate-card-pad: 20px;
+  --slate-card-pad: 24px;
   --slate-gap: 12px;
   --slate-radius-sm: 6px;
   --slate-radius-md: 10px;
@@ -41,52 +39,14 @@
   --slate-shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.04);
 }
 
-/* Light + dark tokens use the Editorial palette (the marketing site's
-   palette) — warm cream + deep warm dark + PSW blue. The studio IS PSW. */
-[data-slate-forms][data-theme-name='slate'][data-theme='light'] {
-  --slate-bg: #faf6ee;
-  --slate-bg-2: #ffffff;
-  --slate-bg-3: #f0eadd;
-  --slate-text: #1a1a1a;
-  --slate-muted: #5b5851;
-  --slate-dim: #8e8b83;
-  --slate-accent: #2d5bff;
-  --slate-accent-rgb: 45 91 255;
-  --slate-accent-on-light: #2d5bff;
-  --slate-accent-lo: rgb(45 91 255 / 0.06);
-  --slate-border: rgba(26, 26, 26, 0.08);
-  --slate-border-md: rgba(26, 26, 26, 0.16);
-  --slate-error: #c8421a;
-  --slate-success: #2f7d32;
-  --slate-warn: #b07900;
-  color-scheme: light;
-}
-
-[data-slate-forms][data-theme-name='slate'][data-theme='dark'] {
-  --slate-bg: #14110d;
-  --slate-bg-2: #1c1815;
-  --slate-bg-3: #25201b;
-  --slate-text: #faf6ee;
-  --slate-muted: #b8b2a4;
-  --slate-dim: #7a7468;
-  --slate-accent: #6e8fff;
-  --slate-accent-rgb: 110 143 255;
-  --slate-accent-on-light: #2d5bff;
-  --slate-accent-lo: rgb(110 143 255 / 0.10);
-  --slate-border: rgba(250, 246, 238, 0.08);
-  --slate-border-md: rgba(250, 246, 238, 0.16);
-  --slate-error: #ff6b3d;
-  --slate-success: #4ade80;
-  --slate-warn: #facc15;
-  color-scheme: dark;
-}
+/* Light/dark chrome palette → slateChromeTokens.css (ADR pending) */
 
 /* ---------- shell layout ---------- */
 
 [data-slate-forms][data-theme-name='slate'] .slate-app {
   min-height: 100vh;
-  background: var(--slate-bg);
-  color: var(--slate-text);
+  background: var(--chrome-bg);
+  color: var(--chrome-ink);
   font-family: var(--slate-font-body);
   /* Plain block flow so the sticky header's containing block extends with
      the page scroll. Grid-with-row-template breaks sticky because the
@@ -97,24 +57,21 @@
   position: sticky;
   top: 0;
   height: var(--slate-header-h);
-  background: var(--slate-bg);
-  border-bottom: 1px solid var(--slate-border);
+  background: color-mix(in srgb, var(--chrome-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--chrome-hair);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 32px;
   z-index: 50;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-brand {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-family: var(--slate-font-display);
-  font-weight: 500;
-  font-size: 17px;
-  letter-spacing: -0.02em;
-  color: var(--slate-text);
+  gap: 14px;
+  color: var(--chrome-ink);
   text-decoration: none;
   cursor: pointer;
   background: transparent;
@@ -122,31 +79,92 @@
   padding: 0;
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-brand-mark {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  background: var(--slate-accent);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+[data-slate-forms][data-theme-name='slate'] .slate-brand svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-brand-divider {
   width: 1px;
-  height: 16px;
-  background: var(--slate-border-md);
-  margin: 0 4px;
+  height: 18px;
+  background: var(--chrome-line);
+  flex-shrink: 0;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-crumb {
-  color: var(--slate-muted);
+  color: var(--chrome-muted);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* PSW toggle in admin header — toggle.css skips [data-theme-name='slate']
+   so nested form previews keep their own mode colors. Header-only rules: */
+[data-slate-forms][data-theme-name='slate'] .slate-header .slate-toggle-scale {
+  display: inline-flex;
+  transform: scale(0.85);
+  transform-origin: right center;
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='light'] .slate-header .theme-toggle {
+  background: var(--accent);
+  border-color: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='light'] .slate-header .theme-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='dark'] .slate-header .theme-toggle {
+  background: #101812;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='dark'] .slate-header .theme-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 0 0 1px rgb(var(--accent-rgb) / 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='dark'] .slate-header .theme-toggle::before {
+  background: var(--accent);
+  box-shadow:
+    0 1px 6px rgba(0, 0, 0, 0.38),
+    0 1px 4px rgb(var(--accent-rgb) / 0.22);
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='light'] .slate-header
+  .theme-toggle:not(.is-morphing-to-light):not(.is-morphing-to-dark)::before {
+  transform: translateX(32px);
+  background: #fff;
+  box-shadow:
+    0 1px 5px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.32);
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='dark'] .slate-header .theme-toggle .theme-ico--moon {
+  color: #0a0a0e;
+  opacity: 1;
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='dark'] .slate-header .theme-toggle .theme-ico--sun {
+  color: rgba(255, 255, 255, 0.5);
+  opacity: 1;
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='light'] .slate-header .theme-ico--moon {
+  color: #0a0a0e;
+  opacity: 0.98;
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='light'] .slate-header .theme-ico--sun {
+  color: #0a0a0e;
+  opacity: 1;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-content {
@@ -176,23 +194,37 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn:hover {
-  background: var(--slate-bg-3);
-  border-color: var(--slate-text);
+  border-color: var(--chrome-ink);
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-btn:active {
-  transform: translateY(0.5px);
+[data-slate-forms][data-theme-name='slate'] .slate-btn--new {
+  background: var(--chrome-panel-2);
+  border: 1px solid var(--chrome-line);
+  border-radius: 10px;
+  color: var(--chrome-ink);
+  font-weight: 600;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--new .slate-btn-plus {
+  color: var(--chrome-red);
+  font-weight: 700;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--new:hover {
+  border-color: var(--chrome-red);
+  background: var(--chrome-panel-2);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--primary {
-  background: var(--slate-accent);
-  color: #fff;
-  border-color: var(--slate-accent);
+  background: var(--chrome-panel-2);
+  color: var(--chrome-ink);
+  border: 1px solid var(--chrome-line);
+  border-radius: 10px;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--primary:hover {
-  background: color-mix(in srgb, var(--slate-accent) 88%, #000);
-  border-color: var(--slate-accent);
+  border-color: var(--chrome-red);
+  background: var(--chrome-panel-2);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--ghost {
@@ -201,9 +233,13 @@
   color: var(--slate-muted);
 }
 
+[data-slate-forms][data-theme-name='slate'] .slate-btn:active {
+  transform: translateY(0.5px);
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-btn--ghost:hover {
-  background: var(--slate-bg-3);
-  color: var(--slate-text);
+  background: var(--chrome-panel-2);
+  color: var(--chrome-ink);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--danger {
@@ -226,9 +262,10 @@
 
 /* ---------- inputs ---------- */
 
-[data-slate-forms][data-theme-name='slate'] .slate-input,
-[data-slate-forms][data-theme-name='slate'] .slate-textarea,
-[data-slate-forms][data-theme-name='slate'] .slate-select {
+/* Respondent Form output nests inside the shell — keep engine underline fields there. */
+[data-slate-forms][data-theme-name='slate'] .slate-input:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-input),
+[data-slate-forms][data-theme-name='slate'] .slate-textarea:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-textarea),
+[data-slate-forms][data-theme-name='slate'] .slate-select:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-select) {
   width: 100%;
   padding: 8px 12px;
   font-family: inherit;
@@ -242,9 +279,9 @@
   transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-input:focus,
-[data-slate-forms][data-theme-name='slate'] .slate-textarea:focus,
-[data-slate-forms][data-theme-name='slate'] .slate-select:focus,
+[data-slate-forms][data-theme-name='slate'] .slate-input:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-input):focus,
+[data-slate-forms][data-theme-name='slate'] .slate-textarea:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-textarea):focus,
+[data-slate-forms][data-theme-name='slate'] .slate-select:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-select):focus,
 [data-slate-forms][data-theme-name='slate'] .slate-select-trigger:focus-visible,
 [data-slate-forms][data-theme-name='slate'] .slate-select-trigger--open {
   border-color: var(--slate-accent);
@@ -417,14 +454,102 @@
 /* ---------- cards / surfaces ---------- */
 
 [data-slate-forms][data-theme-name='slate'] .slate-card {
-  background: var(--slate-bg-2);
-  border: 1px solid var(--slate-border);
-  border-radius: var(--slate-radius-md);
+  background: var(--chrome-panel);
+  border: 1px solid var(--chrome-line);
+  border-radius: 16px;
   overflow: hidden;
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 4px;
+  border-radius: 0 0 3px 3px;
+  background: var(--chrome-red);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card:hover {
+  border-color: color-mix(in srgb, var(--chrome-red) 45%, var(--chrome-line));
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-card-pad {
   padding: var(--slate-card-pad);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-footer {
+  border-top: 1px solid var(--chrome-hair);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: var(--chrome-panel);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-action {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--chrome-ink);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-action:hover {
+  color: var(--chrome-red);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icons {
+  display: flex;
+  gap: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--chrome-muted);
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-title {
+  display: block;
+  text-align: left;
+  font-family: var(--slate-font-display);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn:hover {
+  color: var(--chrome-red);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-section-title {
@@ -437,22 +562,21 @@
   font-family: var(--slate-font-mono);
 }
 
-/* Big page heading (Fraunces serif) — Dashboard's "Your forms",
-   FormSubmissions's "Responses", etc. */
+/* Page heading — Dashboard "Your forms", submissions title, etc. */
 [data-slate-forms][data-theme-name='slate'] .slate-page-title {
   font-family: var(--slate-font-display);
   font-size: var(--slate-title-size);
-  font-weight: var(--slate-title-weight);
+  font-weight: 600;
   letter-spacing: var(--slate-title-tracking);
   line-height: var(--slate-title-line-height);
   margin: 0;
-  color: var(--slate-text);
+  color: var(--chrome-ink);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-page-sub {
   margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--slate-muted);
+  font-size: 14px;
+  color: var(--chrome-muted);
 }
 
 /* ---------- badges ---------- */
@@ -461,14 +585,14 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: 500;
-  font-family: var(--slate-font-mono);
+  font-family: var(--slate-font-body);
   border-radius: 999px;
-  background: var(--slate-bg-3);
-  color: var(--slate-muted);
-  border: 1px solid var(--slate-border);
+  background: var(--chrome-panel-2);
+  color: var(--chrome-muted);
+  border: 1px solid var(--chrome-line);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-badge--accent {
@@ -515,9 +639,9 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-tab--active {
-  background: var(--slate-bg);
-  color: var(--slate-text);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  background: var(--chrome-panel-2);
+  color: var(--chrome-ink);
+  box-shadow: inset 0 0 0 1px var(--chrome-line);
 }
 
 /* ---------- preview frame (when rendering a form inside studio) ---------- */
@@ -545,6 +669,26 @@
   padding-top: clamp(48px, 14vh, 140px);
 }
 
+/* PSW theme toggle: bottom-left in studio preview frames (top-right
+   hugs the frame edge). Production embeds keep the default top-bar slot. */
+[data-slate-forms][data-theme-name='slate'] .slate-preview,
+[data-slate-forms][data-theme-name='slate'] .slate-canvas-frame {
+  transform: translateZ(0);
+}
+
+[data-slate-forms][data-theme-name='slate'] :is(.slate-preview, .slate-canvas-frame) [data-slate-forms] .slate-toggle-scale {
+  position: fixed;
+  bottom: 20px;
+  left: 24px;
+  z-index: 20;
+  transform: scale(0.85);
+  transform-origin: left center;
+}
+
+[data-slate-forms][data-theme-name='slate'] :is(.slate-preview, .slate-canvas-frame) [data-slate-forms] .theme-toggle {
+  position: relative;
+}
+
 /* ===========================================================
    CONFIRM DIALOG — backdrop blur + centered card
    ============================================================ */
@@ -552,6 +696,22 @@
 @keyframes slate-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes slate-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slate-page {
+  min-height: 100vh;
+  animation: slate-page-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes slate-dialog-in {
@@ -603,7 +763,7 @@
   margin: 0 0 8px;
   font-family: var(--slate-font-display);
   font-size: 22px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
   color: var(--slate-text);
@@ -640,6 +800,10 @@
   [data-slate-forms][data-theme-name='slate'] .slate-dialog {
     animation: none;
   }
+
+  .slate-page {
+    animation: none;
+  }
 }
 
 /* ===========================================================
@@ -655,23 +819,23 @@
   display: grid;
   grid-template-columns: 280px 1fr 340px;
   height: calc(100vh - var(--slate-header-h));
-  background: var(--slate-bg);
+  background: var(--chrome-bg);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-rail {
   height: 100%;
   overflow-y: auto;
-  background: var(--slate-bg);
+  background: var(--chrome-panel);
   display: flex;
   flex-direction: column;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-rail--left {
-  border-right: 1px solid var(--slate-border);
+  border-right: 1px solid var(--chrome-hair);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-rail--right {
-  border-left: 1px solid var(--slate-border);
+  border-left: 1px solid var(--chrome-hair);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-rail-pad {
@@ -696,6 +860,15 @@
 
 /* ----- outline list ----- */
 
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list-wrap {
+  position: relative;
+  --slate-outline-grip-w: 22px;
+  --slate-outline-inner-gap: 3px;
+  --slate-outline-idx-w: 26px;
+  --slate-outline-glyph-w: 22px;
+  --slate-outline-row-gap: 10px;
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-outline-list {
   list-style: none;
   margin: 0;
@@ -705,33 +878,194 @@
   gap: 2px;
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-outline-list > li {
+[data-slate-forms][data-theme-name='slate'] .slate-outline-item {
   position: relative;
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-outline-item--drop-before::before {
-  content: '';
-  position: absolute;
-  top: -1px;
-  left: 4px;
-  right: 4px;
-  height: 2px;
-  background: var(--slate-accent);
-  border-radius: 1px;
-  pointer-events: none;
-  z-index: 2;
+[data-slate-forms][data-theme-name='slate'] .slate-outline-item-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--slate-outline-inner-gap);
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-outline-row[draggable='true']:active {
+[data-slate-forms][data-theme-name='slate'] .slate-outline-grip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--slate-outline-grip-w);
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: var(--slate-radius-sm);
+  background: transparent;
+  color: var(--chrome-muted);
+  cursor: grab;
+  touch-action: none;
+  opacity: 0.35;
+  transition:
+    opacity 140ms ease-out,
+    color 140ms ease-out,
+    background 140ms ease-out;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-item:hover .slate-outline-grip,
+[data-slate-forms][data-theme-name='slate'] .slate-outline-grip:focus-visible {
+  opacity: 1;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-grip:hover {
+  color: var(--chrome-ink);
+  background: rgb(0 0 0 / 0.04);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-grip:active {
+  cursor: grabbing;
+}
+
+/* Lifted row keeps its height — content hides, no list reflow. */
+[data-slate-forms][data-theme-name='slate'] .slate-outline-item--lifted .slate-outline-grip,
+[data-slate-forms][data-theme-name='slate'] .slate-outline-item--lifted .slate-outline-row {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list--dragging .slate-outline-item:not(.slate-outline-item--lifted) .slate-outline-row {
+  opacity: 0.5;
+  transition: opacity 160ms ease-out;
+}
+
+/* Floating drop line — overlay only, slides between rows without reflow. */
+[data-slate-forms][data-theme-name='slate'] .slate-outline-drop-line {
+  position: absolute;
+  left: calc(var(--slate-outline-grip-w) + var(--slate-outline-inner-gap));
+  right: 0;
+  top: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--chrome-red);
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: 0 0 10px rgb(226 59 45 / 0.45);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-drop-line::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--chrome-red);
+  transform: translateY(-50%);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-drop-line--animated {
+  transition: transform 200ms cubic-bezier(0.25, 1, 0.4, 1);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  pointer-events: none;
+  margin: 0;
+  will-change: transform;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-drag-ghost--settling {
+  transition: transform 200ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-card {
+  background: var(--chrome-panel-2);
+  border: 1px solid var(--chrome-line);
+  border-radius: var(--slate-radius);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.05),
+    0 4px 8px rgb(0 0 0 / 0.08),
+    0 16px 40px rgb(0 0 0 / 0.18);
+}
+
+@keyframes slate-outline-pick-tilt {
+  from {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.7) rotate(-2.5deg);
+    opacity: 0.96;
+  }
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-card--compact {
+  transform: scale(0.7) rotate(-2.5deg);
+  transform-origin: center center;
+  opacity: 0.96;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.04),
+    0 6px 16px rgb(0 0 0 / 0.14);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-drag-ghost--tracking .slate-outline-card--compact {
+  animation: slate-outline-pick-tilt 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-drag-ghost--settling .slate-outline-card--compact {
+  animation: none;
+  transform: scale(0.7) rotate(0deg);
+  transition: transform 200ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-ghost-label {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--chrome-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: grabbing;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-card .slate-outline-row {
+  background: transparent;
+  border-color: transparent;
+  padding: 9px 12px;
+  cursor: grabbing;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slate-forms][data-theme-name='slate'] .slate-outline-drop-line--animated,
+  [data-slate-forms][data-theme-name='slate'] .slate-outline-drag-ghost--settling,
+  [data-slate-forms][data-theme-name='slate'] .slate-outline-list--dragging .slate-outline-item:not(.slate-outline-item--lifted) .slate-outline-row {
+    transition: none;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-outline-drag-ghost--tracking .slate-outline-card--compact,
+  [data-slate-forms][data-theme-name='slate'] .slate-outline-drag-ghost--settling .slate-outline-card--compact {
+    animation: none;
+    transition: none;
+  }
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row[draggable='true']:active,
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list--dragging .slate-outline-row,
+[data-slate-forms][data-theme-name='slate'] .slate-outline-card .slate-outline-row {
   cursor: grabbing;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-row {
+  flex: 1;
   width: 100%;
   display: grid;
-  grid-template-columns: 22px 18px 1fr auto;
+  grid-template-columns: var(--slate-outline-idx-w) var(--slate-outline-glyph-w) 1fr auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--slate-outline-row-gap);
   padding: 7px 10px;
   background: transparent;
   border: 1px solid transparent;
@@ -740,16 +1074,29 @@
   text-align: left;
   font-family: inherit;
   font-size: 13px;
-  color: var(--slate-text);
+  color: var(--chrome-ink);
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 120ms ease-out,
+    border-color 120ms ease-out,
+    box-shadow 120ms ease-out,
+    transform 120ms ease-out;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row:active:not(.slate-outline-row--source) {
+  background: var(--chrome-panel-2);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-row:hover {
-  background: var(--slate-bg-3);
+  background: var(--chrome-panel-2);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-row--selected {
-  background: var(--slate-accent-lo);
-  border-color: rgb(var(--slate-accent-rgb) / 0.30);
+  background: var(--chrome-panel-2);
+  border-color: var(--chrome-line);
+  box-shadow: inset 3px 0 0 var(--chrome-red);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-idx {
@@ -873,46 +1220,44 @@
 
 /* ----- canvas ----- */
 
-[data-slate-forms][data-theme-name='slate'] .slate-canvas {
-  background: var(--slate-bg-3);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 [data-slate-forms][data-theme-name='slate'] .slate-canvas-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--slate-border);
-  background: var(--slate-bg);
+  border-bottom: 1px solid var(--chrome-hair);
+  background: var(--chrome-bg);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-canvas-label {
   font-size: 11px;
   font-family: var(--slate-font-mono);
-  color: var(--slate-muted);
+  color: var(--chrome-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-canvas {
+  background: var(--chrome-panel-2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-canvas-frame {
   flex: 1;
   margin: 24px;
-  border-radius: var(--slate-radius-lg);
+  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid var(--slate-border-md);
+  border: 1px solid var(--chrome-line);
   box-shadow: var(--slate-shadow-card);
   position: relative;
-  /* the inner [data-slate-forms] wrapper supplies its own theme tokens
-     so nothing here should hard-code a background color. */
 }
 
 /* ---------- nav links ---------- */
 
 [data-slate-forms][data-theme-name='slate'] .slate-link {
-  color: var(--slate-accent);
+  color: var(--chrome-ink);
   text-decoration: none;
   font-weight: 500;
   cursor: pointer;
@@ -924,7 +1269,8 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-link:hover {
-  text-decoration: underline;
+  color: var(--chrome-red);
+  text-decoration: none;
 }
 
 /* ---------- share panel (uses slate-dialog-backdrop for the veil) ---------- */
