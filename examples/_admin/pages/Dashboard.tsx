@@ -23,7 +23,15 @@ import {
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
 import { SharePanel } from '../components/SharePanel.js';
-import { FormCardMoreMenu } from '../components/FormCardMoreMenu.js';
+import {
+  FormCardIconBtn,
+  IconDelete,
+  IconDuplicate,
+  IconEdit,
+  IconPreview,
+  IconResponses,
+  IconShare,
+} from '../components/FormCardIcons.js';
 import { slugify } from '../shareUrls.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import {
@@ -292,30 +300,30 @@ function FormCard({
       </button>
 
       <div className="slate-card-footer">
-        <div className="slate-card-toolbar">
-          <button
-            type="button"
-            className="slate-btn slate-btn--primary slate-btn--compact"
-            onClick={() => navigate(`/forms/${form.id}/edit`)}
-          >
-            Edit
-          </button>
-          <button type="button" className="slate-btn slate-btn--ghost slate-btn--compact" onClick={() => setShareOpen(true)}>
-            Share
-          </button>
-          <button
-            type="button"
-            className="slate-btn slate-btn--ghost slate-btn--compact"
+        <div className="slate-card-toolbar" role="toolbar" aria-label={`Actions for ${form.name}`}>
+          <FormCardIconBtn label="Edit" primary onClick={() => navigate(`/forms/${form.id}/edit`)}>
+            <IconEdit />
+          </FormCardIconBtn>
+          <FormCardIconBtn label="Share" onClick={() => setShareOpen(true)}>
+            <IconShare />
+          </FormCardIconBtn>
+          <FormCardIconBtn
+            label={subCount > 0 ? `Responses (${subCount})` : 'Responses'}
+            badge={subCount}
             onClick={() => navigate(`/forms/${form.id}/submissions`)}
           >
-            Responses{subCount > 0 ? ` (${subCount})` : ''}
-          </button>
+            <IconResponses />
+          </FormCardIconBtn>
+          <FormCardIconBtn label="Preview" onClick={() => navigate(`/forms/${form.id}`)}>
+            <IconPreview />
+          </FormCardIconBtn>
+          <FormCardIconBtn label="Duplicate" onClick={onDuplicate}>
+            <IconDuplicate />
+          </FormCardIconBtn>
+          <FormCardIconBtn label="Delete" danger onClick={onDelete}>
+            <IconDelete />
+          </FormCardIconBtn>
         </div>
-        <FormCardMoreMenu
-          onPreview={() => navigate(`/forms/${form.id}`)}
-          onDuplicate={onDuplicate}
-          onDelete={onDelete}
-        />
       </div>
 
       <SharePanel

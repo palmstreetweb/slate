@@ -502,12 +502,70 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-card-footer {
   border-top: 1px solid var(--chrome-hair);
-  padding: 12px 16px;
+  padding: 10px 16px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  gap: 8px;
   background: var(--chrome-panel);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--chrome-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn:hover {
+  color: var(--chrome-red);
+  background: color-mix(in srgb, var(--chrome-red) 10%, transparent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn--primary {
+  color: var(--chrome-red);
+  background: color-mix(in srgb, var(--chrome-red) 12%, transparent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn--primary:hover {
+  background: color-mix(in srgb, var(--chrome-red) 20%, transparent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn--danger:hover {
+  color: var(--slate-error);
+  background: color-mix(in srgb, var(--slate-error) 12%, transparent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--chrome-red);
+  color: var(--slate-on-accent, #fff);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-card-body-btn {
@@ -526,87 +584,6 @@
   color: var(--chrome-red);
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-card-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-menu {
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-menu-item {
-  display: block;
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  text-align: left;
-  color: var(--chrome-ink);
-  cursor: pointer;
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-menu-item:hover {
-  background: color-mix(in srgb, var(--chrome-red) 10%, transparent);
-  color: var(--chrome-red);
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-menu-item--danger:hover {
-  background: color-mix(in srgb, var(--slate-error) 12%, transparent);
-  color: var(--slate-error);
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-action {
-  background: transparent;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--chrome-ink);
-  cursor: pointer;
-  text-decoration: none;
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-action:hover {
-  color: var(--chrome-red);
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-icons {
-  display: flex;
-  gap: 4px;
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--chrome-muted);
-  cursor: pointer;
-}
-
 [data-slate-forms][data-theme-name='slate'] .slate-card-title {
   display: block;
   text-align: left;
@@ -621,10 +598,6 @@
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--chrome-muted);
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn:hover {
-  color: var(--chrome-red);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-section-title {
