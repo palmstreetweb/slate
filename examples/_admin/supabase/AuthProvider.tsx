@@ -30,9 +30,18 @@ function isPswEmail(email: string | undefined): boolean {
   return Boolean(email?.toLowerCase().endsWith('@palmstreetweb.com'));
 }
 
+async function canSignIn(email: string): Promise<boolean> {
+  if (isPswEmail(email)) return true;
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc('can_sign_in', { p_email: email.trim().toLowerCase() });
+  if (error) return false;
+  return Boolean(data);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(isSupabaseConfigured());
   const [session, setSession] = useState<Session | null>(null);
+  const [isTeam, setIsTeam] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -56,13 +65,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setIsTeam(false);
+      return;
+    }
+    let mounted = true;
+    void canSignIn(session.user.email).then((ok) => {
+      if (mounted) setIsTeam(ok);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [session]);
+
   const signInWithEmail = useCallback(async (email: string) => {
     if (!isSupabaseConfigured()) {
       return { error: 'Supabase is not configured.' };
     }
     const trimmed = email.trim().toLowerCase();
-    if (!isPswEmail(trimmed)) {
-      return { error: 'Sign in is limited to @palmstreetweb.com accounts.' };
+    const allowed = await canSignIn(trimmed);
+    if (!allowed) {
+      return { error: 'This email is not authorized for Slate. Ask a PSW admin to add you.' };
     }
     const supabase = getSupabase();
     const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined;
@@ -83,11 +107,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       session,
       user: session?.user ?? null,
-      isPswTeam: isPswEmail(session?.user?.email),
+      isPswTeam: isTeam,
       signInWithEmail,
       signOut,
     }),
-    [loading, session, signInWithEmail, signOut],
+    [loading, session, isTeam, signInWithEmail, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

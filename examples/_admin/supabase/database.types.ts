@@ -75,6 +75,10 @@ export type Database = {
           schema: Schema;
         }[];
       };
+      can_sign_in: {
+        Args: { p_email: string };
+        Returns: boolean;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
