@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ResolvedThemeMode } from '@/index.js';
+import { ThemeToggle } from '@/components/chrome/ThemeToggle.js';
 import { SlateLogo } from '../components/SlateLogo.js';
 import { navigate } from '../_router.js';
 
@@ -32,15 +33,7 @@ export function Header({ crumbs, rightSlot, mode, onToggle }: Props) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {rightSlot}
-        <button
-          type="button"
-          className="slate-theme-toggle"
-          onClick={onToggle}
-          aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          <span className="slate-theme-toggle-dot" aria-hidden="true" />
-          <span>{mode === 'dark' ? 'Dark' : 'Light'}</span>
-        </button>
+        <ThemeToggle mode={mode} onToggle={onToggle} />
       </div>
     </header>
   );

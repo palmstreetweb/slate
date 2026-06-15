@@ -48,6 +48,22 @@ function matchRoute(path: string): Route {
   return { name: 'notfound', path };
 }
 
+/** Stable key for page transition animations. */
+export function routeKey(route: Route): string {
+  switch (route.name) {
+    case 'dashboard':
+      return '/';
+    case 'editor':
+      return route.formId ? `/forms/${route.formId}/edit` : '/forms/new';
+    case 'preview':
+      return `/forms/${route.formId}`;
+    case 'submissions':
+      return `/forms/${route.formId}/submissions`;
+    case 'notfound':
+      return route.path;
+  }
+}
+
 export function useRoute(): Route {
   const [path, setPath] = useState<string>(() => normalizePath());
 

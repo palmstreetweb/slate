@@ -31,6 +31,13 @@
   --slate-success: #2f7d32;
   --slate-warn: #b07900;
   color-scheme: light;
+
+  --text: var(--slate-text);
+  --muted: var(--slate-muted);
+  --accent: var(--slate-accent);
+  --accent-rgb: var(--slate-accent-rgb);
+  --bg-3: var(--slate-bg-3);
+  --border-md: var(--slate-border-md);
 }
 
 [data-slate-forms][data-theme-name='slate'][data-theme='dark'] {
@@ -59,4 +66,11 @@
   --slate-success: #4ade80;
   --slate-warn: #facc15;
   color-scheme: dark;
+
+  --text: var(--slate-text);
+  --muted: var(--slate-muted);
+  --accent: var(--slate-accent);
+  --accent-rgb: var(--slate-accent-rgb);
+  --bg-3: var(--slate-bg-3);
+  --border-md: var(--slate-border-md);
 }

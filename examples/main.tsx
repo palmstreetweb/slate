@@ -1,6 +1,6 @@
-import { StrictMode } from 'react';
+import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { useRoute } from './_admin/_router.js';
+import { useRoute, routeKey } from './_admin/_router.js';
 import { seedIfEmpty } from './_admin/_formsStore.js';
 import { seedForms } from './_admin/_seedForms.js';
 import { ConfirmProvider } from './_admin/_confirm.js';
@@ -9,9 +9,11 @@ import { FormEditor } from './_admin/pages/FormEditor.js';
 import { FormPreview } from './_admin/pages/FormPreview.js';
 import { FormSubmissions } from './_admin/pages/FormSubmissions.js';
 import { AdminShell } from './_admin/shell/AdminShell.js';
+import { PageTransition } from './_admin/shell/PageTransition.js';
 import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
 
 import './_admin/slateChromeTokens.css';
+import '@/styles/toggle.css';
 import './_admin/_adminTheme.css';
 
 // One-time localStorage migration for the Slate rebrand (ADR-025).
@@ -22,18 +24,24 @@ seedIfEmpty(seedForms);
 
 function App() {
   const route = useRoute();
+  const key = routeKey(route);
 
+  let page: ReactNode;
   switch (route.name) {
     case 'dashboard':
-      return <Dashboard />;
+      page = <Dashboard />;
+      break;
     case 'editor':
-      return <FormEditor formId={route.formId} />;
+      page = <FormEditor formId={route.formId} />;
+      break;
     case 'preview':
-      return <FormPreview formId={route.formId} />;
+      page = <FormPreview formId={route.formId} />;
+      break;
     case 'submissions':
-      return <FormSubmissions formId={route.formId} />;
+      page = <FormSubmissions formId={route.formId} />;
+      break;
     case 'notfound':
-      return (
+      page = (
         <AdminShell crumbs={null}>
           <div className="slate-empty">
             <p style={{ margin: '0 0 12px' }}>Page not found: {route.path}</p>
@@ -43,7 +51,10 @@ function App() {
           </div>
         </AdminShell>
       );
+      break;
   }
+
+  return <PageTransition routeKey={key}>{page}</PageTransition>;
 }
 
 const root = document.getElementById('root');

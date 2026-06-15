@@ -35,6 +35,7 @@ import { Canvas } from '../components/Canvas.js';
 import { Inspector } from '../components/Inspector.js';
 import { SharePanel } from '../components/SharePanel.js';
 import { useEditorHistory } from '../useEditorHistory.js';
+import { clampOutlineDropIndex, resolveOutlineInsertIndex } from '../outlineDropIndex.js';
 import { slugify } from '../shareUrls.js';
 
 type Props = {
@@ -244,11 +245,8 @@ function FormEditorBody({ formId }: { formId: string }) {
     const from = arr.findIndex((q) => q.id === id);
     if (from === -1 || arr[from]!.type === 'welcome' || arr[from]!.type === 'thanks') return;
 
-    const min = arr[0]?.type === 'welcome' ? 1 : 0;
-    const thanksIdx = arr.findIndex((q) => q.type === 'thanks');
-    const max = thanksIdx === -1 ? arr.length : thanksIdx;
-    const to = Math.max(min, Math.min(toIndex, max));
-    if (to === from) return;
+    const insertBefore = clampOutlineDropIndex(schema.questions, toIndex);
+    if (insertBefore === from || insertBefore === from + 1) return;
 
     pushHistory();
     setSchema((s) => {
@@ -257,9 +255,8 @@ function FormEditorBody({ formId }: { formId: string }) {
       const fromIdx = next.findIndex((q) => q.id === id);
       if (fromIdx === -1) return s;
       const [moved] = next.splice(fromIdx, 1);
-      const thanksAt = next.findIndex((q) => q.type === 'thanks');
-      const clamped = Math.max(min, Math.min(to, thanksAt === -1 ? next.length : thanksAt));
-      next.splice(clamped, 0, moved!);
+      const insertAt = resolveOutlineInsertIndex(fromIdx, insertBefore);
+      next.splice(insertAt, 0, moved!);
       return { ...s, questions: next };
     });
   };
@@ -488,10 +485,12 @@ function cloneQuestion(q: Question, id: string): Question {
 }
 
 function formatTime(d: Date): string {
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  const s = String(d.getSeconds()).padStart(2, '0');
-  return `${h}:${m}:${s}`;
+  return d.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
 }
 
 function makeDefaultQuestion(type: QuestionType, id: string): Question {

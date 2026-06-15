@@ -6,11 +6,14 @@ import {
   duplicateForm,
   listForms,
   subscribe,
+  updateForm,
   type FormRecord,
 } from '../_formsStore.js';
 import { countSubmissions, lastSubmissionAt } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
+import { SharePanel } from '../components/SharePanel.js';
+import { slugify } from '../shareUrls.js';
 import { AdminShell } from '../shell/AdminShell.js';
 
 export function Dashboard() {
@@ -41,7 +44,7 @@ export function Dashboard() {
 
   return (
     <AdminShell
-      crumbs={<span className="slate-crumb">Forms</span>}
+      crumbs={null}
       rightSlot={
         <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
           <span className="slate-btn-plus">+</span> New form
@@ -102,11 +105,13 @@ function FormCard({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const [shareOpen, setShareOpen] = useState(false);
   const subCount = countSubmissions(form.id);
   const lastAt = lastSubmissionAt(form.id);
   const qCount = form.schema.questions.filter(
     (q) => q.type !== 'welcome' && q.type !== 'thanks' && q.type !== 'statement',
   ).length;
+  const slug = form.slug?.trim() ? slugify(form.slug) : slugify(form.name);
 
   return (
     <div className="slate-card">
@@ -166,6 +171,9 @@ function FormCard({
               </span>
             )}
           </button>
+          <button type="button" className="slate-card-action" onClick={() => setShareOpen(true)}>
+            Share
+          </button>
         </div>
         <div className="slate-card-icons">
           <button type="button" className="slate-card-icon-btn" onClick={onDuplicate} aria-label="Duplicate" title="Duplicate">
@@ -176,6 +184,15 @@ function FormCard({
           </button>
         </div>
       </div>
+
+      <SharePanel
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        formId={form.id}
+        formName={form.name}
+        slug={slug}
+        onSlugChange={(next) => updateForm(form.id, { slug: slugify(next) })}
+      />
     </div>
   );
 }
