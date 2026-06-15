@@ -11,6 +11,7 @@ import { FormSubmissions } from './_admin/pages/FormSubmissions.js';
 import { AdminShell } from './_admin/shell/AdminShell.js';
 import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
 
+import './_admin/slateChromeTokens.css';
 import './_admin/_adminTheme.css';
 
 // One-time localStorage migration for the Slate rebrand (ADR-025).

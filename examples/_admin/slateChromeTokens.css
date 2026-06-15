@@ -1,0 +1,62 @@
+/* ============================================================
+   Slate admin CHROME tokens — separate from src/styles/tokens.css.
+   Binds to AdminShell's existing data-theme light/dark toggle
+   (localStorage key: slate-theme). Semantic chrome vars map into
+   the legacy --slate-* names used across _adminTheme.css.
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='slate'][data-theme='light'] {
+  --chrome-bg: #f2efe8;
+  --chrome-panel: #ffffff;
+  --chrome-panel-2: #fbfaf6;
+  --chrome-ink: #20242b;
+  --chrome-muted: #6b7280;
+  --chrome-line: #e6e1d6;
+  --chrome-hair: #eae6dc;
+  --chrome-red: #e23b2d;
+
+  --slate-bg: var(--chrome-bg);
+  --slate-bg-2: var(--chrome-panel);
+  --slate-bg-3: var(--chrome-panel-2);
+  --slate-text: var(--chrome-ink);
+  --slate-muted: var(--chrome-muted);
+  --slate-dim: var(--chrome-muted);
+  --slate-border: var(--chrome-line);
+  --slate-border-md: var(--chrome-line);
+  --slate-accent: var(--chrome-red);
+  --slate-accent-rgb: 226 59 45;
+  --slate-accent-on-light: var(--chrome-red);
+  --slate-accent-lo: rgb(226 59 45 / 0.08);
+  --slate-error: #c8421a;
+  --slate-success: #2f7d32;
+  --slate-warn: #b07900;
+  color-scheme: light;
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='dark'] {
+  --chrome-bg: #15181d;
+  --chrome-panel: #1e232b;
+  --chrome-panel-2: #23282f;
+  --chrome-ink: #f2efe8;
+  --chrome-muted: #8a93a1;
+  --chrome-line: #2d333d;
+  --chrome-hair: #262b33;
+  --chrome-red: #e23b2d;
+
+  --slate-bg: var(--chrome-bg);
+  --slate-bg-2: var(--chrome-panel);
+  --slate-bg-3: var(--chrome-panel-2);
+  --slate-text: var(--chrome-ink);
+  --slate-muted: var(--chrome-muted);
+  --slate-dim: var(--chrome-muted);
+  --slate-border: var(--chrome-line);
+  --slate-border-md: var(--chrome-line);
+  --slate-accent: var(--chrome-red);
+  --slate-accent-rgb: 226 59 45;
+  --slate-accent-on-light: var(--chrome-red);
+  --slate-accent-lo: rgb(226 59 45 / 0.12);
+  --slate-error: #ff6b3d;
+  --slate-success: #4ade80;
+  --slate-warn: #facc15;
+  color-scheme: dark;
+}
