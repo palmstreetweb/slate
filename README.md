@@ -4,6 +4,8 @@
 
 **Status:** `1.0.0-beta.1`. Internal Palm Street Web tooling — restricted npm scope.
 
+**Brand guide:** [`brand/`](./brand/) — live at [slateforms.vercel.app](https://slateforms.vercel.app).
+
 ---
 
 ## Install

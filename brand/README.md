@@ -1,0 +1,1 @@
+Standalone Slate brand page. Deployed to Vercel as its own project with Root Directory = `brand`, framework = Other (static, no build). Lives at [slateforms.vercel.app](https://slateforms.vercel.app).

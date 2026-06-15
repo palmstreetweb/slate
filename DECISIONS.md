@@ -359,6 +359,20 @@ Revisit when: we publish to npm and confirm the registry links resolve correctly
 
 ---
 
+## ADR-027 — Standalone brand page (`brand/`)
+Date: 2026-06-14
+Status: accepted
+Context: Slate has a visual identity (Field mark, wordmark, palette, usage rules) that internal teams and partners need outside the form engine and dev examples app. That content should be easy to share as a single URL without coupling it to the npm library build or the Vite examples shell.
+Decision: (1) Add a top-level `brand/` directory containing a self-contained static site (`index.html`, `favicon.svg`, no build step, no `package.json`). (2) Do not wire `brand/` into `tsup`, Vite, Vitest, or the pnpm workspace — the library and examples builds remain unchanged. (3) Deploy `brand/` as a **separate Vercel project** with Root Directory = `brand`, framework = Other (static). Production URL: [slateforms.vercel.app](https://slateforms.vercel.app). (4) Document deploy settings in `brand/README.md` and link from the root README.
+Alternatives:
+- Serve the brand page from the examples Vite app. Rejected — couples brand collateral to the dev server and library-adjacent routing.
+- Publish as a path on palmstreetweb.com. Rejected for now — dedicated Vercel static deploy is faster to ship and keeps PSW site deploys independent.
+- Add a build step (Tailwind, bundler) inside `brand/`. Rejected — the page is already self-contained HTML/CSS/inline SVG; zero build keeps Vercel config trivial.
+Consequences: `brand/` is source-only in this repo; Vercel project setup is manual (Root Directory + static framework). Favicon and page assets live beside `index.html`. Prettier may touch HTML on `npm run format`; that does not affect `npm run build`.
+Revisit when: we want downloadable SVG exports, versioned brand PDFs, or auth-gated partner access.
+
+---
+
 ## Deferred to V2
 
 Per brief §14, V1 explicitly does **not** include the items below. Each gets a stub ADR when the work is actually scheduled.
