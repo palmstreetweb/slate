@@ -9,7 +9,6 @@ import {
   replaceAllForms,
   resetFormsStorage,
   subscribe,
-  updateForm,
   type FormRecord,
 } from '../_formsStore.js';
 import {
@@ -32,7 +31,6 @@ import {
   IconResponses,
   IconShare,
 } from '../components/FormCardIcons.js';
-import { slugify } from '../shareUrls.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import {
   buildBackup,
@@ -269,7 +267,6 @@ function FormCard({
   const qCount = form.schema.questions.filter(
     (q) => q.type !== 'welcome' && q.type !== 'thanks' && q.type !== 'statement',
   ).length;
-  const slug = form.slug?.trim() ? slugify(form.slug) : slugify(form.name);
 
   return (
     <div className="slate-card">
@@ -331,11 +328,7 @@ function FormCard({
         onClose={() => setShareOpen(false)}
         formId={form.id}
         formName={form.name}
-        slug={slug}
         schema={form.schema}
-        onSlugChange={(next) => {
-          updateForm(form.id, { slug: slugify(next) });
-        }}
       />
     </div>
   );

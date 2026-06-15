@@ -403,9 +403,7 @@ function FormEditorBody({ formId }: { formId: string }) {
         onClose={() => setShareOpen(false)}
         formId={formId}
         formName={name}
-        slug={slug}
         schema={schema}
-        onSlugChange={setSlug}
       />
       <div className="slate-editor-shell">
         {issues.length > 0 && (
