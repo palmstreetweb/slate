@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ResolvedThemeMode } from '@/index.js';
 import { Header } from './Header.js';
+import { AdminThemeProvider } from '../adminThemeContext.js';
 
 const STORAGE_KEY = 'slate-theme';
 
@@ -45,18 +46,20 @@ export function AdminShell({ crumbs, rightSlot, children, fullBleed }: Props) {
   const toggle = () => setMode((m) => (m === 'dark' ? 'light' : 'dark'));
 
   return (
-    <div
-      ref={wrapperRef}
-      data-slate-forms=""
-      data-theme-name="slate"
-      data-theme={mode}
-    >
-      <div className="slate-app">
-        <Header crumbs={crumbs} rightSlot={rightSlot} mode={mode} onToggle={toggle} />
-        <main className={`slate-content${fullBleed ? ' slate-content--full-bleed' : ''}`}>
-          {children}
-        </main>
+    <AdminThemeProvider value={{ mode, setMode, toggle }}>
+      <div
+        ref={wrapperRef}
+        data-slate-forms=""
+        data-theme-name="slate"
+        data-theme={mode}
+      >
+        <div className="slate-app">
+          <Header crumbs={crumbs} rightSlot={rightSlot} mode={mode} onToggle={toggle} />
+          <main className={`slate-content${fullBleed ? ' slate-content--full-bleed' : ''}`}>
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </AdminThemeProvider>
   );
 }

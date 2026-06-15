@@ -426,7 +426,7 @@ describe('phase 3 question types', () => {
     await waitFor(() =>
       expect(setAnswer).toHaveBeenCalledWith('doc', 'https://cdn.example.com/hello.txt'),
     );
-    expect(onFileUpload).toHaveBeenCalledWith(file, 'doc');
+    expect(onFileUpload).toHaveBeenCalledWith(file, 'doc', { maxSizeMb: undefined });
   });
 
   it('file_upload rejects files over maxSizeMb', () => {
@@ -440,7 +440,7 @@ describe('phase 3 question types', () => {
     fireEvent.change(container.querySelector('input[type="file"]')!, {
       target: { files: [big] },
     });
-    expect(screen.getByText(/too big/i)).toBeInTheDocument();
+    expect(screen.getByText(/too large/i)).toBeInTheDocument();
     expect(setAnswer).not.toHaveBeenCalled();
   });
 

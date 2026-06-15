@@ -8,15 +8,10 @@ type IconBtnProps = {
   children: ReactNode;
   badge?: number;
   danger?: boolean;
-  primary?: boolean;
 };
 
-export function FormCardIconBtn({ label, onClick, children, badge, danger, primary }: IconBtnProps) {
-  const classes = [
-    'slate-card-icon-btn',
-    primary ? 'slate-card-icon-btn--primary' : '',
-    danger ? 'slate-card-icon-btn--danger' : '',
-  ]
+export function FormCardIconBtn({ label, onClick, children, badge, danger }: IconBtnProps) {
+  const classes = ['slate-card-icon-btn', danger ? 'slate-card-icon-btn--danger' : '']
     .filter(Boolean)
     .join(' ');
 

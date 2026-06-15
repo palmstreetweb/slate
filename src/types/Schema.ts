@@ -8,6 +8,7 @@ import type { Question } from './Question.js';
 import type { AnswersOf, HiddenFields, LooseAnswers } from './Answers.js';
 import type { ThemeMode, ThemeName } from './Theme.js';
 import type { FormSound } from './Sound.js';
+import type { FileUploadMeta } from '@/utils/fileUploadRef.js';
 
 export type BrandConfig = {
   name: string;
@@ -88,7 +89,12 @@ export type FormProps<S extends Schema = Schema> = {
    * stored as the answer. When omitted, the raw `File` object is stored
    * and delivered in the `onSubmit` payload.
    */
-  onFileUpload?: (file: File, questionId: string) => Promise<string>;
+  onFileUpload?: (file: File, questionId: string, ctx?: { maxSizeMb?: number }) => Promise<string>;
+  /**
+   * Resolve display metadata for opaque upload refs (e.g. `slate-file://…`).
+   * Optional; without it, refs show a generic label after reload.
+   */
+  resolveFileUploadMeta?: (ref: string) => Promise<FileUploadMeta | null>;
   /**
    * Save-and-resume (ADR-017). When set, in-progress answers autosave to
    * `localStorage` under `slate-forms-resume:<schema.id>`, a "resume where

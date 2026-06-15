@@ -123,7 +123,7 @@ export function deleteForm(formId: string): boolean {
 export function duplicateForm(formId: string): FormRecord | null {
   const src = getForm(formId);
   if (!src) return null;
-  return createForm({ name: `${src.name} (copy)`, schema: src.schema });
+  return createForm({ name: `${src.name} (Copy)`, schema: src.schema });
 }
 
 export function subscribe(listener: Listener): () => void {

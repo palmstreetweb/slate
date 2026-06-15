@@ -51,6 +51,7 @@
     "react-dom": ">=18"
   },
   "dependencies": {
+    "heic2any": "^0.0.4",
     "libphonenumber-js": "^1.11.0"
   },
   "devDependencies": {

@@ -363,7 +363,10 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {question.type === 'file_upload' && (
           <Row>
-            <Field label="Accept (File Types)" hint="e.g. image/*,.pdf">
+            <Field
+              label="Accept (optional filter)"
+              hint="Leave blank to accept any file type. Only set this if you want to limit the picker (e.g. image/*,.pdf)."
+            >
               <input
                 className="slate-input"
                 value={question.accept ?? ''}

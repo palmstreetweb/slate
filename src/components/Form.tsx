@@ -50,6 +50,7 @@ export function Form<S extends Schema>({
   hiddenFields,
   errorMessage = 'Something went wrong submitting your form. Please try again.',
   onFileUpload,
+  resolveFileUploadMeta,
   resume = false,
   onPartialChange,
 }: FormProps<S>) {
@@ -382,6 +383,7 @@ export function Form<S extends Schema>({
               onRetrySubmit={retrySubmit}
               onRestart={restartForm}
               onFileUpload={onFileUpload}
+              resolveFileUploadMeta={resolveFileUploadMeta}
               score={score}
               visibleList={state.visible}
               onEditQuestion={(id) => {

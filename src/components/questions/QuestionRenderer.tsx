@@ -31,6 +31,7 @@ import { DropdownField } from './DropdownField.js';
 import { YesNoField } from './YesNoField.js';
 import { LegalField } from './LegalField.js';
 import { FileUploadField, type FileUploadHandler } from './FileUploadField.js';
+import type { FileUploadMeta } from '@/utils/fileUploadRef.js';
 import { PictureChoiceField } from './PictureChoiceField.js';
 import { RankingField } from './RankingField.js';
 import { MatrixField } from './MatrixField.js';
@@ -56,6 +57,7 @@ export type QuestionRendererProps = {
   onRestart: () => void;
   /** Host-controlled file storage for `file_upload` questions (ADR-012). */
   onFileUpload?: FileUploadHandler;
+  resolveFileUploadMeta?: (ref: string) => Promise<FileUploadMeta | null>;
   /** Running score total, available in piping as `{{score}}` (ADR-016). */
   score?: number;
   /** Currently visible questions — feeds the review screen's answer list. */
@@ -88,6 +90,7 @@ export function QuestionRenderer({
   onRetrySubmit,
   onRestart,
   onFileUpload,
+  resolveFileUploadMeta,
   score = 0,
   visibleList,
   onEditQuestion,
@@ -367,6 +370,7 @@ export function QuestionRenderer({
             onAnswer={(v) => setAnswer(question.id, v)}
             onAdvance={advanceWithSound}
             onFileUpload={onFileUpload}
+            resolveFileUploadMeta={resolveFileUploadMeta}
           />
         </>
       );

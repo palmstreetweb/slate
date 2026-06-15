@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { defineSchema } from '@/index.js';
 import {
   createForm,
@@ -6,7 +6,6 @@ import {
   duplicateForm,
   listForms,
   probeFormsStorage,
-  replaceAllForms,
   resetFormsStorage,
   subscribe,
   type FormRecord,
@@ -14,9 +13,7 @@ import {
 import {
   countSubmissions,
   lastSubmissionAt,
-  listSubmissions,
   probeSubmissionsStorage,
-  replaceAllSubmissions,
   resetSubmissionsStorage,
 } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
@@ -32,14 +29,12 @@ import {
   IconShare,
 } from '../components/FormCardIcons.js';
 import { AdminShell } from '../shell/AdminShell.js';
+import { dismissWorkflowTip, WORKFLOW_TIP_KEY } from '../_siteSettings.js';
 import {
-  buildBackup,
-  downloadBackupJson,
-  parseBackup,
-  pickBackupFile,
-} from '../dataBackup.js';
-
-const WORKFLOW_TIP_KEY = 'slate-workflow-tip-dismissed';
+  animateFormGridDuplicate,
+  captureFormCardRects,
+  shouldAnimateFormGrid,
+} from '../formGridFlip.js';
 
 export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
@@ -54,12 +49,27 @@ export function Dashboard() {
     },
   );
   const confirm = useConfirm();
+  const gridRef = useRef<HTMLDivElement>(null);
   const [tipDismissed, setTipDismissed] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.localStorage.getItem(WORKFLOW_TIP_KEY) === '1';
   });
 
   useEffect(() => subscribe(setForms), []);
+
+  const handleDuplicate = (sourceId: string) => {
+    const grid = gridRef.current;
+    const before = grid && shouldAnimateFormGrid() ? captureFormCardRects(grid) : null;
+    const created = duplicateForm(sourceId);
+    if (!created) return;
+    if (grid && before) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          animateFormGridDuplicate(grid, sourceId, created.id, before);
+        });
+      });
+    }
+  };
 
   const onNew = () => {
     const created = createForm({
@@ -81,60 +91,13 @@ export function Dashboard() {
     if (created) navigate(`/forms/${created.id}/edit`);
   };
 
-  const onExportBackup = () => {
-    const backup = buildBackup(listForms(), listSubmissions());
-    const stamp = new Date().toISOString().slice(0, 10);
-    downloadBackupJson(backup, `slate-backup-${stamp}.json`);
-  };
-
-  const onImportBackup = async () => {
-    const raw = await pickBackupFile();
-    if (!raw) return;
-    const backup = parseBackup(raw);
-    if (!backup) {
-      await confirm({
-        title: 'Import failed',
-        message: 'That file is not a valid Slate backup.',
-        confirmLabel: 'OK',
-        danger: false,
-      });
-      return;
-    }
-    const ok = await confirm({
-      title: 'Import backup?',
-      message: `Replace all forms and responses in this browser with ${backup.forms.length} form(s) and ${backup.submissions.length} response(s) from ${new Date(backup.exportedAt).toLocaleString()}?`,
-      confirmLabel: 'Import',
-      danger: true,
-    });
-    if (!ok) return;
-    replaceAllSubmissions(backup.submissions);
-    const persisted = replaceAllForms(backup.forms);
-    setForms(listForms());
-    if (!persisted) {
-      await confirm({
-        title: 'Import incomplete',
-        message: 'Responses imported, but forms could not be saved — localStorage may be full.',
-        confirmLabel: 'OK',
-        danger: false,
-      });
-    }
-  };
-
   return (
     <AdminShell
       crumbs={null}
       rightSlot={
-        <>
-          <button type="button" className="slate-btn" onClick={onExportBackup}>
-            Export backup
-          </button>
-          <button type="button" className="slate-btn" onClick={() => void onImportBackup()}>
-            Import backup
-          </button>
-          <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
-            <span className="slate-btn-plus">+</span> New form
-          </button>
-        </>
+        <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
+          <span className="slate-btn-plus">+</span> New form
+        </button>
       }
     >
       {storageIssue && (
@@ -158,27 +121,32 @@ export function Dashboard() {
                 ? 'Saved forms appear corrupted. Responses may still be intact.'
                 : 'Saved responses appear corrupted. Your forms may still be intact.'}
           </p>
-          <button
-            type="button"
-            className="slate-btn slate-btn--danger"
-            onClick={async () => {
-              const ok = await confirm({
-                title: 'Reset local storage?',
-                message: 'Deletes all forms and responses saved in this browser. There is no undo.',
-                confirmLabel: 'Reset storage',
-                danger: true,
-              });
-              if (!ok) return;
-              if (storageIssue === 'forms' || storageIssue === 'both') resetFormsStorage();
-              if (storageIssue === 'submissions' || storageIssue === 'both') {
-                resetSubmissionsStorage();
-              }
-              setForms(listForms());
-              setStorageIssue(null);
-            }}
-          >
-            Reset storage
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="slate-btn slate-btn--danger"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Reset local storage?',
+                  message: 'Deletes all forms and responses saved in this browser. There is no undo.',
+                  confirmLabel: 'Reset storage',
+                  danger: true,
+                });
+                if (!ok) return;
+                if (storageIssue === 'forms' || storageIssue === 'both') resetFormsStorage();
+                if (storageIssue === 'submissions' || storageIssue === 'both') {
+                  resetSubmissionsStorage();
+                }
+                setForms(listForms());
+                setStorageIssue(null);
+              }}
+            >
+              Reset storage
+            </button>
+            <button type="button" className="slate-btn" onClick={() => navigate('/settings')}>
+              Open settings
+            </button>
+          </div>
         </div>
       )}
 
@@ -198,7 +166,7 @@ export function Dashboard() {
             type="button"
             className="slate-btn"
             onClick={() => {
-              window.localStorage.setItem(WORKFLOW_TIP_KEY, '1');
+              dismissWorkflowTip();
               setTipDismissed(true);
             }}
           >
@@ -222,18 +190,12 @@ export function Dashboard() {
           </button>
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: 16,
-          }}
-        >
+        <div ref={gridRef} className="slate-form-grid">
           {forms.map((f) => (
             <FormCard
               key={f.id}
               form={f}
-              onDuplicate={() => duplicateForm(f.id)}
+              onDuplicate={() => handleDuplicate(f.id)}
               onDelete={async () => {
                 const ok = await confirm({
                   title: `Delete "${f.name}"?`,
@@ -269,7 +231,7 @@ function FormCard({
   ).length;
 
   return (
-    <div className="slate-card">
+    <div className="slate-card" data-form-card data-form-id={form.id}>
       <button
         type="button"
         className="slate-card-body-btn"
@@ -298,7 +260,7 @@ function FormCard({
 
       <div className="slate-card-footer">
         <div className="slate-card-toolbar" role="toolbar" aria-label={`Actions for ${form.name}`}>
-          <FormCardIconBtn label="Edit" primary onClick={() => navigate(`/forms/${form.id}/edit`)}>
+          <FormCardIconBtn label="Edit" onClick={() => navigate(`/forms/${form.id}/edit`)}>
             <IconEdit />
           </FormCardIconBtn>
           <FormCardIconBtn label="Share" onClick={() => setShareOpen(true)}>

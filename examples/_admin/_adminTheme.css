@@ -89,6 +89,12 @@
   background: transparent;
   border: none;
   padding: 0;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-brand:hover {
+  transform: translateX(2px);
+  opacity: 0.92;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-brand svg {
@@ -220,6 +226,12 @@
 [data-slate-forms][data-theme-name='slate'] .slate-btn--new .slate-btn-plus {
   color: var(--chrome-red);
   font-weight: 700;
+  display: inline-block;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--new:hover .slate-btn-plus {
+  transform: rotate(90deg) scale(1.1);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--ghost .slate-btn-plus {
@@ -250,8 +262,20 @@
   color: var(--slate-muted);
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-btn:active {
-  transform: translateY(0.5px);
+[data-slate-forms][data-theme-name='slate'] .slate-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
+  transition-duration: 60ms;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--copied {
+  animation: slate-pop-success 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: color-mix(in srgb, var(--slate-accent) 14%, var(--slate-bg-2));
+  border-color: rgb(var(--slate-accent-rgb) / 0.35);
+  color: var(--slate-accent);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-btn--ghost:hover {
@@ -484,13 +508,23 @@
 
 /* ---------- cards / surfaces ---------- */
 
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-card {
   background: var(--chrome-panel);
   border: 1px solid var(--chrome-line);
   border-radius: 16px;
   overflow: hidden;
   position: relative;
-  transition: border-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.22s ease;
+  will-change: transform;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-card::before {
@@ -506,7 +540,23 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-card:hover {
   border-color: color-mix(in srgb, var(--chrome-red) 45%, var(--chrome-line));
+  transform: translateY(-3px);
+  box-shadow:
+    var(--slate-shadow-card),
+    0 10px 28px rgb(0 0 0 / 0.07);
 }
+
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:not(.slate-card--skip-enter) {
+  animation: slate-rise-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(1):not(.slate-card--skip-enter) { animation-delay: 40ms; }
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(2):not(.slate-card--skip-enter) { animation-delay: 80ms; }
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(3):not(.slate-card--skip-enter) { animation-delay: 120ms; }
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(4):not(.slate-card--skip-enter) { animation-delay: 160ms; }
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(5):not(.slate-card--skip-enter) { animation-delay: 200ms; }
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(6):not(.slate-card--skip-enter) { animation-delay: 240ms; }
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(n + 7):not(.slate-card--skip-enter) { animation-delay: 280ms; }
 
 [data-slate-forms][data-theme-name='slate'] .slate-card-pad {
   padding: var(--slate-card-pad);
@@ -541,21 +591,21 @@
   background: transparent;
   color: var(--chrome-muted);
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn:hover {
   color: var(--chrome-red);
   background: color-mix(in srgb, var(--chrome-red) 10%, transparent);
+  transform: scale(1.08);
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn--primary {
-  color: var(--chrome-red);
-  background: color-mix(in srgb, var(--chrome-red) 12%, transparent);
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn--primary:hover {
-  background: color-mix(in srgb, var(--chrome-red) 20%, transparent);
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn:active {
+  transform: scale(0.94);
+  transition-duration: 60ms;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn--danger:hover {
@@ -653,6 +703,12 @@
   background: var(--chrome-panel-2);
   color: var(--chrome-muted);
   border: 1px solid var(--chrome-line);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card:hover .slate-badge--accent {
+  transform: scale(1.04);
+  animation: slate-accent-pulse 1.6s ease-in-out 1;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-badge--accent {
@@ -669,6 +725,7 @@
   border: 1.5px dashed var(--slate-border-md);
   border-radius: var(--slate-radius-lg);
   color: var(--slate-muted);
+  animation: slate-rise-in 480ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
 }
 
 /* ---------- tabs ---------- */
@@ -692,16 +749,23 @@
   border-radius: 4px;
   cursor: pointer;
   font-family: inherit;
+  transition:
+    color 0.15s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.15s ease;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-tab:hover {
   color: var(--slate-text);
+  transform: translateY(-1px);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-tab--active {
   background: var(--chrome-panel-2);
   color: var(--chrome-ink);
   box-shadow: inset 0 0 0 1px var(--chrome-line);
+  transform: translateY(0);
 }
 
 /* ---------- preview frame (when rendering a form inside studio) ---------- */
@@ -774,6 +838,14 @@
   animation: slate-page-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+.slate-page .slate-page-title {
+  animation: slate-rise-in 360ms cubic-bezier(0.16, 1, 0.3, 1) 60ms both;
+}
+
+.slate-page .slate-page-sub {
+  animation: slate-rise-in 360ms cubic-bezier(0.16, 1, 0.3, 1) 100ms both;
+}
+
 @keyframes slate-dialog-in {
   from {
     opacity: 0;
@@ -783,6 +855,39 @@
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+@keyframes slate-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slate-actions-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+}
+
+@keyframes slate-pop-success {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+@keyframes slate-accent-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--slate-accent-rgb) / 0); }
+  50% { box-shadow: 0 0 0 4px rgb(var(--slate-accent-rgb) / 0.18); }
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-dialog-backdrop {
@@ -857,11 +962,48 @@
 
 @media (prefers-reduced-motion: reduce) {
   [data-slate-forms][data-theme-name='slate'] .slate-dialog-backdrop,
-  [data-slate-forms][data-theme-name='slate'] .slate-dialog {
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog,
+  [data-slate-forms][data-theme-name='slate'] .slate-share-panel {
     animation: none;
   }
 
-  .slate-page {
+  [data-slate-forms][data-theme-name='slate'] .slate-card {
+    will-change: auto;
+    transition: border-color 0.2s ease;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card {
+    animation: none;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-card-toolbar,
+  [data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn,
+  [data-slate-forms][data-theme-name='slate'] .slate-icon-btn,
+  [data-slate-forms][data-theme-name='slate'] .slate-btn,
+  [data-slate-forms][data-theme-name='slate'] .slate-tab,
+  [data-slate-forms][data-theme-name='slate'] .slate-brand,
+  [data-slate-forms][data-theme-name='slate'] .slate-badge {
+    transition: none;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-outline-list > li:hover .slate-outline-actions,
+  [data-slate-forms][data-theme-name='slate'] .slate-outline-actions:focus-within {
+    animation: none;
+    transform: translateY(-50%);
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-empty {
+    animation: none;
+  }
+
+  .slate-page,
+  .slate-page .slate-page-title,
+  .slate-page .slate-page-sub {
     animation: none;
   }
 }
@@ -1225,11 +1367,11 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-actions {
-  display: none;
+  display: flex;
   position: absolute;
   top: 50%;
   right: 6px;
-  transform: translateY(-50%);
+  transform: translateY(-50%) translateX(6px) scale(0.96);
   align-items: center;
   justify-content: center;
   gap: 0;
@@ -1237,15 +1379,18 @@
   background: var(--slate-bg-2);
   border: 1px solid var(--slate-border);
   border-radius: var(--slate-radius-sm);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
-/* Reveal on row hover only. We intentionally omit :focus-within — selecting a
-   row focuses its button, which would otherwise keep that row's controls
-   stuck visible after the mouse leaves. */
+/* Reveal on row hover only — not when the row is merely selected/focused. */
 [data-slate-forms][data-theme-name='slate'] .slate-outline-list > li:hover .slate-outline-actions,
-[data-slate-forms][data-theme-name='slate'] .slate-outline-list > li:focus-within .slate-outline-actions,
-[data-slate-forms][data-theme-name='slate'] .slate-outline-list > li:has(.slate-outline-row--selected) .slate-outline-actions {
-  display: flex;
+[data-slate-forms][data-theme-name='slate'] .slate-outline-actions:focus-within {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  animation: slate-actions-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-icon-btn {
@@ -1260,11 +1405,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease,
+    transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-icon-btn:hover {
   color: var(--slate-text);
   background: var(--slate-bg-3);
+  transform: scale(1.12);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-icon-btn:active {
+  transform: scale(0.92);
+  transition-duration: 60ms;
 }
 
 /* Clip hover fills to the pill's rounded ends (no white sliver at the edges). */
@@ -1355,11 +1510,13 @@
   padding: 0;
   font-family: inherit;
   font-size: inherit;
+  transition: color 0.15s ease, transform 0.15s ease;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-link:hover {
   color: var(--chrome-red);
   text-decoration: none;
+  transform: translateX(2px);
 }
 
 /* ---------- share panel (uses slate-dialog-backdrop for the veil) ---------- */
@@ -1479,10 +1636,107 @@
   border-radius: var(--slate-radius-sm);
   border: 1px solid var(--slate-border);
   background: #faf6ee;
+  animation: slate-rise-in 360ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-qr--placeholder {
   width: 168px;
   height: 168px;
   background: var(--slate-bg-2);
+}
+
+/* ---------- settings page ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-header-settings {
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-header-settings:hover {
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-header-settings--active {
+  color: var(--chrome-red);
+  background: color-mix(in srgb, var(--chrome-red) 10%, transparent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings {
+  max-width: 640px;
+  display: grid;
+  gap: 16px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-header {
+  margin-bottom: 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-section {
+  background: var(--chrome-panel);
+  border: 1px solid var(--chrome-line);
+  border-radius: var(--slate-radius-lg);
+  padding: 20px 22px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-section--alert {
+  border-color: color-mix(in srgb, var(--slate-error) 45%, var(--chrome-line));
+  background: color-mix(in srgb, var(--slate-error) 6%, var(--chrome-panel));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-section--muted {
+  background: transparent;
+  border-style: dashed;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-heading {
+  margin: 0 0 6px;
+  font-size: var(--slate-fs-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-copy {
+  margin: 0 0 16px;
+  font-size: var(--slate-fs-md);
+  line-height: 1.55;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-stats > div {
+  padding: 12px 14px;
+  border-radius: var(--slate-radius-sm);
+  background: var(--chrome-panel-2);
+  border: 1px solid var(--chrome-hair);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-stats dt {
+  margin: 0 0 4px;
+  font-size: var(--slate-fs-xs);
+  color: var(--slate-muted);
+  font-weight: 500;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-stats dd {
+  margin: 0;
+  font-size: var(--slate-fs-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-settings-stats {
+    grid-template-columns: 1fr;
+  }
 }

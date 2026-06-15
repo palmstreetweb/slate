@@ -1,20 +1,21 @@
-/**
- * File upload — drop zone + browse button. Storage strategy per ADR-012:
- * when the host passes `onFileUpload` to `<Form>`, the file is handed off
- * at selection time and the returned URL/identifier string is stored as
- * the answer; otherwise the raw `File` object is stored and delivered in
- * the `onSubmit` payload.
- */
-
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { FileUploadQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import {
+  describeFileUploadAnswer,
+  formatBytes,
+  isFileUploadRef,
+  type FileUploadMeta,
+} from '@/utils/fileUploadRef.js';
+import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
+import { formatFileUploadError, resolveFileInputAccept } from '@/utils/fileUploadAccept.js';
+import { shouldOptimizeImage } from '@/utils/prepareFileForUpload.js';
 import { resolveTitle } from './_resolveTitle.js';
 
-export type FileUploadHandler = (file: File, questionId: string) => Promise<string>;
+export type { FileUploadHandler };
 
 type Props = {
   question: FileUploadQuestion;
@@ -23,19 +24,8 @@ type Props = {
   onAnswer: (value: File | string | undefined) => void;
   onAdvance: () => void;
   onFileUpload?: FileUploadHandler;
+  resolveFileUploadMeta?: (ref: string) => Promise<FileUploadMeta | null>;
 };
-
-function describeAnswer(v: File | string | undefined): string | null {
-  if (v === undefined || v === '') return null;
-  if (typeof v === 'string') return v;
-  return `${v.name} (${formatBytes(v.size)})`;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export function FileUploadField({
   question,
@@ -44,41 +34,74 @@ export function FileUploadField({
   onAnswer,
   onAdvance,
   onFileUpload,
+  resolveFileUploadMeta,
 }: Props) {
   const [value, setValue] = useState<File | string | undefined>(initialValue);
+  const [meta, setMeta] = useState<FileUploadMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState<'optimize' | 'upload' | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const labelId = useId();
 
-  const accept = (file: File) => {
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
+
+  useEffect(() => {
+    if (typeof value !== 'string' || !isFileUploadRef(value) || !resolveFileUploadMeta) {
+      if (typeof value !== 'string' || !isFileUploadRef(value)) setMeta(null);
+      return;
+    }
+    let cancelled = false;
+    void resolveFileUploadMeta(value).then((m) => {
+      if (!cancelled) setMeta(m);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [value, resolveFileUploadMeta]);
+
+  const pickFile = (file: File) => {
     if (question.maxSizeMb !== undefined && file.size > question.maxSizeMb * 1024 * 1024) {
-      setError(`File is too big — max ${question.maxSizeMb} MB`);
+      setError(
+        question.maxSizeMb !== undefined
+          ? `That file is too large — max ${question.maxSizeMb} MB.`
+          : 'That file is too large.',
+      );
       return;
     }
     setError(null);
     if (onFileUpload) {
       setUploading(true);
-      onFileUpload(file, question.id)
-        .then((url) => {
-          setValue(url);
-          onAnswer(url);
+      setUploadPhase(shouldOptimizeImage(file) ? 'optimize' : 'upload');
+      onFileUpload(file, question.id, { maxSizeMb: question.maxSizeMb })
+        .then(async (ref) => {
+          setValue(ref);
+          onAnswer(ref);
+          if (resolveFileUploadMeta) {
+            setMeta(await resolveFileUploadMeta(ref));
+          }
         })
         .catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : 'Upload failed — try again';
-          setError(msg);
+          setError(formatFileUploadError(err, question.maxSizeMb));
         })
-        .finally(() => setUploading(false));
+        .finally(() => {
+          setUploading(false);
+          setUploadPhase(null);
+        });
     } else {
       setValue(file);
       onAnswer(file);
+      setMeta(null);
     }
   };
 
   const clear = () => {
     setValue(undefined);
     onAnswer(undefined);
+    setMeta(null);
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -93,7 +116,7 @@ export function FileUploadField({
     onAdvance();
   };
 
-  const described = describeAnswer(value);
+  const described = describeFileUploadAnswer(value, meta);
 
   return (
     <div>
@@ -104,12 +127,14 @@ export function FileUploadField({
         <input
           ref={inputRef}
           type="file"
-          accept={question.accept}
+          {...(resolveFileInputAccept(question.accept)
+            ? { accept: resolveFileInputAccept(question.accept) }
+            : {})}
           aria-labelledby={labelId}
           style={{ display: 'none' }}
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) accept(f);
+            if (f) pickFile(f);
           }}
         />
 
@@ -127,12 +152,14 @@ export function FileUploadField({
               e.preventDefault();
               setDragOver(false);
               const f = e.dataTransfer.files?.[0];
-              if (f) accept(f);
+              if (f) pickFile(f);
             }}
             aria-describedby={labelId}
           >
             {uploading ? (
-              <span aria-live="polite">uploading...</span>
+              <span aria-live="polite">
+                {uploadPhase === 'optimize' ? 'Optimizing & uploading…' : 'Uploading…'}
+              </span>
             ) : (
               <>
                 <span className="slate-upload-cta">choose a file</span>
@@ -148,6 +175,7 @@ export function FileUploadField({
               className="slate-upload-remove"
               onClick={clear}
               aria-label="Remove file"
+              disabled={uploading}
             >
               ×
             </button>
@@ -171,3 +199,5 @@ export function FileUploadField({
     </div>
   );
 }
+
+export { formatBytes };

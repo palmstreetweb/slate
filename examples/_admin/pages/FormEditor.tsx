@@ -541,7 +541,7 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
     case 'date':
       return { id, type, title: 'Pick a date', format: 'MM/DD/YYYY' };
     case 'file_upload':
-      return { id, type, title: 'Upload a file', maxSizeMb: 10 };
+      return { id, type, title: 'Upload a file', maxSizeMb: 32 };
     case 'single_choice':
       return {
         id,

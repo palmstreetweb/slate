@@ -371,6 +371,17 @@ Alternatives:
 Consequences: `brand/` is source-only in this repo; Vercel project setup is manual (Root Directory + static framework). Favicon and page assets live beside `index.html`. Prettier may touch HTML on `npm run format`; that does not affect `npm run build`.
 Revisit when: we want downloadable SVG exports, versioned brand PDFs, or auth-gated partner access.
 
+## ADR-026 — Client-side image optimize pipeline + `heic2any` for uploads
+Date: 2026-06-15
+Status: accepted
+Context: 805 Sealcoating already ships a browser-side upload prep stack (MIME inference, HEIC→JPEG, canvas downscale/recompress) before Supabase Storage. Slate's `file_upload` type (ADR-012) left optimization to hosts; slateforms admin had no `onFileUpload`, so files never persisted.
+Decision: Port the 805 prep pipeline into `src/utils/` (`imageFileTypes`, `heicToJpeg`, `prepareImageForStorage`, `prepareFileForUpload`) and expose `createFileUploadHandler({ upload })` so hosts run optimize-then-upload in one callback. Images use the same profile as 805 (1920px edge, ~450KB JPEG cap, 32MB input cap); non-images pass through with size limits only. Add runtime dep `heic2any`, lazy-imported only when a HEIC/HEIF file is picked. Slate admin (`examples/_admin`) stores prepared blobs in IndexedDB and answers as `slate-file://{uuid}` refs until `VITE_UPLOAD_URL` is configured for remote POST.
+Alternatives:
+- Bake Supabase upload into the library. Rejected — same as ADR-012; storage stays host-specific.
+- Skip optimization in the library. Rejected — duplicates 805 logic in every consumer and slateforms would keep losing files on submit.
+Consequences: `heic2any` counts toward bundle budget but loads on demand. `<Form>` gains optional `resolveFileUploadMeta` for display of opaque refs. Backup/export of submissions includes refs only — blob sidecar in IndexedDB is not in JSON backups yet.
+Revisit when: backup format should embed files, or upload progress UI is needed beyond the field's uploading state.
+
 ---
 
 ## Deferred to V2

@@ -31,6 +31,37 @@ export { Form } from './components/Form.js';
 
 export { FORM_SOUND_OPTIONS } from './utils/formSounds.js';
 
+export {
+  SLATE_IMAGE_INPUT_ACCEPT,
+  SLATE_IMAGE_TYPE_HINT,
+  inferImageMimeType,
+  isLikelyImageFile,
+  isHeicLike,
+} from './utils/imageFileTypes.js';
+
+export { normalizePickedImageFile } from './utils/heicToJpeg.js';
+
+export { prepareImageForStorage } from './utils/prepareImageForStorage.js';
+export { prepareFileForUpload, shouldOptimizeImage } from './utils/prepareFileForUpload.js';
+export { withInferredFileMime, inferFileMimeType } from './utils/fileMimeTypes.js';
+export {
+  createFileUploadHandler,
+  type FileUploadHandler,
+  type CreateFileUploadHandlerOptions,
+} from './utils/createFileUploadHandler.js';
+export {
+  resolveFileInputAccept,
+  formatFileUploadError,
+  isFileSizeError,
+} from './utils/fileUploadAccept.js';
+export {
+  SLATE_FILE_REF_PREFIX,
+  isFileUploadRef,
+  describeFileUploadAnswer,
+  formatBytes,
+  type FileUploadMeta,
+} from './utils/fileUploadRef.js';
+
 export { checkSchema, type SchemaIssue } from './logic/schemaCheck.js';
 
 /**

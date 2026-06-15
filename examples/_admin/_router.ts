@@ -4,6 +4,7 @@
  *
  * Routes (each as `#/path`):
  *   /                            → dashboard
+ *   /settings                    → site settings
  *   /forms/new                   → editor (creating)
  *   /forms/:id                   → preview
  *   /forms/:id/edit              → editor (editing)
@@ -14,6 +15,7 @@ import { useEffect, useState } from 'react';
 
 export type Route =
   | { name: 'dashboard' }
+  | { name: 'settings' }
   | { name: 'editor'; formId: string | null }
   | { name: 'preview'; formId: string }
   | { name: 'submissions'; formId: string }
@@ -40,6 +42,7 @@ export function hashSearchParams(): URLSearchParams {
 
 function matchRoute(path: string): Route {
   if (path === '/') return { name: 'dashboard' };
+  if (path === '/settings') return { name: 'settings' };
   if (path === '/forms/new') return { name: 'editor', formId: null };
 
   if (path === '/r') {
@@ -71,6 +74,8 @@ export function routeKey(route: Route): string {
   switch (route.name) {
     case 'dashboard':
       return '/';
+    case 'settings':
+      return '/settings';
     case 'editor':
       return route.formId ? `/forms/${route.formId}/edit` : '/forms/new';
     case 'preview':

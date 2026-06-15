@@ -4,6 +4,8 @@
  */
 
 import type { Question } from '@/index.js';
+import { describeFileUploadAnswer, isFileUploadRef } from '@/index.js';
+import { peekLocalUploadMeta } from './localFileStore.js';
 
 const CONTACT_PRIORITY = new Set<Question['type']>(['short_text', 'email', 'phone', 'url']);
 
@@ -67,6 +69,12 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
     case 'file_upload':
       if (typeof File !== 'undefined' && value instanceof File) {
         return `${value.name} (${Math.round(value.size / 1024)} KB)`;
+      }
+      if (typeof value === 'string' && isFileUploadRef(value)) {
+        return describeFileUploadAnswer(value, peekLocalUploadMeta(value)) ?? 'Uploaded file';
+      }
+      if (typeof value === 'string') {
+        return describeFileUploadAnswer(value) ?? value;
       }
       return String(value);
 

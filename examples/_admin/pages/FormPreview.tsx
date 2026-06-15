@@ -4,6 +4,8 @@ import { getForm, subscribe, type FormRecord } from '../_formsStore.js';
 import { addSubmission } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { AdminShell } from '../shell/AdminShell.js';
+import { hostFileUpload } from '../hostFileUpload.js';
+import { getLocalUploadMeta } from '../localFileStore.js';
 
 type Props = { formId: string };
 
@@ -68,6 +70,8 @@ export function FormPreview({ formId }: Props) {
             embeds opt into save-and-resume themselves (ADR-017). */}
         <Form
           schema={form.schema}
+          onFileUpload={hostFileUpload}
+          resolveFileUploadMeta={getLocalUploadMeta}
           onSubmit={async (answers, meta) => {
             await new Promise((r) => setTimeout(r, 250));
             addSubmission(formId, answers, meta);

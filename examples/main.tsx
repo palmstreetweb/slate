@@ -9,6 +9,7 @@ import { FormEditor } from './_admin/pages/FormEditor.js';
 import { FormPreview } from './_admin/pages/FormPreview.js';
 import { FormSubmissions } from './_admin/pages/FormSubmissions.js';
 import { PublicRespond } from './_admin/pages/PublicRespond.js';
+import { Settings } from './_admin/pages/Settings.js';
 import { AdminShell } from './_admin/shell/AdminShell.js';
 import { PageTransition } from './_admin/shell/PageTransition.js';
 import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
@@ -31,6 +32,9 @@ function App() {
   switch (route.name) {
     case 'dashboard':
       page = <Dashboard />;
+      break;
+    case 'settings':
+      page = <Settings />;
       break;
     case 'editor':
       page = <FormEditor formId={route.formId} />;

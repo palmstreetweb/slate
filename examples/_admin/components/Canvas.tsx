@@ -21,6 +21,8 @@ import {
   resolveThemeDecoration,
 } from '@/components/ThemeDecoration.js';
 import { progress as progressFn, visibleQuestions } from '@/logic/progress.js';
+import { hostFileUpload } from '../hostFileUpload.js';
+import { getLocalUploadMeta } from '../localFileStore.js';
 import { TYPE_LABEL } from '../questionTypeMeta.js';
 
 import '@/styles/tokens.css';
@@ -160,6 +162,8 @@ export function Canvas({ schema, selectedQuestion }: Props) {
                 submitError={null}
                 onRetrySubmit={noop}
                 onRestart={noop}
+                onFileUpload={hostFileUpload}
+                resolveFileUploadMeta={getLocalUploadMeta}
               />
             </div>
           </div>

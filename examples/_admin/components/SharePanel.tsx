@@ -114,7 +114,11 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                 </p>
                 <div className="slate-share-row">
                   <input className="slate-input slate-share-url" readOnly value={shareUrl} />
-                  <button type="button" className="slate-btn" onClick={() => void doCopy()}>
+                  <button
+                    type="button"
+                    className={`slate-btn${copied ? ' slate-btn--copied' : ''}`}
+                    onClick={() => void doCopy()}
+                  >
                     {copied ? 'Copied' : 'Copy'}
                   </button>
                   <a
