@@ -8,8 +8,13 @@ import { playSendPip } from '@/utils/sendPip.js';
 import { playDeepPop } from '@/utils/deepPop.js';
 
 const DRAG_THRESHOLD_PX = 4;
-const SETTLE_MS = 200;
-const SETTLE_FALLBACK_MS = SETTLE_MS + 80;
+const SETTLE_MS = 380;
+const CANCEL_MS = 300;
+const SETTLE_COMMIT_RATIO = 0.82;
+const SETTLE_EASE = 'cubic-bezier(0.22, 1, 0.16, 1)';
+const CANCEL_EASE = 'cubic-bezier(0.33, 0.9, 0.42, 1)';
+const TRACKING_SCALE = 1.035;
+const TRACKING_ROTATE_DEG = -1.5;
 
 type GhostRect = { x: number; y: number; width: number; height: number };
 
@@ -22,6 +27,7 @@ type DragSession = {
   offsetX: number;
   offsetY: number;
   origin: GhostRect;
+  captureTarget: HTMLButtonElement;
 };
 
 type SettlePlan = {
@@ -31,19 +37,37 @@ type SettlePlan = {
   dropIndex: number;
 };
 
-type Phase = 'idle' | 'tracking' | 'settling' | 'canceling';
+export type OutlineDragPhase = 'idle' | 'tracking' | 'settling' | 'canceling';
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+function clearGhostInlineStyles(el: HTMLElement | null) {
+  if (!el) return;
+  el.style.transform = '';
+  el.style.opacity = '';
+  const card = el.querySelector('.slate-outline-card');
+  if (card instanceof HTMLElement) {
+    card.style.transform = '';
+  }
+}
 
 export function useOutlineDrag(
   questions: ReadonlyArray<{ id: string; type: string }>,
   onMove: (id: string, toIndex: number) => void,
 ) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [phase, setPhase] = useState<Phase>('idle');
+  const [phase, setPhase] = useState<OutlineDragPhase>('idle');
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [lineY, setLineY] = useState<number | null>(null);
   const [lineAnimated, setLineAnimated] = useState(false);
   const [ghost, setGhost] = useState<GhostRect | null>(null);
   const [settleAnimating, setSettleAnimating] = useState(false);
+  const [landedId, setLandedId] = useState<string | null>(null);
 
   const listRef = useRef<HTMLUListElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -51,10 +75,12 @@ export function useOutlineDrag(
   const sessionRef = useRef<DragSession | null>(null);
   const settleRef = useRef<SettlePlan | null>(null);
   const settleArmedRef = useRef(false);
+  const settleAnimsRef = useRef<Animation[]>([]);
+  const settleTimerRef = useRef<number | null>(null);
+  const landedTimerRef = useRef<number | null>(null);
   const ghostRef = useRef<GhostRect | null>(null);
   const dropIndexRef = useRef<number | null>(null);
   const didDragRef = useRef(false);
-  const timerRef = useRef<number | null>(null);
   const questionsRef = useRef(questions);
   const onMoveRef = useRef(onMove);
 
@@ -67,25 +93,24 @@ export function useOutlineDrag(
     setGhost(next);
   };
 
-  const clearTimer = () => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
+  const cancelSettleAnims = () => {
+    if (settleTimerRef.current !== null) {
+      window.clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
     }
-  };
-
-  const finishSettle = () => {
-    const plan = settleRef.current;
-    if (!plan) return;
-    if (!plan.cancel) {
-      playDeepPop();
-      onMoveRef.current(plan.id, plan.dropIndex);
+    if (landedTimerRef.current !== null) {
+      window.clearTimeout(landedTimerRef.current);
+      landedTimerRef.current = null;
     }
-    reset();
+    for (const anim of settleAnimsRef.current) {
+      anim.cancel();
+    }
+    settleAnimsRef.current = [];
   };
 
   const reset = () => {
-    clearTimer();
+    cancelSettleAnims();
+    clearGhostInlineStyles(ghostElRef.current);
     sessionRef.current = null;
     settleRef.current = null;
     settleArmedRef.current = false;
@@ -98,6 +123,11 @@ export function useOutlineDrag(
     setLineAnimated(false);
     setSettleAnimating(false);
     setGhost(null);
+    setLandedId(null);
+  };
+
+  const finishSettle = () => {
+    reset();
   };
 
   const syncDropLine = (index: number) => {
@@ -135,6 +165,13 @@ export function useOutlineDrag(
     pointerId: number,
     captureTarget: HTMLButtonElement,
   ) => {
+    cancelSettleAnims();
+    clearGhostInlineStyles(ghostElRef.current);
+    settleRef.current = null;
+    settleArmedRef.current = false;
+    setSettleAnimating(false);
+    setLandedId(null);
+
     captureTarget.setPointerCapture(pointerId);
     sessionRef.current = {
       id,
@@ -150,6 +187,7 @@ export function useOutlineDrag(
         width: rowRect.width,
         height: rowRect.height,
       },
+      captureTarget,
     };
     dropIndexRef.current = null;
     didDragRef.current = false;
@@ -173,42 +211,94 @@ export function useOutlineDrag(
   useLayoutEffect(() => {
     const plan = settleRef.current;
     const list = listRef.current;
-    if (!plan || !isSettling || !settleAnimating || settleArmedRef.current || !list) return;
+    const el = ghostElRef.current;
+    if (!plan || !isSettling || !settleAnimating || settleArmedRef.current || !list || !el) return;
 
     settleArmedRef.current = true;
 
+    const release = ghostRef.current ?? plan.origin;
     const target = plan.cancel
       ? { x: plan.origin.x, y: plan.origin.y, width: plan.origin.width }
-      : measureOutlineRowTarget(list, plan.dropIndex);
+      : measureOutlineRowTarget(list, plan.dropIndex, questionsRef.current);
 
-    const el = ghostElRef.current;
+    const card = el.querySelector('.slate-outline-card');
+    const reduced = prefersReducedMotion();
+    const duration = reduced ? 0 : plan.cancel ? CANCEL_MS : SETTLE_MS;
 
-    const armFallback = () => {
-      clearTimer();
-      timerRef.current = window.setTimeout(() => finishSettleRef.current(), SETTLE_FALLBACK_MS);
-    };
+    el.style.transform = `translate3d(${release.x}px, ${release.y}px, 0)`;
+    el.style.opacity = '1';
+    if (card instanceof HTMLElement) {
+      card.style.transform = `scale(${TRACKING_SCALE}) rotate(${TRACKING_ROTATE_DEG}deg)`;
+    }
 
-    const onTransitionEnd = (event: TransitionEvent) => {
-      const node = ghostElRef.current;
-      if (!node || event.target !== node || event.propertyName !== 'transform') return;
-      node.removeEventListener('transitionend', onTransitionEnd);
-      clearTimer();
-      finishSettleRef.current();
-    };
-
-    requestAnimationFrame(() => {
-      writeGhost({ ...target, height: plan.origin.height });
-      if (!el) {
-        armFallback();
-        return;
+    const commitReorder = () => {
+      if (plan.cancel) return;
+      playDeepPop();
+      onMoveRef.current(plan.id, plan.dropIndex);
+      setLandedId(plan.id);
+      if (landedTimerRef.current !== null) {
+        window.clearTimeout(landedTimerRef.current);
       }
-      el.addEventListener('transitionend', onTransitionEnd);
-      armFallback();
+      landedTimerRef.current = window.setTimeout(() => setLandedId(null), 360);
+    };
+
+    if (duration === 0) {
+      commitReorder();
+      finishSettleRef.current();
+      return;
+    }
+
+    const moveKeyframes: Keyframe[] = plan.cancel
+      ? [
+          { transform: `translate3d(${release.x}px, ${release.y}px, 0)`, opacity: 1 },
+          { transform: `translate3d(${target.x}px, ${target.y}px, 0)`, opacity: 1 },
+        ]
+      : [
+          { transform: `translate3d(${release.x}px, ${release.y}px, 0)`, opacity: 1 },
+          {
+            transform: `translate3d(${target.x}px, ${target.y}px, 0)`,
+            opacity: 1,
+            offset: SETTLE_COMMIT_RATIO,
+          },
+          { transform: `translate3d(${target.x}px, ${target.y}px, 0)`, opacity: 0 },
+        ];
+
+    const moveAnim = el.animate(moveKeyframes, {
+      duration,
+      easing: plan.cancel ? CANCEL_EASE : SETTLE_EASE,
+      fill: 'forwards',
     });
+
+    const scaleKeyframes: Keyframe[] = [
+      {
+        transform: `scale(${TRACKING_SCALE}) rotate(${TRACKING_ROTATE_DEG}deg)`,
+      },
+      { transform: 'scale(1) rotate(0deg)' },
+    ];
+
+    const scaleAnim =
+      card instanceof HTMLElement
+        ? card.animate(scaleKeyframes, {
+            duration,
+            easing: plan.cancel ? CANCEL_EASE : SETTLE_EASE,
+            fill: 'forwards',
+          })
+        : null;
+
+    settleAnimsRef.current = scaleAnim ? [moveAnim, scaleAnim] : [moveAnim];
+
+    void Promise.all(settleAnimsRef.current.map((a) => a.finished))
+      .then(() => {
+        if (!plan.cancel) commitReorder();
+        finishSettleRef.current();
+      })
+      .catch(() => finishSettleRef.current());
   }, [isSettling, settleAnimating, phase]);
 
   useEffect(() => {
     if (!draggingId) return;
+
+    const captureTarget = sessionRef.current?.captureTarget;
 
     const onPointerMove = (e: PointerEvent) => {
       const session = sessionRef.current;
@@ -257,7 +347,8 @@ export function useOutlineDrag(
         return;
       }
 
-      const unchanged = targetIndex === session.sourceIndex;
+      const unchanged =
+        targetIndex === session.sourceIndex || targetIndex === session.sourceIndex + 1;
       settleRef.current = {
         id: session.id,
         origin: session.origin,
@@ -275,15 +366,25 @@ export function useOutlineDrag(
       resetRef.current();
     };
 
+    const onLostPointerCapture = () => {
+      if (sessionRef.current?.active) {
+        resetRef.current();
+      }
+    };
+
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerCancel);
+    captureTarget?.addEventListener('lostpointercapture', onLostPointerCapture);
     return () => {
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerCancel);
+      captureTarget?.removeEventListener('lostpointercapture', onLostPointerCapture);
     };
   }, [draggingId]);
+
+  useEffect(() => () => resetRef.current(), []);
 
   useEffect(() => {
     if (!draggingId) return;
@@ -300,6 +401,7 @@ export function useOutlineDrag(
     ghostElRef,
     draggingId,
     dragActive,
+    phase,
     dropIndex,
     lineY,
     lineAnimated,
@@ -307,6 +409,7 @@ export function useOutlineDrag(
     ghost,
     isSettling,
     settleAnimating,
+    landedId,
     didDragRef,
     beginPointerDrag,
   };

@@ -11,6 +11,7 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { getSupabase, isSupabaseConfigured } from './env.js';
+import { clearRemoteStores } from './hydrate.js';
 
 type AuthState = {
   loading: boolean;
@@ -33,22 +34,39 @@ function isPswEmail(email: string | undefined): boolean {
   return Boolean(email?.toLowerCase().endsWith('@palmstreetweb.com'));
 }
 
-async function canSignIn(email: string): Promise<boolean> {
-  if (isPswEmail(email)) return true;
+type CanSignInResult =
+  | { status: 'allowed' }
+  | { status: 'denied' }
+  | { status: 'error'; message: string };
+
+async function checkCanSignIn(email: string): Promise<CanSignInResult> {
+  if (isPswEmail(email)) return { status: 'allowed' };
   const supabase = getSupabase();
-  const { data, error } = await supabase.rpc('can_sign_in', { p_email: email.trim().toLowerCase() });
-  if (error) return false;
-  return Boolean(data);
+  const { data, error } = await supabase.rpc('can_sign_in', {
+    p_email: email.trim().toLowerCase(),
+  });
+  if (error) {
+    return {
+      status: 'error',
+      message: 'Could not verify access. Check your connection and try again.',
+    };
+  }
+  return data ? { status: 'allowed' } : { status: 'denied' };
 }
 
 function authRedirectUrl(): string | undefined {
   if (typeof window === 'undefined') return undefined;
-  const path = window.location.pathname || '/';
-  return `${window.location.origin}${path}`;
+  const { origin, pathname, hash } = window.location;
+  const safeHash =
+    hash && hash !== '#' && !hash.includes('access_token=') ? hash : '#/';
+  return `${origin}${pathname || '/'}${safeHash}`;
 }
 
 const UNAUTHORIZED_MSG =
   'This email is not authorized for Slate. Ask a PSW admin to add you.';
+
+const NO_EMAIL_MSG =
+  'This sign-in has no email address. Use Google Workspace or a magic link instead.';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(isSupabaseConfigured());
@@ -64,11 +82,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const supabase = getSupabase();
     let mounted = true;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      setLoading(false);
-    });
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setSession(data.session);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (mounted) setLoading(false);
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       setLoading(false);
@@ -80,17 +103,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!session?.user?.email) {
+    if (!session) {
       setIsTeam(false);
       return;
     }
+
+    const email = session.user.email;
+    if (!email) {
+      setIsTeam(false);
+      setAuthError(NO_EMAIL_MSG);
+      void getSupabase().auth.signOut();
+      return;
+    }
+
     let mounted = true;
+    setIsTeam(false);
     setCheckingTeam(true);
-    void canSignIn(session.user.email)
-      .then(async (ok) => {
+    void checkCanSignIn(email)
+      .then(async (result) => {
         if (!mounted) return;
-        if (!ok) {
+        if (result.status === 'error') {
+          setAuthError(result.message);
+          return;
+        }
+        if (result.status === 'denied') {
           setAuthError(UNAUTHORIZED_MSG);
+          clearRemoteStores();
           await getSupabase().auth.signOut();
           return;
         }
@@ -111,10 +149,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: 'Supabase is not configured.' };
     }
     const trimmed = email.trim().toLowerCase();
-    const allowed = await canSignIn(trimmed);
-    if (!allowed) {
-      return { error: UNAUTHORIZED_MSG };
-    }
+    const result = await checkCanSignIn(trimmed);
+    if (result.status === 'error') return { error: result.message };
+    if (result.status === 'denied') return { error: UNAUTHORIZED_MSG };
     const supabase = getSupabase();
     const redirectTo = authRedirectUrl();
     const { error } = await supabase.auth.signInWithOtp({
@@ -144,6 +181,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (!isSupabaseConfigured()) return;
+    setIsTeam(false);
+    clearRemoteStores();
     await getSupabase().auth.signOut();
   }, []);
 

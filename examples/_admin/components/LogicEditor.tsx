@@ -8,8 +8,13 @@
  *     single leaf condition and a jump-target dropdown.
  */
 
+import { useEffect, useState } from 'react';
 import type { Condition, LogicRule, Question } from '@/index.js';
 import { SlateSelect } from './SlateSelect.js';
+
+function isCompleteJumpRule(rule: LogicRule): boolean {
+  return rule.goTo.trim().length > 0;
+}
 
 type LeafOp =
   | 'equals'
@@ -24,19 +29,39 @@ type LeafOp =
 type Leaf = { field: string; op: LeafOp; value: string };
 
 const OP_LABEL: Record<LeafOp, string> = {
-  equals: 'equals',
-  not_equals: 'does not equal',
-  gt: '>',
-  lt: '<',
-  gte: '≥',
-  lte: '≤',
-  is_empty: 'is empty',
-  is_not_empty: 'is not empty',
+  equals: 'is',
+  not_equals: 'is not',
+  gt: 'is greater than',
+  lt: 'is less than',
+  gte: 'is at least',
+  lte: 'is at most',
+  is_empty: 'is blank',
+  is_not_empty: 'has an answer',
 };
 
 const NUMERIC_OPS = new Set<LeafOp>(['gt', 'lt', 'gte', 'lte']);
 const VALUELESS_OPS = new Set<LeafOp>(['is_empty', 'is_not_empty']);
 const NUMERIC_TYPES = new Set(['number', 'scale', 'nps']);
+const CHOICE_TYPES = new Set([
+  'single_choice',
+  'multi_choice',
+  'dropdown',
+  'yes_no',
+  'legal',
+  'picture_choice',
+  'ranking',
+]);
+
+function opsForQuestion(q: Question | undefined): LeafOp[] {
+  if (!q) return ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
+  if (NUMERIC_TYPES.has(q.type)) {
+    return ['equals', 'not_equals', 'gt', 'lt', 'gte', 'lte', 'is_empty', 'is_not_empty'];
+  }
+  if (CHOICE_TYPES.has(q.type)) {
+    return ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
+  }
+  return ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
+}
 
 function isAnswerBearing(q: Question): boolean {
   return q.type !== 'welcome' && q.type !== 'statement' && q.type !== 'thanks';
@@ -158,66 +183,123 @@ function buildCondition(
   return combinator === 'all' ? { all: conds } : { any: conds };
 }
 
+function valueLabel(leaf: Leaf, questions: ReadonlyArray<Question>): string {
+  if (VALUELESS_OPS.has(leaf.op)) return '';
+  const target = questions.find((q) => q.id === leaf.field);
+  const choices = optionsFor(target);
+  const match = choices?.find((o) => o.value === leaf.value);
+  return match?.label ?? (leaf.value.trim() || '…');
+}
+
+/** Plain-language summary of one rule row. */
+function describeLeaf(leaf: Leaf, questions: ReadonlyArray<Question>): string | null {
+  if (!leaf.field) return null;
+  const target = questions.find((q) => q.id === leaf.field);
+  const name = target ? displayName(target) : 'a question';
+  const op = OP_LABEL[leaf.op];
+  if (VALUELESS_OPS.has(leaf.op)) return `${name} ${op}`;
+  const value = valueLabel(leaf, questions);
+  if (!value || value === '…') return null;
+  return `${name} ${op} “${value}”`;
+}
+
 function LeafRow({
   leaf,
   questions,
   onChange,
   onRemove,
+  mode = 'visibility',
+  currentId,
 }: {
   leaf: Leaf;
   questions: ReadonlyArray<Question>;
   onChange: (next: Leaf) => void;
   onRemove: () => void;
+  mode?: 'visibility' | 'jump';
+  currentId?: string;
 }) {
   const fields = questions.filter(isAnswerBearing);
   const target = questions.find((q) => q.id === leaf.field);
   const choices = optionsFor(target);
   const showChoiceSelect = choices !== null && !NUMERIC_OPS.has(leaf.op);
+  const preview = describeLeaf(leaf, questions);
+  const allowedOps = opsForQuestion(target);
+  const safeOp = allowedOps.includes(leaf.op) ? leaf.op : allowedOps[0];
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
-      <div style={{ display: 'grid', gap: 4 }}>
-        <SlateSelect
-          value={leaf.field}
-          placeholder="— pick a question —"
-          options={[
-            { value: '', label: '— Pick a Question —' },
-            ...fields.map((q) => ({ value: q.id, label: displayName(q) })),
-          ]}
-          aria-label="Question"
-          onChange={(field) => onChange({ ...leaf, field })}
-        />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-          <SlateSelect
-            value={leaf.op}
-            options={(Object.keys(OP_LABEL) as LeafOp[]).map((op) => ({
-              value: op,
-              label: OP_LABEL[op],
-            }))}
-            aria-label="Operator"
-            onChange={(op) => onChange({ ...leaf, op })}
-          />
-          {!VALUELESS_OPS.has(leaf.op) &&
-            (showChoiceSelect ? (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {mode === 'visibility' ? (
+          <p className="slate-logic-rule-head">When this is true…</p>
+        ) : null}
+          <div>
+            <span className="slate-logic-field-label">
+              {mode === 'jump' && leaf.field === currentId ? 'On this question' : 'Earlier answer'}
+            </span>
+            <SlateSelect
+              value={leaf.field}
+              placeholder="Pick a question"
+              options={[
+                { value: '', label: 'Pick a question…' },
+                ...fields.map((q) => ({ value: q.id, label: displayName(q) })),
+              ]}
+              aria-label="Question"
+              onChange={(field) => {
+                const nextTarget = questions.find((q) => q.id === field);
+                const nextOps = opsForQuestion(nextTarget);
+                onChange({
+                  ...leaf,
+                  field,
+                  op: nextOps.includes(leaf.op) ? leaf.op : nextOps[0],
+                });
+              }}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div>
+              <span className="slate-logic-field-label">Condition</span>
               <SlateSelect
-                value={leaf.value}
-                placeholder="— pick an answer —"
-                options={[
-                  { value: '', label: '— Pick an Answer —' },
-                  ...choices.map((o) => ({ value: o.value, label: o.label })),
-                ]}
-                aria-label="Answer value"
-                onChange={(value) => onChange({ ...leaf, value })}
+                value={safeOp}
+                options={allowedOps.map((op) => ({
+                  value: op,
+                  label: OP_LABEL[op],
+                }))}
+                aria-label="Condition"
+                onChange={(op) => onChange({ ...leaf, op })}
               />
-            ) : (
-              <input
-                className="slate-input"
-                value={leaf.value}
-                placeholder="value"
-                style={{ padding: '6px 8px', fontSize: 13 }}
-                onChange={(e) => onChange({ ...leaf, value: e.target.value })}
-              />
-            ))}
-        </div>
+            </div>
+            {!VALUELESS_OPS.has(safeOp) &&
+              (showChoiceSelect ? (
+                <div>
+                  <span className="slate-logic-field-label">Answer</span>
+                  <SlateSelect
+                    value={leaf.value}
+                    placeholder="Pick an answer"
+                    options={[
+                      { value: '', label: 'Pick an answer…' },
+                      ...(choices ?? []).map((o) => ({ value: o.value, label: o.label })),
+                    ]}
+                    aria-label="Answer"
+                    onChange={(value) => onChange({ ...leaf, value })}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <span className="slate-logic-field-label">Value</span>
+                  <input
+                    className="slate-input"
+                    value={leaf.value}
+                    placeholder="Enter a value"
+                    onChange={(e) => onChange({ ...leaf, value: e.target.value })}
+                  />
+                </div>
+              ))}
+          </div>
+        {preview && mode === 'visibility' ? (
+          <p className="slate-logic-preview">
+            Show when <strong>{preview}</strong>
+          </p>
+        ) : null}
       </div>
       <button type="button" className="slate-icon-btn" onClick={onRemove} aria-label="Remove rule">
         ×
@@ -259,30 +341,35 @@ export function ConditionBuilder({
 
   return (
     <div style={{ display: 'grid', gap: 8 }}>
+      {leaves.length === 0 ? (
+        <p className="slate-logic-empty">Always visible — everyone will see this question.</p>
+      ) : null}
       {leaves.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-          <span>Match</span>
+        <div className="slate-logic-combinator">
+          <span>Show when</span>
           <SlateSelect
             className="slate-select-wrap--auto"
             value={combinator}
             options={[
-              { value: 'all', label: 'All' },
-              { value: 'any', label: 'Any' },
+              { value: 'all', label: 'every' },
+              { value: 'any', label: 'any' },
             ]}
             aria-label="Match combinator"
             onChange={(next) => emit(next, leaves)}
           />
-          <span>of the rules:</span>
+          <span>rule matches:</span>
         </div>
       )}
       {leaves.map((leaf, i) => (
-        <LeafRow
-          key={i}
-          leaf={leaf}
-          questions={questions}
-          onChange={(next) => emit(combinator, leaves.map((l, idx) => (idx === i ? next : l)))}
-          onRemove={() => emit(combinator, leaves.filter((_, idx) => idx !== i))}
-        />
+        <div key={i} className="slate-logic-rule">
+          <LeafRow
+            leaf={leaf}
+            questions={questions}
+            mode="visibility"
+            onChange={(next) => emit(combinator, leaves.map((l, idx) => (idx === i ? next : l)))}
+            onRemove={() => emit(combinator, leaves.filter((_, idx) => idx !== i))}
+          />
+        </div>
       ))}
       <button
         type="button"
@@ -295,7 +382,7 @@ export function ConditionBuilder({
           ])
         }
       >
-        <span className="slate-btn-plus">+</span> Add rule
+        <span className="slate-btn-plus">+</span> Add visibility rule
       </button>
     </div>
   );
@@ -313,66 +400,116 @@ export function JumpRulesEditor({
   currentId: string;
 }) {
   const targets = questions.filter((q) => q.id !== currentId && q.type !== 'welcome');
-  const emit = (next: LogicRule[]) => onChange(next.length === 0 ? undefined : next);
+  const persisted = rules.filter(isCompleteJumpRule);
+  const [pending, setPending] = useState<LogicRule[]>([]);
+
+  // Hoist any saved incomplete rules into draft UI state and drop them from schema.
+  useEffect(() => {
+    const incomplete = rules.filter((r) => !isCompleteJumpRule(r));
+    setPending(incomplete);
+    if (incomplete.length > 0) {
+      onChange(persisted.length > 0 ? persisted : undefined);
+    }
+    // Only re-run when switching questions — not on every rules edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId]);
+
+  const displayRules = [...persisted, ...pending];
+  const emitPersisted = (next: LogicRule[]) =>
+    onChange(next.length === 0 ? undefined : next.filter(isCompleteJumpRule));
+
+  const updateRule = (index: number, patch: Partial<LogicRule>) => {
+    if (index < persisted.length) {
+      const next = persisted.map((r, idx) => (idx === index ? { ...r, ...patch } : r));
+      const updated = next[index];
+      if (updated && !isCompleteJumpRule(updated)) {
+        emitPersisted(persisted.filter((_, idx) => idx !== index));
+        setPending((prev) => [...prev, updated]);
+        return;
+      }
+      emitPersisted(next);
+      return;
+    }
+
+    const pendingIndex = index - persisted.length;
+    setPending((prev) => {
+      const next = prev.map((r, idx) => (idx === pendingIndex ? { ...r, ...patch } : r));
+      const updated = next[pendingIndex];
+      if (updated && isCompleteJumpRule(updated)) {
+        emitPersisted([...persisted, updated]);
+        return next.filter((_, idx) => idx !== pendingIndex);
+      }
+      return next;
+    });
+  };
+
+  const removeRule = (index: number) => {
+    if (index < persisted.length) {
+      emitPersisted(persisted.filter((_, idx) => idx !== index));
+      return;
+    }
+    const pendingIndex = index - persisted.length;
+    setPending((prev) => prev.filter((_, idx) => idx !== pendingIndex));
+  };
 
   return (
     <div style={{ display: 'grid', gap: 10 }}>
-      {rules.map((rule, i) => {
+      {displayRules.length === 0 ? (
+        <p className="slate-logic-empty">
+          Goes to the next question in order — add a rule to skip ahead based on their answer.
+        </p>
+      ) : null}
+      {displayRules.map((rule, i) => {
         const leaf = toLeaf(rule.if);
+        const targetName = targets.find((q) => q.id === rule.goTo);
+        const conditionText = leaf ? describeLeaf(leaf, questions) : null;
+        const destination = targetName ? displayName(targetName) : null;
         return (
-          <div
-            key={i}
-            style={{
-              display: 'grid',
-              gap: 6,
-              padding: 8,
-              border: '1px solid var(--slate-border)',
-              borderRadius: 'var(--slate-radius-sm)',
-            }}
-          >
+          <div key={i} className="slate-logic-rule">
+            <p className="slate-logic-rule-head">Skip rule {i + 1}</p>
             {leaf ? (
               <LeafRow
                 leaf={leaf}
                 questions={questions}
+                mode="jump"
+                currentId={currentId}
                 onChange={(next) =>
-                  emit(
-                    rules.map((r, idx) =>
-                      idx === i ? { ...r, if: fromLeaf(next, questions) } : r,
-                    ),
-                  )
+                  updateRule(i, { if: fromLeaf(next, questions) })
                 }
-                onRemove={() => emit(rules.filter((_, idx) => idx !== i))}
+                onRemove={() => removeRule(i)}
               />
             ) : (
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
-                  Composite condition — edit in schema code.
+                  This rule uses advanced logic — edit it in the schema code.
                 </p>
                 <button
                   type="button"
                   className="slate-btn slate-btn--ghost slate-btn--compact"
-                  onClick={() => emit(rules.filter((_, idx) => idx !== i))}
+                  onClick={() => removeRule(i)}
                 >
                   Remove
                 </button>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-              <span>→ jump to</span>
+            <div>
+              <span className="slate-logic-field-label">Then skip to</span>
               <SlateSelect
                 value={rule.goTo}
-                style={{ flex: 1 }}
-                placeholder="— pick a target —"
+                placeholder="Pick a question"
                 options={[
-                  { value: '', label: '— Pick a Target —' },
+                  { value: '', label: 'Pick a question…' },
                   ...targets.map((q) => ({ value: q.id, label: displayName(q) })),
                 ]}
                 aria-label="Jump target"
-                onChange={(goTo) =>
-                  emit(rules.map((r, idx) => (idx === i ? { ...r, goTo } : r)))
-                }
+                onChange={(goTo) => updateRule(i, { goTo })}
               />
             </div>
+            {conditionText && destination ? (
+              <p className="slate-logic-preview">
+                If <strong>{conditionText}</strong>, skip to <strong>{destination}</strong>.
+              </p>
+            ) : null}
           </div>
         );
       })}
@@ -381,10 +518,13 @@ export function JumpRulesEditor({
         className="slate-btn slate-btn--ghost slate-btn--compact"
         style={{ justifySelf: 'start' }}
         onClick={() =>
-          emit([...rules, { if: { field: currentId, op: 'equals', value: '' }, goTo: '' }])
+          setPending((prev) => [
+            ...prev,
+            { if: { field: currentId, op: 'equals', value: '' }, goTo: '' },
+          ])
         }
       >
-        <span className="slate-btn-plus">+</span> Add jump rule
+        <span className="slate-btn-plus">+</span> Add skip rule
       </button>
     </div>
   );

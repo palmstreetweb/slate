@@ -77,6 +77,8 @@ export function Outline({
   onSoundChange,
 }: Props) {
   const [addOpen, setAddOpen] = useState(false);
+  const [addPlacement, setAddPlacement] = useState<'below' | 'above'>('below');
+  const [openAddGroups, setOpenAddGroups] = useState<Set<string>>(() => new Set(['Inputs']));
   const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({ visibility: 'hidden' });
   const addAnchorRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -90,12 +92,13 @@ export function Outline({
     ghostElRef,
     draggingId,
     dragActive,
+    phase,
     lineY,
     lineAnimated,
     showDropLine,
     ghost,
     isSettling,
-    settleAnimating,
+    landedId,
     didDragRef,
     beginPointerDrag,
   } = useOutlineDrag(schema.questions, onMove);
@@ -128,17 +131,28 @@ export function Outline({
   const portalRoot =
     addAnchorRef.current?.closest('[data-slate-forms][data-theme-name="slate"]') ?? document.body;
 
+  const addGroups = Array.from(new Set(ADDABLE_TYPES.map((t) => t.group)));
+
   const repositionPopover = () => {
     const anchor = addAnchorRef.current;
+    const popover = popoverRef.current;
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
-    const width = Math.max(rect.width, 260);
-    const left = Math.min(rect.left, window.innerWidth - width - 8);
-    const spaceBelow = window.innerHeight - rect.bottom - 8;
-    const maxHeight = Math.min(420, Math.max(160, spaceBelow));
+    const width = Math.max(rect.width, 280);
+    const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+    const gap = 6;
+    const maxPopover = Math.min(window.innerHeight * 0.7, 420);
+    const spaceBelow = window.innerHeight - rect.bottom - gap - 8;
+    const spaceAbove = rect.top - gap - 8;
+    const naturalHeight = popover?.scrollHeight ?? 320;
+    const openUp = spaceBelow < Math.min(naturalHeight, 240) && spaceAbove > spaceBelow;
+    const maxHeight = Math.min(maxPopover, openUp ? spaceAbove : spaceBelow);
+    const height = Math.min(naturalHeight, maxHeight);
+    const top = openUp ? Math.max(8, rect.top - gap - height) : rect.bottom + gap;
+    setAddPlacement(openUp ? 'above' : 'below');
     setPopoverStyle({
       position: 'fixed',
-      top: rect.bottom + 6,
+      top,
       left,
       width,
       maxHeight,
@@ -146,10 +160,25 @@ export function Outline({
     });
   };
 
+  const toggleAddGroup = (group: string) => {
+    setOpenAddGroups((cur) => {
+      const next = new Set(cur);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!addOpen) return;
+    setOpenAddGroups(new Set(['Inputs']));
+    repositionPopover();
+  }, [addOpen]);
+
   useLayoutEffect(() => {
     if (!addOpen) return;
     repositionPopover();
-  }, [addOpen]);
+  }, [addOpen, openAddGroups]);
 
   useEffect(() => {
     if (!addOpen) return;
@@ -182,7 +211,7 @@ export function Outline({
     createPortal(
       <div
         ref={popoverRef}
-        className="slate-popover slate-popover--portal"
+        className={`slate-popover slate-popover--portal slate-popover--${addPlacement}`}
         style={popoverStyle}
         role="dialog"
         aria-label="Add question"
@@ -190,53 +219,50 @@ export function Outline({
         <p className="slate-label" style={{ marginBottom: 6 }}>
           Add to Form
         </p>
-        {Array.from(new Set(ADDABLE_TYPES.map((t) => t.group))).map((group) => (
-          <div key={group} style={{ marginBottom: 8 }}>
-            <p
-              style={{
-                margin: '6px 0 4px',
-                fontSize: 11,
-                color: 'var(--slate-dim)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                fontFamily: 'var(--slate-font-mono)',
-              }}
-            >
-              {group}
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-              {ADDABLE_TYPES.filter((t) => t.group === group).map((t) => (
-                <button
-                  key={t.type}
-                  type="button"
-                  className="slate-btn"
-                  style={{
-                    padding: '6px 8px',
-                    fontSize: 13,
-                    justifyContent: 'flex-start',
-                    minHeight: 30,
-                  }}
-                  onClick={() => {
-                    onAddQuestion(t.type);
-                    setAddOpen(false);
-                  }}
-                >
+        {addGroups.map((group) => {
+          const types = ADDABLE_TYPES.filter((t) => t.group === group);
+          const expanded = openAddGroups.has(group);
+          return (
+            <div key={group} className="slate-add-group">
+              <button
+                type="button"
+                className="slate-add-group-trigger"
+                aria-expanded={expanded}
+                onClick={() => toggleAddGroup(group)}
+              >
+                <span>{group}</span>
+                <span className="slate-add-group-meta">
+                  <span className="slate-add-group-count">{types.length}</span>
                   <span
-                    style={{
-                      fontFamily: 'var(--slate-font-mono)',
-                      opacity: 0.6,
-                      marginRight: 4,
-                    }}
-                  >
-                    {TYPE_GLYPH[t.type]}
-                  </span>
-                  {t.label}
-                </button>
-              ))}
+                    className={`slate-collapsible-chevron${expanded ? ' slate-collapsible-chevron--open' : ''}`}
+                    aria-hidden
+                  />
+                </span>
+              </button>
+              {expanded && (
+                <div className="slate-add-group-grid">
+                  {types.map((t) => (
+                    <button
+                      key={t.type}
+                      type="button"
+                      className="slate-btn slate-add-type-btn"
+                      onClick={() => {
+                        onAddQuestion(t.type);
+                        setAddOpen(false);
+                      }}
+                    >
+                      <span className="slate-add-type-glyph" aria-hidden>
+                        {TYPE_GLYPH[t.type]}
+                      </span>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          );
+        })}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
           <button
             type="button"
             className="slate-btn slate-btn--ghost slate-btn--compact"
@@ -340,7 +366,7 @@ export function Outline({
                 return (
                   <li
                     key={q.id}
-                    className={`slate-outline-item${isLifted ? ' slate-outline-item--lifted' : ''}`}
+                    className={`slate-outline-item${isLifted ? ' slate-outline-item--lifted' : ''}${landedId === q.id ? ' slate-outline-item--landed' : ''}`}
                   >
                     <div className="slate-outline-item-inner">
                       {selectMode && !pinned && (
@@ -441,7 +467,7 @@ export function Outline({
             </ul>
             {showDropLine && lineY !== null ? (
               <div
-                className={`slate-outline-drop-line${lineAnimated ? ' slate-outline-drop-line--animated' : ''}`}
+                className={`slate-outline-drop-line${lineAnimated ? ' slate-outline-drop-line--animated' : ''}${isSettling ? ' slate-outline-drop-line--settling' : ''}`}
                 style={{ transform: `translateY(${lineY}px)` }}
                 aria-hidden
               />
@@ -452,7 +478,8 @@ export function Outline({
             <button
               type="button"
               className="slate-btn slate-btn--primary"
-              onClick={() => setAddOpen(true)}
+              onClick={() => setAddOpen((open) => !open)}
+              aria-expanded={addOpen}
               style={{ width: '100%', justifyContent: 'center' }}
             >
               + Add
@@ -520,14 +547,18 @@ export function Outline({
       {ghost && ghostQuestion && ghostIndex >= 0 ? (
         <div
           ref={ghostElRef}
-          className={`slate-outline-drag-ghost${settleAnimating ? ' slate-outline-drag-ghost--settling' : ' slate-outline-drag-ghost--tracking'}`}
-          style={{
-            transform: `translate3d(${ghost.x}px, ${ghost.y}px, 0)`,
-            width: ghost.width,
-          }}
+          className={`slate-outline-drag-ghost slate-outline-drag-ghost--${phase}`}
+          style={
+            isSettling
+              ? { width: ghost.width }
+              : {
+                  transform: `translate3d(${ghost.x}px, ${ghost.y}px, 0)`,
+                  width: ghost.width,
+                }
+          }
           aria-hidden
         >
-          <div className="slate-outline-card slate-outline-card--compact">
+          <div className="slate-outline-card">
             <p className="slate-outline-ghost-label">{ghostTitle || '(no title)'}</p>
           </div>
         </div>

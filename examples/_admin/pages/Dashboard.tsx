@@ -4,29 +4,28 @@ import {
   createForm,
   duplicateForm,
   emptyFormTrash,
-  listAllForms,
   listForms,
   listTrashedForms,
   permanentlyDeleteForm,
   probeFormsStorage,
-  replaceAllForms,
   resetFormsStorage,
   restoreAllForms,
   restoreForm,
   subscribe,
   trashForm,
+  updateForm,
   type FormRecord,
 } from '../_formsStore.js';
 import {
   countSubmissions,
   lastSubmissionAt,
-  listAllSubmissions,
   probeSubmissionsStorage,
-  replaceAllSubmissions,
   resetSubmissionsStorage,
 } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
+import { isDefaultFormName } from '../formName.js';
+import { usePromptFormTitle } from '../promptFormTitle.js';
 import { SharePanel } from '../components/SharePanel.js';
 import {
   FormCardIconBtn,
@@ -39,12 +38,6 @@ import {
 } from '../components/FormCardIcons.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import { dismissWorkflowTip, WORKFLOW_TIP_KEY } from '../_siteSettings.js';
-import {
-  buildBackup,
-  downloadBackupJson,
-  parseBackup,
-  pickBackupFile,
-} from '../dataBackup.js';
 import {
   animateFormGridDuplicate,
   captureFormCardRects,
@@ -116,60 +109,13 @@ export function Dashboard() {
     if (created) navigate(`/forms/${created.id}/edit`);
   };
 
-  const onExportBackup = () => {
-    const backup = buildBackup(listAllForms(), listAllSubmissions());
-    const stamp = new Date().toISOString().slice(0, 10);
-    downloadBackupJson(backup, `slate-backup-${stamp}.json`);
-  };
-
-  const onImportBackup = async () => {
-    const raw = await pickBackupFile();
-    if (!raw) return;
-    const backup = parseBackup(raw);
-    if (!backup) {
-      await confirm({
-        title: 'Import failed',
-        message: 'That file is not a valid Slate backup.',
-        confirmLabel: 'OK',
-        danger: false,
-      });
-      return;
-    }
-    const ok = await confirm({
-      title: 'Import backup?',
-      message: `Replace all forms and responses in this browser with ${backup.forms.length} form(s) and ${backup.submissions.length} response(s) from ${new Date(backup.exportedAt).toLocaleString()}?`,
-      confirmLabel: 'Import',
-      danger: true,
-    });
-    if (!ok) return;
-    replaceAllSubmissions(backup.submissions);
-    const persisted = replaceAllForms(backup.forms);
-    setForms(listForms());
-    if (!persisted) {
-      await confirm({
-        title: 'Import incomplete',
-        message: 'Responses imported, but forms could not be saved — localStorage may be full.',
-        confirmLabel: 'OK',
-        danger: false,
-      });
-    }
-  };
-
   return (
     <AdminShell
-      crumbs={null}
+      crumbs={<span className="slate-crumb">Forms</span>}
       rightSlot={
-        <>
-          <button type="button" className="slate-btn" onClick={onExportBackup}>
-            Export backup
-          </button>
-          <button type="button" className="slate-btn" onClick={() => void onImportBackup()}>
-            Import backup
-          </button>
-          <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
-            <span className="slate-btn-plus">+</span> New form
-          </button>
-        </>
+        <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
+          <span className="slate-btn-plus">+</span> New form
+        </button>
       }
     >
       {storageIssue && (
@@ -228,8 +174,8 @@ export function Dashboard() {
           <p style={{ margin: '0 0 8px', fontWeight: 600 }}>How Slate works on this site</p>
           <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--slate-muted)', lineHeight: 1.5 }}>
             {isSupabaseConfigured()
-              ? 'Forms and responses sync to Slate cloud. Publish a form, then Share → public fill link for clients. Export backup occasionally for safety.'
-              : 'Forms and responses save in this browser only — use the same browser and URL (slateforms.vercel.app). To send a form to someone, use Share → Shareable Link. Export backup occasionally so nothing is lost.'}
+              ? 'Forms and responses sync to Slate cloud. Publish a form, then Share → public fill link for clients.'
+              : 'Forms and responses save in this browser only — use the same browser and URL (slateforms.vercel.app). To send a form to someone, use Share → Shareable Link. Back up from Settings if you need a safety copy.'}
           </p>
           <button
             type="button"
@@ -438,11 +384,30 @@ function FormCard({
   onDelete: () => void;
 }) {
   const [shareOpen, setShareOpen] = useState(false);
+  const [shareName, setShareName] = useState(form.name);
+  const promptFormTitle = usePromptFormTitle();
   const subCount = countSubmissions(form.id);
   const lastAt = lastSubmissionAt(form.id);
   const qCount = form.schema.questions.filter(
     (q) => q.type !== 'welcome' && q.type !== 'thanks' && q.type !== 'statement',
   ).length;
+
+  const handleShare = async () => {
+    let nextName = form.name;
+    if (isDefaultFormName(nextName)) {
+      const titled = await promptFormTitle();
+      if (!titled) return;
+      const schema =
+        form.schema.brand.name === form.name
+          ? { ...form.schema, brand: { ...form.schema.brand, name: titled } }
+          : form.schema;
+      const [updated] = updateForm(form.id, { name: titled, schema });
+      if (!updated) return;
+      nextName = titled;
+    }
+    setShareName(nextName);
+    setShareOpen(true);
+  };
 
   return (
     <div className="slate-card" data-form-card data-form-id={form.id}>
@@ -477,7 +442,7 @@ function FormCard({
           <FormCardIconBtn label="Edit" onClick={() => navigate(`/forms/${form.id}/edit`)}>
             <IconEdit />
           </FormCardIconBtn>
-          <FormCardIconBtn label="Share" onClick={() => setShareOpen(true)}>
+          <FormCardIconBtn label="Share" onClick={() => void handleShare()}>
             <IconShare />
           </FormCardIconBtn>
           <FormCardIconBtn
@@ -503,7 +468,7 @@ function FormCard({
         open={shareOpen}
         onClose={() => setShareOpen(false)}
         formId={form.id}
-        formName={form.name}
+        formName={shareName}
         schema={form.schema}
       />
     </div>

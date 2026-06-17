@@ -21,6 +21,13 @@ export function isSubmissionsHydrated(): boolean {
   return hydrated;
 }
 
+/** Drop cached rows (e.g. on sign-out). Next hydrate refetches from Postgres. */
+export function clearSubmissionsRemoteCache(): void {
+  cache = [];
+  hydrated = false;
+  notify();
+}
+
 export async function hydrateSubmissionsRemote(): Promise<void> {
   const supabase = getSupabase();
   const { data, error } = await supabase

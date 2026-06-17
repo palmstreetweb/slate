@@ -75,6 +75,7 @@ export function measureOutlineGapY(
 export function measureOutlineRowTarget(
   list: HTMLElement,
   insertBefore: number,
+  questions?: ReadonlyArray<{ type: string }>,
 ): { x: number; y: number; width: number } {
   const items = list.querySelectorAll(':scope > li.slate-outline-item');
   const listRect = list.getBoundingClientRect();
@@ -88,6 +89,16 @@ export function measureOutlineRowTarget(
     return {
       x: listRect.left + OUTLINE_ROW_INSET,
       y: listRect.top,
+      width: listRect.width - OUTLINE_ROW_INSET,
+    };
+  }
+
+  const thanksIdx = questions?.findIndex((q) => q.type === 'thanks') ?? -1;
+  if (thanksIdx !== -1 && insertBefore === thanksIdx && insertBefore > 0) {
+    const prevRect = rowViewportRect(items[insertBefore - 1]!);
+    return {
+      x: listRect.left + OUTLINE_ROW_INSET,
+      y: prevRect.bottom + 2,
       width: listRect.width - OUTLINE_ROW_INSET,
     };
   }

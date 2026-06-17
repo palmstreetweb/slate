@@ -4,6 +4,7 @@ import { syncHashFromPathname, useRoute, routeKey, type Route } from './_admin/_
 import { seedIfEmpty } from './_admin/_formsStore.js';
 import { seedForms } from './_admin/_seedForms.js';
 import { ConfirmProvider } from './_admin/_confirm.js';
+import { PromptFormTitleProvider } from './_admin/promptFormTitle.js';
 import { Dashboard } from './_admin/pages/Dashboard.js';
 import { FormEditor } from './_admin/pages/FormEditor.js';
 import { FormPreview } from './_admin/pages/FormPreview.js';
@@ -30,6 +31,14 @@ function isPublicRoute(route: Route): boolean {
   return route.name === 'respond' || route.name === 'fill';
 }
 
+function LoadingScreen() {
+  return (
+    <div className="slate-empty" style={{ minHeight: '100vh', display: 'grid', placeContent: 'center' }}>
+      Loading…
+    </div>
+  );
+}
+
 function AppRoutes() {
   const route = useRoute();
   const { ready, allowed } = useRequiresAuth();
@@ -49,11 +58,7 @@ function AppRoutes() {
   }
 
   if (isSupabaseConfigured() && !ready) {
-    return (
-      <div className="slate-empty" style={{ minHeight: '100vh', display: 'grid', placeContent: 'center' }}>
-        Loading…
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (isSupabaseConfigured() && !allowed) {
@@ -94,32 +99,43 @@ function AppRoutes() {
   return <PageTransition routeKey={key}>{page}</PageTransition>;
 }
 
-function Bootstrap() {
-  const [ready, setReady] = useState(!isSupabaseConfigured());
+/** Fetch remote stores only after the user is authenticated (cloud mode). */
+function AdminCloudBootstrap() {
+  const { ready, allowed } = useRequiresAuth();
+  const [storesReady, setStoresReady] = useState(false);
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    void hydrateStores()
-      .then(() => {
-        seedIfEmpty(seedForms);
-        setReady(true);
-      })
-      .catch(() => setReady(true));
-  }, []);
+    if (!ready) return;
+    if (!allowed) {
+      setStoresReady(true);
+      return;
+    }
+    setStoresReady(false);
+    void hydrateStores({ force: true })
+      .then(() => setStoresReady(true))
+      .catch(() => setStoresReady(true));
+  }, [ready, allowed]);
 
-  if (!ready) {
-    return (
-      <div className="slate-empty" style={{ minHeight: '100vh', display: 'grid', placeContent: 'center' }}>
-        Loading…
-      </div>
-    );
-  }
-
-  if (!isSupabaseConfigured()) {
-    seedIfEmpty(seedForms);
+  if (!ready || (allowed && !storesReady)) {
+    return <LoadingScreen />;
   }
 
   return <AppRoutes />;
+}
+
+function Bootstrap() {
+  const route = useRoute();
+
+  if (!isSupabaseConfigured()) {
+    seedIfEmpty(seedForms);
+    return <AppRoutes />;
+  }
+
+  if (isPublicRoute(route)) {
+    return <AppRoutes />;
+  }
+
+  return <AdminCloudBootstrap />;
 }
 
 const root = document.getElementById('root');
@@ -129,7 +145,9 @@ createRoot(root).render(
   <StrictMode>
     <AuthProvider>
       <ConfirmProvider>
-        <Bootstrap />
+        <PromptFormTitleProvider>
+          <Bootstrap />
+        </PromptFormTitleProvider>
       </ConfirmProvider>
     </AuthProvider>
   </StrictMode>,

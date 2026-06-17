@@ -1,11 +1,11 @@
 /**
  * Right-rail inspector. Shows the editable properties for the currently
  * selected question. Per-question-type fields rendered via a switch on
- * `question.type`. No collapsing — always shows everything for the
- * selected question.
+ * `question.type`. Logic sections collapse by default and open when needed.
  */
 
-import type { Option, PictureOption, Question } from '@/index.js';
+import { useEffect, useState } from 'react';
+import type { Condition, Option, PictureOption, Question } from '@/index.js';
 import { TYPE_GLYPH, TYPE_LABEL } from '../questionTypeMeta.js';
 import { ConditionBuilder, JumpRulesEditor } from './LogicEditor.js';
 import { SlateSelect } from './SlateSelect.js';
@@ -117,7 +117,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
           question.type === 'file_upload' ||
           question.type === 'matrix' ||
           (question.type === 'picture_choice' && !question.multiple)) && (
-          <Row>
+          <>
             {(question.type === 'short_text' ||
               question.type === 'long_text' ||
               question.type === 'email' ||
@@ -145,7 +145,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
               onChange={(v) => onChange({ required: v } as Partial<Question>)}
               label="Required"
             />
-          </Row>
+          </>
         )}
 
         {question.type === 'date' && (
@@ -517,23 +517,37 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         {question.type !== 'welcome' && (
           <>
             <div style={{ height: 1, background: 'var(--slate-border)', margin: '8px 0' }} />
-            <Field
-              label={question.type === 'thanks' ? 'Show This Ending When…' : 'Show This Question When…'}
-              hint="Leave empty to always show."
+            <CollapsibleSection
+              label={question.type === 'thanks' ? 'When to show this ending' : 'When to show'}
+              hint="Everyone sees this by default. Add a rule to show it only when earlier answers match."
+              summary={
+                visibilityRuleCount(question.visibleIf) > 0
+                  ? `${visibilityRuleCount(question.visibleIf)} visibility ${visibilityRuleCount(question.visibleIf) === 1 ? 'rule' : 'rules'}`
+                  : 'Always visible'
+              }
+              defaultOpen={visibilityRuleCount(question.visibleIf) > 0}
+              questionId={question.id}
             >
               <ConditionBuilder
                 value={question.visibleIf}
                 onChange={(visibleIf) => onChange({ visibleIf } as Partial<Question>)}
                 questions={allQuestions}
               />
-            </Field>
+            </CollapsibleSection>
           </>
         )}
 
         {question.type !== 'welcome' && question.type !== 'thanks' && question.type !== 'review' && (
-          <Field
-            label="Logic Jumps"
-            hint="On advance, the first matching rule wins. No match = next question."
+          <CollapsibleSection
+            label="Skip ahead"
+            hint="After they answer, jump to another question. First matching rule wins; otherwise they go to the next question in order."
+            summary={
+              skipRuleCount(question) > 0
+                ? `${skipRuleCount(question)} skip ${skipRuleCount(question) === 1 ? 'rule' : 'rules'}`
+                : 'Next question in order'
+            }
+            defaultOpen={skipRuleCount(question) > 0}
+            questionId={question.id}
           >
             <JumpRulesEditor
               rules={('logic' in question ? question.logic : undefined) ?? []}
@@ -541,7 +555,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
               questions={allQuestions}
               currentId={question.id}
             />
-          </Field>
+          </CollapsibleSection>
         )}
 
         {canDelete && (
@@ -554,6 +568,63 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         )}
       </div>
     </aside>
+  );
+}
+
+function visibilityRuleCount(c: Condition | undefined): number {
+  if (!c) return 0;
+  if ('field' in c) return 1;
+  if ('all' in c) return c.all.length;
+  return c.any.length;
+}
+
+function skipRuleCount(question: Question): number {
+  if (!('logic' in question) || !question.logic) return 0;
+  return question.logic.length;
+}
+
+function CollapsibleSection({
+  label,
+  hint,
+  summary,
+  defaultOpen,
+  questionId,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  summary: string;
+  defaultOpen: boolean;
+  questionId: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    setOpen(defaultOpen);
+  }, [questionId, defaultOpen]);
+
+  return (
+    <div className="slate-collapsible">
+      <button
+        type="button"
+        className="slate-collapsible-trigger"
+        aria-expanded={open}
+        onClick={() => setOpen((cur) => !cur)}
+      >
+        <span className="slate-collapsible-label">{label}</span>
+        <span className="slate-collapsible-meta">
+          {!open && <span className="slate-collapsible-summary">{summary}</span>}
+          <span className={`slate-collapsible-chevron${open ? ' slate-collapsible-chevron--open' : ''}`} aria-hidden />
+        </span>
+      </button>
+      {open && (
+        <div className="slate-collapsible-body">
+          {hint && <p className="slate-help" style={{ marginTop: 0 }}>{hint}</p>}
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -589,7 +660,7 @@ function Checkbox({
   label: string;
 }) {
   return (
-    <label className="slate-checkbox" style={{ alignSelf: 'end', marginBottom: 6 }}>
+    <label className="slate-checkbox" style={{ marginBottom: 6 }}>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       {label}
     </label>

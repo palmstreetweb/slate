@@ -19,7 +19,9 @@
    - Authorized JavaScript origins: `http://localhost:5173`, `https://slateforms.vercel.app`
    - Authorized redirect URIs: `https://<project-ref>.supabase.co/auth/v1/callback` (from Supabase → Auth → Google)
 2. **Supabase Dashboard** → Authentication → Providers → **Google** — enable, paste Client ID + Client Secret
-3. **Authentication → URL Configuration** — Site URL `https://slateforms.vercel.app`; Redirect URLs include `http://localhost:5173` and production URL
+3. **Authentication → URL Configuration** (critical — wrong values cause `{"error":"requested path is invalid"}` after Google sign-in)
+   - **Site URL:** `https://slateforms.vercel.app` — must be your app, **not** `https://<project-ref>.supabase.co`
+   - **Redirect URLs:** add `https://slateforms.vercel.app/**` and `http://localhost:5173/**`
 4. Same allowlist rules apply: `@palmstreetweb.com` or a row in `team_allowlist` (migration `003_team_allowlist.sql`)
 
 ## Vercel (slateforms.vercel.app)

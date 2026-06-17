@@ -22,6 +22,13 @@ export function isFormsHydrated(): boolean {
   return hydrated;
 }
 
+/** Drop cached rows (e.g. on sign-out). Next hydrate refetches from Postgres. */
+export function clearFormsRemoteCache(): void {
+  cache = [];
+  hydrated = false;
+  notify();
+}
+
 export async function hydrateFormsRemote(): Promise<void> {
   const supabase = getSupabase();
   const { data, error } = await supabase.from('forms').select('*').order('updated_at', { ascending: false });

@@ -29,14 +29,18 @@ import { playFormSound } from '@/utils/formSounds.js';
 import { createForm, getForm, subscribe, updateForm, type FormRecord } from '../_formsStore.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
+import { isDefaultFormName } from '../formName.js';
+import { usePromptFormTitle } from '../promptFormTitle.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import { Outline } from '../components/Outline.js';
 import { Canvas } from '../components/Canvas.js';
 import { Inspector } from '../components/Inspector.js';
+import { EditorLayoutShell } from '../components/EditorLayoutShell.js';
 import { SharePanel } from '../components/SharePanel.js';
 import { useEditorHistory } from '../useEditorHistory.js';
 import { clampOutlineDropIndex, resolveOutlineInsertIndex } from '../outlineDropIndex.js';
 import { uniqueQuestionId } from '../questionIds.js';
+import { sanitizeSchemaLogic } from '../sanitizeSchema.js';
 import { slugify } from '../shareUrls.js';
 
 type Props = {
@@ -84,7 +88,11 @@ export function FormEditor({ formId }: Props) {
 }
 
 function FormEditorBody({ formId }: { formId: string }) {
-  const initial: FormRecord | null = useMemo(() => getForm(formId), [formId]);
+  const initial: FormRecord | null = useMemo(() => {
+    const form = getForm(formId);
+    if (!form) return null;
+    return { ...form, schema: sanitizeSchemaLogic(form.schema) };
+  }, [formId]);
   const [formExists, setFormExists] = useState(() => getForm(formId) !== null);
   const [name, setName] = useState<string>(initial?.name ?? 'Untitled form');
   const [slug, setSlug] = useState<string>(() => {
@@ -101,6 +109,7 @@ function FormEditorBody({ formId }: { formId: string }) {
     return first?.id ?? '';
   });
   const confirm = useConfirm();
+  const promptFormTitle = usePromptFormTitle();
 
   useEffect(() => {
     const sync = () => setFormExists(getForm(formId) !== null);
@@ -221,6 +230,15 @@ function FormEditorBody({ formId }: { formId: string }) {
     }
   };
 
+  const handleShare = async () => {
+    if (isDefaultFormName(name)) {
+      const next = await promptFormTitle();
+      if (!next) return;
+      handleNameChange(next);
+    }
+    setShareOpen(true);
+  };
+
   const updateQuestion = (id: string, patch: Partial<Question>) => {
     pushHistory();
     setSchema((s) => {
@@ -238,7 +256,9 @@ function FormEditorBody({ formId }: { formId: string }) {
     pushHistory();
     setSchema((s) => {
       if (!s) return s;
-      return { ...s, questions: s.questions.filter((q) => q.id !== id) };
+      const q = s.questions.find((item) => item.id === id);
+      if (!q || q.type === 'welcome' || q.type === 'thanks') return s;
+      return { ...s, questions: s.questions.filter((item) => item.id !== id) };
     });
   };
 
@@ -388,7 +408,7 @@ function FormEditorBody({ formId }: { formId: string }) {
           >
             Responses
           </button>
-          <button type="button" className="slate-btn" onClick={() => setShareOpen(true)}>
+          <button type="button" className="slate-btn" onClick={() => void handleShare()}>
             Share
           </button>
           <button
@@ -426,54 +446,56 @@ function FormEditorBody({ formId }: { formId: string }) {
           </div>
         )}
 
-        <div className="slate-editor">
-        <Outline
-          schema={schema}
-          selectedId={selectedQuestion.id}
-          onSelect={setSelectedId}
-          onAddQuestion={addQuestion}
-          onReorder={reorder}
-          onMove={moveTo}
-          onDuplicate={duplicateQuestion}
-          onBulkDelete={bulkDelete}
-          name={name}
-          onNameChange={handleNameChange}
-          onBrandChange={(v) => patchSchema({ brand: { ...schema.brand, name: v } })}
-          onThemeChange={(v: ThemeName) => patchSchema({ theme: v })}
-          onThemeModeChange={(v: ThemeMode) => patchSchema({ themeMode: v })}
-          onSoundChange={(v: FormSound) => {
-            patchSchema({ sound: v === 'off' ? undefined : v });
-            if (v !== 'off') playFormSound(v);
-          }}
+        <EditorLayoutShell
+          outline={
+            <Outline
+              schema={schema}
+              selectedId={selectedQuestion.id}
+              onSelect={setSelectedId}
+              onAddQuestion={addQuestion}
+              onReorder={reorder}
+              onMove={moveTo}
+              onDuplicate={duplicateQuestion}
+              onBulkDelete={bulkDelete}
+              name={name}
+              onNameChange={handleNameChange}
+              onBrandChange={(v) => patchSchema({ brand: { ...schema.brand, name: v } })}
+              onThemeChange={(v: ThemeName) => patchSchema({ theme: v })}
+              onThemeModeChange={(v: ThemeMode) => patchSchema({ themeMode: v })}
+              onSoundChange={(v: FormSound) => {
+                patchSchema({ sound: v === 'off' ? undefined : v });
+                if (v !== 'off') playFormSound(v);
+              }}
+            />
+          }
+          canvas={<Canvas schema={schema} selectedQuestion={selectedQuestion} />}
+          inspector={
+            <Inspector
+              question={selectedQuestion}
+              allQuestions={schema.questions}
+              onChange={(patch) => updateQuestion(selectedQuestion.id, patch)}
+              onDelete={async () => {
+                const titleText =
+                  'title' in selectedQuestion && typeof selectedQuestion.title === 'string'
+                    ? selectedQuestion.title
+                    : selectedQuestion.id;
+                const ok = await confirm({
+                  title: 'Delete this item?',
+                  message: (
+                    <>
+                      Removes <strong>{titleText}</strong> from this form. Existing responses
+                      for it stay in localStorage but won&apos;t be collected anymore.
+                    </>
+                  ),
+                  confirmLabel: 'Delete',
+                  danger: true,
+                });
+                if (ok) removeQuestion(selectedQuestion.id);
+              }}
+              canDelete={canDelete}
+            />
+          }
         />
-
-        <Canvas schema={schema} selectedQuestion={selectedQuestion} />
-
-        <Inspector
-          question={selectedQuestion}
-          allQuestions={schema.questions}
-          onChange={(patch) => updateQuestion(selectedQuestion.id, patch)}
-          onDelete={async () => {
-            const titleText =
-              'title' in selectedQuestion && typeof selectedQuestion.title === 'string'
-                ? selectedQuestion.title
-                : selectedQuestion.id;
-            const ok = await confirm({
-              title: 'Delete this item?',
-              message: (
-                <>
-                  Removes <strong>{titleText}</strong> from this form. Existing responses
-                  for it stay in localStorage but won&apos;t be collected anymore.
-                </>
-              ),
-              confirmLabel: 'Delete',
-              danger: true,
-            });
-            if (ok) removeQuestion(selectedQuestion.id);
-          }}
-          canDelete={canDelete}
-        />
-      </div>
       </div>
     </AdminShell>
   );

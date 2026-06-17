@@ -9,7 +9,14 @@ export function getSupabaseAnonKey(): string | undefined {
   return import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || undefined;
 }
 
+/** When `1` / `true`, ignore Supabase keys — localStorage admin, no login (local UI testing). */
+export function isAdminOfflineMode(): boolean {
+  const raw = import.meta.env.VITE_ADMIN_OFFLINE;
+  return raw === '1' || raw === 'true';
+}
+
 export function isSupabaseConfigured(): boolean {
+  if (isAdminOfflineMode()) return false;
   return Boolean(getSupabaseUrl() && getSupabaseAnonKey());
 }
 

@@ -1,4 +1,5 @@
-import { navigate, useRoute } from '../_router.js';
+import { useRef } from 'react';
+import { navigate, routeKey, useRoute } from '../_router.js';
 
 function IconSettings() {
   return (
@@ -24,14 +25,25 @@ function IconSettings() {
 export function SettingsFab() {
   const route = useRoute();
   const onSettings = route.name === 'settings';
+  const returnToRef = useRef('/');
+
+  const toggleSettings = () => {
+    if (onSettings) {
+      navigate(returnToRef.current);
+      return;
+    }
+    returnToRef.current = routeKey(route);
+    navigate('/settings');
+  };
 
   return (
     <button
       type="button"
       className={`slate-btn slate-btn--icon slate-settings-fab${onSettings ? ' slate-settings-fab--active' : ''}`}
-      onClick={() => navigate('/settings')}
-      aria-label="Settings"
-      title="Settings"
+      onClick={toggleSettings}
+      aria-label={onSettings ? 'Close settings' : 'Settings'}
+      aria-pressed={onSettings}
+      title={onSettings ? 'Close settings' : 'Settings'}
     >
       <IconSettings />
     </button>

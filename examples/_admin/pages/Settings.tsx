@@ -1,6 +1,7 @@
 'use client';
 
 import { AdminShell } from '../shell/AdminShell.js';
+import { BackupPanel } from '../components/BackupPanel.js';
 import { useAdminTheme } from '../adminThemeContext.js';
 import { isSupabaseConfigured } from '../supabase/env.js';
 import { useAuth } from '../supabase/AuthProvider.js';
@@ -83,7 +84,9 @@ function SettingsContent() {
             Sign out
           </button>
         </section>
-      ) : null}
+      ) : (
+        <BackupPanel />
+      )}
     </div>
   );
 }
