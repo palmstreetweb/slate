@@ -23,7 +23,9 @@ src/
 ├── utils/         focus, letters, tokens (small helpers)
 ├── types/         Question.ts, Schema.ts, Answers.ts, Theme.ts (+ barrel)
 └── index.ts       public exports barrel
-examples/          dev-only demos served by `npm run dev`
+examples/          dev-only demos served by `npm run dev` (admin → Neon, ADR-029)
+api/               Vercel serverless (auth-email proxy, Build with AI — ADR-039)
+neon/              migrations + Functions + SETUP.md (admin backend)
 tests/             Vitest specs
 ```
 

@@ -7,6 +7,6 @@
   "rewrites": [
     { "source": "/brand", "destination": "/brand/index.html" },
     { "source": "/brand/", "destination": "/brand/index.html" },
-    { "source": "/((?!brand/).*)", "destination": "/index.html" }
+    { "source": "/((?!brand/|api/).*)", "destination": "/index.html" }
   ]
 }

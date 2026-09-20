@@ -147,3 +147,43 @@ export function playFormSound(sound: FormSound | boolean | undefined, volume = 0
   if (id === 'off') return;
   playSound(volume, RECIPES[id]);
 }
+
+/**
+ * Soft mechanical key tick for text entry (ADR-034). Pitch varies slightly so
+ * rapid typing doesn't sound like a single sample loop. Rate-limited so held
+ * keys / autofill don't flood the AudioContext.
+ */
+const TYPEWRITER_TICK: Recipe = {
+  duration: 0.045,
+  layers: [
+    {
+      wave: 'triangle',
+      gain: 0.11,
+      ampEnv: { attack: 0.0004, decay: 0.022, sustain: 0, release: 0.006 },
+      filter: { type: 'bandpass', freq: 2600, q: 3.2 },
+      repeat: {
+        count: 1,
+        interval: 0,
+        pitchPool: [860, 940, 1020, 1100, 1180, 1260],
+      },
+    },
+    {
+      wave: 'square',
+      gain: 0.028,
+      freq: 180,
+      ampEnv: { attack: 0.0003, decay: 0.012, sustain: 0, release: 0.004 },
+      filter: { type: 'lowpass', freq: 600, q: 0.7 },
+    },
+  ],
+};
+
+let _lastTypewriterMs = 0;
+const TYPEWRITER_MIN_GAP_MS = 26;
+
+/** Play one typewriter key tick (quieter than step sounds). */
+export function playTypewriterTick(volume = 0.34): void {
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  if (now - _lastTypewriterMs < TYPEWRITER_MIN_GAP_MS) return;
+  _lastTypewriterMs = now;
+  playSound(volume, TYPEWRITER_TICK);
+}

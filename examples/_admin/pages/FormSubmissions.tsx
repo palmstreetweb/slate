@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Question } from '@/index.js';
-import { getForm } from '../_formsStore.js';
+import { getForm, subscribe as subscribeForms } from '../_formsStore.js';
 import {
   emptyTrash,
   listSubmissions,
@@ -8,7 +8,7 @@ import {
   permanentlyDeleteSubmission,
   restoreSubmission,
   restoreSubmissions,
-  subscribe,
+  subscribe as subscribeSubmissions,
   trashSubmission,
   trashSubmissions,
   type StoredSubmission,
@@ -25,25 +25,68 @@ import {
   titleOf,
 } from '../responsesFormat.js';
 import { downloadResponsesCsv } from '../csvExport.js';
+import { ResponseFileAnswer } from '../components/ResponseFileAnswer.js';
+import { isNeonConfigured } from '../neon/env.js';
+import { refreshSubmissionsRemote } from '../neon/submissionsRemote.js';
+import { isStoresHydrated } from '../neon/hydrate.js';
 
 type Props = { formId: string };
 
 export function FormSubmissions({ formId }: Props) {
-  const form = useMemo(() => getForm(formId), [formId]);
+  const [form, setForm] = useState(() => getForm(formId));
   const [subs, setSubs] = useState<StoredSubmission[]>(() => listSubmissions(formId));
   const [trashed, setTrashed] = useState<StoredSubmission[]>(() => listTrashedSubmissions(formId));
   const [open, setOpen] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'summary' | 'trash'>('list');
   const confirm = useConfirm();
 
-  useEffect(
-    () =>
-      subscribe(() => {
-        setSubs(listSubmissions(formId));
-        setTrashed(listTrashedSubmissions(formId));
-      }),
-    [formId],
-  );
+  const refresh = () => {
+    setForm(getForm(formId));
+    setSubs(listSubmissions(formId));
+    setTrashed(listTrashedSubmissions(formId));
+  };
+
+  useEffect(() => {
+    const sync = () => refresh();
+    sync();
+    const unsubForms = subscribeForms(sync);
+    const unsubSubs = subscribeSubmissions(sync);
+    return () => {
+      unsubForms();
+      unsubSubs();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- formId-scoped refresh
+  }, [formId]);
+
+  // Pull latest from Neon when opening Responses / returning to the tab so
+  // public share-link submits show up without a full page reload.
+  useEffect(() => {
+    if (!isNeonConfigured() || !isStoresHydrated()) return;
+    let cancelled = false;
+    let lastPull = 0;
+    const pull = () => {
+      const now = Date.now();
+      if (now - lastPull < 2500) return;
+      lastPull = now;
+      void refreshSubmissionsRemote()
+        .then(() => {
+          if (!cancelled) refresh();
+        })
+        .catch(() => {
+          /* keep cache */
+        });
+    };
+    pull();
+    const onVis = () => {
+      if (document.visibilityState === 'visible') pull();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- formId-scoped refresh
+  }, [formId]);
 
   if (!form) {
     return (
@@ -515,9 +558,21 @@ function ResponseRow({
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--slate-text)' }}>
                     {titleOf(q)}
                   </span>
-                  <span style={{ fontSize: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--slate-muted)' }}>
-                    {formatAnswerForQuestion(q, v)}
-                  </span>
+                  {q.type === 'file_upload' ? (
+                    <ResponseFileAnswer value={v} />
+                  ) : (
+                    <span
+                      className="slate-selectable"
+                      style={{
+                        fontSize: 14,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        color: 'var(--slate-muted)',
+                      }}
+                    >
+                      {formatAnswerForQuestion(q, v)}
+                    </span>
+                  )}
                 </div>
               );
             })}

@@ -1,28 +1,34 @@
 /**
  * Default Slate admin / public-respond file upload handler.
- * Optimizes images, then stores in IndexedDB, Supabase Storage, or
+ * Optimizes images, then stores in IndexedDB, Neon Object Storage, or
  * POSTs to `VITE_UPLOAD_URL` when configured.
  */
 
 import { createFileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import { saveLocalUpload } from './localFileStore.js';
-import { isSupabaseConfigured, getSupabase } from './supabase/env.js';
-import { uploadToSupabaseStorage } from './storageUpload.js';
+import { getNeon, hasStorageSignUrl, isNeonConfigured } from './neon/env.js';
+import { uploadToNeonStorage } from './storageUpload.js';
+import { getUploadFormId } from './uploadContext.js';
 
 async function uploadToRemote(
   file: File,
   questionId: string,
   _ctx?: { maxSizeMb?: number },
 ): Promise<string> {
-  if (isSupabaseConfigured()) {
-    const { data } = await getSupabase().auth.getSession();
-    const scope = data.session ? 'draft' : 'public';
-    return uploadToSupabaseStorage(file, { scope });
+  const formId = getUploadFormId();
+  // Portable share links and missing context use local storage — Neon paths need a real form id.
+  const portable =
+    !formId || formId.startsWith('portable_') || formId.startsWith('local_');
+
+  if (isNeonConfigured() && hasStorageSignUrl() && !portable) {
+    const { data } = await getNeon().auth.getSession();
+    const scope = data?.session ? 'draft' : 'public';
+    return uploadToNeonStorage(file, { scope, formId });
   }
 
   const base = import.meta.env.VITE_UPLOAD_URL?.trim();
-  if (!base) {
+  if (!base || portable) {
     return saveLocalUpload(file);
   }
 
@@ -43,6 +49,13 @@ async function uploadToRemote(
   }
   return out;
 }
+
+/** Always IndexedDB — for portable share links that aren't Neon-backed forms. */
+export const localHostFileUpload: FileUploadHandler = (file, questionId, ctx) =>
+  createFileUploadHandler({
+    maxSizeMb: ctx?.maxSizeMb,
+    upload: (f) => saveLocalUpload(f),
+  })(file, questionId, ctx);
 
 /** Shared handler for preview, public share links, and canvas. */
 export function createHostFileUploadHandler(maxSizeMb?: number): FileUploadHandler {

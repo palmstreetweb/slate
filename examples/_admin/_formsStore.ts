@@ -1,13 +1,14 @@
 /**
- * Forms store — persists schemas to localStorage or Supabase (ADR-028) with a
+ * Forms store — persists schemas to localStorage or Neon (ADR-029) with a
  * simple CRUD + pub/sub API. Deleted forms are soft-deleted (`deletedAt`).
  */
 
 import type { Schema } from '@/index.js';
-import { isSupabaseConfigured } from './supabase/env.js';
-import { isStoresHydrated } from './supabase/hydrate.js';
-import * as remote from './supabase/formsRemote.js';
+import { isNeonConfigured } from './neon/env.js';
+import { isStoresHydrated } from './neon/hydrate.js';
+import * as remote from './neon/formsRemote.js';
 import { purgeSubmissions } from './_submissionStore.js';
+import type { FormQuota } from './formQuota.js';
 
 const STORAGE_KEY = 'slate-forms';
 
@@ -31,8 +32,19 @@ export type FormRecord = {
 type Listener = (forms: FormRecord[]) => void;
 const listeners = new Set<Listener>();
 
+/** Neon is the source of truth once configured — never fall back to localStorage mid-boot. */
+function useNeon(): boolean {
+  return isNeonConfigured();
+}
+
+/** Mutations require a finished hydrate so we don't write into an empty cache. */
 function useRemote(): boolean {
-  return isSupabaseConfigured() && isStoresHydrated();
+  return isNeonConfigured() && isStoresHydrated();
+}
+
+/** When Neon is on but hydrate failed/pending, refuse localStorage writes (split-brain). */
+function neonNotReady(): boolean {
+  return isNeonConfigured() && !isStoresHydrated();
 }
 
 function read(): FormRecord[] {
@@ -82,6 +94,7 @@ export function resetFormsStorage(): void {
 /** Replace all stored forms (backup restore). Returns false on write failure. */
 export function replaceAllForms(forms: FormRecord[]): boolean {
   if (useRemote()) return remote.replaceAllFormsRemoteSync(forms);
+  if (neonNotReady()) return false;
   return write(forms);
 }
 
@@ -105,19 +118,19 @@ function trashAt(): string {
 
 /** Active forms only (not in trash). */
 export function listForms(): FormRecord[] {
-  if (useRemote()) return remote.listFormsRemote();
+  if (useNeon()) return remote.listFormsRemote();
   return read().filter(isActive);
 }
 
 /** All forms including trash (backup export). */
 export function listAllForms(): FormRecord[] {
-  if (useRemote()) return remote.listAllFormsRemote();
+  if (useNeon()) return remote.listAllFormsRemote();
   return read();
 }
 
 /** Trashed forms only. */
 export function listTrashedForms(): FormRecord[] {
-  if (useRemote()) return remote.listTrashedFormsRemote();
+  if (useNeon()) return remote.listTrashedFormsRemote();
   return read().filter(isTrashed);
 }
 
@@ -126,12 +139,24 @@ export function countTrashedForms(): number {
 }
 
 export function getForm(formId: string): FormRecord | null {
-  if (useRemote()) return remote.getFormRemote(formId);
+  if (useNeon()) return remote.getFormRemote(formId);
   return read().find((f) => f.id === formId && isActive(f)) ?? null;
+}
+
+/** Cloud quota (ADR-038). `null` in localStorage-only mode (uncapped). */
+export function getFormQuota(): FormQuota | null {
+  if (!useNeon()) return null;
+  return remote.getFormQuotaRemote();
+}
+
+export function isAtFormQuota(): boolean {
+  const quota = getFormQuota();
+  return quota !== null && quota.used >= quota.max;
 }
 
 export function createForm(opts: { name: string; schema: Schema }): FormRecord | null {
   if (useRemote()) return remote.createFormRemoteSync(opts);
+  if (neonNotReady()) return null;
   const now = new Date().toISOString();
   const record: FormRecord = {
     id: id(),
@@ -143,11 +168,21 @@ export function createForm(opts: { name: string; schema: Schema }): FormRecord |
   return write([record, ...read()]) ? record : null;
 }
 
+/** Prefer for New form — waits for Neon upsert so the editor never races a soft refresh. */
+export async function createFormAsync(opts: {
+  name: string;
+  schema: Schema;
+}): Promise<FormRecord | null> {
+  if (useRemote()) return remote.createFormRemote(opts);
+  return createForm(opts);
+}
+
 export function updateForm(
   formId: string,
   patch: Partial<Omit<FormRecord, 'id' | 'createdAt'>>,
 ): [FormRecord | null, boolean] {
   if (useRemote()) return remote.updateFormRemoteSync(formId, patch);
+  if (neonNotReady()) return [null, false];
   const all = read();
   const idx = all.findIndex((f) => f.id === formId && isActive(f));
   if (idx === -1) return [null, false];
@@ -165,6 +200,7 @@ export function updateForm(
 
 export function trashForm(formId: string): boolean {
   if (useRemote()) return remote.trashFormRemoteSync(formId);
+  if (neonNotReady()) return false;
   const now = trashAt();
   const all = read();
   const idx = all.findIndex((f) => f.id === formId && isActive(f));
@@ -181,6 +217,7 @@ export function deleteForm(formId: string): boolean {
 
 export function restoreForm(formId: string): boolean {
   if (useRemote()) return remote.restoreFormRemoteSync(formId);
+  if (neonNotReady()) return false;
   const all = read();
   const idx = all.findIndex((f) => f.id === formId && isTrashed(f));
   if (idx === -1) return false;
@@ -192,6 +229,7 @@ export function restoreForm(formId: string): boolean {
 
 export function restoreAllForms(): boolean {
   if (useRemote()) return remote.restoreAllFormsRemoteSync();
+  if (neonNotReady()) return false;
   return write(
     read().map((f) => {
       if (!isTrashed(f)) return f;
@@ -204,6 +242,7 @@ export function restoreAllForms(): boolean {
 export function permanentlyDeleteForm(formId: string): boolean {
   purgeSubmissions(formId);
   if (useRemote()) return remote.permanentlyDeleteFormRemoteSync(formId);
+  if (neonNotReady()) return false;
   return write(read().filter((f) => f.id !== formId));
 }
 
@@ -211,6 +250,7 @@ export function emptyFormTrash(): boolean {
   const trashedIds = listTrashedForms().map((f) => f.id);
   for (const formId of trashedIds) purgeSubmissions(formId);
   if (useRemote()) return remote.emptyFormTrashRemoteSync();
+  if (neonNotReady()) return false;
   return write(read().filter(isActive));
 }
 
@@ -236,7 +276,10 @@ export function unpublishForm(formId: string): FormRecord | null {
 }
 
 export function subscribe(listener: Listener): () => void {
-  if (useRemote()) return remote.subscribeFormsRemote(listener);
+  // Always attach to the Neon cache when configured — hydrate notifies these
+  // listeners. Gating on isStoresHydrated() caused a sticky empty dashboard:
+  // UI subscribed to localStorage, hydrate filled the remote cache, nobody updated.
+  if (useNeon()) return remote.subscribeFormsRemote(listener);
   listeners.add(listener);
   const onStorage = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY) listener(read());

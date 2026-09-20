@@ -22,7 +22,8 @@ import {
 } from '@/components/ThemeDecoration.js';
 import { progress as progressFn, visibleQuestions } from '@/logic/progress.js';
 import { hostFileUpload } from '../hostFileUpload.js';
-import { getLocalUploadMeta } from '../localFileStore.js';
+import { resolveUploadMeta } from '../resolveUploadMeta.js';
+import { clearUploadContext, setUploadContext } from '../uploadContext.js';
 import { TYPE_LABEL } from '../questionTypeMeta.js';
 
 import '@/styles/tokens.css';
@@ -32,6 +33,7 @@ import '@/styles/base.css';
 import '@/styles/questions.css';
 
 type Props = {
+  formId: string;
   schema: Schema;
   selectedQuestion: Question;
 };
@@ -44,9 +46,14 @@ function defaultMode(themeMode: ThemeMode): ResolvedThemeMode {
   return 'dark';
 }
 
-export function Canvas({ schema, selectedQuestion }: Props) {
+export function Canvas({ formId, schema, selectedQuestion }: Props) {
   const forced = schema.themeMode === 'light' || schema.themeMode === 'dark';
   const [mode, setMode] = useState<ResolvedThemeMode>(() => defaultMode(schema.themeMode));
+
+  useEffect(() => {
+    setUploadContext(formId);
+    return () => clearUploadContext();
+  }, [formId]);
 
   // Re-resolve when the schema's themeMode setting changes (e.g. user
   // toggled "Force dark" in the outline settings).
@@ -163,7 +170,7 @@ export function Canvas({ schema, selectedQuestion }: Props) {
                 onRetrySubmit={noop}
                 onRestart={noop}
                 onFileUpload={hostFileUpload}
-                resolveFileUploadMeta={getLocalUploadMeta}
+                resolveFileUploadMeta={resolveUploadMeta}
               />
             </div>
           </div>

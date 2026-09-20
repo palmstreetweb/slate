@@ -59,8 +59,17 @@ export async function prepareFileForUpload(
   if (shouldOptimizeImage(normalized)) {
     try {
       return await prepareImageForStorage(normalized);
-    } catch {
-      // Exotic or unreadable raster — store the original instead of failing.
+    } catch (err) {
+      // HEIC that we can't decode must not be stored as a fake "image" —
+      // Responses Preview would then fail the same way. Surface the error.
+      if (isHeicLike(withInferredImageMime(normalized))) {
+        throw err instanceof Error
+          ? err
+          : new Error(
+              'Could not read this HEIC/HEIF photo. Export as JPG from Photos and try again.',
+            );
+      }
+      // Other exotic rasters — store the original instead of failing the form.
       return passThrough(normalized, opts);
     }
   }

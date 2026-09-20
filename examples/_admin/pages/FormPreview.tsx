@@ -64,10 +64,11 @@ export function FormPreview({ formId }: Props) {
       }
     >
       <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--slate-muted)' }}>
-        Live preview. Submissions you make here are saved to localStorage and visible under{' '}
+        Live preview. Submissions you make here are saved and visible under{' '}
         <button type="button" className="slate-link" onClick={() => navigate(`/forms/${formId}/submissions`)}>
           Responses
-        </button>.
+        </button>
+        .
       </p>
       <div className="slate-preview" style={{ height: 'calc(100vh - 160px)', overflow: 'hidden' }}>
         {/* No `resume` here: the preview is a build/test surface, not a real
@@ -79,7 +80,6 @@ export function FormPreview({ formId }: Props) {
           onFileUpload={hostFileUpload}
           resolveFileUploadMeta={resolveUploadMeta}
           onSubmit={async (answers, meta) => {
-            await new Promise((r) => setTimeout(r, 250));
             addSubmission(formId, answers, meta);
           }}
         />

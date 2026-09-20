@@ -58,6 +58,7 @@ export {
   SLATE_FILE_REF_PREFIX,
   isFileUploadRef,
   describeFileUploadAnswer,
+  describeFileUploadAnswers,
   formatBytes,
   type FileUploadMeta,
 } from './utils/fileUploadRef.js';

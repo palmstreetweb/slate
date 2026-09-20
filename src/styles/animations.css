@@ -36,6 +36,38 @@
   }
 }
 
+@keyframes slate-q-child-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slate-choice-select-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes slate-ok-confirm {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--slate-accent-rgb) / 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 12px rgb(var(--slate-accent-rgb) / 0);
+  }
+}
+
 [data-slate-forms] .slate-q-enter[data-direction='forward'] {
   animation: slate-q-in-forward 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -46,6 +78,57 @@
 
 [data-slate-forms] .slate-q-leave {
   animation: slate-q-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* Staggered presence inside each question — title → field → actions. */
+[data-slate-forms] .slate-q-enter .slate-step-badge {
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both;
+}
+
+[data-slate-forms] .slate-q-enter .slate-title {
+  animation: slate-q-child-in 440ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+}
+
+[data-slate-forms] .slate-q-enter .slate-subtitle {
+  animation: slate-q-child-in 440ms cubic-bezier(0.16, 1, 0.3, 1) 110ms both;
+}
+
+[data-slate-forms] .slate-q-enter .slate-input,
+[data-slate-forms] .slate-q-enter .slate-choices,
+[data-slate-forms] .slate-q-enter .slate-scale,
+[data-slate-forms] .slate-q-enter .slate-matrix,
+[data-slate-forms] .slate-q-enter .slate-upload-zone,
+[data-slate-forms] .slate-q-enter .slate-upload-list,
+[data-slate-forms] .slate-q-enter .slate-picture-grid,
+[data-slate-forms] .slate-q-enter .slate-dropdown-list,
+[data-slate-forms] .slate-q-enter .slate-ranking,
+[data-slate-forms] .slate-q-enter .slate-date-row,
+[data-slate-forms] .slate-q-enter .slate-review,
+[data-slate-forms] .slate-q-enter .slate-cta {
+  animation: slate-q-child-in 460ms cubic-bezier(0.16, 1, 0.3, 1) 140ms both;
+}
+
+[data-slate-forms] .slate-q-enter .slate-actions {
+  animation: slate-q-child-in 480ms cubic-bezier(0.16, 1, 0.3, 1) 200ms both;
+}
+
+[data-slate-forms] .slate-q-enter .slate-choice:nth-child(1) {
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
+}
+[data-slate-forms] .slate-q-enter .slate-choice:nth-child(2) {
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 200ms both;
+}
+[data-slate-forms] .slate-q-enter .slate-choice:nth-child(3) {
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 240ms both;
+}
+[data-slate-forms] .slate-q-enter .slate-choice:nth-child(4) {
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 280ms both;
+}
+[data-slate-forms] .slate-q-enter .slate-choice:nth-child(5) {
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 320ms both;
+}
+[data-slate-forms] .slate-q-enter .slate-choice:nth-child(n + 6) {
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 360ms both;
 }
 
 /* Swiss is snappier — 380ms in / 180ms out, slightly less Y travel. */
@@ -108,9 +191,38 @@
   animation: slate-q-out-classic 260ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
+/* OK / choice micro-feedback */
+[data-slate-forms] .slate-ok-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.97);
+  animation: slate-ok-confirm 420ms ease-out;
+}
+
+[data-slate-forms] .slate-choice--selected {
+  animation: slate-choice-select-pop 320ms cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-slate-forms] .slate-q-enter,
-  [data-slate-forms] .slate-q-leave {
+  [data-slate-forms] .slate-q-leave,
+  [data-slate-forms] .slate-q-enter .slate-step-badge,
+  [data-slate-forms] .slate-q-enter .slate-title,
+  [data-slate-forms] .slate-q-enter .slate-subtitle,
+  [data-slate-forms] .slate-q-enter .slate-input,
+  [data-slate-forms] .slate-q-enter .slate-choices,
+  [data-slate-forms] .slate-q-enter .slate-scale,
+  [data-slate-forms] .slate-q-enter .slate-matrix,
+  [data-slate-forms] .slate-q-enter .slate-upload-zone,
+  [data-slate-forms] .slate-q-enter .slate-upload-list,
+  [data-slate-forms] .slate-q-enter .slate-picture-grid,
+  [data-slate-forms] .slate-q-enter .slate-dropdown-list,
+  [data-slate-forms] .slate-q-enter .slate-ranking,
+  [data-slate-forms] .slate-q-enter .slate-date-row,
+  [data-slate-forms] .slate-q-enter .slate-review,
+  [data-slate-forms] .slate-q-enter .slate-cta,
+  [data-slate-forms] .slate-q-enter .slate-actions,
+  [data-slate-forms] .slate-q-enter .slate-choice,
+  [data-slate-forms] .slate-choice--selected,
+  [data-slate-forms] .slate-ok-btn:active:not(:disabled) {
     animation: none !important;
   }
 }

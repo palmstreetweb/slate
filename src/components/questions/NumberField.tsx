@@ -6,6 +6,7 @@ import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
+import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -14,9 +15,17 @@ type Props = {
   initialValue: number | undefined;
   onAnswer: (value: number | undefined) => void;
   onAdvance: () => void;
+  onType?: () => void;
 };
 
-export function NumberField({ question, answers, initialValue, onAnswer, onAdvance }: Props) {
+export function NumberField({
+  question,
+  answers,
+  initialValue,
+  onAnswer,
+  onAdvance,
+  onType,
+}: Props) {
   const [text, setText] = useState<string>(initialValue !== undefined ? String(initialValue) : '');
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,6 +55,7 @@ export function NumberField({ question, answers, initialValue, onAnswer, onAdvan
   useRegisterFormConfirm(submit);
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isTypewriterKey(e)) onType?.();
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       submit();

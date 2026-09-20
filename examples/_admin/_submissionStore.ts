@@ -1,12 +1,12 @@
 /**
- * Submissions store — localStorage or Supabase (ADR-028). All submissions
+ * Submissions store — localStorage or Neon (ADR-029). All submissions
  * are scoped per formId. Deleted responses are soft-deleted (`deletedAt`).
  */
 
 import type { Answers, SubmitMeta } from '@/index.js';
-import { isSupabaseConfigured } from './supabase/env.js';
-import { isStoresHydrated } from './supabase/hydrate.js';
-import * as remote from './supabase/submissionsRemote.js';
+import { isNeonConfigured } from './neon/env.js';
+import { isStoresHydrated } from './neon/hydrate.js';
+import * as remote from './neon/submissionsRemote.js';
 
 const STORAGE_KEY = 'slate-submissions';
 
@@ -26,8 +26,21 @@ export type StoredSubmission = {
 type Listener = (subs: StoredSubmission[]) => void;
 const listeners = new Set<Listener>();
 
+function useNeon(): boolean {
+  return isNeonConfigured();
+}
+
 function useRemote(): boolean {
-  return isSupabaseConfigured() && isStoresHydrated();
+  return isNeonConfigured() && isStoresHydrated();
+}
+
+function neonNotReady(): boolean {
+  return isNeonConfigured() && !isStoresHydrated();
+}
+
+/** Portable / offline share links are never cloud forms. */
+function isLocalOnlyFormId(formId: string): boolean {
+  return formId.startsWith('portable_') || formId.startsWith('local_');
 }
 
 function read(): StoredSubmission[] {
@@ -79,6 +92,7 @@ export function replaceAllSubmissions(subs: StoredSubmission[]): void {
     remote.replaceAllSubmissionsRemoteSync(subs);
     return;
   }
+  if (neonNotReady()) return;
   write(subs);
 }
 
@@ -96,7 +110,12 @@ function makeId(): string {
 }
 
 export function addSubmission(formId: string, answers: Answers, meta: SubmitMeta): StoredSubmission {
-  if (useRemote()) return remote.addSubmissionRemoteSync(formId, answers, meta);
+  if (useRemote() && !isLocalOnlyFormId(formId)) {
+    return remote.addSubmissionRemoteSync(formId, answers, meta);
+  }
+  if (neonNotReady() && !isLocalOnlyFormId(formId)) {
+    throw new Error('Cloud sync is not ready — try again in a moment.');
+  }
   const sub: StoredSubmission = {
     id: makeId(),
     formId,
@@ -117,26 +136,26 @@ export function addSubmission(formId: string, answers: Answers, meta: SubmitMeta
 
 /** Active responses only (not in trash). */
 export function listSubmissions(formId?: string): StoredSubmission[] {
-  if (useRemote()) return remote.listSubmissionsRemote(formId);
+  if (useNeon()) return remote.listSubmissionsRemote(formId);
   const all = read().filter(isActive);
   return formId ? all.filter((s) => s.formId === formId) : all;
 }
 
 /** All submissions including trash (backup export). */
 export function listAllSubmissions(): StoredSubmission[] {
-  if (useRemote()) return remote.listAllSubmissionsRemote();
+  if (useNeon()) return remote.listAllSubmissionsRemote();
   return read();
 }
 
 /** Trashed responses only. */
 export function listTrashedSubmissions(formId?: string): StoredSubmission[] {
-  if (useRemote()) return remote.listTrashedSubmissionsRemote(formId);
+  if (useNeon()) return remote.listTrashedSubmissionsRemote(formId);
   const trashed = read().filter(isTrashed);
   return formId ? trashed.filter((s) => s.formId === formId) : trashed;
 }
 
 export function countSubmissions(formId?: string): number {
-  if (useRemote()) return remote.countSubmissionsRemote(formId);
+  if (useNeon()) return remote.countSubmissionsRemote(formId);
   return listSubmissions(formId).length;
 }
 
@@ -145,7 +164,7 @@ export function countTrashedSubmissions(formId?: string): number {
 }
 
 export function lastSubmissionAt(formId?: string): string | null {
-  if (useRemote()) return remote.lastSubmissionAtRemote(formId);
+  if (useNeon()) return remote.lastSubmissionAtRemote(formId);
   const subs = listSubmissions(formId);
   return subs.length > 0 ? subs[0]!.receivedAt : null;
 }
@@ -160,6 +179,7 @@ export function trashSubmissions(formId?: string): void {
     remote.trashSubmissionsRemoteSync(formId);
     return;
   }
+  if (neonNotReady()) return;
   const now = trashAt();
   if (!formId) {
     write(read().map((s) => (isActive(s) ? { ...s, deletedAt: now } : s)));
@@ -180,6 +200,7 @@ export function trashSubmission(submissionId: string): void {
     remote.trashSubmissionRemoteSync(submissionId);
     return;
   }
+  if (neonNotReady()) return;
   const now = trashAt();
   write(
     read().map((s) => (s.id === submissionId && isActive(s) ? { ...s, deletedAt: now } : s)),
@@ -196,6 +217,7 @@ export function restoreSubmission(submissionId: string): void {
     remote.restoreSubmissionRemoteSync(submissionId);
     return;
   }
+  if (neonNotReady()) return;
   write(
     read().map((s) => {
       if (s.id !== submissionId) return s;
@@ -210,6 +232,7 @@ export function restoreSubmissions(formId: string): void {
     remote.restoreSubmissionsRemoteSync(formId);
     return;
   }
+  if (neonNotReady()) return;
   write(
     read().map((s) => {
       if (s.formId !== formId || !isTrashed(s)) return s;
@@ -224,6 +247,7 @@ export function permanentlyDeleteSubmission(submissionId: string): void {
     remote.permanentlyDeleteSubmissionRemoteSync(submissionId);
     return;
   }
+  if (neonNotReady()) return;
   write(read().filter((s) => s.id !== submissionId));
 }
 
@@ -232,6 +256,7 @@ export function emptyTrash(formId?: string): void {
     remote.emptyTrashRemoteSync(formId);
     return;
   }
+  if (neonNotReady()) return;
   if (!formId) {
     write(read().filter(isActive));
     return;
@@ -249,7 +274,7 @@ export function purgeSubmissions(formId: string): void {
 }
 
 export function subscribe(listener: Listener): () => void {
-  if (useRemote()) return remote.subscribeSubmissionsRemote(listener);
+  if (useNeon()) return remote.subscribeSubmissionsRemote(listener);
   listeners.add(listener);
   const onStorage = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY) listener(read());

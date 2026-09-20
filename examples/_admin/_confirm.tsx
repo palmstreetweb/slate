@@ -24,6 +24,8 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { detectAdminUiTheme } from './adminUiTheme.js';
+import { readSlateMode } from './slateMode.js';
 
 export type ConfirmOptions = {
   title: string;
@@ -38,20 +40,6 @@ type Resolver = (value: boolean) => void;
 type ConfirmFn = (opts: ConfirmOptions) => Promise<boolean>;
 
 const ConfirmContext = createContext<ConfirmFn | null>(null);
-
-/** Read Slate theme that's currently persisted, so the dialog renders
- *  in the same mode as the rest of the chrome. */
-function readSlateMode(): 'light' | 'dark' {
-  if (typeof window === 'undefined') return 'dark';
-  try {
-    const v = window.localStorage.getItem('slate-theme');
-    if (v === 'light' || v === 'dark') return v;
-  } catch {
-    /* ignored */
-  }
-  if (window.matchMedia?.('(prefers-color-scheme: light)').matches) return 'light';
-  return 'dark';
-}
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [opts, setOpts] = useState<ConfirmOptions | null>(null);
@@ -123,12 +111,18 @@ function Dialog({
 
   if (typeof document === 'undefined') return null;
 
-  // The portal renders outside the AdminShell's wrapper, so we wrap in our
-  // own studio data attributes to pick up the same tokens.
+  // Portal is outside AdminShell — must set theme + admin-ui or chrome
+  // tokens never bind and the dialog blends into the page (wrong/missing vars).
   const mode = readSlateMode();
+  const uiTheme = detectAdminUiTheme();
 
   return createPortal(
-    <div data-slate-forms="" data-theme-name="slate" data-theme={mode}>
+    <div
+      data-slate-forms=""
+      data-theme-name="slate"
+      data-admin-ui={uiTheme}
+      data-theme={mode}
+    >
       <div
         className="slate-dialog-backdrop"
         role="presentation"

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Slate — code input options</title>
+<style>
+  :root {
+    --bg:#15181D; --panel:#1E232B; --panel-2:#23282F; --ink:#F2EFE8; --muted:#8A93A1;
+    --line:#2D333D; --hair:#2A2F38; --red:#E23B2D; --red-glow:rgba(226,59,45,.18);
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:36px 20px 80px; }
+  .kicker { font:700 11px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+  h1 { font:600 26px/1.2 var(--sans); letter-spacing:-.03em; margin:0 0 8px; }
+  .lead { color:var(--muted); margin:0 0 28px; max-width:46ch; }
+  .grid { display:flex; flex-direction:column; gap:14px; }
+  .opt {
+    background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:18px 18px 16px;
+  }
+  .opt header {
+    display:flex; align-items:flex-start; gap:10px; margin-bottom:6px;
+  }
+  .opt h2 { margin:0; font:600 15px/1.3 var(--sans); letter-spacing:-.01em; }
+  .opt .n {
+    flex:none; width:22px; height:22px; border-radius:7px; background:var(--panel-2); border:1px solid var(--line);
+    font:700 11px/22px var(--sans); text-align:center; color:var(--muted);
+  }
+  .opt p { margin:0 0 14px 32px; font-size:12px; color:var(--muted); }
+  .head-l { display:flex; align-items:center; gap:10px; }
+  .stage { min-height:56px; display:flex; align-items:center; justify-content:center; }
+  .otp { position:relative; display:flex; align-items:center; justify-content:center; }
+  .otp input.trap {
+    position:absolute; inset:0; opacity:0; margin:0; border:0; cursor:text;
+    font-size:16px; /* iOS zoom prevent */
+  }
+  .cell {
+    display:flex; align-items:center; justify-content:center;
+    font:600 22px/1 var(--sans); font-variant-numeric:tabular-nums; color:var(--ink);
+    user-select:none;
+  }
+  .otp.is-focus .cell.is-active { border-color:var(--red); box-shadow:0 0 0 3px var(--red-glow); }
+  a { color:var(--red); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <p class="kicker">Login code</p>
+    <h1>Ten OTP inputs</h1>
+    <p class="lead">Click a row and type (or paste). The one people keep copying is usually <b style="color:var(--ink);font-weight:600">#1 Split boxes</b> — Clerk, Linear, Stripe, shadcn. Reply with a number.</p>
+    <div class="grid" id="grid"></div>
+  </div>
+<script>
+const SAMPLE = '482195';
+
+const styles = [
+  { id:1, name:'Split boxes', note:'The ubiquitous one. Six tiles, active cell gets a red ring.' },
+  { id:2, name:'Triplet groups', note:'3 + gap + 3. Bank / Apple SMS energy.' },
+  { id:3, name:'Underline slots', note:'No boxes. Baselines only, like Material OTP.' },
+  { id:4, name:'Segmented bar', note:'One rounded capsule, hairline dividers.' },
+  { id:5, name:'Soft wells', note:'Same tiles as the email. Inset, quiet.' },
+  { id:6, name:'Pills', note:'Fully rounded capsules. iOS 18-ish.' },
+  { id:7, name:'Passcode dots', note:'Circles. Empty is a ring; digits sit inside.' },
+  { id:8, name:'Spaced field', note:'What we have now, cleaned up. One box, tracking.' },
+  { id:9, name:'Caret cell', note:'Empty cells stay hollow; a bar blinks in the active one.' },
+  { id:10, name:'Active underline', note:'Quiet tiles, only the current digit gets a red baseline.' },
+];
+
+function cellsHtml(n, value, i) {
+  const digits = value.split('');
+  const active = Math.min(value.length, 5);
+  const ch = digits[i] || '';
+  const on = i === active || (value.length === 6 && i === 5);
+  switch (n) {
+    case 1:
+      return `<span class="cell${on?' is-active':''}" style="width:44px;height:52px;border:1px solid var(--line);background:var(--panel-2);border-radius:12px">${ch}</span>`;
+    case 2:
+      return `<span class="cell${on?' is-active':''}" style="width:42px;height:50px;border:1px solid var(--line);background:var(--panel-2);border-radius:10px">${ch}</span>`;
+    case 3:
+      return `<span class="cell${on?' is-active':''}" style="width:40px;height:48px;border:0;border-bottom:2px solid ${on?'var(--red)':'var(--line)'};border-radius:0;background:transparent">${ch}</span>`;
+    case 4:
+      return `<span class="cell${on?' is-active':''}" style="flex:1;min-width:0;height:52px;border:0;border-right:${i===5?'0':'1px solid var(--line)'};background:transparent;border-radius:0;display:grid;place-items:center;line-height:1;letter-spacing:0">${ch}</span>`;
+    case 5:
+      return `<span class="cell${on?' is-active':''}" style="width:44px;height:54px;border:1px solid var(--line);background:var(--panel-2);border-radius:10px">${ch}</span>`;
+    case 6:
+      return `<span class="cell${on?' is-active':''}" style="width:46px;height:48px;border:1px solid var(--line);background:var(--panel-2);border-radius:999px">${ch}</span>`;
+    case 7:
+      return `<span class="cell${on?' is-active':''}" style="width:44px;height:44px;border:1.5px solid var(--line);background:transparent;border-radius:50%;font-size:18px">${ch}</span>`;
+    case 8:
+      return '';
+    case 9:
+      return `<span class="cell${on?' is-active':''}" style="width:44px;height:52px;border:1px solid var(--line);background:transparent;border-radius:12px">${ch || (on ? '<i style="display:block;width:2px;height:22px;background:var(--red);border-radius:1px"></i>' : '')}</span>`;
+    case 10:
+      return `<span class="cell${on?' is-active':''}" style="width:44px;height:52px;border:1px solid var(--line);border-bottom:2px solid ${on?'var(--red)':'var(--line)'};background:var(--panel-2);border-radius:10px">${ch}</span>`;
+    default:
+      return '';
+  }
+}
+
+function rowInner(n, value) {
+  if (n === 8) {
+    return `<div style="width:min(100%,320px);height:52px;border:1px solid var(--line);background:var(--panel-2);border-radius:12px;display:flex;align-items:center;justify-content:center;font:600 22px/1 var(--sans);letter-spacing:.42em;padding-left:.42em">${value || ''}</div>`;
+  }
+  const gap = n === 2 ? 0 : 8;
+  const parts = [];
+  for (let i = 0; i < 6; i++) {
+    if (n === 2 && i === 3) parts.push('<span style="width:14px;flex:none"></span>');
+    parts.push(cellsHtml(n, value, i));
+  }
+  const extra = n === 4
+    ? 'overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--panel-2);width:min(100%,320px);'
+    : '';
+  const gap = n === 4 ? 0 : n === 2 ? 0 : 8;
+  return `<div class="otp-cells" style="display:flex;gap:${gap}px;${extra}">${parts.join('')}</div>`;
+}
+
+const grid = document.getElementById('grid');
+styles.forEach((s) => {
+  const el = document.createElement('article');
+  el.className = 'opt';
+  el.dataset.id = String(s.id);
+  el.innerHTML = `
+    <header>
+      <div class="head-l"><span class="n">${s.id}</span><h2>${s.name}</h2></div>
+    </header>
+    <p>${s.note}</p>
+    <div class="stage">
+      <div class="otp" data-style="${s.id}">
+        <input class="trap" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="${SAMPLE}" aria-label="Style ${s.id} ${s.name}"/>
+        <div class="face">${rowInner(s.id, SAMPLE)}</div>
+      </div>
+    </div>`;
+  grid.appendChild(el);
+});
+
+function paint(otp) {
+  const input = otp.querySelector('.trap');
+  const face = otp.querySelector('.face');
+  const n = Number(otp.dataset.style);
+  const v = (input.value || '').replace(/\D/g, '').slice(0, 6);
+  if (input.value !== v) input.value = v;
+  face.innerHTML = rowInner(n, v);
+}
+
+document.querySelectorAll('.otp').forEach((otp) => {
+  const input = otp.querySelector('.trap');
+  input.addEventListener('input', () => paint(otp));
+  input.addEventListener('focus', () => otp.classList.add('is-focus'));
+  input.addEventListener('blur', () => otp.classList.remove('is-focus'));
+  otp.addEventListener('click', () => input.focus());
+});
+</script>
+</body>
+</html>

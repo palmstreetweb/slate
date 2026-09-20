@@ -6,6 +6,7 @@ import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
+import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
   initialValue: string;
   onAnswer: (value: string) => void;
   onAdvance: () => void;
+  onType?: () => void;
 };
 
 /** Prefix `https://` when the user typed a bare domain. */
@@ -23,7 +25,14 @@ function normalizeUrl(raw: string): string {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
-export function UrlField({ question, answers, initialValue, onAnswer, onAdvance }: Props) {
+export function UrlField({
+  question,
+  answers,
+  initialValue,
+  onAnswer,
+  onAdvance,
+  onType,
+}: Props) {
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,6 +56,7 @@ export function UrlField({ question, answers, initialValue, onAnswer, onAdvance 
   useRegisterFormConfirm(submit);
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isTypewriterKey(e)) onType?.();
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       submit();

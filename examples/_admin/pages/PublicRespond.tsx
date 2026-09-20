@@ -4,7 +4,7 @@ import { decodePortableSchema } from '../portableShare.js';
 import { addSubmission } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
-import { hostFileUpload } from '../hostFileUpload.js';
+import { localHostFileUpload } from '../hostFileUpload.js';
 import { readSlateMode } from '../slateMode.js';
 
 type Props = { token: string };
@@ -33,10 +33,9 @@ export function PublicRespond({ token }: Props) {
     <div className="slate-public-respond" style={{ minHeight: '100vh' }}>
       <Form
         schema={schema}
-        onFileUpload={hostFileUpload}
+        onFileUpload={localHostFileUpload}
         resolveFileUploadMeta={resolveUploadMeta}
         onSubmit={async (answers, meta) => {
-          await new Promise((r) => setTimeout(r, 250));
           addSubmission(submissionFormId, answers, meta);
         }}
       />

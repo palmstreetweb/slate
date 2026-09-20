@@ -66,6 +66,8 @@ export type QuestionRendererProps = {
   onEditQuestion?: (questionId: string) => void;
   /** Play the schema step-sound on discrete interactions (choices, OK, etc.). */
   playInteractionSound?: () => void;
+  /** Soft typewriter tick while typing in text fields (ADR-034). */
+  playTypingSound?: () => void;
 };
 
 function StepBadge({ step, total }: { step: number; total: number }) {
@@ -95,6 +97,7 @@ export function QuestionRenderer({
   visibleList,
   onEditQuestion,
   playInteractionSound,
+  playTypingSound,
 }: QuestionRendererProps) {
   // Resolve {{field:id}} / {{score}} piping (and function-style DynamicTitle)
   // once here, so every field component receives ready-to-render copy.
@@ -171,6 +174,7 @@ export function QuestionRenderer({
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
             onAdvance={advanceWithSound}
+            onType={playTypingSound}
           />
         </>
       );
@@ -185,6 +189,7 @@ export function QuestionRenderer({
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
             onAdvance={advanceWithSound}
+            onType={playTypingSound}
           />
         </>
       );
@@ -199,6 +204,7 @@ export function QuestionRenderer({
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
             onAdvance={advanceWithSound}
+            onType={playTypingSound}
           />
         </>
       );
@@ -213,6 +219,7 @@ export function QuestionRenderer({
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
             onAdvance={advanceWithSound}
+            onType={playTypingSound}
           />
         </>
       );
@@ -227,6 +234,7 @@ export function QuestionRenderer({
             initialValue={(answers[question.id] as string | undefined) ?? ''}
             onAnswer={(v) => setAnswer(question.id, v)}
             onAdvance={advanceWithSound}
+            onType={playTypingSound}
           />
         </>
       );
@@ -255,6 +263,7 @@ export function QuestionRenderer({
             initialValue={answers[question.id] as number | undefined}
             onAnswer={(v) => setAnswer(question.id, v)}
             onAdvance={advanceWithSound}
+            onType={playTypingSound}
           />
         </>
       );
@@ -366,7 +375,7 @@ export function QuestionRenderer({
           <FileUploadField
             question={question}
             answers={answers}
-            initialValue={answers[question.id] as File | string | undefined}
+            initialValue={answers[question.id] as File | string | Array<File | string> | undefined}
             onAnswer={(v) => setAnswer(question.id, v)}
             onAdvance={advanceWithSound}
             onFileUpload={onFileUpload}

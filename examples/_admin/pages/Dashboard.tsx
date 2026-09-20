@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { defineSchema } from '@/index.js';
 import {
-  createForm,
+  createFormAsync,
   duplicateForm,
   emptyFormTrash,
+  getFormQuota,
+  isAtFormQuota,
   listForms,
   listTrashedForms,
   permanentlyDeleteForm,
@@ -43,7 +45,11 @@ import {
   captureFormCardRects,
   shouldAnimateFormGrid,
 } from '../formGridFlip.js';
-import { isSupabaseConfigured } from '../supabase/env.js';
+import { isNeonConfigured } from '../neon/env.js';
+import { refreshFormsRemote } from '../neon/formsRemote.js';
+import { FORM_QUOTA_MAX, formQuotaUserMessage, isFormQuotaError } from '../formQuota.js';
+import { BuildWithAiModal, SparkleIcon } from '../components/BuildWithAiModal.js';
+import { markAiDraft, type GeneratedDraft } from '../ai/client.js';
 
 export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
@@ -75,49 +81,202 @@ export function Dashboard() {
     [],
   );
 
-  const handleDuplicate = (sourceId: string) => {
-    const grid = gridRef.current;
-    const before = grid && shouldAnimateFormGrid() ? captureFormCardRects(grid) : null;
-    const created = duplicateForm(sourceId);
-    if (!created) return;
-    if (grid && before) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          animateFormGridDuplicate(grid, sourceId, created.id, before);
+  // Sync immediately on mount (covers subscribe-after-hydrate races). Soft
+  // refresh on focus recovers from rare empty-cache glitches — hydrate never
+  // clobbers a warm cache with an empty fetch anymore.
+  useEffect(() => {
+    setForms(listForms());
+    setTrashed(listTrashedForms());
+  }, []);
+
+  useEffect(() => {
+    if (!isNeonConfigured()) return;
+    let cancelled = false;
+    let lastPull = 0;
+    const refresh = () => {
+      const now = Date.now();
+      // Debounce focus + visibilitychange (both fire on tab return).
+      if (now - lastPull < 2500) return;
+      lastPull = now;
+      void refreshFormsRemote()
+        .then(() => {
+          if (cancelled) return;
+          setForms(listForms());
+          setTrashed(listTrashedForms());
+        })
+        .catch((err) => {
+          console.warn('[slate] Forms refresh failed', err);
         });
-      });
-    }
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    // Boot hydrate already loaded forms — only refresh when the tab returns.
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
+
+  const handleDuplicate = (sourceId: string) => {
+    void (async () => {
+      if (isAtFormQuota()) {
+        await showQuotaDialog();
+        return;
+      }
+      const grid = gridRef.current;
+      const before = grid && shouldAnimateFormGrid() ? captureFormCardRects(grid) : null;
+      const created = duplicateForm(sourceId);
+      if (!created) {
+        if (isAtFormQuota()) await showQuotaDialog();
+        return;
+      }
+      if (grid && before) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            animateFormGridDuplicate(grid, sourceId, created.id, before);
+          });
+        });
+      }
+    })();
+  };
+
+  const [creating, setCreating] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const quota = getFormQuota();
+
+  const showQuotaDialog = async () => {
+    const current = getFormQuota();
+    const trashCount = listTrashedForms().length;
+    const openTrash = trashCount > 0;
+    const ok = await confirm({
+      title: 'Form limit reached',
+      message: formQuotaUserMessage(
+        current ?? { used: FORM_QUOTA_MAX, max: FORM_QUOTA_MAX },
+        trashCount,
+      ),
+      confirmLabel: openTrash ? 'Open Trash' : 'OK',
+      cancelLabel: openTrash ? 'OK' : 'Close',
+    });
+    if (ok && openTrash) setView('trash');
   };
 
   const onNew = () => {
-    const created = createForm({
-      name: 'Untitled form',
-      schema: defineSchema({
-        // Brand starts matching the form name so the sync logic in
-        // FormEditor can detect "user hasn't customized brand" and follow
-        // along when they rename the form. See FormEditorBody.handleNameChange.
-        brand: { name: 'Untitled form' },
-        theme: 'swiss',
-        themeMode: 'toggle',
-        questions: [
-          { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
-          { id: 'q1', type: 'short_text', title: 'First question?', required: true },
-          { id: 'done', type: 'thanks', title: "You're all set.", cta: 'Submit another' },
-        ],
-      }),
-    });
-    if (created) navigate(`/forms/${created.id}/edit`);
+    if (creating) return;
+    if (isAtFormQuota()) {
+      void showQuotaDialog();
+      return;
+    }
+    setCreating(true);
+    void (async () => {
+      try {
+        const created = await createFormAsync({
+          name: 'Untitled form',
+          schema: defineSchema({
+            // Brand starts matching the form name so the sync logic in
+            // FormEditor can detect "user hasn't customized brand" and follow
+            // along when they rename the form. See FormEditorBody.handleNameChange.
+            brand: { name: 'Untitled form' },
+            theme: 'swiss',
+            themeMode: 'toggle',
+            questions: [
+              { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
+              { id: 'q1', type: 'short_text', title: 'First question?', required: true },
+              { id: 'done', type: 'thanks', title: "You're all set.", cta: 'Submit another' },
+            ],
+          }),
+        });
+        if (created) {
+          navigate(`/forms/${created.id}/edit`);
+          return;
+        }
+        await confirm({
+          title: 'Could not create form',
+          message: 'The cloud did not save the new form. Check your connection and try again.',
+          confirmLabel: 'OK',
+          danger: false,
+        });
+      } catch (err) {
+        if (isFormQuotaError(err)) {
+          await showQuotaDialog();
+          return;
+        }
+        await confirm({
+          title: 'Could not create form',
+          message: 'The cloud did not save the new form. Check your connection and try again.',
+          confirmLabel: 'OK',
+          danger: false,
+        });
+      } finally {
+        setCreating(false);
+      }
+    })();
+  };
+
+  const openAi = () => {
+    if (isAtFormQuota()) {
+      void showQuotaDialog();
+      return;
+    }
+    setAiOpen(true);
+  };
+
+  const onAiReady = async (draft: GeneratedDraft) => {
+    if (isAtFormQuota()) {
+      setAiOpen(false);
+      await showQuotaDialog();
+      throw new Error('Form limit reached.');
+    }
+    try {
+      const created = await createFormAsync({
+        name: draft.name,
+        schema: defineSchema(draft.schema),
+      });
+      if (created) {
+        markAiDraft(created.id);
+        setAiOpen(false);
+        navigate(`/forms/${created.id}/edit`);
+        return;
+      }
+      throw new Error('The cloud did not save the generated draft. Check your connection and try again.');
+    } catch (err) {
+      if (isFormQuotaError(err)) {
+        setAiOpen(false);
+        await showQuotaDialog();
+        throw err;
+      }
+      throw err instanceof Error ? err : new Error('Could not save the draft.');
+    }
   };
 
   return (
     <AdminShell
       crumbs={<span className="slate-crumb">Forms</span>}
       rightSlot={
-        <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
-          <span className="slate-btn-plus">+</span> New form
-        </button>
+        <div className="slate-header-actions">
+          <button
+            type="button"
+            className="slate-btn"
+            onClick={openAi}
+            disabled={creating}
+            title={quota && quota.used >= quota.max ? `Limit of ${quota.max} forms reached` : undefined}
+          >
+            <SparkleIcon /> Build with AI
+          </button>
+          <button
+            type="button"
+            className="slate-btn slate-btn--new"
+            onClick={onNew}
+            disabled={creating}
+            title={quota && quota.used >= quota.max ? `Limit of ${quota.max} forms reached` : undefined}
+          >
+            <span className="slate-btn-plus">+</span> {creating ? 'Creating…' : 'New form'}
+          </button>
+        </div>
       }
     >
+      <BuildWithAiModal open={aiOpen} onClose={() => setAiOpen(false)} onReady={onAiReady} />
       {storageIssue && (
         <div
           role="alert"
@@ -173,7 +332,7 @@ export function Dashboard() {
         >
           <p style={{ margin: '0 0 8px', fontWeight: 600 }}>How Slate works on this site</p>
           <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--slate-muted)', lineHeight: 1.5 }}>
-            {isSupabaseConfigured()
+            {isNeonConfigured()
               ? 'Forms and responses sync to Slate cloud. Publish a form, then Share → public fill link for clients.'
               : 'Forms and responses save in this browser only — use the same browser and URL (slateforms.vercel.app). To send a form to someone, use Share → Shareable Link. Back up from Settings if you need a safety copy.'}
           </p>
@@ -198,10 +357,14 @@ export function Dashboard() {
               ? 'No deleted forms.'
               : `${trashed.length} deleted ${trashed.length === 1 ? 'form' : 'forms'}`
             : forms.length === 0 && trashed.length === 0
-              ? 'No forms yet.'
+              ? quota
+                ? `No forms yet · ${quota.max} form limit`
+                : 'No forms yet.'
               : forms.length === 0
-                ? `No active forms · ${trashed.length} in trash`
-                : `${forms.length} ${forms.length === 1 ? 'form' : 'forms'}${trashed.length > 0 ? ` · ${trashed.length} in trash` : ''}`}
+                ? `No active forms · ${trashed.length} in trash${quota ? ` · ${quota.used} of ${quota.max}` : ''}`
+                : `${forms.length} ${forms.length === 1 ? 'form' : 'forms'}${
+                    quota ? ` · ${quota.used} of ${quota.max}` : ''
+                  }${trashed.length > 0 ? ` · ${trashed.length} in trash` : ''}`}
         </p>
         {(forms.length > 0 || trashed.length > 0) && (
           <div style={{ display: 'flex', gap: 4, marginTop: 12, flexWrap: 'wrap' }}>
@@ -303,9 +466,14 @@ export function Dashboard() {
           <p style={{ margin: '0 0 12px', fontSize: 15 }}>
             {trashed.length > 0 ? 'No active forms. Check Trash to restore.' : 'No forms yet.'}
           </p>
-          <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
-            <span className="slate-btn-plus">+</span> Create your first form
-          </button>
+          <div className="slate-header-actions">
+            <button type="button" className="slate-btn" onClick={openAi}>
+              <SparkleIcon /> Build with AI
+            </button>
+            <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
+              <span className="slate-btn-plus">+</span> Create your first form
+            </button>
+          </div>
         </div>
       ) : (
         <div ref={gridRef} className="slate-form-grid">

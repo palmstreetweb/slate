@@ -1,35 +1,36 @@
-# Slate production deploy checklist (ADR-028)
+# Slate production deploy checklist (ADR-029)
 
-## Supabase
+## Neon (free project)
 
-- [ ] Create **staging** and **production** projects
-- [ ] Run migrations: `supabase db push` or apply `supabase/migrations/*.sql` in order
-- [ ] Deploy Edge Function: `supabase functions deploy submit-response`
-- [ ] Set function secrets:
-  - `SUPABASE_SERVICE_ROLE_KEY`
-  - `RESEND_API_KEY` (optional — new submission emails)
-  - `PSW_NOTIFY_EMAIL` (optional — defaults to hello@palmstreetweb.com)
-  - `PUBLIC_FORM_BASE` (optional — link in notification emails)
-- [ ] Enable Auth: magic link and/or **Google OAuth** (see below)
-- [ ] RLS audit: anonymous users cannot `select` from `forms` / `submissions` directly
+Follow [`neon/SETUP.md`](./neon/SETUP.md) in full:
 
-### Google OAuth (recommended for PSW team)
-
-1. **Google Cloud Console** → APIs & Services → Credentials → Create **OAuth client ID** (Web application)
-   - Authorized JavaScript origins: `http://localhost:5173`, `https://slateforms.vercel.app`
-   - Authorized redirect URIs: `https://<project-ref>.supabase.co/auth/v1/callback` (from Supabase → Auth → Google)
-2. **Supabase Dashboard** → Authentication → Providers → **Google** — enable, paste Client ID + Client Secret
-3. **Authentication → URL Configuration** (critical — wrong values cause `{"error":"requested path is invalid"}` after Google sign-in)
-   - **Site URL:** `https://slateforms.vercel.app` — must be your app, **not** `https://<project-ref>.supabase.co`
-   - **Redirect URLs:** add `https://slateforms.vercel.app/**` and `http://localhost:5173/**`
-4. Same allowlist rules apply: `@palmstreetweb.com` or a row in `team_allowlist` (migration `003_team_allowlist.sql`)
+- [ ] Enable **Data API** + **Managed Better Auth**
+- [ ] Configure **Google OAuth** (redirect `{NEON_AUTH_BASE_URL}/callback/google`)
+- [ ] Create Object Storage bucket **`form-uploads`** (private)
+- [ ] Apply `neon/migrations/001_initial.sql` … `010_form_quota.sql`
+- [ ] Refresh Data API schema cache
+- [ ] Deploy Functions: `submitresponse`, `storagesign`, `authemail` (ADR-030/031/037)
+- [ ] Function env: `RESEND_API_KEY`, `PSW_NOTIFY_EMAIL`, `PUBLIC_FORM_BASE`, `STORAGE_SIGN_*` / `SUBMIT_RATE_*`, `authemail`: `NEON_AUTH_URL`
+- [ ] Auth webhooks: `send.otp` + `send.magic_link` → `https://slateforms.vercel.app/api/auth-email` (proxies to `authemail`)
+- [ ] Confirm Neon Auth / Google OAuth allows any account (not org-restricted)
 
 ## Vercel (slateforms.vercel.app)
 
-- [ ] `VITE_SUPABASE_URL` — project URL
-- [ ] `VITE_SUPABASE_ANON_KEY` — anon key (RLS protects data)
+- [ ] `VITE_NEON_URL` — HTTPS Neon database URL
+- [ ] `VITE_SUBMIT_URL` — submitresponse Function URL
+- [ ] `VITE_STORAGE_SIGN_URL` — storagesign Function URL
 - [ ] `VITE_PUBLIC_FORM_BASE` — optional custom domain for share links
-- [ ] Preview and production use the same Supabase project (or separate staging keys on preview)
+- [ ] `AUTH_EMAIL_FUNCTION_URL` — authemail Function URL (webhook proxy)
+- [ ] Remove legacy `VITE_SUPABASE_*` env vars
+- [ ] `ANTHROPIC_API_KEY` — server-only, Build with AI (`/api/generate`). Never `VITE_`.
+
+## Local `/api`
+
+`npm run dev` proxies `POST /api/generate` through Vite (loads `ANTHROPIC_API_KEY` from `.env.local`).
+
+Alternatively run `vercel dev` so Vercel serves `/api` the same way production does.
+
+Golden prompts: `npm run qa:ai` (needs the key).
 
 ## Smoke test
 
@@ -38,6 +39,6 @@
 3. Open link in incognito → complete form → submission appears in Responses
 4. Optional: attach a file on a `file_upload` question → download from Responses
 
-## Local dev without Supabase
+## Local dev without Neon
 
-Leave `VITE_SUPABASE_*` unset — admin uses localStorage (same as before).
+Set `VITE_ADMIN_OFFLINE=1` (or leave `VITE_NEON_URL` unset) — admin uses localStorage.

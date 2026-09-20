@@ -138,17 +138,19 @@ export function Outline({
     const popover = popoverRef.current;
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
-    const width = Math.max(rect.width, 280);
-    const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+    const edge = 8;
     const gap = 6;
-    const maxPopover = Math.min(window.innerHeight * 0.7, 420);
-    const spaceBelow = window.innerHeight - rect.bottom - gap - 8;
-    const spaceAbove = rect.top - gap - 8;
+    const width = Math.max(rect.width, 280);
+    const left = Math.min(Math.max(edge, rect.left), window.innerWidth - width - edge);
+    // Use the real free space under/above the + Add control — no artificial 420px cap
+    // that forced scrolling while empty sidebar sat unused.
+    const spaceBelow = window.innerHeight - rect.bottom - gap - edge;
+    const spaceAbove = rect.top - gap - edge;
     const naturalHeight = popover?.scrollHeight ?? 320;
-    const openUp = spaceBelow < Math.min(naturalHeight, 240) && spaceAbove > spaceBelow;
-    const maxHeight = Math.min(maxPopover, openUp ? spaceAbove : spaceBelow);
+    const openUp = spaceBelow < Math.min(naturalHeight, 280) && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(160, openUp ? spaceAbove : spaceBelow);
     const height = Math.min(naturalHeight, maxHeight);
-    const top = openUp ? Math.max(8, rect.top - gap - height) : rect.bottom + gap;
+    const top = openUp ? Math.max(edge, rect.top - gap - height) : rect.bottom + gap;
     setAddPlacement(openUp ? 'above' : 'below');
     setPopoverStyle({
       position: 'fixed',
@@ -535,7 +537,7 @@ export function Outline({
                 <SlateSelect
                   value={resolveFormSound(schema.sound)}
                   options={FORM_SOUND_OPTIONS}
-                  aria-label="Step sound"
+                  aria-label="Step sound (includes typewriter ticks while typing)"
                   onChange={onSoundChange}
                 />
               </label>

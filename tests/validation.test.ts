@@ -299,6 +299,37 @@ describe('validation — file_upload', () => {
     expect(validate(required, new File(['x'], 'x.txt'))).toBeNull();
     expect(validate(required, 'https://cdn.example.com/x.txt')).toBeNull();
   });
+
+  it('multiple mode requires at least one when required and caps maxFiles', () => {
+    const multi: FileUploadQuestion = {
+      ...q,
+      multiple: true,
+      required: true,
+      maxFiles: 2,
+    };
+    expect(validate(multi, [])?.code).toBe('required');
+    expect(validate(multi, [new File(['a'], 'a.txt')])).toBeNull();
+    expect(validate(multi, new File(['a'], 'a.txt'))).toBeNull();
+    expect(
+      validate(multi, [
+        new File(['a'], 'a.txt'),
+        new File(['b'], 'b.txt'),
+        new File(['c'], 'c.txt'),
+      ])?.code,
+    ).toBe('max_selections');
+  });
+
+  it('defaults to multiple when multiple is unset', () => {
+    const required = { ...q, required: true };
+    expect(validate(required, [])?.code).toBe('required');
+    expect(validate(required, [new File(['a'], 'a.txt')])).toBeNull();
+  });
+
+  it('single mode when multiple is false', () => {
+    const single: FileUploadQuestion = { ...q, multiple: false, required: true };
+    expect(validate(single, undefined)?.code).toBe('required');
+    expect(validate(single, new File(['a'], 'a.txt'))).toBeNull();
+  });
 });
 
 describe('validation — picture_choice', () => {

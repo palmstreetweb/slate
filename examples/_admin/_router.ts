@@ -21,6 +21,7 @@ export type Route =
   | { name: 'submissions'; formId: string }
   | { name: 'respond'; token: string }
   | { name: 'fill'; slug: string }
+  | { name: 'dropLab' }
   | { name: 'notfound'; path: string };
 
 /** Map a bare pathname (e.g. `/settings`) to `#/settings` on first load. */
@@ -56,6 +57,7 @@ export function hashSearchParams(): URLSearchParams {
 function matchRoute(path: string): Route {
   if (path === '/') return { name: 'dashboard' };
   if (path === '/settings') return { name: 'settings' };
+  if (path === '/lab/drop') return { name: 'dropLab' };
   if (path === '/forms/new') return { name: 'editor', formId: null };
 
   if (path === '/r') {
@@ -104,6 +106,8 @@ export function routeKey(route: Route): string {
       return '/r';
     case 'fill':
       return `/f/${route.slug}`;
+    case 'dropLab':
+      return '/lab/drop';
     case 'notfound':
       return route.path;
   }

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Slate login email preview</title>
+  <style>
+    :root { --bg:#0E1014; --panel:#1E232B; --ink:#F2EFE8; --muted:#8A93A1; --line:#2D333D; --red:#E23B2D; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; }
+    .chrome { max-width:640px; margin:0 auto; padding:28px 16px 64px; }
+    .kicker { font:700 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+    h1 { font:600 22px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; letter-spacing:-0.03em; margin:0 0 8px; }
+    .note { color:var(--muted); margin:0 0 22px; font-size:13px; }
+    .inbox { background:var(--panel); border:1px solid var(--line); border-radius:16px; overflow:hidden; margin-bottom:18px; }
+    .row { display:grid; grid-template-columns:72px 1fr; gap:10px; padding:12px 16px; border-bottom:1px solid var(--line); font-size:13px; }
+    .row span { color:var(--muted); }
+    .mail { background:#15181D; }
+    a.back { color:var(--red); font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="chrome">
+    <p class="kicker">Email preview</p>
+    <h1>What people get when they sign in</h1>
+    <p class="note">This is the real HTML (logo loaded from this folder). Production still uses the attached lockup PNG.</p>
+    <div class="inbox">
+      <div class="row"><span>From</span><div>Slate &lt;notifications@palmstreetweb.com&gt;</div></div>
+      <div class="row"><span>Subject</span><div>Sign in to Slate</div></div>
+      <div class="mail"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#15181D;">Your sign-in code is 482195. Expires in about 10 minutes.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#15181D" style="background:#15181D;">
+    <tr>
+      <td align="center" style="padding:40px 16px 48px;">
+        <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="width:520px;max-width:100%;">
+          <tr>
+            <td align="center" style="padding:0 0 28px;">
+              <img src="slate-lockup.png" width="200" height="62" alt="Slate" style="display:block;border:0;outline:none;text-decoration:none;height:62px;width:200px;margin:0 auto;"/>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#1E232B;border:1px solid #2D333D;border-radius:20px;overflow:hidden;">
+                <tr>
+                  <td height="4" bgcolor="#E23B2D" style="background:#E23B2D;font-size:0;line-height:4px;height:4px;">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td style="padding:36px 36px 40px;">
+                    <p style="margin:0 0 12px;font:700 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#8A93A1;">Sign in</p>
+                    <h1 style="margin:0 0 12px;font:600 28px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#F2EFE8;letter-spacing:-0.03em;">Your login is ready.</h1>
+                    <p style="margin:0 0 32px;font:400 15px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#8A93A1;">Use the button, or type the code on the login screen. This expires in about 10 minutes.</p>
+                    <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 8px;">
+        <tr>
+          <td align="center" bgcolor="#E23B2D" style="background:#E23B2D;border-radius:999px;">
+            <a href="https://slateforms.vercel.app/#/?token=preview" style="display:inline-block;background:#E23B2D;color:#F2EFE8;font:600 15px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;text-decoration:none;padding:16px 36px;border-radius:999px;letter-spacing:.02em;">Sign in to Slate</a>
+          </td>
+        </tr>
+      </table>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0 0;">
+    <tr>
+      <td align="center">
+        <p style="margin:0 0 14px;font:700 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#8A93A1;">Or enter this code</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto;">
+        <tr>
+          <td width="44" height="54" align="center" valign="middle" bgcolor="#23282F" style="width:44px;height:54px;background:#23282F;border:1px solid #2D333D;border-radius:10px;font:600 22px/54px -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#F2EFE8;letter-spacing:0;">4</td><td width="8" style="width:8px;font-size:0;">&nbsp;</td><td width="44" height="54" align="center" valign="middle" bgcolor="#23282F" style="width:44px;height:54px;background:#23282F;border:1px solid #2D333D;border-radius:10px;font:600 22px/54px -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#F2EFE8;letter-spacing:0;">8</td><td width="8" style="width:8px;font-size:0;">&nbsp;</td><td width="44" height="54" align="center" valign="middle" bgcolor="#23282F" style="width:44px;height:54px;background:#23282F;border:1px solid #2D333D;border-radius:10px;font:600 22px/54px -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#F2EFE8;letter-spacing:0;">2</td><td width="8" style="width:8px;font-size:0;">&nbsp;</td><td width="44" height="54" align="center" valign="middle" bgcolor="#23282F" style="width:44px;height:54px;background:#23282F;border:1px solid #2D333D;border-radius:10px;font:600 22px/54px -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#F2EFE8;letter-spacing:0;">1</td><td width="8" style="width:8px;font-size:0;">&nbsp;</td><td width="44" height="54" align="center" valign="middle" bgcolor="#23282F" style="width:44px;height:54px;background:#23282F;border:1px solid #2D333D;border-radius:10px;font:600 22px/54px -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#F2EFE8;letter-spacing:0;">9</td><td width="8" style="width:8px;font-size:0;">&nbsp;</td><td width="44" height="54" align="center" valign="middle" bgcolor="#23282F" style="width:44px;height:54px;background:#23282F;border:1px solid #2D333D;border-radius:10px;font:600 22px/54px -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#F2EFE8;letter-spacing:0;">5</td>
+        </tr>
+      </table>
+        <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:18px auto 0;">
+        <tr>
+          <td align="center" bgcolor="#23282F" style="background:#23282F;border:1px solid #2D333D;border-radius:999px;">
+            <a id="slate-copy-code" href="https://slateforms.vercel.app/#/?otp=482195" data-code="482195" data-idle="Copy code" data-done="Copied" style="display:inline-block;background:#23282F;color:#F2EFE8;font:600 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;text-decoration:none;padding:12px 20px;border-radius:999px;letter-spacing:.01em;">Copy code</a>
+          </td>
+        </tr>
+      </table>
+      </td>
+    </tr>
+  </table>
+                    <p style="margin:28px 0 0;font:400 12px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#8A93A1;word-break:break-all;">If the button does not work, paste this link into your browser:<br/><a href="https://slateforms.vercel.app/#/?token=preview" style="color:#F2EFE8;text-decoration:underline;">slateforms.vercel.app/#/?token=preview</a></p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 12px 0;font:400 12px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#6B7280;">
+              If you did not ask to sign in, you can ignore this email.<br/>
+              <span style="color:#8A93A1;">Palm Street Web · Slate</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  <script>
+(function(){
+  var btn = document.getElementById('slate-copy-code');
+  if (!btn) return;
+  var idle = btn.getAttribute('data-idle') || 'Copy code';
+  var done = btn.getAttribute('data-done') || 'Copied';
+  btn.addEventListener('click', function(e){
+    var code = btn.getAttribute('data-code') || '';
+    if (!code) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      e.preventDefault();
+    } else {
+      return;
+    }
+    var mark = function(){
+      btn.textContent = done;
+      window.setTimeout(function(){ btn.textContent = idle; }, 1600);
+    };
+    var fallback = function(){
+      try {
+        var t = document.createElement('textarea');
+        t.value = code;
+        t.setAttribute('readonly','');
+        t.style.cssText = 'position:fixed;left:-9999px;top:0;';
+        document.body.appendChild(t);
+        t.select();
+        document.execCommand('copy');
+        document.body.removeChild(t);
+        mark();
+      } catch (err) {}
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(mark).catch(fallback);
+    } else {
+      fallback();
+    }
+  });
+})();
+</script></div>
+    </div>
+    <p class="note">Edit <code>neon/functions/auth-email/emailHtml.ts</code>, then run <code>npx vite-node scripts/preview-auth-email.ts</code>.</p>
+    <a class="back" href="index.html">Brand page</a>
+  </div>
+</body>
+</html>

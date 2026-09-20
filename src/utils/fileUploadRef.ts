@@ -31,6 +31,24 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export function filenameHintFromFileRef(ref: string): string | null {
+  if (!isFileUploadRef(ref)) return null;
+  const id = parseFileUploadRef(ref);
+  if (!id) return null;
+  // Neon storage refs: storage:public|draft/{formId}/{uuid}/{filename}
+  if (id.startsWith('storage:')) {
+    const seg = id.split('/').filter(Boolean).pop();
+    if (seg) {
+      try {
+        return decodeURIComponent(seg);
+      } catch {
+        return seg;
+      }
+    }
+  }
+  return null;
+}
+
 /** Human label for a stored upload answer (ref, URL, or raw File). */
 export function describeFileUploadAnswer(
   value: File | string | undefined,
@@ -42,7 +60,10 @@ export function describeFileUploadAnswer(
   }
   if (typeof value === 'string') {
     if (meta) return `${meta.name} (${formatBytes(meta.size)})`;
-    if (isFileUploadRef(value)) return 'Uploaded file';
+    if (isFileUploadRef(value)) {
+      const hint = filenameHintFromFileRef(value);
+      return hint ?? 'Uploaded file';
+    }
     try {
       const url = new URL(value);
       const seg = url.pathname.split('/').filter(Boolean).pop();
@@ -52,4 +73,28 @@ export function describeFileUploadAnswer(
     }
   }
   return String(value);
+}
+
+/** Labels for one or many upload answers (ADR-032). */
+export function describeFileUploadAnswers(
+  value: File | string | Array<File | string> | undefined,
+  metaByRef?: (ref: string) => FileUploadMeta | null | undefined,
+): string | null {
+  if (value === undefined) return null;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return null;
+    return value
+      .map((item) =>
+        describeFileUploadAnswer(
+          item,
+          typeof item === 'string' ? metaByRef?.(item) ?? null : null,
+        ),
+      )
+      .filter(Boolean)
+      .join(', ');
+  }
+  return describeFileUploadAnswer(
+    value,
+    typeof value === 'string' ? metaByRef?.(value) ?? null : null,
+  );
 }

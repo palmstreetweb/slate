@@ -174,6 +174,10 @@ export type FileUploadQuestion<TId extends string = string> = IdField<TId> &
     accept?: string;
     /** Client-side max size in megabytes, checked at selection time. */
     maxSizeMb?: number;
+    /** When true (default), answer is `(File | string)[]` and the field allows adding more (ADR-032). Set `false` for single-file. */
+    multiple?: boolean;
+    /** Cap on attachments when `multiple` (default 10). */
+    maxFiles?: number;
   };
 
 /* ---------- date ---------- */

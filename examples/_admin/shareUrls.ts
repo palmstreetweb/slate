@@ -73,3 +73,21 @@ export async function copyText(text: string): Promise<boolean> {
     return false;
   }
 }
+
+/** Copy a PNG (data URL or blob URL) to the clipboard as an image. */
+export async function copyImage(src: string): Promise<boolean> {
+  if (
+    typeof navigator === 'undefined' ||
+    !navigator.clipboard?.write ||
+    typeof ClipboardItem === 'undefined'
+  ) {
+    return false;
+  }
+  try {
+    const blob = await (await fetch(src)).blob();
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+    return true;
+  } catch {
+    return false;
+  }
+}

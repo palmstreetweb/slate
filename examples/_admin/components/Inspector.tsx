@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import type { Condition, Option, PictureOption, Question } from '@/index.js';
 import { TYPE_GLYPH, TYPE_LABEL } from '../questionTypeMeta.js';
 import { ConditionBuilder, JumpRulesEditor } from './LogicEditor.js';
+import { SlateNumberInput } from './SlateNumberInput.js';
 import { SlateSelect } from './SlateSelect.js';
 
 type Props = {
@@ -253,15 +254,9 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {(question.type === 'short_text' || question.type === 'long_text') && (
           <Field label="Max Length (Characters)">
-            <input
-              className="slate-input"
-              type="number"
-              value={question.maxLength ?? ''}
-              onChange={(e) =>
-                onChange({
-                  maxLength: e.target.value ? Number(e.target.value) : undefined,
-                } as Partial<Question>)
-              }
+            <SlateNumberInput
+              value={question.maxLength}
+              onChange={(n) => onChange({ maxLength: n } as Partial<Question>)}
             />
           </Field>
         )}
@@ -282,27 +277,15 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         {question.type === 'number' && (
           <Row>
             <Field label="Min">
-              <input
-                className="slate-input"
-                type="number"
-                value={question.min ?? ''}
-                onChange={(e) =>
-                  onChange({
-                    min: e.target.value ? Number(e.target.value) : undefined,
-                  } as Partial<Question>)
-                }
+              <SlateNumberInput
+                value={question.min}
+                onChange={(n) => onChange({ min: n } as Partial<Question>)}
               />
             </Field>
             <Field label="Max">
-              <input
-                className="slate-input"
-                type="number"
-                value={question.max ?? ''}
-                onChange={(e) =>
-                  onChange({
-                    max: e.target.value ? Number(e.target.value) : undefined,
-                  } as Partial<Question>)
-                }
+              <SlateNumberInput
+                value={question.max}
+                onChange={(n) => onChange({ max: n } as Partial<Question>)}
               />
             </Field>
           </Row>
@@ -312,28 +295,22 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
           <>
             <Row>
               <Field label="Min Value">
-                <input
-                  className="slate-input"
-                  type="number"
+                <SlateNumberInput
                   value={question.min}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    if (raw === '') return;
-                    const n = Number(raw);
-                    if (!Number.isNaN(n)) onChange({ min: n } as Partial<Question>);
+                  allowEmpty={false}
+                  onChange={(n) => {
+                    if (n === undefined) return;
+                    onChange({ min: n } as Partial<Question>);
                   }}
                 />
               </Field>
               <Field label="Max Value">
-                <input
-                  className="slate-input"
-                  type="number"
+                <SlateNumberInput
                   value={question.max}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    if (raw === '') return;
-                    const n = Number(raw);
-                    if (!Number.isNaN(n)) onChange({ max: n } as Partial<Question>);
+                  allowEmpty={false}
+                  onChange={(n) => {
+                    if (n === undefined) return;
+                    onChange({ max: n } as Partial<Question>);
                   }}
                 />
               </Field>
@@ -362,32 +339,47 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         )}
 
         {question.type === 'file_upload' && (
-          <Row>
-            <Field
-              label="Accept (optional filter)"
-              hint="Leave blank to accept any file type. Only set this if you want to limit the picker (e.g. image/*,.pdf)."
-            >
-              <input
-                className="slate-input"
-                value={question.accept ?? ''}
-                onChange={(e) =>
-                  onChange({ accept: e.target.value || undefined } as Partial<Question>)
-                }
-              />
-            </Field>
-            <Field label="Max Size (MB)">
-              <input
-                className="slate-input"
-                type="number"
-                value={question.maxSizeMb ?? ''}
-                onChange={(e) =>
-                  onChange({
-                    maxSizeMb: e.target.value ? Number(e.target.value) : undefined,
-                  } as Partial<Question>)
-                }
-              />
-            </Field>
-          </Row>
+          <>
+            <Checkbox
+              checked={question.multiple !== false}
+              onChange={(v) =>
+                onChange({
+                  multiple: v,
+                  maxFiles: v ? (question.maxFiles ?? 10) : undefined,
+                } as Partial<Question>)
+              }
+              label="Allow Multiple Files"
+            />
+            <Row>
+              <Field
+                label="Accept"
+                hint="Leave blank for any type. Optional filter, e.g. image/*,.pdf"
+              >
+                <input
+                  className="slate-input"
+                  value={question.accept ?? ''}
+                  onChange={(e) =>
+                    onChange({ accept: e.target.value || undefined } as Partial<Question>)
+                  }
+                />
+              </Field>
+              <Field label="Max Size (MB)">
+                <SlateNumberInput
+                  value={question.maxSizeMb}
+                  onChange={(n) => onChange({ maxSizeMb: n } as Partial<Question>)}
+                />
+              </Field>
+            </Row>
+            {question.multiple !== false && (
+              <Field label="Max Files">
+                <SlateNumberInput
+                  min={1}
+                  value={question.maxFiles ?? 10}
+                  onChange={(n) => onChange({ maxFiles: n } as Partial<Question>)}
+                />
+              </Field>
+            )}
+          </>
         )}
 
         {(question.type === 'single_choice' ||
@@ -419,27 +411,15 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
             {question.multiple && (
               <Row>
                 <Field label="Min Selections">
-                  <input
-                    className="slate-input"
-                    type="number"
-                    value={question.min ?? ''}
-                    onChange={(e) =>
-                      onChange({
-                        min: e.target.value ? Number(e.target.value) : undefined,
-                      } as Partial<Question>)
-                    }
+                  <SlateNumberInput
+                    value={question.min}
+                    onChange={(n) => onChange({ min: n } as Partial<Question>)}
                   />
                 </Field>
                 <Field label="Max Selections">
-                  <input
-                    className="slate-input"
-                    type="number"
-                    value={question.max ?? ''}
-                    onChange={(e) =>
-                      onChange({
-                        max: e.target.value ? Number(e.target.value) : undefined,
-                      } as Partial<Question>)
-                    }
+                  <SlateNumberInput
+                    value={question.max}
+                    onChange={(n) => onChange({ max: n } as Partial<Question>)}
                   />
                 </Field>
               </Row>
@@ -472,27 +452,15 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         {question.type === 'multi_choice' && (
           <Row>
             <Field label="Min Selections">
-              <input
-                className="slate-input"
-                type="number"
-                value={question.min ?? ''}
-                onChange={(e) =>
-                  onChange({
-                    min: e.target.value ? Number(e.target.value) : undefined,
-                  } as Partial<Question>)
-                }
+              <SlateNumberInput
+                value={question.min}
+                onChange={(n) => onChange({ min: n } as Partial<Question>)}
               />
             </Field>
             <Field label="Max Selections">
-              <input
-                className="slate-input"
-                type="number"
-                value={question.max ?? ''}
-                onChange={(e) =>
-                  onChange({
-                    max: e.target.value ? Number(e.target.value) : undefined,
-                  } as Partial<Question>)
-                }
+              <SlateNumberInput
+                value={question.max}
+                onChange={(n) => onChange({ max: n } as Partial<Question>)}
               />
             </Field>
           </Row>
@@ -629,7 +597,9 @@ function CollapsibleSection({
 }
 
 function Row({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{children}</div>;
+  // Subgrid: label / control / hint share row tracks so inputs stay level
+  // even when one label wraps or only one side has a hint.
+  return <div className="slate-inspector-row">{children}</div>;
 }
 
 function Field({
@@ -642,10 +612,14 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label style={{ display: 'block' }}>
+    <label className="slate-inspector-field">
       <span className="slate-label">{label}</span>
-      {children}
-      {hint && <p className="slate-help">{hint}</p>}
+      <span className="slate-inspector-field-control">{children}</span>
+      {hint ? (
+        <p className="slate-help">{hint}</p>
+      ) : (
+        <span className="slate-help slate-help--empty" aria-hidden />
+      )}
     </label>
   );
 }
@@ -717,7 +691,7 @@ function OptionsEditor({
           key={i}
           style={{
             display: 'grid',
-            gridTemplateColumns: scoring ? '1fr 56px auto' : '1fr auto',
+            gridTemplateColumns: scoring ? '1fr 96px auto' : '1fr auto',
             gap: 4,
             alignItems: 'center',
           }}
@@ -730,16 +704,12 @@ function OptionsEditor({
             style={{ padding: '6px 8px', fontSize: 13 }}
           />
           {scoring && (
-            <input
-              className="slate-input"
-              type="number"
-              value={opt.score ?? ''}
+            <SlateNumberInput
+              compact
+              value={opt.score}
               placeholder="pts"
               aria-label="Score points"
-              style={{ padding: '6px 6px', fontSize: 12 }}
-              onChange={(e) =>
-                update(i, { score: e.target.value === '' ? undefined : Number(e.target.value) })
-              }
+              onChange={(n) => update(i, { score: n })}
             />
           )}
           <div style={{ display: 'flex', gap: 0 }}>
@@ -846,7 +816,7 @@ function PictureOptionsEditor({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: scoring ? '1fr 56px auto' : '1fr auto',
+              gridTemplateColumns: scoring ? '1fr 96px auto' : '1fr auto',
               gap: 4,
             }}
           >
@@ -858,16 +828,12 @@ function PictureOptionsEditor({
               style={{ padding: '6px 8px', fontSize: 13 }}
             />
             {scoring && (
-              <input
-                className="slate-input"
-                type="number"
-                value={opt.score ?? ''}
+              <SlateNumberInput
+                compact
+                value={opt.score}
                 placeholder="pts"
                 aria-label="Score points"
-                style={{ padding: '6px 6px', fontSize: 12 }}
-                onChange={(e) =>
-                  update(i, { score: e.target.value === '' ? undefined : Number(e.target.value) })
-                }
+                onChange={(n) => update(i, { score: n })}
               />
             )}
             <button

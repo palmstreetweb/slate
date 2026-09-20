@@ -15,7 +15,7 @@
  * a stale schema.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   FormSound,
   Question,
@@ -26,11 +26,24 @@ import type {
 } from '@/index.js';
 import { checkSchema, defineSchema } from '@/index.js';
 import { playFormSound } from '@/utils/formSounds.js';
-import { createForm, getForm, subscribe, updateForm, type FormRecord } from '../_formsStore.js';
+import {
+  createFormAsync,
+  getForm,
+  permanentlyDeleteForm,
+  subscribe,
+  updateForm,
+} from '../_formsStore.js';
+import { clearAiDraft, isAiDraft } from '../ai/client.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
 import { isDefaultFormName } from '../formName.js';
 import { usePromptFormTitle } from '../promptFormTitle.js';
+import {
+  FORM_QUOTA_MAX,
+  formQuotaUserMessage,
+  isFormQuotaError,
+  quotaFromUnknown,
+} from '../formQuota.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import { Outline } from '../components/Outline.js';
 import { Canvas } from '../components/Canvas.js';
@@ -49,38 +62,80 @@ type Props = {
 
 export function FormEditor({ formId }: Props) {
   const creatingRef = useRef(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
-  // /forms/new → create + redirect.
+  // /forms/new → create + redirect (await cloud write so hydrate can't race).
   useEffect(() => {
     if (formId !== null) return;
     if (creatingRef.current) return;
     creatingRef.current = true;
-    const created = createForm({
-      name: 'Untitled form',
-      schema: defineSchema({
-        // Brand mirrors form name so the sync below picks up renames.
-        brand: { name: 'Untitled form' },
-        theme: 'swiss',
-        themeMode: 'toggle',
-        questions: [
-          { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
-          { id: 'q1', type: 'short_text', title: 'First question?', required: true },
-          {
-            id: 'done',
-            type: 'thanks',
-            title: "You're all set.",
-            cta: 'Submit another',
-          },
-        ],
-      }),
-    });
-    if (created) navigate(`/forms/${created.id}/edit`);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const created = await createFormAsync({
+          name: 'Untitled form',
+          schema: defineSchema({
+            brand: { name: 'Untitled form' },
+            theme: 'swiss',
+            themeMode: 'toggle',
+            questions: [
+              { id: 'welcome', type: 'welcome', title: 'Welcome.', cta: 'Start' },
+              { id: 'q1', type: 'short_text', title: 'First question?', required: true },
+              {
+                id: 'done',
+                type: 'thanks',
+                title: "You're all set.",
+                cta: 'Submit another',
+              },
+            ],
+          }),
+        });
+        if (cancelled) return;
+        if (created) {
+          navigate(`/forms/${created.id}/edit`);
+          return;
+        }
+        setCreateError('Could not create the form. Check your connection and try again.');
+      } catch (err) {
+        if (cancelled) return;
+        if (isFormQuotaError(err)) {
+          const q = quotaFromUnknown(err);
+          setCreateError(
+            formQuotaUserMessage({
+              used: q?.used ?? FORM_QUOTA_MAX,
+              max: q?.max ?? FORM_QUOTA_MAX,
+            }),
+          );
+        } else {
+          setCreateError('Could not create the form. Check your connection and try again.');
+        }
+      }
+      creatingRef.current = false;
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [formId]);
 
   if (formId === null) {
     return (
       <AdminShell crumbs={null} fullBleed>
-        <div className="slate-empty">Creating…</div>
+        <div className="slate-empty">
+          {createError ? (
+            <>
+              <p style={{ margin: '0 0 12px' }}>{createError}</p>
+              <button
+                type="button"
+                className="slate-btn slate-btn--primary"
+                onClick={() => navigate('/')}
+              >
+                Back to dashboard
+              </button>
+            </>
+          ) : (
+            'Creating…'
+          )}
+        </div>
       </AdminShell>
     );
   }
@@ -88,31 +143,46 @@ export function FormEditor({ formId }: Props) {
 }
 
 function FormEditorBody({ formId }: { formId: string }) {
-  const initial: FormRecord | null = useMemo(() => {
-    const form = getForm(formId);
-    if (!form) return null;
-    return { ...form, schema: sanitizeSchemaLogic(form.schema) };
-  }, [formId]);
-  const [formExists, setFormExists] = useState(() => getForm(formId) !== null);
-  const [name, setName] = useState<string>(initial?.name ?? 'Untitled form');
+  const seed = getForm(formId);
+  const [formExists, setFormExists] = useState(() => seed !== null);
+  const [name, setName] = useState<string>(seed?.name ?? 'Untitled form');
   const [slug, setSlug] = useState<string>(() => {
-    if (initial?.slug?.trim()) return slugify(initial.slug);
-    if (initial?.name) return slugify(initial.name);
+    if (seed?.slug?.trim()) return slugify(seed.slug);
+    if (seed?.name) return slugify(seed.name);
     return '';
   });
   const [shareOpen, setShareOpen] = useState(false);
-  const [schema, setSchema] = useState<Schema | null>(initial?.schema ?? null);
+  const [schema, setSchema] = useState<Schema | null>(() =>
+    seed ? sanitizeSchemaLogic(seed.schema) : null,
+  );
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string>(() => {
-    const first = initial?.schema.questions[0];
+    const first = seed?.schema.questions[0];
     return first?.id ?? '';
   });
   const confirm = useConfirm();
   const promptFormTitle = usePromptFormTitle();
+  const [aiDraft, setAiDraft] = useState(() => isAiDraft(formId));
+  /** Once the editor has a schema, don't re-seed from remote (would clobber edits). */
+  const seededRef = useRef(Boolean(seed));
 
   useEffect(() => {
-    const sync = () => setFormExists(getForm(formId) !== null);
+    const sync = () => {
+      const form = getForm(formId);
+      if (!form) {
+        setFormExists(false);
+        return;
+      }
+      setFormExists(true);
+      if (seededRef.current) return;
+      seededRef.current = true;
+      const sanitized = sanitizeSchemaLogic(form.schema);
+      setName(form.name);
+      setSlug(form.slug?.trim() ? slugify(form.slug) : slugify(form.name));
+      setSchema(sanitized);
+      setSelectedId(sanitized.questions[0]?.id ?? '');
+    };
     sync();
     return subscribe(sync);
   }, [formId]);
@@ -161,6 +231,26 @@ function FormEditorBody({ formId }: { formId: string }) {
     }
   }, [name, slug, schema, formId]);
 
+  useEffect(() => {
+    const onPersistError = (event: Event) => {
+      const detail = (event as CustomEvent<{ kind?: string; message?: string }>).detail;
+      if (detail?.kind !== 'form') return;
+      setSaveError(detail.message || 'Could not save to the cloud.');
+    };
+    const onPersistOk = (event: Event) => {
+      const detail = (event as CustomEvent<{ kind?: string }>).detail;
+      if (detail?.kind !== 'form') return;
+      setSaveError(null);
+      setSavedAt(new Date());
+    };
+    window.addEventListener('slate-persist-error', onPersistError);
+    window.addEventListener('slate-persist-ok', onPersistOk);
+    return () => {
+      window.removeEventListener('slate-persist-error', onPersistError);
+      window.removeEventListener('slate-persist-ok', onPersistOk);
+    };
+  }, []);
+
   // If the selected question was deleted (or doesn't exist after a schema
   // mutation), fall back to the first question.
   useEffect(() => {
@@ -171,7 +261,7 @@ function FormEditorBody({ formId }: { formId: string }) {
     }
   }, [schema, selectedId]);
 
-  if (!schema || !initial || !formExists) {
+  if (!schema || !formExists) {
     return (
       <AdminShell
         crumbs={
@@ -429,6 +519,30 @@ function FormEditorBody({ formId }: { formId: string }) {
         schema={schema}
       />
       <div className="slate-editor-shell">
+        {aiDraft && (
+          <div className="slate-ai-pill-bar" role="status">
+            <span className="slate-ai-pill">Generated with AI</span>
+            <button
+              type="button"
+              className="slate-link"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Undo generated draft?',
+                  message: 'Deletes this form and returns to your forms list.',
+                  confirmLabel: 'Undo',
+                  danger: true,
+                });
+                if (!ok) return;
+                permanentlyDeleteForm(formId);
+                clearAiDraft();
+                setAiDraft(false);
+                navigate('/');
+              }}
+            >
+              Undo
+            </button>
+          </div>
+        )}
         {issues.length > 0 && (
           <div className="slate-editor-alert" role="alert">
             <strong>{issues.length} schema {issues.length === 1 ? 'issue' : 'issues'}:</strong>
@@ -468,7 +582,7 @@ function FormEditorBody({ formId }: { formId: string }) {
               }}
             />
           }
-          canvas={<Canvas schema={schema} selectedQuestion={selectedQuestion} />}
+          canvas={<Canvas formId={formId} schema={schema} selectedQuestion={selectedQuestion} />}
           inspector={
             <Inspector
               question={selectedQuestion}
@@ -566,7 +680,7 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
     case 'date':
       return { id, type, title: 'Pick a date', format: 'MM/DD/YYYY' };
     case 'file_upload':
-      return { id, type, title: 'Upload a file', maxSizeMb: 32 };
+      return { id, type, title: 'Upload a file', maxSizeMb: 32, multiple: true, maxFiles: 10 };
     case 'single_choice':
       return {
         id,

@@ -6,6 +6,7 @@ import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
+import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
   initialValue: string;
   onAnswer: (value: string) => void;
   onAdvance: () => void;
+  onType?: () => void;
 };
 
 export function LongTextField({
@@ -22,6 +24,7 @@ export function LongTextField({
   initialValue,
   onAnswer,
   onAdvance,
+  onType,
 }: Props) {
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +49,7 @@ export function LongTextField({
   useRegisterFormConfirm(submit);
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (isTypewriterKey(e)) onType?.();
     // Shift+Enter inserts newline (browser default). Plain Enter submits.
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();

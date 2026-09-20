@@ -75,6 +75,14 @@ describe('csvExport', () => {
     expect(text).not.toContain('\n');
   });
 
+  it('buildResponsesCsv includes answers for removed question ids', () => {
+    const questions: Question[] = [choice];
+    const csv = buildResponsesCsv(questions, subs);
+    const lines = csv.split('\r\n');
+    expect(lines[0]).toContain('(removed) name');
+    expect(lines[1]).toContain('Alex');
+  });
+
   it('responsesCsvFilename includes form name and date', () => {
     expect(responsesCsvFilename('805 Quote')).toMatch(/^805 Quote — responses \d{4}-\d{2}-\d{2}\.csv$/);
   });

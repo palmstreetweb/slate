@@ -1,0 +1,737 @@
+/* ============================================================
+   Slate admin motion language
+   Presence + hierarchy — springy where delight matters,
+   snappy where tools should feel precise. Always honor
+   prefers-reduced-motion.
+   ============================================================ */
+
+:root {
+  --slate-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --slate-ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --slate-ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------- page route enter ---------- */
+
+/* Opacity-only on .slate-page — NEVER transform/filter here.
+   AdminShell's sticky header lives inside this wrapper; transform on a
+   sticky ancestor causes the uncomfortable jump on every route change. */
+@keyframes slate-page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slate-header-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slate-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slate-rise-scale-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slate-blur-rise {
+  /* No blur — filter on large trees feels like a glitch on slower GPUs. */
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slate-fade-up-soft {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slate-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slate-dialog-veil {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(10px) saturate(120%);
+  }
+}
+
+@keyframes slate-fab-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slate-float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes slate-accent-bar-grow {
+  from {
+    width: 0;
+    opacity: 0;
+  }
+  to {
+    width: 28px;
+    opacity: 1;
+  }
+}
+
+@keyframes slate-shimmer-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes slate-tab-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes slate-gear-spin {
+  to {
+    transform: rotate(90deg);
+  }
+}
+
+@keyframes slate-badge-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slate-press-ripple {
+  from {
+    box-shadow: 0 0 0 0 rgb(var(--slate-accent-rgb) / 0.35);
+  }
+  to {
+    box-shadow: 0 0 0 14px rgb(var(--slate-accent-rgb) / 0);
+  }
+}
+
+@keyframes slate-empty-breathe {
+  0%,
+  100% {
+    border-color: var(--chrome-line);
+  }
+  50% {
+    border-color: color-mix(in srgb, var(--chrome-red) 40%, var(--chrome-line));
+  }
+}
+
+/* ---------- shell ---------- */
+
+.slate-page {
+  /* Don't force 100vh — fights sticky header + causes scroll jump. */
+  animation: slate-page-in 180ms ease-out both;
+}
+
+.slate-page .slate-page-title {
+  animation: slate-fade-up-soft 320ms var(--slate-ease-out) 40ms both;
+}
+
+.slate-page .slate-page-sub {
+  animation: slate-fade-up-soft 320ms var(--slate-ease-out) 70ms both;
+}
+
+.slate-page .slate-tabs {
+  animation: slate-fade-up-soft 320ms var(--slate-ease-out) 90ms both;
+}
+
+.slate-page .slate-form-grid,
+.slate-page .slate-empty,
+.slate-page .slate-settings-block,
+.slate-page .slate-ui-theme-grid {
+  animation: slate-fade-up-soft 360ms var(--slate-ease-out) 100ms both;
+}
+
+/* Header must not slide on every route — AdminShell remounts with the page.
+   A fade is enough for first paint; transform: translateY(-100%) felt broken. */
+[data-slate-forms][data-theme-name='slate'] .slate-header {
+  animation: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-brand {
+  transition:
+    transform 0.28s var(--slate-ease-spring),
+    opacity 0.2s ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-brand:hover {
+  transform: scale(1.03);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-brand:active {
+  transform: scale(0.97);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-brand-divider {
+  transform-origin: center;
+  animation: slate-fade-up-soft 400ms var(--slate-ease-out) 120ms both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-crumb {
+  transition: color 0.18s ease, transform 0.22s var(--slate-ease-out);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-crumb:hover {
+  transform: translateY(-1px);
+}
+
+/* ---------- buttons ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn {
+  transition:
+    background 140ms ease-out,
+    border-color 140ms ease-out,
+    color 140ms ease-out,
+    transform 180ms var(--slate-ease-spring),
+    box-shadow 180ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.97);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--primary:active:not(:disabled),
+[data-slate-forms][data-theme-name='slate'] .slate-btn--danger-filled:active:not(:disabled) {
+  animation: slate-press-ripple 420ms ease-out;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--new .slate-btn-plus {
+  transition: transform 0.28s var(--slate-ease-spring);
+  display: inline-block;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--new:hover .slate-btn-plus {
+  transform: rotate(90deg) scale(1.08);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--icon {
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 220ms var(--slate-ease-spring);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--icon:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-btn--icon:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+/* ---------- cards ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-card {
+  transition:
+    border-color 0.22s ease,
+    transform 0.32s var(--slate-ease-out),
+    box-shadow 0.32s ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card::before {
+  animation: slate-accent-bar-grow 480ms var(--slate-ease-out) both;
+  transition: width 0.35s var(--slate-ease-out), background 0.2s ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card:hover {
+  transform: translateY(-5px) scale(1.01);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 14px 36px rgb(0 0 0 / 0.1);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card:hover::before {
+  width: 48px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card:active {
+  transform: translateY(-2px) scale(1.005);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:not(.slate-card--skip-enter) {
+  animation: slate-rise-scale-in 560ms var(--slate-ease-out) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(1):not(.slate-card--skip-enter) {
+  animation-delay: 40ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(2):not(.slate-card--skip-enter) {
+  animation-delay: 90ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(3):not(.slate-card--skip-enter) {
+  animation-delay: 140ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(4):not(.slate-card--skip-enter) {
+  animation-delay: 190ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(5):not(.slate-card--skip-enter) {
+  animation-delay: 240ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(6):not(.slate-card--skip-enter) {
+  animation-delay: 290ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card:nth-child(n + 7):not(.slate-card--skip-enter) {
+  animation-delay: 340ms;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn {
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    transform 220ms var(--slate-ease-spring);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn:hover {
+  transform: translateY(-2px) scale(1.08);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn:active {
+  transform: scale(0.9);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-card-icon-btn--danger:hover {
+  transform: translateY(-2px) scale(1.08) rotate(-4deg);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-badge--accent {
+  animation: slate-badge-pop 420ms var(--slate-ease-spring) both;
+}
+
+/* ---------- tabs ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-tab {
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    transform 220ms var(--slate-ease-spring);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-tab:hover {
+  transform: translateY(-1px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-tab--active {
+  animation: slate-tab-pop 320ms var(--slate-ease-spring);
+}
+
+/* ---------- empty ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-empty {
+  animation: slate-rise-in 560ms var(--slate-ease-out) 80ms both, slate-empty-breathe 4.5s ease-in-out 700ms infinite;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-empty .slate-btn {
+  animation: slate-float-soft 3.2s ease-in-out 900ms infinite;
+}
+
+/* ---------- dialogs ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-dialog-backdrop {
+  animation: slate-fade-in 220ms ease-out both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-dialog {
+  animation: slate-dialog-in 420ms var(--slate-ease-spring) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-dialog-title {
+  animation: slate-blur-rise 420ms var(--slate-ease-out) 60ms both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-dialog-message {
+  animation: slate-fade-up-soft 400ms var(--slate-ease-out) 120ms both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-dialog-actions {
+  animation: slate-fade-up-soft 400ms var(--slate-ease-out) 180ms both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-panel {
+  animation: slate-dialog-in 460ms var(--slate-ease-spring) both;
+}
+
+/* ---------- settings fab ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-fab {
+  animation: slate-fab-in 560ms var(--slate-ease-spring) 280ms both;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 280ms var(--slate-ease-spring),
+    box-shadow 280ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-fab svg {
+  transition: transform 0.4s var(--slate-ease-spring);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-fab:hover {
+  transform: translateY(-3px) scale(1.06);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.16);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-fab:hover svg {
+  transform: rotate(45deg);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-fab--active {
+  transform: scale(1.04);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-fab--active svg {
+  animation: slate-gear-spin 0.45s var(--slate-ease-out);
+}
+
+/* ---------- settings theme cards ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-ui-theme-card {
+  transition:
+    border-color 0.2s ease,
+    transform 0.28s var(--slate-ease-spring),
+    box-shadow 0.28s ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ui-theme-card:hover {
+  transform: translateY(-3px) scale(1.015);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ui-theme-card--active {
+  animation: slate-tab-pop 360ms var(--slate-ease-spring);
+}
+
+/* ---------- login / auth surfaces ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-login {
+  animation: slate-page-in 600ms var(--slate-ease-out) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-card {
+  animation: slate-rise-scale-in 640ms var(--slate-ease-spring) 80ms both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-brand {
+  animation: slate-blur-rise 520ms var(--slate-ease-out) 160ms both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-google,
+[data-slate-forms][data-theme-name='slate'] .slate-login-form {
+  animation: slate-fade-up-soft 480ms var(--slate-ease-out) 260ms both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-google {
+  transition:
+    transform 220ms var(--slate-ease-spring),
+    box-shadow 220ms ease,
+    background 140ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-google:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 0.1);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-sent {
+  animation: slate-rise-scale-in 520ms var(--slate-ease-spring) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-login-sent-icon {
+  animation: slate-badge-pop 560ms var(--slate-ease-spring) 80ms both;
+}
+
+/* ---------- editor rails subtle enter ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-editor-shell {
+  /* No transform on this ancestor — sticky/layout stay calm. */
+  animation: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rail--left {
+  animation: slate-fade-up-soft 360ms var(--slate-ease-out) 40ms both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-canvas {
+  animation: slate-fade-up-soft 360ms var(--slate-ease-out) 70ms both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rail--right {
+  animation: slate-fade-up-soft 360ms var(--slate-ease-out) 100ms both;
+}
+
+/* Outline question list — staggered settle on open */
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > .slate-outline-item {
+  animation: slate-fade-up-soft 380ms var(--slate-ease-out) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > .slate-outline-item:nth-child(1) {
+  animation-delay: 30ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > .slate-outline-item:nth-child(2) {
+  animation-delay: 60ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > .slate-outline-item:nth-child(3) {
+  animation-delay: 90ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > .slate-outline-item:nth-child(4) {
+  animation-delay: 120ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > .slate-outline-item:nth-child(5) {
+  animation-delay: 150ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-outline-list > .slate-outline-item:nth-child(n + 6) {
+  animation-delay: 180ms;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-row {
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 220ms var(--slate-ease-spring),
+    box-shadow 220ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-outline-item:not(.slate-outline-item--lifted):hover .slate-outline-row {
+  transform: translateX(2px);
+}
+
+/* Inspector fields settle in */
+[data-slate-forms][data-theme-name='slate'] .slate-inspector-field {
+  animation: slate-fade-up-soft 360ms var(--slate-ease-out) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inspector-field:nth-child(1) {
+  animation-delay: 40ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-inspector-field:nth-child(2) {
+  animation-delay: 80ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-inspector-field:nth-child(3) {
+  animation-delay: 120ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-inspector-field:nth-child(n + 4) {
+  animation-delay: 160ms;
+}
+
+/* Response file chips */
+[data-slate-forms][data-theme-name='slate'] .slate-response-file {
+  animation: slate-rise-scale-in 420ms var(--slate-ease-out) both;
+  transition:
+    border-color 180ms ease,
+    transform 220ms var(--slate-ease-spring),
+    box-shadow 220ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-response-file:nth-child(1) {
+  animation-delay: 40ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-response-file:nth-child(2) {
+  animation-delay: 90ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-response-file:nth-child(n + 3) {
+  animation-delay: 140ms;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-response-file:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.08);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-response-file-thumb {
+  transition: transform 280ms var(--slate-ease-spring), opacity 200ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-response-file-thumb-btn:hover .slate-response-file-thumb {
+  transform: scale(1.04);
+}
+
+/* Team allowlist rows */
+[data-slate-forms][data-theme-name='slate'] .slate-allowlist-item {
+  animation: slate-fade-up-soft 360ms var(--slate-ease-out) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-allowlist-item:nth-child(1) {
+  animation-delay: 40ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-allowlist-item:nth-child(2) {
+  animation-delay: 80ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-allowlist-item:nth-child(3) {
+  animation-delay: 120ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-allowlist-item:nth-child(n + 4) {
+  animation-delay: 160ms;
+}
+
+/* ---------- submissions list rows ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-submissions-table tbody tr,
+[data-slate-forms][data-theme-name='slate'] .slate-response-row {
+  animation: slate-fade-up-soft 420ms var(--slate-ease-out) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-submissions-table tbody tr:nth-child(1),
+[data-slate-forms][data-theme-name='slate'] .slate-response-row:nth-child(1) {
+  animation-delay: 40ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-submissions-table tbody tr:nth-child(2),
+[data-slate-forms][data-theme-name='slate'] .slate-response-row:nth-child(2) {
+  animation-delay: 80ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-submissions-table tbody tr:nth-child(3),
+[data-slate-forms][data-theme-name='slate'] .slate-response-row:nth-child(3) {
+  animation-delay: 120ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-submissions-table tbody tr:nth-child(4),
+[data-slate-forms][data-theme-name='slate'] .slate-response-row:nth-child(4) {
+  animation-delay: 160ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-submissions-table tbody tr:nth-child(5),
+[data-slate-forms][data-theme-name='slate'] .slate-response-row:nth-child(5) {
+  animation-delay: 200ms;
+}
+[data-slate-forms][data-theme-name='slate'] .slate-submissions-table tbody tr:nth-child(n + 6),
+[data-slate-forms][data-theme-name='slate'] .slate-response-row:nth-child(n + 6) {
+  animation-delay: 240ms;
+}
+
+/* ---------- reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .slate-page,
+  .slate-page .slate-page-title,
+  .slate-page .slate-page-sub,
+  .slate-page .slate-tabs,
+  .slate-page .slate-form-grid,
+  .slate-page .slate-empty,
+  .slate-page .slate-settings-block,
+  .slate-page .slate-ui-theme-grid,
+  [data-slate-forms][data-theme-name='slate'] .slate-header,
+  [data-slate-forms][data-theme-name='slate'] .slate-form-grid > .slate-card,
+  [data-slate-forms][data-theme-name='slate'] .slate-empty,
+  [data-slate-forms][data-theme-name='slate'] .slate-empty .slate-btn,
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog,
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-backdrop,
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-title,
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-message,
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-actions,
+  [data-slate-forms][data-theme-name='slate'] .slate-share-panel,
+  [data-slate-forms][data-theme-name='slate'] .slate-settings-fab,
+  [data-slate-forms][data-theme-name='slate'] .slate-settings-fab--active svg,
+  [data-slate-forms][data-theme-name='slate'] .slate-badge--accent,
+  [data-slate-forms][data-theme-name='slate'] .slate-card::before,
+  [data-slate-forms][data-theme-name='slate'] .slate-editor-shell,
+  [data-slate-forms][data-theme-name='slate'] .slate-rail--left,
+  [data-slate-forms][data-theme-name='slate'] .slate-canvas,
+  [data-slate-forms][data-theme-name='slate'] .slate-rail--right,
+  [data-slate-forms][data-theme-name='slate'] .slate-outline-list > .slate-outline-item,
+  [data-slate-forms][data-theme-name='slate'] .slate-inspector-field,
+  [data-slate-forms][data-theme-name='slate'] .slate-response-file,
+  [data-slate-forms][data-theme-name='slate'] .slate-allowlist-item,
+  [data-slate-forms][data-theme-name='slate'] .slate-submissions-table tbody tr,
+  [data-slate-forms][data-theme-name='slate'] .slate-response-row,
+  [data-slate-forms][data-theme-name='slate'] .slate-login,
+  [data-slate-forms][data-theme-name='slate'] .slate-login-card,
+  [data-slate-forms][data-theme-name='slate'] .slate-login-brand,
+  [data-slate-forms][data-theme-name='slate'] .slate-login-google,
+  [data-slate-forms][data-theme-name='slate'] .slate-login-form,
+  [data-slate-forms][data-theme-name='slate'] .slate-login-sent,
+  [data-slate-forms][data-theme-name='slate'] .slate-login-sent-icon,
+  [data-slate-forms][data-theme-name='slate'] .slate-tab--active,
+  [data-slate-forms][data-theme-name='slate'] .slate-ui-theme-card--active {
+    animation: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-card:hover,
+  [data-slate-forms][data-theme-name='slate'] .slate-btn:hover:not(:disabled),
+  [data-slate-forms][data-theme-name='slate'] .slate-settings-fab:hover,
+  [data-slate-forms][data-theme-name='slate'] .slate-outline-item:hover .slate-outline-row,
+  [data-slate-forms][data-theme-name='slate'] .slate-response-file:hover {
+    transform: none;
+  }
+}

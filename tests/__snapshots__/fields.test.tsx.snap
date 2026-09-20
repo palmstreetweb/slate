@@ -89,12 +89,12 @@ exports[`phase 3 question types > matrix renders + snapshot, single-select per r
   <div>
     <h1
       class="slate-title"
-      id="_r_17_"
+      id="_r_18_"
     >
       Rate each
     </h1>
     <div
-      aria-labelledby="_r_17_"
+      aria-labelledby="_r_18_"
       class="slate-matrix"
       style="--slate-matrix-cols: 2;"
     >
@@ -243,12 +243,12 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
   <div>
     <h1
       class="slate-title"
-      id="_r_13_"
+      id="_r_14_"
     >
       Pick a pet
     </h1>
     <div
-      aria-labelledby="_r_13_"
+      aria-labelledby="_r_14_"
       class="slate-picture-grid"
       role="radiogroup"
     >
@@ -352,12 +352,12 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
   <div>
     <h1
       class="slate-title"
-      id="_r_16_"
+      id="_r_17_"
     >
       Rank these
     </h1>
     <ol
-      aria-labelledby="_r_16_"
+      aria-labelledby="_r_17_"
       class="slate-ranking"
     >
       <li

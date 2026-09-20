@@ -167,11 +167,35 @@ export function validate(question: Question, answer: unknown): ValidationResult 
     }
 
     case 'file_upload': {
+      const isFileItem = (v: unknown): boolean =>
+        (typeof File !== 'undefined' && v instanceof File) ||
+        (typeof v === 'string' && v.trim() !== '');
+
+      // Default ON when unset (ADR-032) — set `multiple: false` for single-file.
+      if (question.multiple !== false) {
+        const arr = Array.isArray(answer)
+          ? answer
+          : isFileItem(answer)
+            ? [answer]
+            : [];
+        const maxFiles = question.maxFiles ?? 10;
+        if (question.required && arr.length === 0) {
+          return { code: 'required', message: 'Please choose at least one file' };
+        }
+        if (arr.length > maxFiles) {
+          return {
+            code: 'max_selections',
+            message: `Attach at most ${maxFiles} file${maxFiles === 1 ? '' : 's'}`,
+          };
+        }
+        if (arr.some((item) => !isFileItem(item))) {
+          return { code: 'required', message: 'Please choose a file' };
+        }
+        return null;
+      }
+
       if (question.required) {
-        const hasFile =
-          (typeof File !== 'undefined' && answer instanceof File) ||
-          (typeof answer === 'string' && answer.trim() !== '');
-        if (!hasFile) {
+        if (!isFileItem(answer)) {
           return { code: 'required', message: 'Please choose a file' };
         }
       }

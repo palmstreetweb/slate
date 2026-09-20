@@ -12,6 +12,7 @@ import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
+import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -20,6 +21,7 @@ type Props = {
   initialValue: string;
   onAnswer: (value: string) => void;
   onAdvance: () => void;
+  onType?: () => void;
 };
 
 // Type-only import is fully erased by TS, so the runtime bundle stays free
@@ -34,7 +36,14 @@ async function loadLib(): Promise<typeof Libphonenumber> {
   return libCache;
 }
 
-export function PhoneField({ question, answers, initialValue, onAnswer, onAdvance }: Props) {
+export function PhoneField({
+  question,
+  answers,
+  initialValue,
+  onAnswer,
+  onAdvance,
+  onType,
+}: Props) {
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +94,7 @@ export function PhoneField({ question, answers, initialValue, onAnswer, onAdvanc
   });
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isTypewriterKey(e)) onType?.();
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void submit();

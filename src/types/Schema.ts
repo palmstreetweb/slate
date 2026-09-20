@@ -34,7 +34,8 @@ export type Schema<Q extends ReadonlyArray<Question> = ReadonlyArray<Question>> 
   /**
    * Step confirmation sound on forward navigation (ADR-023). One of ten built-in
    * synthesized presets, or `'off'` / omit for silent. Legacy `true` maps to
-   * `'pixie-mallet'`.
+   * `'pixie-mallet'`. When a preset is on, text fields also play soft typewriter
+   * key ticks while typing (ADR-034).
    */
   sound?: FormSound | boolean;
   questions: Q;

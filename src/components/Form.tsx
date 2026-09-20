@@ -35,7 +35,7 @@ import {
   hasStepDecorationBackdrop,
   resolveThemeDecoration,
 } from './ThemeDecoration.js';
-import { playFormSound, resolveFormSound } from '@/utils/formSounds.js';
+import { playFormSound, playTypewriterTick, resolveFormSound } from '@/utils/formSounds.js';
 import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
 
 import '@/styles/tokens.css';
@@ -115,6 +115,10 @@ export function Form<S extends Schema>({
 
   const playInteractionSound = useCallback(() => {
     if (soundId !== 'off') playFormSound(soundId);
+  }, [soundId]);
+
+  const playTypingSound = useCallback(() => {
+    if (soundId !== 'off') playTypewriterTick();
   }, [soundId]);
 
   const advanceWithSound = useCallback(() => {
@@ -399,6 +403,7 @@ export function Form<S extends Schema>({
                   if (idx >= 0) goTo(idx, 'backward');
                 }}
                 playInteractionSound={playInteractionSound}
+                playTypingSound={playTypingSound}
               />
             ) : null}
           </div>

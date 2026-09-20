@@ -48,6 +48,12 @@ function serializableAnswers(answers: LooseAnswers): LooseAnswers {
   const out: LooseAnswers = {};
   for (const [k, v] of Object.entries(answers)) {
     if (typeof File !== 'undefined' && v instanceof File) continue;
+    if (Array.isArray(v)) {
+      const kept = v.filter((item) => !(typeof File !== 'undefined' && item instanceof File));
+      if (kept.length === 0) continue;
+      out[k] = kept as typeof v;
+      continue;
+    }
     out[k] = v;
   }
   return out;

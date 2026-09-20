@@ -6,6 +6,7 @@ import type { Question } from '@/index.js';
 import type { StoredSubmission } from './_submissionStore.js';
 import {
   formatAnswerForCsv,
+  formatAnswerForQuestion,
   formatDurationMs,
   formatSubmittedAt,
   titleOf,
@@ -27,15 +28,56 @@ export function uniqueColumnTitles(titles: string[]): string[] {
   });
 }
 
+type CsvColumn = {
+  id: string;
+  title: string;
+  question: Question | null;
+};
+
+/** Schema questions plus any answer keys that no longer exist on the form. */
+export function buildCsvColumns(
+  questions: Question[],
+  subs: StoredSubmission[],
+): CsvColumn[] {
+  const known = new Set(questions.map((q) => q.id));
+  const extraIds: string[] = [];
+  for (const s of subs) {
+    for (const id of Object.keys(s.answers ?? {})) {
+      if (!known.has(id) && !extraIds.includes(id)) extraIds.push(id);
+    }
+  }
+  return [
+    ...questions.map((q) => ({ id: q.id, title: titleOf(q), question: q })),
+    ...extraIds.map((id) => ({
+      id,
+      title: `(removed) ${id}`,
+      question: null,
+    })),
+  ];
+}
+
+function formatCell(column: CsvColumn, value: unknown): string {
+  if (column.question) return formatAnswerForCsv(column.question, value);
+  if (value === undefined || value === null || value === '') return '';
+  // Best-effort for removed questions (may still be a file ref).
+  const stub = {
+    id: column.id,
+    type: 'short_text',
+    title: column.title,
+  } as Question;
+  return formatAnswerForQuestion(stub, value).replace(/\n/g, '; ');
+}
+
 export function buildResponsesCsv(questions: Question[], subs: StoredSubmission[]): string {
-  const questionHeaders = uniqueColumnTitles(questions.map((q) => titleOf(q)));
+  const columns = buildCsvColumns(questions, subs);
+  const questionHeaders = uniqueColumnTitles(columns.map((c) => c.title));
   const headers = ['Submitted', 'Time spent', 'Score', ...questionHeaders];
 
   const rows = subs.map((s) => [
     formatSubmittedAt(s.receivedAt),
     formatDurationMs(s.meta.durationMs),
     s.meta.score != null ? String(s.meta.score) : '',
-    ...questions.map((q) => formatAnswerForCsv(q, s.answers[q.id])),
+    ...columns.map((c) => formatCell(c, s.answers[c.id])),
   ]);
 
   return [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');

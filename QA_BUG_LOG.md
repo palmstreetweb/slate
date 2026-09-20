@@ -1,5 +1,14 @@
 # QA Golden Sweep — Bug Log
 
+## Build with AI golden prompts (ADR-039)
+
+Fifteen prompts live in `examples/_admin/ai/goldenPrompts.ts` (RSVP, lead capture, job application, feedback, event registration, intake, volunteer, education, waitlist).
+
+- Schema/mapper unit tests: `tests/aiGenerateForm.test.ts`
+- Live sweep (needs `ANTHROPIC_API_KEY`): `npm run qa:ai`
+
+---
+
 Branch: `qa/golden-sweep`  
 Date: 2026-06-14  
 Scope: `@palmstreetweb/slate` form engine + `examples/_admin` builder (localStorage). Phases 5–6 from the original prompt (Supabase, Resend, Playwright) are **N/A** for this repo — see Final Report.

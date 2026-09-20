@@ -446,6 +446,7 @@ describe('phase 3 question types', () => {
       type: 'file_upload',
       title: 'Upload your doc',
       maxSizeMb: 5,
+      multiple: false,
     });
     expect(screen.getByText(/choose a file/i)).toBeInTheDocument();
     expect(screen.getByText(/max 5 MB/i)).toBeInTheDocument();
@@ -459,6 +460,7 @@ describe('phase 3 question types', () => {
       type: 'file_upload',
       title: 'Upload your doc',
       required: true,
+      multiple: false,
     });
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
     const input = container.querySelector('input[type="file"]')!;
@@ -473,7 +475,7 @@ describe('phase 3 question types', () => {
   it('file_upload hands the file to onFileUpload and stores the returned string', async () => {
     const onFileUpload = vi.fn().mockResolvedValue('https://cdn.example.com/hello.txt');
     const { container, setAnswer } = renderQuestion(
-      { id: 'doc', type: 'file_upload', title: 'Upload your doc' },
+      { id: 'doc', type: 'file_upload', title: 'Upload your doc', multiple: false },
       {},
       onFileUpload,
     );
@@ -493,6 +495,7 @@ describe('phase 3 question types', () => {
       type: 'file_upload',
       title: 'Upload your doc',
       maxSizeMb: 1,
+      multiple: false,
     });
     const big = new File([new ArrayBuffer(2 * 1024 * 1024)], 'big.bin');
     fireEvent.change(container.querySelector('input[type="file"]')!, {
@@ -502,6 +505,31 @@ describe('phase 3 question types', () => {
     expect(setAnswer).not.toHaveBeenCalled();
   });
 
+  it('file_upload multiple keeps drop zone and appends files', async () => {
+    const { container, setAnswer } = renderQuestion({
+      id: 'docs',
+      type: 'file_upload',
+      title: 'Upload docs',
+      multiple: true,
+      maxFiles: 5,
+    });
+    expect(screen.getByText(/choose files/i)).toBeInTheDocument();
+    const a = new File(['a'], 'a.txt', { type: 'text/plain' });
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [a] },
+    });
+    expect(setAnswer).toHaveBeenCalledWith('docs', [a]);
+    expect(screen.getByText(/a\.txt/)).toBeInTheDocument();
+    expect(screen.getByText(/add another file/i)).toBeInTheDocument();
+
+    const b = new File(['b'], 'b.txt', { type: 'text/plain' });
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [b] },
+    });
+    expect(setAnswer).toHaveBeenCalledWith('docs', [a, b]);
+    expect(screen.getByText('2/5 files')).toBeInTheDocument();
+  });
+
   it('file_upload blocks OK when required and empty', async () => {
     const user = userEvent.setup();
     const { advance } = renderQuestion({
@@ -509,6 +537,7 @@ describe('phase 3 question types', () => {
       type: 'file_upload',
       title: 'Upload your doc',
       required: true,
+      multiple: false,
     });
     await user.click(screen.getByRole('button', { name: /ok/i }));
     expect(await screen.findByText(/Please choose a file/)).toBeInTheDocument();

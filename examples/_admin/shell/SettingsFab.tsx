@@ -1,5 +1,5 @@
-import { useRef } from 'react';
 import { navigate, routeKey, useRoute } from '../_router.js';
+import { closeSettings, rememberSettingsReturn } from './settingsNav.js';
 
 function IconSettings() {
   return (
@@ -25,14 +25,13 @@ function IconSettings() {
 export function SettingsFab() {
   const route = useRoute();
   const onSettings = route.name === 'settings';
-  const returnToRef = useRef('/');
 
   const toggleSettings = () => {
     if (onSettings) {
-      navigate(returnToRef.current);
+      closeSettings();
       return;
     }
-    returnToRef.current = routeKey(route);
+    rememberSettingsReturn(routeKey(route));
     navigate('/settings');
   };
 

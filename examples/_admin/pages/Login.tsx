@@ -1,10 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SlateLogo } from '../components/SlateLogo.js';
-import { useAuth } from '../supabase/AuthProvider.js';
+import { hashSearchParams } from '../_router.js';
+import { useAuth } from '../neon/AuthProvider.js';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { readSlateMode } from '../slateMode.js';
+
+function readOtpFromHash(): string {
+  const raw = hashSearchParams().get('otp') || hashSearchParams().get('code') || '';
+  return raw.replace(/\D/g, '').slice(0, 6);
+}
 
 function GoogleIcon() {
   return (
@@ -29,15 +35,81 @@ function GoogleIcon() {
   );
 }
 
+function LoginOtpField({
+  id,
+  value,
+  disabled,
+  inputRef,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  disabled: boolean;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onChange: (next: string) => void;
+}) {
+  const digits = value.replace(/\D/g, '').slice(0, 6);
+  const active = digits.length === 6 ? 5 : digits.length;
+
+  return (
+    <div className="slate-login-otp">
+      <input
+        ref={inputRef}
+        id={id}
+        className="slate-login-otp-trap"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        data-1p-ignore="true"
+        data-lpignore="true"
+        data-form-type="other"
+        pattern="[0-9]*"
+        maxLength={6}
+        value={digits}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        required
+        aria-label="Sign-in code"
+      />
+      <div className="slate-login-otp-bar" aria-hidden="true">
+        {Array.from({ length: 6 }, (_, i) => (
+          <span
+            key={i}
+            className={`slate-login-otp-cell${i === active ? ' is-active' : ''}${i === 5 ? ' is-last' : ''}`}
+          >
+            {digits[i] ?? ''}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Login() {
-  const { signInWithEmail, signInWithGoogle, authError, clearAuthError } = useAuth();
+  const { signInWithEmail, verifyEmailOtp, signInWithGoogle, authError, clearAuthError } =
+    useAuth();
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'google'>('idle');
+  const [code, setCode] = useState('');
+  const [status, setStatus] = useState<
+    'idle' | 'sending' | 'sent' | 'verifying' | 'error' | 'google'
+  >('idle');
+  const [magicLinkSent, setMagicLinkSent] = useState(true);
+  const [resending, setResending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const codeRef = useRef<HTMLInputElement>(null);
+  const verifyingRef = useRef(false);
+  const seededCode = useMemo(() => readOtpFromHash(), []);
   const mode = readSlateMode();
   const uiTheme = useMemo(() => detectAdminUiTheme(), []);
 
   const displayError = message ?? authError;
+
+  useEffect(() => {
+    if (status !== 'sent') return;
+    codeRef.current?.focus();
+  }, [status]);
 
   const onGoogle = async () => {
     clearAuthError();
@@ -57,14 +129,66 @@ export function Login() {
     clearAuthError();
     setStatus('sending');
     setMessage(null);
-    const { error } = await signInWithEmail(email);
+    const { error, magicLinkSent: sentLink } = await signInWithEmail(email);
     if (error) {
       setStatus('error');
       setMessage(error);
       return;
     }
+    setMagicLinkSent(sentLink);
+    setCode('');
     setStatus('sent');
     setMessage(null);
+  };
+
+  const submitCode = async (raw: string) => {
+    const next = raw.replace(/\D/g, '').slice(0, 6);
+    setCode(next);
+    if (next.length !== 6 || verifyingRef.current) return;
+    verifyingRef.current = true;
+    clearAuthError();
+    setStatus('verifying');
+    setMessage(null);
+    try {
+      const { error } = await verifyEmailOtp(email, next);
+      if (error) {
+        setStatus('sent');
+        setMessage(error);
+        setCode('');
+        codeRef.current?.focus();
+      }
+    } catch (err) {
+      setStatus('sent');
+      setMessage(err instanceof Error ? err.message : 'Could not verify that code.');
+      setCode('');
+      codeRef.current?.focus();
+    } finally {
+      verifyingRef.current = false;
+    }
+  };
+
+  const seededUsedRef = useRef(false);
+  useEffect(() => {
+    if (status !== 'sent' || seededCode.length !== 6 || seededUsedRef.current) return;
+    seededUsedRef.current = true;
+    void submitCode(seededCode);
+  }, [status, seededCode]);
+
+  const onResend = async () => {
+    if (resending || status === 'verifying') return;
+    clearAuthError();
+    setResending(true);
+    setMessage(null);
+    const { error, magicLinkSent: sentLink } = await signInWithEmail(email);
+    setResending(false);
+    if (error) {
+      setMessage(error);
+      return;
+    }
+    setMagicLinkSent(sentLink);
+    setCode('');
+    setMessage(null);
+    codeRef.current?.focus();
   };
 
   return (
@@ -81,34 +205,84 @@ export function Login() {
             <div>
               <h1 className="slate-login-title">Sign in to Slate</h1>
               <p className="slate-login-lead">
-                Internal form studio for the PSW team and invited collaborators.
+                Create and share conversational forms. Sign in to open your studio.
               </p>
             </div>
           </div>
 
-          {status === 'sent' ? (
+          {status === 'sent' || status === 'verifying' ? (
             <div className="slate-login-sent">
-              <div className="slate-login-sent-icon" aria-hidden>
-                ✓
-              </div>
               <h2 className="slate-login-title" style={{ fontSize: 'var(--slate-fs-lg)' }}>
                 Check your inbox
               </h2>
               <p className="slate-login-lead" style={{ marginTop: 8 }}>
-                We sent a sign-in link to{' '}
-                <strong style={{ color: 'var(--chrome-ink)' }}>{email}</strong>. Click it to open
-                the dashboard.
+                {magicLinkSent ? (
+                  <>
+                    We emailed a sign-in link and a 6-digit code to{' '}
+                    <strong style={{ color: 'var(--chrome-ink)' }}>{email}</strong>. Click the
+                    link, or type the code below.
+                  </>
+                ) : (
+                  <>
+                    We emailed a 6-digit code to{' '}
+                    <strong style={{ color: 'var(--chrome-ink)' }}>{email}</strong>.
+                  </>
+                )}
               </p>
-              <button
-                type="button"
-                className="slate-login-back"
-                onClick={() => {
-                  setStatus('idle');
-                  setEmail('');
+              <form
+                className="slate-login-form"
+                style={{ marginTop: 18 }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void submitCode(code);
                 }}
               >
-                Use a different email
-              </button>
+                <div className="slate-login-field">
+                  <label className="slate-label" htmlFor="login-code">
+                    Sign-in code
+                  </label>
+                  <LoginOtpField
+                    id="login-code"
+                    value={code}
+                    disabled={status === 'verifying'}
+                    inputRef={codeRef}
+                    onChange={(next) => void submitCode(next)}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="slate-login-submit slate-login-submit--secondary"
+                  disabled={status === 'verifying' || code.length !== 6}
+                >
+                  {status === 'verifying' ? 'Signing in…' : 'Sign in'}
+                </button>
+              </form>
+              {displayError ? (
+                <p className="slate-login-message slate-login-message--error" role="alert">
+                  {displayError}
+                </p>
+              ) : null}
+              <div className="slate-login-sent-actions">
+                <button
+                  type="button"
+                  className="slate-login-back"
+                  onClick={() => void onResend()}
+                  disabled={status === 'verifying' || resending}
+                >
+                  {resending ? 'Sending…' : 'Resend email'}
+                </button>
+                <button
+                  type="button"
+                  className="slate-login-back"
+                  onClick={() => {
+                    setStatus('idle');
+                    setCode('');
+                    setMessage(null);
+                  }}
+                >
+                  Use a different email
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -129,25 +303,41 @@ export function Login() {
               <form className="slate-login-form" onSubmit={(e) => void onSubmit(e)}>
                 <div className="slate-login-field">
                   <label className="slate-label" htmlFor="login-email">
-                    Work email
+                    Email
                   </label>
                   <input
                     id="login-email"
                     className="slate-input"
                     type="email"
                     autoComplete="email"
-                    placeholder="you@palmstreetweb.com"
+                    placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
+                {seededCode.length === 6 ? (
+                  <div className="slate-login-seeded">
+                    <p className="slate-login-foot" style={{ margin: 0 }}>
+                      Sign-in code from your email is ready. Enter your address, then we’ll use it.
+                    </p>
+                    <button
+                      type="button"
+                      className="slate-login-back"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(seededCode).catch(() => {});
+                      }}
+                    >
+                      Copy code
+                    </button>
+                  </div>
+                ) : null}
                 <button
                   type="submit"
                   className="slate-login-submit slate-login-submit--secondary"
                   disabled={status === 'sending' || status === 'google'}
                 >
-                  {status === 'sending' ? 'Sending link…' : 'Send magic link'}
+                  {status === 'sending' ? 'Sending…' : 'Email me a link and code'}
                 </button>
               </form>
               {displayError ? (
@@ -156,7 +346,8 @@ export function Login() {
                 </p>
               ) : null}
               <p className="slate-login-foot">
-                Google Workspace or allowlisted email only. Magic link is a fallback if you prefer.
+                Anyone can sign up. Google is one click. Email sends a sign-in link and a 6-digit
+                code — use either.
               </p>
             </>
           )}

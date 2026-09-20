@@ -78,6 +78,26 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
       return String(value);
 
     case 'file_upload':
+      if (Array.isArray(value)) {
+        return (
+          value
+            .map((item) => {
+              if (typeof File !== 'undefined' && item instanceof File) {
+                return `${item.name} (${Math.round(item.size / 1024)} KB)`;
+              }
+              if (typeof item === 'string' && isFileUploadRef(item)) {
+                return (
+                  describeFileUploadAnswer(item, peekLocalUploadMeta(item)) ?? 'Uploaded file'
+                );
+              }
+              if (typeof item === 'string') {
+                return describeFileUploadAnswer(item) ?? item;
+              }
+              return String(item);
+            })
+            .join('\n') || '—'
+        );
+      }
       if (typeof File !== 'undefined' && value instanceof File) {
         return `${value.name} (${Math.round(value.size / 1024)} KB)`;
       }

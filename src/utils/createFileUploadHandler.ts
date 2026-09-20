@@ -2,6 +2,7 @@
  * Factory for `onFileUpload` — runs 805-style prepare, then delegates to host storage.
  */
 
+import { isHeicLike, withInferredImageMime } from './imageFileTypes.js';
 import { prepareFileForUpload } from './prepareFileForUpload.js';
 import { isFileSizeError } from './fileUploadAccept.js';
 
@@ -27,8 +28,16 @@ export function createFileUploadHandler(opts: CreateFileUploadHandlerOptions): F
     try {
       prepared = await prepareFileForUpload(file, { maxSizeMb });
     } catch (err) {
-      // Only block on size — if optimize/prepare fails, store the original file.
       if (isFileSizeError(err)) throw err;
+      // Never store raw HEIC/HEIF — browsers can't preview it and Responses breaks.
+      if (isHeicLike(withInferredImageMime(file))) {
+        throw err instanceof Error
+          ? err
+          : new Error(
+              'Could not convert this HEIC photo to JPG. Export as JPG from Photos and try again.',
+            );
+      }
+      // Other exotic rasters — store the original instead of failing the form.
       prepared = file;
     }
     return opts.upload(prepared, questionId, ctx);

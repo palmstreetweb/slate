@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { isDefaultFormName, normalizeFormNameInput } from './formName.js';
+import { detectAdminUiTheme } from './adminUiTheme.js';
 import { readSlateMode } from './slateMode.js';
 
 type PromptFn = () => Promise<string | null>;
@@ -79,9 +80,15 @@ function TitleDialog({ onClose }: { onClose: (value: string | null) => void }) {
   if (typeof document === 'undefined') return null;
 
   const mode = readSlateMode();
+  const uiTheme = detectAdminUiTheme();
 
   return createPortal(
-    <div data-slate-forms="" data-theme-name="slate" data-theme={mode}>
+    <div
+      data-slate-forms=""
+      data-theme-name="slate"
+      data-admin-ui={uiTheme}
+      data-theme={mode}
+    >
       <div
         className="slate-dialog-backdrop"
         role="presentation"

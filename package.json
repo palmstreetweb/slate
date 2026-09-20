@@ -44,24 +44,35 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "prepublishOnly": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "preview:auth-email": "npx vite-node scripts/preview-auth-email.ts",
+    "qa:ai": "npx vite-node scripts/qa-ai-generate.ts",
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "neon:setup": "echo See neon/SETUP.md"
   },
   "peerDependencies": {
     "react": ">=18",
     "react-dom": ">=18"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.58",
+    "ai": "^7.0.107",
+    "heic-to": "^1.5.2",
     "heic2any": "^0.0.4",
-    "libphonenumber-js": "^1.11.0"
+    "libphonenumber-js": "^1.11.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1131.0",
+    "@aws-sdk/s3-request-presigner": "^3.1131.0",
     "@eslint/js": "^9.17.0",
+    "@neon/config": "^1.4.2",
+    "@neondatabase/neon-js": "^0.7.0-beta",
     "@playwright/test": "^1.60.0",
-    "@supabase/supabase-js": "^2.108.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
     "@types/node": "^25.6.2",
+    "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
@@ -72,7 +83,9 @@
     "eslint-plugin-react": "^7.37.3",
     "eslint-plugin-react-hooks": "^5.1.0",
     "globals": "^15.14.0",
+    "hono": "^4.13.7",
     "jsdom": "^29.1.1",
+    "pg": "^8.23.0",
     "prettier": "^3.4.2",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",

@@ -1,10 +1,10 @@
 'use client';
 
-import { useAuth } from '../supabase/AuthProvider.js';
-import { isSupabaseConfigured } from '../supabase/env.js';
+import { useAuth } from '../neon/AuthProvider.js';
+import { isNeonConfigured } from '../neon/env.js';
 
 export function SignOutButton() {
-  const cloud = isSupabaseConfigured();
+  const cloud = isNeonConfigured();
   const { signOut, user } = useAuth();
 
   if (!cloud) return null;

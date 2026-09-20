@@ -170,29 +170,82 @@ function drawDotFinders(
   }
 }
 
-function drawModule(
+/** Gap between a module and its cell edge, as a fraction of the cell. */
+const MODULE_GAP = 0.14;
+/** Sub-pixel bleed so merged neighbors render without hairline seams. */
+const MODULE_BLEED = 0.6;
+
+/** Trace a rounded rectangle with independent per-corner radii. */
+function roundedRectPath(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  size: number,
-  style: ShareQrStyle,
+  w: number,
+  h: number,
+  tl: number,
+  tr: number,
+  br: number,
+  bl: number,
 ): void {
+  ctx.beginPath();
+  ctx.moveTo(x + tl, y);
+  ctx.lineTo(x + w - tr, y);
+  ctx.arcTo(x + w, y, x + w, y + tr, tr);
+  ctx.lineTo(x + w, y + h - br);
+  ctx.arcTo(x + w, y + h, x + w - br, y + h, br);
+  ctx.lineTo(x + bl, y + h);
+  ctx.arcTo(x, y + h, x, y + h - bl, bl);
+  ctx.lineTo(x, y + tl);
+  ctx.arcTo(x, y, x + tl, y, tl);
+  ctx.closePath();
+}
+
+/**
+ * Connected rounded modules: isolated cells render as circles, while runs of
+ * adjacent cells merge into smooth rounded blobs. This keeps the modules large
+ * and chunky (good scannability) while looking far softer than spaced dots.
+ */
+function drawRoundedModules(
+  ctx: CanvasRenderingContext2D,
+  isOn: (row: number, col: number) => boolean,
+  count: number,
+  cell: number,
+  offset: number,
+): void {
+  const gap = cell * MODULE_GAP;
+  const radius = (cell - gap * 2) / 2;
+
   ctx.fillStyle = QR_COLORS.dark;
 
-  if (style === 'swiss') {
-    ctx.fillRect(x, y, size, size);
-    return;
+  for (let row = 0; row < count; row++) {
+    for (let col = 0; col < count; col++) {
+      if (!isOn(row, col)) continue;
+
+      const up = isOn(row - 1, col);
+      const down = isOn(row + 1, col);
+      const left = isOn(row, col - 1);
+      const right = isOn(row, col + 1);
+
+      const cellX = offset + col * cell;
+      const cellY = offset + row * cell;
+
+      // Drop the gap (and add bleed) on any side that touches a neighbor so
+      // the fills overlap and read as one continuous shape.
+      const x = cellX + (left ? -MODULE_BLEED : gap);
+      const y = cellY + (up ? -MODULE_BLEED : gap);
+      const right2 = cellX + cell - (right ? -MODULE_BLEED : gap);
+      const bottom = cellY + cell - (down ? -MODULE_BLEED : gap);
+
+      // Round a corner only when both of its sides are open (no neighbor).
+      const tl = !up && !left ? radius : 0;
+      const tr = !up && !right ? radius : 0;
+      const br = !down && !right ? radius : 0;
+      const bl = !down && !left ? radius : 0;
+
+      roundedRectPath(ctx, x, y, right2 - x, bottom - y, tl, tr, br, bl);
+      ctx.fill();
+    }
   }
-
-  const gap = style === 'soft' || style === 'branded' ? size * 0.38 : size * 0.2;
-  const module = size - gap;
-  const ox = x + gap / 2;
-  const oy = y + gap / 2;
-  const r = module / 2;
-
-  ctx.beginPath();
-  ctx.arc(ox + module / 2, oy + module / 2, r, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function drawModules(
@@ -205,29 +258,32 @@ function drawModules(
   const cell = (RENDER_SIZE - margin * 2) / count;
   const offset = (RENDER_SIZE - cell * count) / 2;
   const skipCenter = style === 'branded';
-  const customFinders = style === 'swiss' || style === 'soft' || style === 'branded';
-  const moduleStyle = style === 'branded' ? 'branded' : style;
+
+  const isOn = (row: number, col: number): boolean => {
+    if (row < 0 || col < 0 || row >= count || col >= count) return false;
+    if (!qr.modules.get(row, col)) return false;
+    if (skipCenter && isInLogoClearZone(row, col, count)) return false;
+    if (isInFinderPattern(row, col, count)) return false;
+    return true;
+  };
 
   ctx.fillStyle = QR_COLORS.light;
   ctx.fillRect(0, 0, RENDER_SIZE, RENDER_SIZE);
 
-  for (let row = 0; row < count; row++) {
-    for (let col = 0; col < count; col++) {
-      if (!qr.modules.get(row, col)) continue;
-      if (skipCenter && isInLogoClearZone(row, col, count)) continue;
-      if (customFinders && isInFinderPattern(row, col, count)) continue;
-
-      const x = offset + col * cell;
-      const y = offset + row * cell;
-      drawModule(ctx, x, y, cell, moduleStyle);
-    }
-  }
-
   if (style === 'swiss') {
+    ctx.fillStyle = QR_COLORS.dark;
+    for (let row = 0; row < count; row++) {
+      for (let col = 0; col < count; col++) {
+        if (!isOn(row, col)) continue;
+        ctx.fillRect(offset + col * cell, offset + row * cell, cell, cell);
+      }
+    }
     drawSwissFinders(ctx, count, cell, offset);
-  } else if (style === 'soft' || style === 'branded') {
-    drawDotFinders(ctx, count, cell, offset);
+    return;
   }
+
+  drawRoundedModules(ctx, isOn, count, cell, offset);
+  drawDotFinders(ctx, count, cell, offset);
 }
 
 function drawLogo(ctx: CanvasRenderingContext2D, logo: HTMLImageElement): void {

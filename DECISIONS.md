@@ -373,7 +373,7 @@ Revisit when: we want downloadable SVG exports, versioned brand PDFs, or auth-ga
 
 ## ADR-026 — Client-side image optimize pipeline + `heic2any` for uploads
 Date: 2026-06-15
-Status: accepted
+Status: accepted (HEIC decoder path updated by ADR-033)
 Context: 805 Sealcoating already ships a browser-side upload prep stack (MIME inference, HEIC→JPEG, canvas downscale/recompress) before Supabase Storage. Slate's `file_upload` type (ADR-012) left optimization to hosts; slateforms admin had no `onFileUpload`, so files never persisted.
 Decision: Port the 805 prep pipeline into `src/utils/` (`imageFileTypes`, `heicToJpeg`, `prepareImageForStorage`, `prepareFileForUpload`) and expose `createFileUploadHandler({ upload })` so hosts run optimize-then-upload in one callback. Images use the same profile as 805 (1920px edge, ~450KB JPEG cap, 32MB input cap); non-images pass through with size limits only. Add runtime dep `heic2any`, lazy-imported only when a HEIC/HEIF file is picked. Slate admin (`examples/_admin`) stores prepared blobs in IndexedDB and answers as `slate-file://{uuid}` refs until `VITE_UPLOAD_URL` is configured for remote POST.
 Alternatives:
@@ -386,7 +386,7 @@ Revisit when: backup format should embed files, or upload progress UI is needed 
 
 ## ADR-028 — Production Slate admin: Supabase persistence + PSW auth
 Date: 2026-06-15
-Status: accepted
+Status: superseded by ADR-029
 Context: ADR-018 scoped Slate as a localStorage-backed internal dev tool with no backend. The studio is now deployed at slateforms.vercel.app and needs real persistence: PSW team auth, centralized submissions from public fill links, file storage, and email alerts. The form engine package (`src/`) stays host-agnostic per the brief.
 Decision: (1) Add Supabase (Postgres + Auth + Storage + Edge Functions) as the production backend for `examples/_admin` only — not a runtime dep of `@palmstreetweb/slate`. (2) Auth-gate the admin SPA: only `@palmstreetweb.com` (or allowlisted) emails via Supabase Auth magic link / OAuth. (3) `forms` and `submissions` tables with soft-delete (`deleted_at`), draft vs `published_schema` + `status`. (4) Public fill at `#/f/{slug}` via `get_form_by_slug` RPC; anonymous submit via `submit-response` Edge Function (rate-limited, no open RLS insert). (5) File uploads to private `form-uploads` bucket; refs in answers. (6) `submit-response` triggers Resend notification when configured. (7) When `VITE_SUPABASE_URL` is unset, admin falls back to localStorage (tests + offline dev).
 Alternatives:
@@ -395,6 +395,136 @@ Alternatives:
 - Vercel Postgres + custom API routes. Rejected — Supabase matches 805 patterns and ships Auth + Storage.
 Consequences: `@supabase/supabase-js` is a devDependency (examples build only). New `supabase/migrations/` and Edge Functions in repo. ADR-018's "no backend ambitions" is superseded for the **deployed admin app** only; the published package is unchanged. RLS must be audited before production credentials ship.
 Revisit when: multi-tenant client workspaces, real-time collaborative editing, or embedding admin in the npm package.
+
+## ADR-029 — Production Slate admin: Neon backend (Data API + Auth + Storage + Functions)
+Date: 2026-09-13
+Status: accepted
+Context: ADR-028 put the deployed studio on Supabase. Paying for additional Supabase Pro projects to isolate apps became undesirable; Neon’s free tier allows many projects, and Neon now ships Managed Better Auth, Data API, Object Storage, and Functions (beta) sufficient for Slate’s admin needs. Fresh cutover — no migration of historical Supabase rows/files.
+Decision: (1) Replace Supabase with **Neon** for `examples/_admin` only — still not a runtime dep of `@palmstreetweb/slate`. (2) Use `@neondatabase/neon-js` with `SupabaseAuthAdapter` so existing `from()` / `rpc()` / `auth.signInWithOAuth` call shapes stay close. (3) Env: `VITE_NEON_URL` (HTTPS database URL; SDK derives Auth + Data API). Offline: `VITE_ADMIN_OFFLINE=1` ignores Neon (localStorage). (4) Schema in `neon/migrations/`; RLS via `is_psw_team()` using JWT email / `neon_auth.user` + `team_allowlist`. (5) Public submit via Neon Function `submit-response` (`VITE_SUBMIT_URL`). (6) File uploads via Neon Object Storage bucket `form-uploads` with Neon Function `storage-sign` for presigned URLs (`VITE_STORAGE_SIGN_URL`). (7) Package remains host-agnostic.
+Alternatives:
+- Keep Supabase and share one Pro project with schemas. Rejected — prior cross-app Auth/redirect conflicts; cost of extra Pros.
+- Neon Postgres only + keep Supabase Auth/Storage. Rejected — still requires a Supabase project.
+- Full rewrite onto Better Auth native API without SupabaseAuthAdapter. Deferred — adapter minimizes churn for this cutover.
+Consequences: `@supabase/supabase-js` removed; Neon Auth/Storage/Functions are beta. Operators enable Data API + Auth + Google OAuth in Neon Console per `neon/SETUP.md`. OAuth users re-authenticate; password hashes do not migrate.
+Revisit when: Neon Auth/Storage leave beta, or multi-app schemas share one Neon project.
+
+## ADR-030 — Public submit rate limits (Neon Function)
+Date: 2026-09-13
+Status: accepted
+Context: Share links are public (`#/f/{slug}`). Without limits, anonymous `submitresponse` can be flooded. Honeypot alone is insufficient.
+Decision: (1) Postgres table `submit_rate_buckets` + `consume_submit_rate()` RPC (security definer, owner-only). (2) Neon Function checks **IP+form** (default 10 / 10 min) then **IP** (default 30 / hour) before insert; returns **429** + `Retry-After`. (3) Limits tunable via Function env `SUBMIT_RATE_*`. (4) Fail closed (503) if the rate check errors.
+Alternatives:
+- In-memory Map on the Function isolate. Rejected — resets on cold start / multi-isolate.
+- External Redis. Rejected — extra paid service for v1 scale.
+Consequences: Legitimate rapid re-tests from one network may hit 429; raise env limits if needed. IP spoofing is mitigated by trusting platform `x-forwarded-for` from Neon/edge.
+Revisit when: per-form admin-configurable quotas or CAPTCHA are required.
+
+## ADR-031 — Public upload signing guards (Neon Function)
+Date: 2026-09-13
+Status: accepted
+Context: `storagesign` issued presigned PUTs for any `public/{formId}/…` path with no form check, size cap, or rate limit — bucket fill risk on share links.
+Decision: (1) Path must match `public|draft/{formId}/{uuid}/{filename}`. (2) `public/` uploads only when the form exists, is **published**, and not soft-deleted. (3) Require `contentLength`; max **32 MB** (env `STORAGE_SIGN_MAX_BYTES`). Accept **any** `contentType` (default `application/octet-stream`) — no MIME allowlist; respondents must not fail on file type. (4) Bind `ContentLength` on the signed PUT. (5) Rate-limit anonymous signing via existing `consume_submit_rate` (defaults: 20 / 10 min per IP+form, 60 / hour per IP). (6) `draft/` uploads and all `download` / `meta` / `content` ops require a Bearer JWT whose `sub` (or `id`) matches `forms.owner_id` (exp checked; signature verify deferred until JWKS is wired).
+Alternatives:
+- MIME allowlist. Rejected — customer forms need arbitrary attachments; type errors are worse than hosting risk mitigated by size + rate + path guards.
+- Virus scanning / ClamAV. Deferred — ops cost.
+- CAPTCHA on upload. Deferred until abuse persists after these guards.
+- Full JWKS signature verify on every request. Deferred — owner_id match + exp blocks casual Bearer forgery; add JWKS when Neon Auth exposes a stable URL in Function env.
+Consequences: Malware can still be uploaded within size/rate limits; downloads should treat blobs as untrusted. Optional per-question `accept` remains a client picker hint only, not a server gate. Admin Responses previews require a signed-in owner session.
+Revisit when: JWKS verification on draft/download, or admin opts into a server-side MIME denylist.
+
+## ADR-032 — Multi-file `file_upload` answers
+Date: 2026-09-13
+Status: accepted
+Context: ADR-012 deferred multi-file. Studio users need respondents to attach more than one file and keep drag-and-drop after the first pick (empty-state zone alone is insufficient).
+Decision: (1) `FileUploadQuestion` gains `multiple?: boolean` (default **ON** when unset; set `false` for single-file) and `maxFiles?: number` (default **10** when multiple). (2) Single mode (`multiple: false`) keeps answer `File | string`. Multiple mode stores `(File | string)[]` (legacy single values still accepted when reading). (3) UI: file chip list + persistent drop zone; `<input multiple>` and drop accept all files up to `maxFiles`. (4) Studio: new `file_upload` questions set `multiple: true`; unset schemas behave as multi. (5) `onFileUpload` still called once per file (sequential).
+Alternatives:
+- Always store an array. Rejected — breaks existing single-string answers and `AnswersOf` consumers.
+- Parallel uploads with progress UI. Deferred — sequential + “Uploading…” is enough for v1.
+Consequences: Autosave strips raw `File` items from arrays (string refs remain). Piping / response formatting join multi labels with ", ".
+Revisit when: per-file progress bars or a host batch-upload API is needed.
+
+## ADR-033 — HEIC decode: `heic-to` (+ native) for iOS 18+
+Date: 2026-09-13
+Status: accepted
+Context: ADR-026 used `heic2any` alone. iPhone HEIC from iOS 18+ fails with libheif “format not supported,” so uploads silently passed through raw `.HEIC` and Responses Preview showed a dead-end error. `heic2any` is unmaintained relative to libheif.
+Decision: (1) Convert HEIC via native decode → `heic-to` (libheif 1.22+) → `heic2any` fallback. (2) Keep both deps lazy-loaded. (3) On upload, if HEIC still cannot be decoded, **fail the upload** with a clear message instead of storing unreadable HEIC.
+Alternatives:
+- Server-side conversion in `storagesign`. Deferred — adds Function CPU/deps; client path is enough for PSW admin volume.
+- Drop HEIC support. Rejected — iPhone is the default camera for PSW fieldwork.
+Consequences: slightly larger on-demand chunk when HEIC is opened; existing stored `.HEIC` answers become previewable after refresh.
+Revisit when: Neon Functions should normalize all uploads server-side.
+
+## ADR-034 — Typewriter key ticks while typing (companion to step sound)
+Date: 2026-09-13
+Status: accepted
+Context: ADR-023 covers discrete step/choice confirmation cues. Respondents (and studio preview) also want a soft typewriter feel on free-text entry when sound is enabled. Brief is silent; revisit clause on ADR-023 named per-interaction cues.
+Decision: When `schema.sound` resolves to a preset (not `off`), text-entry fields play a **separate synthesized typewriter tick** on printable keys, Backspace, and Delete — not on Enter (Enter still uses the step sound via OK/advance). Implemented as `playTypewriterTick()` in `formSounds.ts` (Web Audio, no assets), rate-limited (~26ms) with slight pitch variation. Wired through `<Form>` → `QuestionRenderer` → short/long text, email, phone, url, and number fields. No new schema field — typing sound is on whenever step sound is on.
+Alternatives:
+- Separate `schema.typingSound` toggle. Rejected for v1 — one Settings control is enough; can split later without breaking callers.
+- Reuse the selected step preset per key. Rejected — step presets are too long/loud for keystroke rate.
+- Sampled typewriter WAV. Rejected — same ADR-023 asset budget rule.
+Consequences: Forms with sound on feel more conversational while typing; silent forms stay silent. IME composition keys are ignored.
+Revisit when: respondent mute control, or typing sound independent of step sound.
+
+## ADR-035 — Team allowlist UI via SECURITY DEFINER RPCs
+Date: 2026-09-14
+Status: superseded by ADR-036
+Context: Extra studio emails live in `team_allowlist` (002). Migration 005 revoked direct client table access because RLS policies that call `is_psw_team()` recurse (that helper reads the same table). Operators still needed SQL to invite contractors. Sharing model for v1 remains a **single shared PSW workspace** (`@palmstreetweb.com` + allowlist), not multi-tenant personal accounts.
+Decision: (1) Add `list_team_allowlist` / `add_team_allowlist` / `remove_team_allowlist` as `SECURITY DEFINER` RPCs gated by `is_psw_team()` first — table stays revoked from `authenticated`. (2) Settings → Team access panel for add/remove. (3) Skip inserting `@palmstreetweb.com` (already covered by domain). (4) Block allowlisted-only users from removing their own email. (5) `can_sign_in` continues to honor the allowlist for magic-link / OAuth gate.
+Alternatives:
+- Restore table RLS with `(select is_psw_team())`. Rejected — same recursion footgun that 005 fixed.
+- Multi-tenant per-user forms. Deferred — product decision; current ops model is shared studio.
+Consequences: Any team member can invite/remove others from Settings. Schema cache refresh required after migration 007.
+Revisit when: multi-tenant or role-scoped admin (owner-only invites).
+Superseded by: ADR-036 (open signup; Team Access UI removed).
+
+## ADR-036 — Open signup + per-user form ownership
+Date: 2026-09-14
+Status: accepted (supersedes ADR-035 sharing model; ADR-029 team gate)
+Context: Slate was gated to `@palmstreetweb.com` + `team_allowlist` with a single shared form library. Product intent is now **anyone can sign up and use the app** with isolated libraries. Team Access in Settings is unnecessary under that model.
+Decision: (1) Open `can_sign_in` to any plausible email. (2) Add `forms.owner_id` stamped from `auth.user_id()` on insert (frozen on update). (3) Replace team RLS with owner-scoped policies on `forms` / `submissions` / `form_files`. (4) Remove Team Access UI; keep allowlist table/RPCs inert for now. (5) Backfill existing rows to a known PSW auth user so current forms are not orphaned. (6) Public fill by slug + Function submit remain global (slug still unique).
+Alternatives:
+- Keep shared team library + invites. Rejected — conflicts with “anyone can use.”
+- Multi-user orgs / form sharing. Deferred — personal accounts first.
+Consequences: New accounts start empty. Two users cannot share a form library without a future share model. Global slug uniqueness can collide across users (unique index still enforces).
+Revisit when: form sharing, teams, or per-owner slug namespaces.
+
+## ADR-037 — One branded sign-in email (magic link + code + Slate lockup)
+Date: 2026-09-18
+Status: accepted
+Context: Email sign-in calls both the Email OTP plugin and the Magic Link plugin so the login screen can accept either a click or a 6-digit code. Neon’s shared mailer then sends **two** default-branded messages. Dashboard email templates are not available; custom SMTP still uses Neon’s copy. Users asked for a single email that includes the actual Slate lockup.
+Decision: Subscribe Managed Better Auth webhooks to `send.otp` and `send.magic_link` (which disables Neon’s default templates). A Neon Function (`authemail`) verifies the Ed25519 signature, coalesces both payloads for the same address (~1.8s + advisory lock), and sends one Resend email from `Slate <notifications@palmstreetweb.com>` with the lockup PNG (CID), a Sign-in button, and the code. Staging rows live in `auth_email_pending` (RLS on, no Data API grants). Neon Auth will not call its own Function hosts, so production webhook URL is `https://slateforms.vercel.app/api/auth-email`, which forwards to `authemail`.
+Alternatives:
+- Custom SMTP only. Rejected — still two Neon-branded templates.
+- Send only magic link *or* only OTP. Rejected — login UI offers both.
+- Client-side merge. Impossible — tokens are minted server-side.
+Consequences: `RESEND_API_KEY` and `NEON_AUTH_URL` must be set on `authemail`. The Auth webhook URL must be a non-Neon HTTPS host (`slateforms.vercel.app/api/auth-email`). If one plugin fails, the email still sends with whichever payload arrived.
+Revisit when: Neon ships dashboard email templates that can include both a link and a code.
+
+## ADR-038 — Hard per-user form quota
+Date: 2026-09-18
+Status: accepted
+Context: ADR-036 opened signup. Authenticated users insert forms through the Data API with no ceiling, so one bot account could create unbounded rows, keep compute awake, and burn Launch credits. Public submit/upload already have IP rate limits (ADR-030/031); form *creation* did not.
+Decision: (1) Postgres `BEFORE INSERT` on `forms` (inside `forms_enforce_owner`) counts **all** rows for `owner_id`, including trash, and raises `FORM_QUOTA_EXCEEDED` at **50**. (2) Count includes soft-deleted rows so trash-and-recreate cannot churn; a slot frees only on permanent delete. (3) Skip the quota when the `id` already exists so PostgREST upserts of existing forms still save at the cap. (4) Serialize with `pg_advisory_xact_lock` per owner. (5) Limit lives in `form_quota_limit()`; SPA reads `form_quota_status()` for copy. (6) UI blocks New form / Duplicate with an explanation — not a hidden button. LocalStorage offline mode stays uncapped.
+Alternatives:
+- Client-only disable of New form. Rejected — bots call the Data API directly.
+- Count active forms only. Rejected — infinite create/trash loop.
+- Invite-only signup. Complementary, not a substitute; product still wants open signup.
+- Per-hour insert rate in addition to the cap. Deferred until we see abuse at 50.
+Consequences: A user with 50 forms (active + trash) cannot create or duplicate until they delete forever. Bumping the number is one SQL change to `form_quota_limit()` plus Data API schema refresh. Existing libraries over 50 remain editable.
+Revisit when: paid plans, per-email allowlist exceptions, or signup captcha.
+
+## ADR-039 — Build with AI (admin draft generator)
+Date: 2026-09-19
+Status: accepted
+Context: Authors want a first draft from a short prompt. The engine bundle budget is <50kb gzipped (brief §2.9); Anthropic must stay server-side. No existing Zod model of the form schema.
+Decision: (1) Add runtime deps `ai`, `@ai-sdk/anthropic`, and `zod` for the **admin API only** — never imported from `src/`. (2) `POST /api/generate` (Vercel serverless, Node) calls structured generation with `claude-haiku-4-5` and a Zod schema of **every type the editor can add** (`ADDABLE_TYPES` + welcome/thanks as separate chrome). Questions are a **flat object** (type enum + unused fields as `""` / `0` / `[]`) because Anthropic structured output cannot compile a 20-way discriminated union. `picture_choice` options need a real `https` `src`. (3) Map `title` → form name + `brand.name`, `description` → welcome subtitle, `theme` → `editorial` | `swiss`, `themeMode` always `toggle`. (4) In-memory 10 req/min per IP. (5) SPA creates a draft via `createFormAsync` and offers Undo (permanent delete of that unused draft).
+Alternatives:
+- Import AI SDK into the published engine. Rejected — blows the bundle budget and exposes the key path.
+- Limit to BUILD_BRIEF §5 (11 types). Superseded — the editor already ships url, date, file_upload, dropdown, yes_no, nps, etc.
+- Stream tokens. Deferred — stagger-reveal the landed object in the modal.
+Consequences: `ANTHROPIC_API_KEY` is server-only (Vercel + `.env.local`). `npm run dev` proxies `/api/generate` through a Vite middleware so localhost works without `vercel dev`; production/preview still use the Vercel function. Engine `npm run build` size is unchanged.
+Revisit when: streaming schemas or per-user auth on the generate endpoint.
 
 ---
 

@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Form } from '@/index.js';
-import { fetchPublishedFormBySlug, metaToPayload, submitPublicResponse } from '../supabase/publicApi.js';
-import { isSupabaseConfigured } from '../supabase/env.js';
+import { fetchPublishedFormBySlug, metaToPayload, submitPublicResponse } from '../neon/publicApi.js';
+import { isNeonConfigured } from '../neon/env.js';
 import { navigate } from '../_router.js';
 import { hostFileUpload } from '../hostFileUpload.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
 import { setUploadContext, clearUploadContext } from '../uploadContext.js';
 import { readSlateMode } from '../slateMode.js';
+import { LoadingScreen } from '../shell/LoadingScreen.js';
 
 type Props = { slug: string };
 
@@ -19,22 +20,28 @@ export function PublicFill({ slug }: Props) {
   const mode = readSlateMode();
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      setError('Public fill requires Supabase configuration.');
+    if (!isNeonConfigured()) {
+      setError('Public fill requires Neon configuration.');
       setLoading(false);
       return;
     }
     let cancelled = false;
-    void fetchPublishedFormBySlug(slug).then((payload) => {
-      if (cancelled) return;
-      if (!payload) {
-        setError('This form is not published or does not exist.');
-      } else {
-        setForm(payload);
-        setUploadContext(payload.id);
-      }
-      setLoading(false);
-    });
+    void fetchPublishedFormBySlug(slug)
+      .then((payload) => {
+        if (cancelled) return;
+        if (!payload) {
+          setError('This form is not published or does not exist.');
+        } else {
+          setForm(payload);
+          setUploadContext(payload.id);
+        }
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Could not load this form.');
+        setLoading(false);
+      });
     return () => {
       cancelled = true;
       clearUploadContext();
@@ -44,13 +51,7 @@ export function PublicFill({ slug }: Props) {
   const schema = useMemo(() => form?.schema ?? null, [form]);
 
   if (loading) {
-    return (
-      <div data-slate-forms="" data-theme-name="slate" data-theme={mode} className="slate-app">
-        <div className="slate-empty" style={{ minHeight: '100vh', display: 'grid', placeContent: 'center' }}>
-          Loading form…
-        </div>
-      </div>
-    );
+    return <LoadingScreen label="Loading form" />;
   }
 
   if (error || !schema || !form) {

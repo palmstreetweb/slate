@@ -6,6 +6,8 @@
 
 **Live demo:** [slateforms.vercel.app](https://slateforms.vercel.app) — also `npm run dev` locally
 
+**Admin backend:** Neon (Data API + Auth + Object Storage + Functions). Setup: [`neon/SETUP.md`](./neon/SETUP.md) · Deploy: [`DEPLOY.md`](./DEPLOY.md)
+
 **Brand reference:** [slateforms.vercel.app/brand](https://slateforms.vercel.app/brand) (static page in [`brand/`](./brand/))
 
 ---
@@ -92,7 +94,8 @@ type Schema = {
   brand: { name: string; logo?: string };
   theme: 'classic' | 'editorial' | 'swiss' | (string & {});
   themeMode: 'auto' | 'light' | 'dark' | 'toggle';
-  /** Opt-in step sound: `'off'` or one of ten built-in presets (ADR-023). */
+  /** Opt-in step sound: `'off'` or one of ten built-in presets (ADR-023).
+   *  When on, text fields also play typewriter key ticks (ADR-034). */
   sound?: FormSound | boolean;
   questions: ReadonlyArray<Question>;
 };
@@ -121,7 +124,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `url` | `title`, `placeholder?`, `required?` | website shape; bare domains get `https://` prefixed | `string` |
 | `number` | `title`, `placeholder?`, `min?`, `max?`, `step?`, `required?` | range | `number` |
 | `date` | `title`, `required?`, `format?` (`'MM/DD/YYYY'` default), `min?`, `max?` (ISO) | real calendar date + bounds | `string` (ISO `YYYY-MM-DD`) |
-| `file_upload` | `title`, `required?`, `accept?`, `maxSizeMb?` | presence + size | `File`, or `string` via `onFileUpload` |
+| `file_upload` | `title`, `required?`, `accept?`, `maxSizeMb?`, `multiple?`, `maxFiles?` | presence + size; max files when multiple | `File` / `string`, or `(File \| string)[]` when `multiple` |
 | `single_choice` | `title`, `options: Option[]`, `required?` (default `true`) | required | `string` |
 | `multi_choice` | `title`, `options: Option[]`, `min?`, `max?` | min/max selections | `string[]` |
 | `dropdown` | `title`, `options: Option[]`, `placeholder?`, `required?` (default `true`) | required | `string` |

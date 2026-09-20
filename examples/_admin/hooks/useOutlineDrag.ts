@@ -13,7 +13,7 @@ const CANCEL_MS = 300;
 const SETTLE_COMMIT_RATIO = 0.82;
 const SETTLE_EASE = 'cubic-bezier(0.22, 1, 0.16, 1)';
 const CANCEL_EASE = 'cubic-bezier(0.33, 0.9, 0.42, 1)';
-const TRACKING_SCALE = 1.035;
+const TRACKING_SCALE = 0.7;
 const TRACKING_ROTATE_DEG = -1.5;
 
 type GhostRect = { x: number; y: number; width: number; height: number };

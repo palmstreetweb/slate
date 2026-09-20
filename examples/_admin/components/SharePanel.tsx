@@ -8,7 +8,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useFocusTrap } from '../useFocusTrap.js';
 import type { Schema } from '@/index.js';
-import { copyText } from '../shareUrls.js';
+import { copyText, copyImage } from '../shareUrls.js';
 import { buildPortableShareUrl, canEncodePortableSchema } from '../portableShare.js';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { readSlateMode } from '../slateMode.js';
@@ -21,8 +21,8 @@ import {
   type ShareQrStyle,
 } from '../shareQr.js';
 import { getForm, publishForm, unpublishForm, subscribe } from '../_formsStore.js';
-import { isSupabaseConfigured } from '../supabase/env.js';
-import { publicFillUrl } from '../supabase/publicApi.js';
+import { isNeonConfigured } from '../neon/env.js';
+import { publicFillUrl } from '../neon/publicApi.js';
 
 type Props = {
   open: boolean;
@@ -39,6 +39,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const [qrError, setQrError] = useState<string | null>(null);
   const [qrStyle, setQrStyle] = useState<ShareQrStyle>(() => readShareQrStyle());
   const [copied, setCopied] = useState(false);
+  const [qrCopied, setQrCopied] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [, setTick] = useState(0);
 
@@ -53,7 +54,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const isPublished = form?.status === 'published';
   const slug = form?.slug ?? formId;
 
-  const productionUrl = isSupabaseConfigured() && isPublished ? publicFillUrl(slug) : null;
+  const productionUrl = isNeonConfigured() && isPublished ? publicFillUrl(slug) : null;
   const portableUrl = canEncodePortableSchema(schema)
     ? buildPortableShareUrl(schema, { formId, name: formName })
     : null;
@@ -118,6 +119,15 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
     }
   }, [shareUrl]);
 
+  const onCopyQr = useCallback(async () => {
+    if (!qr) return;
+    const ok = await copyImage(qr);
+    if (ok) {
+      setQrCopied(true);
+      window.setTimeout(() => setQrCopied(false), 2000);
+    }
+  }, [qr]);
+
   const onPublish = () => {
     setPublishing(true);
     publishForm(formId);
@@ -134,7 +144,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
 
   const mode = readSlateMode();
   const uiTheme = detectAdminUiTheme();
-  const cloud = isSupabaseConfigured();
+  const cloud = isNeonConfigured();
   const linkLabel = productionUrl ? 'Public link' : 'Portable link';
 
   return createPortal(
@@ -223,13 +233,22 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                 <section className="slate-share-scan" aria-label="QR code">
                   <div className="slate-share-qr-frame" aria-hidden={!qr}>
                     {qr ? (
-                      <img
-                        src={qr}
-                        alt=""
-                        className="slate-share-qr"
-                        width={SHARE_QR_DISPLAY_PX}
-                        height={SHARE_QR_DISPLAY_PX}
-                      />
+                      <button
+                        type="button"
+                        className="slate-share-qr-btn"
+                        onClick={() => void onCopyQr()}
+                        title="Click to copy QR image"
+                        aria-label={qrCopied ? 'QR code copied' : 'Copy QR code image'}
+                      >
+                        <img
+                          src={qr}
+                          alt=""
+                          className="slate-share-qr"
+                          width={SHARE_QR_DISPLAY_PX}
+                          height={SHARE_QR_DISPLAY_PX}
+                        />
+                        {qrCopied ? <span className="slate-share-qr-toast">Copied</span> : null}
+                      </button>
                     ) : qrError ? (
                       <div className="slate-share-qr slate-share-qr--error" role="status">
                         {qrError}
@@ -257,7 +276,9 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                     ))}
                   </div>
 
-                  <p className="slate-share-scan-hint">Scan with your phone camera</p>
+                  <p className="slate-share-scan-hint">
+                    Scan with your phone camera · click to copy
+                  </p>
                 </section>
               </>
             ) : (

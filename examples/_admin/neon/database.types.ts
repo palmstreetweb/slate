@@ -1,5 +1,5 @@
 /**
- * Supabase generated-style types for Slate admin (ADR-028).
+ * Neon generated-style types for Slate admin (ADR-029).
  * Hand-maintained to avoid codegen in CI; update when migrations change.
  */
 
@@ -14,6 +14,7 @@ export type DbFormRow = {
   schema: Schema;
   published_schema: Schema | null;
   status: FormStatus;
+  owner_id: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -78,6 +79,38 @@ export type Database = {
       can_sign_in: {
         Args: { p_email: string };
         Returns: boolean;
+      };
+      list_team_allowlist: {
+        Args: Record<string, never>;
+        Returns: { email: string; created_at: string }[];
+      };
+      add_team_allowlist: {
+        Args: { p_email: string };
+        Returns: string;
+      };
+      remove_team_allowlist: {
+        Args: { p_email: string };
+        Returns: boolean;
+      };
+      is_psw_team: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      auth_email: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      auth_uid: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      form_quota_limit: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      form_quota_status: {
+        Args: Record<string, never>;
+        Returns: { used: number; max_forms: number }[];
       };
     };
     Enums: Record<string, never>;

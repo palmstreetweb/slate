@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Slate — Legend-like loading sounds</title>
+<style>
+  :root {
+    --bg:#15181D; --panel:#1E232B; --panel-2:#23282F; --ink:#F2EFE8; --muted:#8A93A1;
+    --line:#2D333D; --red:#E23B2D; --on:#fff;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:640px; margin:0 auto; padding:36px 20px 80px; }
+  .kicker { font:700 11px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+  h1 { font:600 26px/1.2 var(--sans); letter-spacing:-.03em; margin:0 0 8px; }
+  .lead { color:var(--muted); margin:0 0 28px; max-width:52ch; }
+  .grid { display:flex; flex-direction:column; gap:10px; }
+  .opt {
+    display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:14px 16px;
+  }
+  .n {
+    width:26px; height:26px; border-radius:8px; background:var(--panel-2); border:1px solid var(--line);
+    font:700 11px/26px var(--sans); text-align:center; color:var(--muted);
+  }
+  .opt h2 { margin:0; font:600 15px/1.25 var(--sans); letter-spacing:-.01em; }
+  .opt p { margin:3px 0 0; font-size:12px; color:var(--muted); }
+  button.play {
+    appearance:none; border:0; cursor:pointer;
+    min-width:72px; height:36px; padding:0 14px; border-radius:999px;
+    font:600 13px/1 var(--sans); color:var(--on); background:var(--red);
+  }
+  button.play:hover { filter:brightness(1.06); }
+  button.play.is-on { background:var(--panel-2); color:var(--ink); border:1px solid var(--line); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <p class="kicker">Loading splash · Legend-adjacent</p>
+    <h1>Ten premium load idents</h1>
+    <p class="lead">Closer to Robinhood Legend: short, dark, expensive. Whoosh + sub + a resolved chord — not toy ticks. Click Play. Reply with a number.</p>
+    <div class="grid" id="grid"></div>
+  </div>
+<script>
+const OPTIONS = [
+  { id:1, name:'Open resolve', note:'Reverse air, sub hit, major fifth locks. The Legend shape.' },
+  { id:2, name:'Lydian lift', note:'Same whoosh, brighter #4 sparkle. More optimistic.' },
+  { id:3, name:'Dark lock', note:'Heavier bass, quieter air, minor-into-major.' },
+  { id:4, name:'Glass market', note:'Thin whoosh, glassy two-note stamp.' },
+  { id:5, name:'Wide bloom', note:'Stereo sweep into a three-note pad chord.' },
+  { id:6, name:'Soft power-on', note:'Filtered rise, then one warm octave.' },
+  { id:7, name:'Strike resolve', note:'Tighter, faster. Trading-desk snap.' },
+  { id:8, name:'Deep open', note:'Sub-forward. Almost felt more than heard.' },
+  { id:9, name:'Halo fifth', note:'Longer tail, distant fifth hanging.' },
+  { id:10, name:'Clean ident', note:'Least air, most logo. Two notes and done.' },
+];
+
+let ctx = null;
+
+function ac() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+function noiseBuf(c, dur) {
+  const n = Math.ceil(c.sampleRate * dur);
+  const buf = c.createBuffer(1, n, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+function whoosh(c, dest, t0, { dur = 0.55, peak = 0.07, startF = 280, endF = 2400, reverse = true } = {}) {
+  const src = c.createBufferSource();
+  src.buffer = noiseBuf(c, dur + 0.1);
+  const f = c.createBiquadFilter();
+  f.type = 'bandpass';
+  f.Q.value = 0.85;
+  if (reverse) {
+    f.frequency.setValueAtTime(endF, t0);
+    f.frequency.exponentialRampToValueAtTime(startF, t0 + dur);
+  } else {
+    f.frequency.setValueAtTime(startF, t0);
+    f.frequency.exponentialRampToValueAtTime(endF, t0 + dur);
+  }
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  if (reverse) {
+    g.gain.exponentialRampToValueAtTime(peak, t0 + dur * 0.72);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  } else {
+    g.gain.exponentialRampToValueAtTime(peak, t0 + dur * 0.35);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  }
+  src.connect(f).connect(g).connect(dest);
+  src.start(t0);
+  src.stop(t0 + dur + 0.02);
+}
+
+function tone(c, dest, t, freq, { type = 'sine', peak = 0.05, a = 0.012, d = 0.35, r = 0.45, detune = 0 } = {}) {
+  const o = c.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (detune) o.detune.setValueAtTime(detune, t);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peak, t + a);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.22), t + a + d);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + a + d + r);
+  o.connect(g).connect(dest);
+  o.start(t);
+  o.stop(t + a + d + r + 0.05);
+}
+
+function sub(c, dest, t, freq, peak = 0.08) {
+  const o = c.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(freq, t);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peak, t + 0.018);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+  o.connect(g).connect(dest);
+  o.start(t);
+  o.stop(t + 0.5);
+}
+
+function play(id) {
+  const c = ac();
+  const t0 = c.currentTime + 0.02;
+  const master = c.createGain();
+  master.gain.value = 1;
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 9000;
+  master.connect(lp).connect(c.destination);
+
+  const hit = t0 + 0.38;
+
+  if (id === 1) {
+    whoosh(c, master, t0, { dur: 0.48, peak: 0.075, reverse: true });
+    sub(c, master, hit, 55, 0.09);
+    tone(c, master, hit, 196, { peak: 0.045, d: 0.4, r: 0.55 });
+    tone(c, master, hit + 0.03, 294, { peak: 0.05, d: 0.45, r: 0.7, type: 'triangle' });
+    tone(c, master, hit + 0.05, 392, { peak: 0.028, d: 0.5, r: 0.8 });
+  }
+
+  if (id === 2) {
+    whoosh(c, master, t0, { dur: 0.5, peak: 0.07, endF: 3200, reverse: true });
+    sub(c, master, hit, 61.74, 0.075);
+    tone(c, master, hit, 246.94, { peak: 0.04, d: 0.35, r: 0.5 });
+    tone(c, master, hit + 0.04, 370, { peak: 0.048, d: 0.4, r: 0.65, type: 'triangle' });
+    tone(c, master, hit + 0.08, 493.88, { peak: 0.03, d: 0.45, r: 0.75 });
+  }
+
+  if (id === 3) {
+    whoosh(c, master, t0, { dur: 0.52, peak: 0.055, startF: 180, endF: 1600, reverse: true });
+    sub(c, master, hit, 49, 0.11);
+    tone(c, master, hit, 185, { peak: 0.05, d: 0.25, r: 0.35 });
+    tone(c, master, hit + 0.09, 220, { peak: 0.04, d: 0.3, r: 0.4 });
+    tone(c, master, hit + 0.16, 277.18, { peak: 0.048, d: 0.5, r: 0.7, type: 'triangle' });
+  }
+
+  if (id === 4) {
+    whoosh(c, master, t0, { dur: 0.4, peak: 0.05, startF: 600, endF: 4000, reverse: true });
+    sub(c, master, hit, 73.4, 0.055);
+    tone(c, master, hit, 523.25, { peak: 0.035, a: 0.006, d: 0.55, r: 0.7 });
+    tone(c, master, hit + 0.02, 784, { peak: 0.04, a: 0.008, d: 0.6, r: 0.85 });
+  }
+
+  if (id === 5) {
+    whoosh(c, master, t0, { dur: 0.62, peak: 0.068, reverse: true });
+    sub(c, master, hit, 55, 0.07);
+    const chord = [174.61, 220, 261.63, 329.63];
+    chord.forEach((f, i) => {
+      tone(c, master, hit + i * 0.018, f, { peak: 0.032, type: i ? 'sine' : 'triangle', d: 0.55, r: 0.9 });
+    });
+  }
+
+  if (id === 6) {
+    whoosh(c, master, t0, { dur: 0.7, peak: 0.06, reverse: false, startF: 200, endF: 2200 });
+    tone(c, master, t0 + 0.55, 130.81, { peak: 0.05, a: 0.04, d: 0.5, r: 0.6, type: 'triangle' });
+    tone(c, master, t0 + 0.58, 261.63, { peak: 0.04, a: 0.05, d: 0.55, r: 0.7 });
+  }
+
+  if (id === 7) {
+    whoosh(c, master, t0, { dur: 0.28, peak: 0.06, reverse: true, endF: 2800 });
+    const h = t0 + 0.22;
+    sub(c, master, h, 65.4, 0.085);
+    tone(c, master, h, 329.63, { peak: 0.042, a: 0.004, d: 0.22, r: 0.35 });
+    tone(c, master, h + 0.025, 493.88, { peak: 0.05, a: 0.004, d: 0.28, r: 0.45, type: 'triangle' });
+  }
+
+  if (id === 8) {
+    whoosh(c, master, t0, { dur: 0.5, peak: 0.04, startF: 120, endF: 900, reverse: true });
+    sub(c, master, hit, 41.2, 0.13);
+    tone(c, master, hit, 82.4, { peak: 0.06, d: 0.5, r: 0.6 });
+    tone(c, master, hit + 0.06, 123.47, { peak: 0.035, d: 0.55, r: 0.7 });
+  }
+
+  if (id === 9) {
+    whoosh(c, master, t0, { dur: 0.45, peak: 0.05, reverse: true });
+    sub(c, master, hit, 58.27, 0.07);
+    tone(c, master, hit, 293.66, { peak: 0.038, d: 0.7, r: 1.1 });
+    tone(c, master, hit + 0.04, 440, { peak: 0.042, d: 0.85, r: 1.3, type: 'triangle' });
+  }
+
+  if (id === 10) {
+    whoosh(c, master, t0, { dur: 0.32, peak: 0.035, reverse: true });
+    const h = t0 + 0.26;
+    sub(c, master, h, 55, 0.06);
+    tone(c, master, h, 261.63, { peak: 0.048, a: 0.006, d: 0.32, r: 0.5 });
+    tone(c, master, h + 0.05, 392, { peak: 0.052, a: 0.006, d: 0.4, r: 0.65, type: 'triangle' });
+  }
+}
+
+const grid = document.getElementById('grid');
+OPTIONS.forEach((opt) => {
+  const el = document.createElement('div');
+  el.className = 'opt';
+  el.innerHTML = `
+    <div class="n">${opt.id}</div>
+    <div>
+      <h2>${opt.name}</h2>
+      <p>${opt.note}</p>
+    </div>
+    <button type="button" class="play" data-id="${opt.id}">Play</button>
+  `;
+  grid.appendChild(el);
+});
+
+grid.addEventListener('click', (e) => {
+  const btn = e.target.closest('button.play');
+  if (!btn) return;
+  const id = Number(btn.dataset.id);
+  play(id);
+  document.querySelectorAll('button.play').forEach((b) => {
+    b.classList.toggle('is-on', b === btn);
+    b.textContent = b === btn ? 'Playing' : 'Play';
+  });
+  window.setTimeout(() => {
+    btn.classList.remove('is-on');
+    btn.textContent = 'Play';
+  }, 1800);
+});
+</script>
+</body>
+</html>

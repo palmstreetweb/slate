@@ -30,6 +30,6 @@
     },
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src", "tests", "examples", "*.config.ts", "*.config.mjs"],
+  "include": ["src", "tests", "examples", "api", "*.config.ts", "*.config.mjs"],
   "exclude": ["node_modules", "dist"]
 }

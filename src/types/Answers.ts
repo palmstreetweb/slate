@@ -43,20 +43,23 @@ import type {
  *   - picture_choice → string, or string[] when `multiple: true`
  *   - yes_no → 'yes' | 'no'
  *   - legal → 'accept' | 'decline'
- *   - file_upload → File, or string when the host uploads via `onFileUpload`
+ *   - file_upload → File | string, or (File | string)[] when `multiple: true` (ADR-032)
  *   - matrix → Record<rowValue, columnValue | columnValue[]> (see ADR-013)
  *   - welcome, statement, thanks → never stored
  */
 
-/** A `file_upload` answer — the raw File, or the host's URL/id after upload. */
-export type FileAnswer = File | string;
+/** One attachment — raw File, or the host's URL/id after upload. */
+export type FileAnswerItem = File | string;
+
+/** A `file_upload` answer — single item, or an array when `multiple: true`. */
+export type FileAnswer = FileAnswerItem | FileAnswerItem[];
 
 /** A `matrix` answer — row value → selected column value(s). */
 export type MatrixAnswer = Record<string, string | string[]>;
 
 export type LooseAnswers = Record<
   string,
-  string | string[] | number | File | MatrixAnswer | undefined
+  string | string[] | number | File | FileAnswerItem[] | MatrixAnswer | undefined
 >;
 
 /** Public alias — what the brief calls `Answers`. */
@@ -93,7 +96,9 @@ export type AnswerValueOf<Q extends Question> = Q extends ShortTextQuestion
                     : Q extends LegalQuestion
                       ? 'accept' | 'decline'
                       : Q extends FileUploadQuestion
-                        ? FileAnswer
+                        ? Q extends { multiple: true }
+                          ? FileAnswerItem[]
+                          : FileAnswerItem
                         : Q extends MatrixQuestion
                           ? MatrixAnswer
                           : Q extends RankingQuestion<string, infer TOpts>
