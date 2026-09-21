@@ -59,6 +59,7 @@ import { slugify } from '../shareUrls.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { useToast } from '../toast.js';
 import { playUiSound } from '../uiSounds.js';
+import { lockBodyScroll } from '../lockBodyScroll.js';
 
 type Props = {
   formId: string | null;
@@ -296,11 +297,15 @@ function FormEditorBody({ formId }: { formId: string }) {
 
   useEffect(() => {
     if (!shortcutsOpen) return;
+    const unlock = lockBodyScroll();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setShortcutsOpen(false);
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      unlock();
+    };
   }, [shortcutsOpen]);
 
   // If the selected question was deleted (or doesn't exist after a schema

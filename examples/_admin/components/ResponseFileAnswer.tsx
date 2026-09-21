@@ -18,6 +18,7 @@ import {
   isStorageUploadRef,
   storagePathFromRef,
 } from '../storageUpload.js';
+import { lockBodyScroll } from '../lockBodyScroll.js';
 
 function asFileItems(value: unknown): Array<File | string> {
   if (value === undefined || value === null || value === '') return [];
@@ -336,11 +337,10 @@ function FileLightbox({
       }
     };
     window.addEventListener('keydown', onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockBodyScroll();
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
+      unlock();
     };
   }, [onClose]);
 

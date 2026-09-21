@@ -25,6 +25,7 @@ import { isNeonConfigured } from '../neon/env.js';
 import { publicFillUrl } from '../neon/publicApi.js';
 import { playUiSound } from '../uiSounds.js';
 import { useToast } from '../toast.js';
+import { lockBodyScroll } from '../lockBodyScroll.js';
 
 type Props = {
   open: boolean;
@@ -77,11 +78,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
+    return lockBodyScroll();
   }, [open]);
 
   useEffect(() => {

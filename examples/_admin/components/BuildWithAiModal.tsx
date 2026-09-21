@@ -15,6 +15,7 @@ import {
 } from '../ai/client.js';
 import { readSlateMode } from '../slateMode.js';
 import { useFocusTrap } from '../useFocusTrap.js';
+import { lockBodyScroll } from '../lockBodyScroll.js';
 
 const CHIPS = [
   'A wedding RSVP with meal choice and plus-one…',
@@ -90,11 +91,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
   useEffect(() => {
     if (!open) return;
     setRecent(readRecentPrompts());
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
+    return lockBodyScroll();
   }, [open]);
 
   useEffect(() => {

@@ -6,6 +6,11 @@
    its theme tokens via cascade specificity.
    ============================================================ */
 
+/* Reserve scrollbar space so modals that lock body scroll don’t shove the page. */
+html {
+  scrollbar-gutter: stable;
+}
+
 /* The base [data-slate-forms] rule sets overflow-x: hidden, which the
    browser implicitly turns into `overflow: hidden auto` — that makes the
    wrapper its OWN scroll container and breaks `position: sticky` on the

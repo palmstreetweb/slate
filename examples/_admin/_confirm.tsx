@@ -26,6 +26,7 @@ import {
 import { createPortal } from 'react-dom';
 import { detectAdminUiTheme } from './adminUiTheme.js';
 import { readSlateMode } from './slateMode.js';
+import { lockBodyScroll } from './lockBodyScroll.js';
 
 export type ConfirmOptions = {
   title: string;
@@ -98,13 +99,11 @@ function Dialog({
     };
     window.addEventListener('keydown', onKey);
 
-    // Lock scroll while open.
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockBodyScroll();
 
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
+      unlock();
       previouslyFocused.current?.focus({ preventScroll: true });
     };
   }, [onClose]);

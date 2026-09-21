@@ -17,6 +17,7 @@ import { createPortal } from 'react-dom';
 import { isDefaultFormName, normalizeFormNameInput } from './formName.js';
 import { detectAdminUiTheme } from './adminUiTheme.js';
 import { readSlateMode } from './slateMode.js';
+import { lockBodyScroll } from './lockBodyScroll.js';
 
 type PromptFn = () => Promise<string | null>;
 
@@ -62,8 +63,7 @@ function TitleDialog({ onClose }: { onClose: (value: string | null) => void }) {
 
   useEffect(() => {
     inputRef.current?.focus({ preventScroll: true });
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockBodyScroll();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -73,7 +73,7 @@ function TitleDialog({ onClose }: { onClose: (value: string | null) => void }) {
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
+      unlock();
     };
   }, [onClose]);
 
