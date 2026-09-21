@@ -31,6 +31,9 @@ export const GENERATED_QUESTION_TYPES = [
 
 export type GeneratedQuestionType = (typeof GENERATED_QUESTION_TYPES)[number];
 
+/** AI drafts only. The engine has no question limit. 24 fits a full worksheet. */
+export const GENERATED_QUESTION_MAX = 24;
+
 const id = z
   .string()
   .min(1)
@@ -87,7 +90,7 @@ export const generatedFormSchema = z
       subtitle: z.string(),
       cta: z.string(),
     }),
-    questions: z.array(generatedQuestionSchema).min(3).max(12),
+    questions: z.array(generatedQuestionSchema).min(3).max(GENERATED_QUESTION_MAX),
     thanks: z.object({
       title: z.string().min(1),
       subtitle: z.string(),
@@ -203,7 +206,8 @@ Branching (showIfField / showIfEquals):
 When revising a draft: keep ids stable for questions that remain. Change copy, drop extras, or add fields as asked.
 
 Rules:
-- 3–8 questions unless the user asks otherwise (hard cap 12).
+- A short prompt stays 3–8 questions.
+- A document, or a request to keep everything, uses one question per blank, choice, or numbered pair. Section notes become statements. Do not merge or drop lines to stay short. Hard cap ${GENERATED_QUESTION_MAX}.
 - Never put welcome or thanks inside questions[].
 - Never use a question as the welcome or thanks title.
 - Pick the type that matches the data (email, date, phone, yes_no).

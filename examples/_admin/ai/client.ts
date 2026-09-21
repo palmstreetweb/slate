@@ -12,9 +12,14 @@ export type GenerateRequest = {
   prompt: string;
   previous?: GeneratedForm;
   instruction?: string;
+  document?: {
+    filename: string;
+    mime?: string;
+    base64?: string;
+  };
 };
 
-export async function requestGeneratedForm(input: GenerateRequest): Promise<GeneratedDraft> {
+export async function requestGeneratedForm(input: GenerateRequest): Promise<GeneratedDraft & { sourcePrompt: string }> {
   const res = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -22,16 +27,17 @@ export async function requestGeneratedForm(input: GenerateRequest): Promise<Gene
       prompt: input.prompt,
       previous: input.previous,
       instruction: input.instruction,
+      document: input.document,
     }),
   });
   const data = (await res.json().catch(() => null)) as
-    | { form?: GeneratedForm; error?: string }
+    | { form?: GeneratedForm; prompt?: string; error?: string }
     | null;
   if (!res.ok || !data?.form) {
     throw new Error(data?.error || `Generate failed (${res.status}).`);
   }
   const mapped = mapGeneratedForm(data.form);
-  return { ...mapped, form: data.form };
+  return { ...mapped, form: data.form, sourcePrompt: data.prompt?.trim() || input.prompt };
 }
 
 export const AI_DRAFT_KEY = 'slate-ai-draft';

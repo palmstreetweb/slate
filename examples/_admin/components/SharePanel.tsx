@@ -170,7 +170,6 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const mode = readSlateMode();
   const uiTheme = detectAdminUiTheme();
   const cloud = isNeonConfigured();
-  const linkLabel = productionUrl ? 'Public link' : 'Portable link';
 
   return createPortal(
     <div data-slate-forms="" data-theme-name="slate" data-admin-ui={uiTheme} data-theme={mode}>
@@ -202,44 +201,9 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
           </header>
 
           <div className="slate-share-body">
-            {cloud ? (
-              <section className="slate-share-cloud">
-                <p className="slate-share-kicker">Production</p>
-                {isPublished ? (
-                  <p className="slate-share-hint">
-                    {stale
-                      ? 'Draft has changes the public link isn’t serving yet — republish to update.'
-                      : 'Live — responses sync to Slate cloud.'}
-                  </p>
-                ) : (
-                  <p className="slate-share-hint">Publish to enable the public fill link.</p>
-                )}
-                {stale ? (
-                  <p className="slate-share-stale" role="status">
-                    Unpublished changes
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  className={`slate-btn${isPublished && !stale ? '' : ' slate-btn--primary'}`}
-                  onClick={isPublished && !stale ? onUnpublish : onPublish}
-                  disabled={publishing}
-                >
-                  {publishing
-                    ? 'Working…'
-                    : isPublished
-                      ? stale
-                        ? 'Republish'
-                        : 'Unpublish'
-                      : 'Publish'}
-                </button>
-              </section>
-            ) : null}
-
             {shareUrl ? (
               <>
                 <section className="slate-share-link-card" aria-label="Share link">
-                  <p className="slate-share-kicker">{linkLabel}</p>
                   <div className="slate-share-link-field">
                     <input
                       className="slate-input slate-share-url"
@@ -255,15 +219,33 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                       {copied ? 'Copied' : 'Copy'}
                     </button>
                   </div>
-                  <a
-                    href={shareUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="slate-share-open"
-                  >
-                    Open in browser
-                    <span aria-hidden>↗</span>
-                  </a>
+                  <div className="slate-share-actions">
+                    <a
+                      href={shareUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="slate-share-open"
+                    >
+                      Open in browser
+                      <span aria-hidden>↗</span>
+                    </a>
+                    {cloud ? (
+                      <button
+                        type="button"
+                        className={`slate-btn slate-btn--compact${isPublished && !stale ? '' : ' slate-btn--primary'}`}
+                        onClick={isPublished && !stale ? onUnpublish : onPublish}
+                        disabled={publishing}
+                      >
+                        {publishing
+                          ? 'Working…'
+                          : isPublished
+                            ? stale
+                              ? 'Republish'
+                              : 'Unpublish'
+                            : 'Publish'}
+                      </button>
+                    ) : null}
+                  </div>
                 </section>
 
                 <section className="slate-share-scan" aria-label="QR code">
@@ -311,11 +293,20 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                       </button>
                     ))}
                   </div>
-
-                  <p className="slate-share-scan-hint">
-                    Scan with your phone camera · click to copy
-                  </p>
                 </section>
+
+                <div className="slate-share-foot">
+                  {isPublished && !stale ? (
+                    <p className="slate-share-live">
+                      <span className="slate-share-live-dot" aria-hidden />
+                      Live
+                    </p>
+                  ) : stale ? (
+                    <p className="slate-share-stale" role="status">
+                      Unpublished changes
+                    </p>
+                  ) : null}
+                </div>
               </>
             ) : (
               <div className="slate-share-callout">
@@ -325,6 +316,16 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                     ? 'Publish this form to get a public fill link.'
                     : 'This form is too large for a portable link. Remove questions or shorten copy and try again.'}
                 </p>
+                {cloud ? (
+                  <button
+                    type="button"
+                    className="slate-btn slate-btn--primary slate-btn--compact"
+                    onClick={onPublish}
+                    disabled={publishing}
+                  >
+                    {publishing ? 'Working…' : 'Publish'}
+                  </button>
+                ) : null}
               </div>
             )}
           </div>

@@ -64,6 +64,28 @@ export type Database = {
         Update: Partial<DbFormFileRow>;
         Relationships: [];
       };
+      feedback: {
+        Row: {
+          id: string;
+          owner_id: string | null;
+          email: string | null;
+          message: string;
+          path: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id?: string | null;
+          email?: string | null;
+          message: string;
+          path?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          message?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

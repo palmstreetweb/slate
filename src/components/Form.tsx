@@ -3,7 +3,7 @@
  *
  *   - useTheme        (resolves light/dark, drives the toggle)
  *   - useFormState    (step machine, answers, history, visited)
- *   - useKeyboardNav  (global Enter / A–F / 0–9 / Esc)
+ *   - useKeyboardNav  (global Enter / A–Z / 0–9 / Esc)
  *   - chrome          (TopBar, ProgressBar, FooterCounter, ThemeToggle)
  *
  * Question rendering is dispatched by QuestionRenderer to per-type Field

@@ -1,5 +1,5 @@
 /**
- * useKeyboardNav — global key handling: Enter on chrome screens, A–F choice
+ * useKeyboardNav — global key handling: Enter on chrome screens, A–Z choice
  * selection, 0–9 scale selection, Esc opt-in, and typing-target suppression.
  */
 
@@ -97,6 +97,20 @@ describe('useKeyboardNav', () => {
     expect(onSelectChoice).toHaveBeenCalledWith(0);
     fireEvent.keyDown(window, { key: 'B' });
     expect(onSelectChoice).toHaveBeenCalledWith(1);
+  });
+
+  it('letters continue past F for long choice lists', () => {
+    const towns: Question = {
+      id: 'towns',
+      type: 'multi_choice',
+      title: 'Towns?',
+      options: 'ABCDEFGHIJKLMNOP'.split('').map((letter) => ({ label: letter, value: letter.toLowerCase() })),
+    };
+    const { onSelectChoice } = setup(towns);
+    fireEvent.keyDown(window, { key: 'g' });
+    expect(onSelectChoice).toHaveBeenCalledWith(6);
+    fireEvent.keyDown(window, { key: 'P' });
+    expect(onSelectChoice).toHaveBeenCalledWith(15);
   });
 
   it('letters beyond the option count are ignored', () => {

@@ -59,6 +59,7 @@
     "heic-to": "^1.5.2",
     "heic2any": "^0.0.4",
     "libphonenumber-js": "^1.11.0",
+    "unpdf": "^1.8.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {

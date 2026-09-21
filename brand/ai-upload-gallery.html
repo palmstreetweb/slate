@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Slate — pick an upload look</title>
+<style>
+  :root {
+    --bg:#121418; --panel:#1c2128; --panel-2:#232931; --ink:#f3efe6; --muted:#8b93a0;
+    --line:#313842; --red:#e23b2d; --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 var(--sans); }
+  .banner {
+    position:sticky; top:0; z-index:5; padding:14px 22px;
+    background:rgb(18 20 24 / .92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line); font-weight:650;
+  }
+  .wrap { max-width:1080px; margin:0 auto; padding:28px 20px 80px; }
+  h1 { margin:0 0 6px; font-size:28px; letter-spacing:-.03em; }
+  .lead { margin:0 0 22px; color:var(--muted); max-width:62ch; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:860px) { .grid { grid-template-columns:1fr; } }
+  .opt {
+    background:#0e1014; border:1px solid var(--line); border-radius:18px; padding:14px;
+  }
+  .opt.head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .n {
+    width:26px; height:26px; border-radius:8px; display:grid; place-items:center;
+    background:var(--panel-2); border:1px solid var(--line); font:700 12px/1 var(--sans); color:var(--muted);
+  }
+  .opt h2 { margin:0; font-size:15px; letter-spacing:-.02em; }
+  .opt .why { margin:2px 0 0; color:var(--muted); font-size:12px; }
+  button.pick {
+    appearance:none; border:0; cursor:pointer; height:32px; padding:0 12px; border-radius:999px;
+    background:var(--red); color:#fff; font:650 12px/1 var(--sans);
+  }
+  button.pick.is-on { background:#fff; color:#111; }
+  .mock {
+    background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px;
+  }
+  .kicker { margin:0 0 6px; font:700 10px/1 var(--sans); letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+  .mock h3 { margin:0 0 6px; font-size:18px; letter-spacing:-.03em; }
+  .sub { margin:0 0 12px; color:var(--muted); font-size:12px; }
+  .box, .zone, .paper, .split-type {
+    width:100%; border-radius:12px; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--muted); font:inherit; padding:12px; min-height:72px;
+  }
+  .zone {
+    border-style:dashed; text-align:center; display:grid; place-items:center; gap:4px; cursor:pointer;
+  }
+  .zone strong { color:var(--ink); font-weight:650; }
+  .zone.is-hot { border-color:var(--red); color:var(--ink); background:rgb(226 59 45 / .08); }
+  .file {
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    margin-top:8px; padding:8px 10px; border-radius:10px; background:#181c22; border:1px solid var(--line);
+    font-size:12px;
+  }
+  .file button { appearance:none; border:0; background:transparent; color:var(--muted); cursor:pointer; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .btn {
+    appearance:none; border:1px solid var(--line); background:#181c22; color:var(--ink);
+    border-radius:999px; height:34px; padding:0 12px; font:600 12px/1 var(--sans); cursor:pointer;
+  }
+  .btn.red { background:var(--red); border-color:var(--red); color:#fff; }
+  .split { display:grid; grid-template-columns:1.2fr .8fr; gap:8px; }
+  .paper {
+    min-height:88px; background:#f4efe6; color:#1a1a1a; border:0;
+    box-shadow:0 10px 24px rgb(0 0 0 / .25); transform:rotate(-.4deg);
+  }
+  .paper b { display:block; font-size:11px; letter-spacing:.12em; }
+  .sheet { height:6px; border-radius:99px; background:#111; margin:6px 0; opacity:.7; }
+  .sheet.s { width:40%; background:var(--red); }
+  .ghost { display:flex; gap:8px; flex-wrap:wrap; }
+  .cover {
+    position:relative;
+  }
+  .cover .veil {
+    display:none; position:absolute; inset:0; border-radius:12px;
+    border:1.5px dashed var(--red); background:rgb(18 20 24 / .82);
+    place-items:center; font-weight:650;
+  }
+  .cover.is-hot .veil { display:grid; }
+  .bar { height:3px; background:var(--red); border-radius:99px 99px 0 0; margin:-16px -16px 12px; }
+</style>
+</head>
+<body>
+  <div class="banner" id="banner">Pick a number. Nothing is chosen yet.</div>
+  <div class="wrap">
+    <h1>How should a document land?</h1>
+    <p class="lead">Ten ways to drop or upload a file into Build with AI. Each one sits under “Describe your perfect form.” Click a zone to pretend you dropped Brent’s notes, then Choose.</p>
+    <div class="grid" id="grid"></div>
+  </div>
+<script>
+const OPTIONS = [
+  { id:1, name:'Dashed well', why:'A quiet box under the prompt. Drop or click upload.' },
+  { id:2, name:'Whole composer', why:'The prompt itself is the drop target. No second box.' },
+  { id:3, name:'Split', why:'Type on the left. A tall drop column on the right.' },
+  { id:4, name:'Paper', why:'Looks like the page you already have. Drop onto the sheet.' },
+  { id:5, name:'Slim row', why:'One upload button and a short “or drop here.”' },
+  { id:6, name:'File on the box', why:'The document sits on the corner of the prompt, like a clip.' },
+  { id:7, name:'Red rail', why:'A thin red bar, then the drop line. Studio accent, not a big target.' },
+  { id:8, name:'Big target', why:'The drop is the hero. Typing is secondary.' },
+  { id:9, name:'Two doors', why:'Upload PDF and type stay equal. No dashed rectangle.' },
+  { id:10, name:'Drag veil', why:'Calm until you drag. Then the composer covers with “Drop to build.”' },
+];
+
+const FILE = 'brent-site-notes.pdf';
+
+function zone(label, hot) {
+  return `<div class="zone${hot ? ' is-hot' : ''}" data-act="toggle"><strong>${hot ? FILE : label}</strong><span>${hot ? 'Remove' : 'Drop a PDF, or click to upload'}</span></div>`;
+}
+
+function mock(id, hot) {
+  const title = `<p class="kicker">Build with AI</p><h3>Describe your perfect form</h3><p class="sub">A first draft you can edit. Type it, or start from a document.</p>`;
+  if (id === 1) return `${title}<div class="box">A client intake, or leave this blank…</div>${zone('Drop a document', hot)}`;
+  if (id === 2) return `${title}<div class="cover${hot ? ' is-hot' : ''}"><div class="box" data-act="toggle" style="min-height:110px">${hot ? FILE : 'Type here, or drop a PDF on this box.'}</div><div class="veil">Drop to build</div></div>`;
+  if (id === 3) return `${title}<div class="split"><div class="split-type box">Type the form…</div>${zone('Drop', hot)}</div>`;
+  if (id === 4) return `${title}<div class="paper" data-act="toggle"><b>${hot ? 'NOTES · READY' : 'DROP THE PAGE'}</b><div class="sheet s"></div><div class="sheet"></div><div class="sheet" style="width:70%"></div><div style="margin-top:8px;font-size:12px">${hot ? FILE : 'PDF, text, or notes'}</div></div>`;
+  if (id === 5) return `${title}<div class="box">Describe it…</div><div class="row" style="margin-top:8px"><button class="btn" type="button" data-act="toggle">${hot ? 'Remove file' : 'Upload'}</button><span style="color:var(--muted);font-size:12px">${hot ? FILE : 'or drop a file anywhere in this card'}</span></div>`;
+  if (id === 6) return `${title}<div style="position:relative"><div class="box" style="min-height:96px">Describe it…</div>${hot ? `<div class="file" style="position:absolute;right:8px;bottom:8px;margin:0"><span>${FILE}</span><button type="button" data-act="toggle">✕</button></div>` : `<button class="btn" type="button" data-act="toggle" style="position:absolute;right:8px;bottom:8px">+ File</button>`}</div>`;
+  if (id === 7) return `<div class="bar"></div>${title}<div class="box">Describe it…</div>${zone('Add a document', hot)}`;
+  if (id === 8) return `${title}${zone(hot ? FILE : 'Drop the document', hot)}<div class="box" style="margin-top:8px;min-height:48px">Or type it instead…</div>`;
+  if (id === 9) return `${title}<div class="ghost"><button class="btn red" type="button" data-act="toggle">${hot ? FILE : 'Upload a document'}</button><button class="btn" type="button">Type instead</button></div><div class="box" style="margin-top:8px">Optional note…</div>`;
+  return `${title}<div class="cover${hot ? ' is-hot' : ''}"><div class="box" data-act="toggle">${hot ? 'Holding ' + FILE : 'Start typing. Drag a file in when you have one.'}</div><div class="veil">Drop to build the form</div></div>`;
+}
+
+const chosen = new Set();
+const grid = document.getElementById('grid');
+
+function paint() {
+  grid.innerHTML = OPTIONS.map((opt) => `
+    <article class="opt" data-id="${opt.id}">
+      <div class="head">
+        <div style="display:flex;gap:10px;align-items:center">
+          <div class="n">${opt.id}</div>
+          <div><h2>${opt.name}</h2><p class="why">${opt.why}</p></div>
+        </div>
+        <button class="pick${chosen.has(opt.id) ? ' is-on' : ''}" type="button" data-pick="${opt.id}">${chosen.has(opt.id) ? 'Chosen' : 'Choose'}</button>
+      </div>
+      <div class="mock">${mock(opt.id, chosen.has(opt.id))}</div>
+    </article>
+  `).join('');
+  const ids = [...chosen];
+  document.getElementById('banner').textContent = ids.length
+    ? `You picked ${ids.join(', ')}. Reply with that number.`
+    : 'Pick a number. Nothing is chosen yet.';
+}
+
+grid.addEventListener('click', (e) => {
+  const pick = e.target.closest('[data-pick]');
+  if (pick) {
+    const id = Number(pick.dataset.pick);
+    if (chosen.has(id)) chosen.delete(id); else chosen.add(id);
+    paint();
+    return;
+  }
+  const act = e.target.closest('[data-act="toggle"]');
+  if (!act) return;
+  const card = act.closest('.opt');
+  const id = Number(card.dataset.id);
+  if (chosen.has(id)) chosen.delete(id); else chosen.add(id);
+  paint();
+});
+
+paint();
+</script>
+</body>
+</html>

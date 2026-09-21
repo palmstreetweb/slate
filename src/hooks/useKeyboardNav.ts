@@ -3,7 +3,7 @@
  *
  *   Enter (in body)            → advance from welcome/statement/review, or
  *                                confirm OK steps (multi_choice, text fields, …)
- *   A–F (any focus)            → select choice option N (auto-advance for single_choice — caller decides)
+ *   A–Z (any focus)            → select choice option N (auto-advance for single_choice — caller decides)
  *   Y / N (in body)            → select yes_no answer (A/B also work)
  *   A / B (in body)            → select legal accept/decline
  *   0–9 (in body)              → select scale / nps value if in range
@@ -97,7 +97,7 @@ export function useKeyboardNav({
         }
       }
 
-      // Choice selection — A–F.
+      // Choice selection — A–Z, one key per option.
       if (
         (currentQ.type === 'single_choice' ||
           currentQ.type === 'multi_choice' ||

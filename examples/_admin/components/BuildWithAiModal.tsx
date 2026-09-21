@@ -7,22 +7,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
-import {
-  readRecentPrompts,
-  rememberPrompt,
-  requestGeneratedForm,
-  type GeneratedDraft,
-} from '../ai/client.js';
+import { requestGeneratedForm, type GeneratedDraft } from '../ai/client.js';
 import { readSlateMode } from '../slateMode.js';
 import { useFocusTrap } from '../useFocusTrap.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
-
-const CHIPS = [
-  'A wedding RSVP with meal choice and plus-one…',
-  'SaaS demo request for a B2B analytics tool',
-  'Job application for a senior designer',
-  'Saturday workshop registration with dietary needs',
-] as const;
+import { LoadingScreen } from '../shell/LoadingScreen.js';
+import { playUiSound } from '../uiSounds.js';
 
 export const REVISE_CHIPS = [
   {
@@ -80,7 +70,12 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
   const [phase, setPhase] = useState<Phase>('compose');
   const [revealed, setRevealed] = useState<string[]>([]);
   const [draft, setDraft] = useState<GeneratedDraft | null>(null);
-  const [recent, setRecent] = useState<string[]>([]);
+  const [file, setFile] = useState<{ name: string; base64?: string; mime?: string } | null>(null);
+  const [dropWash, setDropWash] = useState<'off' | 'hover' | 'landed'>('off');
+  const [converting, setConverting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const sourcePromptRef = useRef<string>('');
+  const dropLandedTimer = useRef<number>(0);
 
   const busy = phase === 'generating' || phase === 'opening';
 
@@ -90,7 +85,6 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setRecent(readRecentPrompts());
     return lockBodyScroll();
   }, [open]);
 
@@ -101,6 +95,10 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
     setDraft(null);
     setRevise('');
     setPhase('compose');
+    setFile(null);
+    setConverting(false);
+    setDropWash('off');
+    window.clearTimeout(dropLandedTimer.current);
   }, [open]);
 
   const lastInstructionRef = useRef<string | undefined>(undefined);
@@ -108,24 +106,35 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
 
   const generate = useCallback(
     async (instruction?: string) => {
-      const text = prompt.trim();
-      if (!text) return;
       const note = instruction?.trim();
       const revising = Boolean(note && draft);
+      const text = (revising ? sourcePromptRef.current : prompt).trim();
+      if (!text && !file) return;
       lastInstructionRef.current = revising ? note : undefined;
       const token = (genRef.current += 1);
       setPhase('generating');
       setError(null);
       setRevealed([]);
+      const fromPdf = !revising && Boolean(file);
+      if (fromPdf) setConverting(true);
+      const started = Date.now();
       try {
         const next = await requestGeneratedForm({
           prompt: text,
           previous: revising ? draft?.form : undefined,
           instruction: revising ? note : undefined,
+          document: fromPdf && file
+            ? { filename: file.name, mime: file.mime, base64: file.base64 }
+            : undefined,
         });
+        if (fromPdf) {
+          const remaining = 3000 - (Date.now() - started);
+          if (remaining > 0) {
+            await new Promise((resolve) => window.setTimeout(resolve, remaining));
+          }
+        }
         if (token !== genRef.current) return;
-        if (!revising) rememberPrompt(text);
-        setRecent(readRecentPrompts());
+        sourcePromptRef.current = next.sourcePrompt;
         const titles = next.schema.questions
           .filter((q) => q.type !== 'welcome' && q.type !== 'thanks')
           .map((q) => (typeof q.title === 'string' ? q.title : q.id));
@@ -143,10 +152,81 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
         if (token !== genRef.current) return;
         setError(err instanceof Error ? err.message : 'Could not generate the form.');
         setPhase(draft ? 'review' : 'compose');
+      } finally {
+        if (!revising && file) setConverting(false);
       }
     },
-    [draft, prompt],
+    [draft, prompt, file],
   );
+
+  const takeFile = useCallback(async (picked: File | undefined) => {
+    if (!picked || busy) return;
+    const name = picked.name || 'document';
+    const ext = name.split('.').pop()?.toLowerCase() ?? '';
+    if (picked.size > 3_000_000) {
+      setError('Keep the file under 3 MB.');
+      return;
+    }
+    if (ext === 'pdf' || picked.type === 'application/pdf') {
+      const bytes = new Uint8Array(await picked.arrayBuffer());
+      let binary = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      setFile({ name, mime: 'application/pdf', base64: btoa(binary) });
+      setError(null);
+      return;
+    }
+    setError('Start with a PDF. Word and Pages can come later.');
+  }, [busy]);
+
+  useEffect(() => {
+    if (!open || busy || phase === 'review' || phase === 'opening') {
+      setDropWash((w) => (w === 'hover' ? 'off' : w));
+      return;
+    }
+    let depth = 0;
+    const hasFiles = (event: DragEvent) =>
+      Array.from(event.dataTransfer?.types ?? []).includes('Files');
+    const onEnter = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      depth += 1;
+      if (depth === 1) setDropWash('hover');
+    };
+    const onOver = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+    };
+    const onLeave = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) {
+        setDropWash((w) => (w === 'hover' ? 'off' : w));
+      }
+    };
+    const onDrop = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      depth = 0;
+      setDropWash('landed');
+      playUiSound('drop');
+      window.clearTimeout(dropLandedTimer.current);
+      dropLandedTimer.current = window.setTimeout(() => setDropWash('off'), 1100);
+      void takeFile(event.dataTransfer?.files?.[0]);
+    };
+    window.addEventListener('dragenter', onEnter);
+    window.addEventListener('dragover', onOver);
+    window.addEventListener('dragleave', onLeave);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragenter', onEnter);
+      window.removeEventListener('dragover', onOver);
+      window.removeEventListener('dragleave', onLeave);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, [open, busy, phase, takeFile]);
 
   const openEditor = useCallback(async () => {
     if (!draft || phase === 'opening') return;
@@ -164,7 +244,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
 
   const mode = readSlateMode();
   const uiTheme = detectAdminUiTheme();
-  const empty = prompt.trim().length === 0;
+  const empty = prompt.trim().length === 0 && !file;
   const reviewing = phase === 'review' || phase === 'opening';
   const middle = draft?.form.questions ?? [];
 
@@ -192,43 +272,84 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
         >
           <p className="slate-ai-kicker">Build with AI</p>
           <h2 id="slate-ai-title" className="slate-dialog-title">
-            {reviewing ? 'Here’s a draft.' : 'Describe the form.'}
+            {reviewing ? 'Here’s a draft.' : 'Describe your perfect form'}
           </h2>
           <p className="slate-dialog-message">
             {reviewing
               ? 'Revise it here, then open the editor when it looks right. Closing discards it.'
-              : 'A first draft you can edit. 3–8 questions, welcome and thank-you included.'}
+              : 'Type it in the box. Attach a PDF if you already have one.'}
           </p>
 
           {!reviewing ? (
             <>
-              <textarea
-                className="slate-ai-textarea"
-                rows={5}
-                value={prompt}
-                disabled={busy}
-                placeholder="A wedding RSVP with meal choice and plus-one…"
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    void generate();
-                  }
-                }}
-              />
-
-              <div className="slate-ai-chips">
-                {(recent.length > 0 ? recent : CHIPS).map((chip) => (
+              <div className="slate-ai-compose">
+                <textarea
+                  className="slate-ai-textarea"
+                  rows={5}
+                  value={prompt}
+                  disabled={busy}
+                  placeholder="Type what this form should ask…"
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      void generate();
+                    }
+                  }}
+                />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  hidden
+                  onChange={(e) => {
+                    void takeFile(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
+                <div className="slate-ai-attach-row">
+                  {file ? (
+                    <span className="slate-ai-attach-pill slate-ai-attach-pill--file">
+                      <button
+                        type="button"
+                        className="slate-ai-attach-name"
+                        disabled={busy}
+                        data-slate-sound="none"
+                        onClick={() => fileRef.current?.click()}
+                      >
+                        {file.name}
+                      </button>
+                      <button
+                        type="button"
+                        className="slate-ai-attach-remove"
+                        disabled={busy}
+                        aria-label="Remove PDF"
+                        data-slate-sound="none"
+                        onClick={() => setFile(null)}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="slate-ai-attach-pill"
+                      disabled={busy}
+                      data-slate-sound="none"
+                      onClick={() => fileRef.current?.click()}
+                    >
+                      Upload or Drop PDF
+                    </button>
+                  )}
                   <button
-                    key={chip}
                     type="button"
-                    className="slate-ai-chip"
-                    disabled={busy}
-                    onClick={() => setPrompt(chip)}
+                    className="slate-btn slate-btn--primary"
+                    disabled={empty || busy}
+                    onClick={() => void generate()}
                   >
-                    {chip}
+                    {phase === 'generating' ? 'Generating…' : 'Generate'}
                   </button>
-                ))}
+                </div>
               </div>
             </>
           ) : (
@@ -288,7 +409,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
             </>
           )}
 
-          {phase === 'generating' && (
+          {phase === 'generating' && !converting ? (
             <ol className="slate-ai-skel" aria-live="polite" aria-label="Generating questions">
               {(revealed.length > 0 ? revealed : ['', '', '', '']).map((title, i) => (
                 <li
@@ -300,7 +421,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                 </li>
               ))}
             </ol>
-          )}
+          ) : null}
 
           {error && (
             <div className="slate-ai-error" role="alert">
@@ -354,26 +475,31 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                   {phase === 'opening' ? 'Opening…' : 'Open in editor'}
                 </button>
               </>
-            ) : (
-              <button
-                type="button"
-                className="slate-btn slate-btn--primary"
-                disabled={empty || busy}
-                onClick={() => void generate()}
-              >
-                {phase === 'generating' ? 'Generating…' : 'Generate'}
-              </button>
-            )}
+            ) : null}
           </div>
           <p className="slate-ai-hint">
             {phase === 'generating'
               ? (draft?.name ?? 'Writing questions…')
               : reviewing
                 ? '⌘+Enter revises, or opens the editor if the box is empty'
-                : '⌘+Enter to generate'}
+                : '⌘+Enter to generate · drop a PDF anywhere'}
           </p>
         </div>
       </div>
+      {converting ? <LoadingScreen label="Converting" /> : null}
+      {dropWash !== 'off' ? (
+        <div
+          className={`slate-ai-drop-wash${dropWash === 'landed' ? ' is-landed' : ''}`}
+          aria-hidden
+        >
+          <div className="slate-ai-drop-stack">
+            <span className="slate-ai-drop-bar" />
+            <span className="slate-ai-drop-bar" />
+            <span className="slate-ai-drop-bar" />
+          </div>
+          <p className="slate-ai-drop-label">Drop to convert</p>
+        </div>
+      ) : null}
     </div>,
     document.body,
   );

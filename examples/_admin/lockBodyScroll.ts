@@ -1,7 +1,7 @@
 /**
- * Lock document scroll without the classic “page jump” when the scrollbar
- * disappears. Compensates with padding-right equal to the gutter width.
- * Returns an unlock function (idempotent-safe restore of prior inline styles).
+ * Lock document scroll without the page jumping sideways.
+ * One compensation only: the live scrollbar width, applied when that bar
+ * is about to disappear. Do not also set scrollbar-gutter (that double-counts).
  */
 
 'use client';
@@ -13,15 +13,15 @@ let savedPaddingRight = '';
 export function lockBodyScroll(): () => void {
   if (typeof document === 'undefined') return () => {};
 
-  const body = document.body;
+  const root = document.documentElement;
   if (lockCount === 0) {
-    savedOverflow = body.style.overflow;
-    savedPaddingRight = body.style.paddingRight;
-    const gutter = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
-    body.style.overflow = 'hidden';
+    savedOverflow = root.style.overflow;
+    savedPaddingRight = root.style.paddingRight;
+    const gutter = Math.max(0, window.innerWidth - root.clientWidth);
+    root.style.overflow = 'hidden';
     if (gutter > 0) {
-      const existing = Number.parseFloat(getComputedStyle(body).paddingRight) || 0;
-      body.style.paddingRight = `${existing + gutter}px`;
+      const existing = Number.parseFloat(getComputedStyle(root).paddingRight) || 0;
+      root.style.paddingRight = `${existing + gutter}px`;
     }
   }
   lockCount += 1;
@@ -32,8 +32,8 @@ export function lockBodyScroll(): () => void {
     released = true;
     lockCount = Math.max(0, lockCount - 1);
     if (lockCount === 0) {
-      body.style.overflow = savedOverflow;
-      body.style.paddingRight = savedPaddingRight;
+      root.style.overflow = savedOverflow;
+      root.style.paddingRight = savedPaddingRight;
       savedOverflow = '';
       savedPaddingRight = '';
     }

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Slate — assemble drop sounds</title>
+<style>
+  :root {
+    --bg:#121418; --panel:#1c2128; --ink:#f3efe6; --muted:#8b93a0;
+    --line:#313842; --red:#e23b2d; --on:#fff;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 var(--sans); }
+  .banner {
+    position:sticky; top:0; z-index:6; padding:14px 22px;
+    background:rgb(18 20 24 / .92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line); font-weight:650;
+  }
+  .wrap { max-width:720px; margin:0 auto; padding:28px 20px 80px; }
+  .kicker { font:700 11px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+  h1 { margin:0 0 6px; font-size:26px; letter-spacing:-.03em; }
+  .lead { margin:0 0 22px; color:var(--muted); max-width:62ch; }
+  .grid { display:flex; flex-direction:column; gap:10px; }
+  .opt {
+    display:grid; grid-template-columns:auto 72px 1fr auto; gap:14px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:12px 14px;
+  }
+  .n {
+    width:26px; height:26px; border-radius:8px; display:grid; place-items:center;
+    background:#232931; border:1px solid var(--line); font:700 11px/1 var(--sans); color:var(--muted);
+  }
+  .mini {
+    width:72px; height:56px; border-radius:10px; background:var(--red);
+    display:grid; place-items:center;
+  }
+  .stack { display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .bar {
+    display:block; height:6px; border-radius:99px; background:#fff;
+    transform-origin:left center; opacity:.25; transform:scaleX(.2);
+  }
+  .bar:nth-child(1) { width:14px; }
+  .bar:nth-child(2) { width:28px; }
+  .bar:nth-child(3) { width:20px; }
+  .opt.is-playing .bar { animation: assemble .9s var(--ease) 1; }
+  .opt.is-playing .bar:nth-child(1) { animation-delay: 0s; }
+  .opt.is-playing .bar:nth-child(2) { animation-delay: .12s; }
+  .opt.is-playing .bar:nth-child(3) { animation-delay: .24s; }
+  @keyframes assemble {
+    0% { opacity:0; transform:scaleX(.2); }
+    25%, 70% { opacity:1; transform:scaleX(1); }
+    100% { opacity:.35; transform:scaleX(1); }
+  }
+  h2 { margin:0; font-size:15px; letter-spacing:-.01em; }
+  .why { margin:3px 0 0; color:var(--muted); font-size:12px; }
+  button.play {
+    appearance:none; border:0; cursor:pointer;
+    min-width:72px; height:36px; padding:0 14px; border-radius:999px;
+    font:650 13px/1 var(--sans); color:#fff; background:var(--red);
+  }
+  button.play.is-on { background:#fff; color:#111; }
+</style>
+</head>
+<body>
+  <div class="banner" id="banner">Assemble is locked. Play a sound. Reply with the number.</div>
+  <div class="wrap">
+    <p class="kicker">Drop wash · Assemble</p>
+    <h1>Ten sounds for the red page</h1>
+    <p class="lead">Timed to the three bars growing in. Click Play — you’ll see the stack and hear the cue. Reply with a number, or “none” for silent.</p>
+    <div class="grid" id="grid"></div>
+  </div>
+<script>
+const OPTIONS = [
+  { id:1, name:'Bar ticks', why:'Three quiet notes on the bar delays. The stack is the metronome.' },
+  { id:2, name:'File fall', why:'Air comes down with the PDF, then a soft lock.' },
+  { id:3, name:'Wood stack', why:'Three muted taps. Paper hitting a desk, not a game.' },
+  { id:4, name:'Sparkle stack', why:'Same family as Build with AI. Three rising chimes.' },
+  { id:5, name:'Scan lock', why:'A thin sweep as the bars grow, then it settles.' },
+  { id:6, name:'Catch thud', why:'Felt more than heard. Sub + one tick when it lands.' },
+  { id:7, name:'Glass drop', why:'Three glass taps, last one a little brighter.' },
+  { id:8, name:'Paper rustle', why:'A little paper noise, then a high stamp.' },
+  { id:9, name:'Marimba assemble', why:'Warm wooden thirds. Friendly, still short.' },
+  { id:10, name:'Quiet stamp', why:'Almost nothing. One small confirm when the wash is up.' },
+];
+
+let ctx = null;
+const chosen = new Set();
+
+function ac() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+function noiseBuf(c, dur) {
+  const n = Math.ceil(c.sampleRate * dur);
+  const buf = c.createBuffer(1, n, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+function whoosh(c, dest, t0, { dur = 0.32, peak = 0.055, startF = 2200, endF = 280 } = {}) {
+  const src = c.createBufferSource();
+  src.buffer = noiseBuf(c, dur + 0.08);
+  const f = c.createBiquadFilter();
+  f.type = 'bandpass';
+  f.Q.value = 0.9;
+  f.frequency.setValueAtTime(startF, t0);
+  f.frequency.exponentialRampToValueAtTime(endF, t0 + dur);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(peak, t0 + dur * 0.38);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f).connect(g).connect(dest);
+  src.start(t0);
+  src.stop(t0 + dur + 0.02);
+}
+
+function rustle(c, dest, t0, peak = 0.04) {
+  const src = c.createBufferSource();
+  src.buffer = noiseBuf(c, 0.22);
+  const f = c.createBiquadFilter();
+  f.type = 'highpass';
+  f.frequency.value = 1800;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(peak, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16);
+  src.connect(f).connect(g).connect(dest);
+  src.start(t0);
+  src.stop(t0 + 0.2);
+}
+
+function tone(c, dest, t, freq, { type = 'sine', peak = 0.05, a = 0.008, d = 0.12, r = 0.08 } = {}) {
+  const o = c.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peak, t + a);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.2), t + a + d);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + a + d + r);
+  o.connect(g).connect(dest);
+  o.start(t);
+  o.stop(t + a + d + r + 0.04);
+}
+
+function sub(c, dest, t, freq, peak = 0.07) {
+  const o = c.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(freq, t);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peak, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+  o.connect(g).connect(dest);
+  o.start(t);
+  o.stop(t + 0.32);
+}
+
+function sweep(c, dest, t0, { from = 400, to = 1400, dur = 0.28, peak = 0.03 } = {}) {
+  const o = c.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(from, t0);
+  o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+  const f = c.createBiquadFilter();
+  f.type = 'lowpass';
+  f.frequency.value = 2400;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(peak, t0 + 0.04);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(f).connect(g).connect(dest);
+  o.start(t0);
+  o.stop(t0 + dur + 0.02);
+}
+
+function play(id) {
+  const c = ac();
+  const t0 = c.currentTime + 0.02;
+  const master = c.createGain();
+  master.gain.value = 1;
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 9000;
+  master.connect(lp).connect(c.destination);
+  const b = [0, 0.12, 0.24];
+
+  if (id === 1) {
+    tone(c, master, t0 + b[0], 659.25, { peak: 0.045, d: 0.09 });
+    tone(c, master, t0 + b[1], 783.99, { peak: 0.05, d: 0.09 });
+    tone(c, master, t0 + b[2], 987.77, { peak: 0.055, d: 0.14, r: 0.12 });
+  } else if (id === 2) {
+    whoosh(c, master, t0, { dur: 0.3, peak: 0.06 });
+    sub(c, master, t0 + 0.26, 70, 0.07);
+    tone(c, master, t0 + 0.27, 392, { peak: 0.04, d: 0.18, r: 0.16, type: 'triangle' });
+  } else if (id === 3) {
+    tone(c, master, t0 + b[0], 196, { type: 'triangle', peak: 0.08, a: 0.001, d: 0.05, r: 0.02 });
+    tone(c, master, t0 + b[1], 220, { type: 'triangle', peak: 0.075, a: 0.001, d: 0.05, r: 0.02 });
+    tone(c, master, t0 + b[2], 247, { type: 'triangle', peak: 0.08, a: 0.001, d: 0.07, r: 0.03 });
+  } else if (id === 4) {
+    tone(c, master, t0 + b[0], 784, { peak: 0.05, d: 0.1 });
+    tone(c, master, t0 + b[1], 988, { peak: 0.055, d: 0.1 });
+    tone(c, master, t0 + b[2], 1175, { peak: 0.06, d: 0.16, r: 0.12 });
+  } else if (id === 5) {
+    sweep(c, master, t0, { from: 380, to: 1600, dur: 0.34, peak: 0.032 });
+    tone(c, master, t0 + 0.3, 880, { peak: 0.04, d: 0.12, r: 0.1 });
+  } else if (id === 6) {
+    sub(c, master, t0 + 0.08, 58, 0.1);
+    tone(c, master, t0 + 0.1, 262, { type: 'triangle', peak: 0.035, d: 0.1, r: 0.08 });
+  } else if (id === 7) {
+    tone(c, master, t0 + b[0], 1318, { peak: 0.035, a: 0.001, d: 0.08, r: 0.04 });
+    tone(c, master, t0 + b[1], 1568, { peak: 0.038, a: 0.001, d: 0.08, r: 0.04 });
+    tone(c, master, t0 + b[2], 1976, { peak: 0.042, a: 0.001, d: 0.14, r: 0.1 });
+  } else if (id === 8) {
+    rustle(c, master, t0, 0.045);
+    tone(c, master, t0 + 0.14, 990, { peak: 0.05, d: 0.08, r: 0.06 });
+  } else if (id === 9) {
+    tone(c, master, t0 + b[0], 523.25, { type: 'triangle', peak: 0.055, d: 0.14, r: 0.1 });
+    tone(c, master, t0 + b[1], 659.25, { type: 'triangle', peak: 0.055, d: 0.14, r: 0.1 });
+    tone(c, master, t0 + b[2], 783.99, { type: 'triangle', peak: 0.06, d: 0.2, r: 0.14 });
+  } else {
+    tone(c, master, t0 + 0.04, 698.46, { peak: 0.04, a: 0.003, d: 0.1, r: 0.08 });
+  }
+}
+
+const grid = document.getElementById('grid');
+const banner = document.getElementById('banner');
+
+function paint() {
+  grid.innerHTML = OPTIONS.map((opt) => `
+    <article class="opt" data-id="${opt.id}">
+      <div class="n">${opt.id}</div>
+      <div class="mini" aria-hidden>
+        <div class="stack">
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+        </div>
+      </div>
+      <div>
+        <h2>${opt.name}</h2>
+        <p class="why">${opt.why}</p>
+      </div>
+      <button class="play${chosen.has(opt.id) ? ' is-on' : ''}" type="button" data-play="${opt.id}">${chosen.has(opt.id) ? 'Chosen' : 'Play'}</button>
+    </article>
+  `).join('');
+  const ids = [...chosen];
+  banner.textContent = ids.length
+    ? `You picked ${ids[0]}. Reply with that number.`
+    : 'Assemble is locked. Play a sound. Reply with the number.';
+}
+
+grid.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-play]');
+  if (!btn) return;
+  const id = Number(btn.dataset.play);
+  chosen.clear();
+  chosen.add(id);
+  paint();
+  const row = grid.querySelector(`[data-id="${id}"]`);
+  row.classList.remove('is-playing');
+  void row.offsetWidth;
+  row.classList.add('is-playing');
+  play(id);
+});
+paint();
+</script>
+</body>
+</html>

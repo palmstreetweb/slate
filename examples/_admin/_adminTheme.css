@@ -6,17 +6,20 @@
    its theme tokens via cascade specificity.
    ============================================================ */
 
-/* Reserve scrollbar space so modals that lock body scroll don’t shove the page. */
-html {
-  scrollbar-gutter: stable;
-}
-
 /* The base [data-slate-forms] rule sets overflow-x: hidden, which the
    browser implicitly turns into `overflow: hidden auto` — that makes the
    wrapper its OWN scroll container and breaks `position: sticky` on the
    admin header. Slate doesn't need clipping; let the document scroll. */
 [data-slate-forms][data-theme-name='slate'] {
   overflow: visible;
+}
+
+/* Portals attach to document.body. Engine `[data-slate-forms]` is min-height
+   100vh, so each open dialog used to add a blank second page under the studio. */
+body > [data-slate-forms][data-theme-name='slate'] {
+  min-height: 0;
+  height: 0;
+  background: transparent;
 }
 
 [data-slate-forms][data-theme-name='slate'] {
@@ -1906,8 +1909,8 @@ body.slate-editor-resizing * {
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-panel {
   width: min(440px, calc(100vw - 32px));
-  max-height: min(92vh, 760px);
-  overflow: auto;
+  margin: auto;
+  overflow: visible;
   background: var(--slate-bg-2);
   color: var(--slate-text);
   border: 1px solid color-mix(in srgb, var(--slate-text) 8%, var(--slate-border-md));
@@ -2031,9 +2034,88 @@ body.slate-editor-resizing * {
   border-radius: 4px;
 }
 
+[data-slate-forms][data-theme-name='slate'] .slate-dialog-backdrop:has(.slate-share-panel) {
+  overflow-y: auto;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-actions .slate-share-open {
+  margin-top: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-scan {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-qr-frame {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: min(220px, 100%);
+  box-sizing: border-box;
+  padding: 14px;
+  border-radius: 16px;
+  background: #faf6ee;
+  box-shadow:
+    inset 0 0 0 1px rgb(42 37 32 / 0.06),
+    0 10px 28px -8px rgb(0 0 0 / 0.28);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 22px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e7fff3;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: #3ddc97;
+  box-shadow: 0 0 0 0 rgb(61 220 151 / 0.55);
+  animation: slate-share-live-pulse 2.4s ease-out infinite;
+}
+
+@keyframes slate-share-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(61 220 151 / 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgb(61 220 151 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(61 220 151 / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slate-forms][data-theme-name='slate'] .slate-share-live-dot {
+    animation: none;
+  }
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-share-link-card {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-link-field {
@@ -2105,18 +2187,17 @@ body.slate-editor-resizing * {
 [data-slate-forms][data-theme-name='slate'] .slate-share-scan {
   display: grid;
   justify-items: center;
-  gap: 14px;
-  padding-top: 4px;
+  gap: 10px;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-qr-frame {
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 100%;
+  width: min(220px, 100%);
   box-sizing: border-box;
-  padding: 22px;
-  border-radius: 20px;
+  padding: 12px;
+  border-radius: 16px;
   background: #faf6ee;
   box-shadow:
     inset 0 0 0 1px rgb(42 37 32 / 0.06),
@@ -2235,6 +2316,7 @@ body.slate-editor-resizing * {
   margin: 0;
   font-size: var(--slate-fs-sm);
   color: var(--slate-dim);
+  text-align: center;
 }
 
 @keyframes slate-share-qr-shimmer {
@@ -2290,6 +2372,23 @@ body.slate-editor-resizing * {
   color: var(--chrome-red);
   background: color-mix(in srgb, var(--chrome-red) 10%, var(--chrome-panel));
   border-color: color-mix(in srgb, var(--chrome-red) 45%, var(--chrome-line));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-feedback-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  color: var(--chrome-muted);
+  background: color-mix(in srgb, var(--chrome-panel) 92%, transparent);
+  border: 1px solid var(--chrome-line);
+  box-shadow: var(--slate-shadow-card);
+  backdrop-filter: blur(8px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-feedback-fab:hover {
+  color: var(--chrome-ink);
+  border-color: color-mix(in srgb, var(--chrome-red) 35%, var(--chrome-line));
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-settings {
@@ -3648,9 +3747,9 @@ body.slate-editor-resizing * {
   gap: 28px;
   margin: 0;
   padding: 24px;
-  width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
+  width: auto;
+  height: auto;
+  min-height: 0;
   background: var(--chrome-bg, #f2efe8);
   color: var(--chrome-ink, #20242b);
   font-family: Inter, system-ui, sans-serif;
@@ -3771,7 +3870,10 @@ body.slate-editor-resizing * {
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-dialog--ai {
-  max-width: 580px;
+  display: flex;
+  flex-direction: column;
+  max-width: 640px;
+  max-height: calc(100dvh - 48px);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-dialog--ai .slate-dialog-actions {
@@ -3791,7 +3893,7 @@ body.slate-editor-resizing * {
   display: block;
   width: 100%;
   min-height: 132px;
-  margin: 0 0 12px;
+  margin: 0;
   padding: 14px 16px;
   resize: vertical;
   border: 1px solid var(--chrome-line, var(--slate-border-md));
@@ -3803,7 +3905,166 @@ body.slate-editor-resizing * {
   line-height: 1.5;
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-ai-textarea:focus {
+[data-slate-forms][data-theme-name='slate'] .slate-ai-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-wash {
+  position: fixed;
+  inset: 0;
+  z-index: 14000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  pointer-events: none;
+  background: var(--chrome-red, var(--slate-accent));
+  color: #fff;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-bar {
+  display: block;
+  height: 10px;
+  border-radius: 99px;
+  background: #fff;
+  transform-origin: left center;
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-bar:nth-child(1) {
+  width: 22px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-bar:nth-child(2) {
+  width: 42px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-bar:nth-child(3) {
+  width: 30px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-wash.is-landed .slate-ai-drop-bar {
+  animation: slate-ai-drop-assemble 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-wash.is-landed .slate-ai-drop-bar:nth-child(1) {
+  animation-delay: 0s;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-wash.is-landed .slate-ai-drop-bar:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-wash.is-landed .slate-ai-drop-bar:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+@keyframes slate-ai-drop-assemble {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-drop-label {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slate-forms][data-theme-name='slate'] .slate-ai-drop-bar,
+  [data-slate-forms][data-theme-name='slate'] .slate-ai-drop-wash.is-landed .slate-ai-drop-bar {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-attach-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-attach-pill {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  max-width: min(100%, 280px);
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--chrome-line, var(--slate-border-md));
+  background: transparent;
+  color: var(--chrome-muted, var(--slate-muted));
+  font: 600 13px/1 inherit;
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-attach-pill:hover:not(:disabled) {
+  color: var(--chrome-ink, var(--slate-text));
+  border-color: color-mix(in srgb, var(--chrome-ink, var(--slate-text)) 28%, var(--chrome-line, var(--slate-border-md)));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-attach-pill--file {
+  padding: 0 4px 0 12px;
+  color: var(--chrome-ink, var(--slate-text));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-attach-name,
+[data-slate-forms][data-theme-name='slate'] .slate-ai-attach-remove {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-attach-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-attach-remove {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  color: var(--chrome-muted, var(--slate-muted));
+  font-size: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-attach-remove:hover {
+  color: var(--chrome-ink, var(--slate-text));
+  background: color-mix(in srgb, var(--chrome-ink, var(--slate-text)) 8%, transparent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-feedback-input {
+  margin: 4px 0 12px;
+  min-height: 120px;
+}
   outline: none;
   border-color: var(--chrome-red, var(--slate-accent));
 }
@@ -3815,6 +4076,7 @@ body.slate-editor-resizing * {
 [data-slate-forms][data-theme-name='slate'] .slate-ai-textarea--revise {
   min-height: 72px;
   margin-top: 12px;
+  margin-bottom: 12px;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-ai-review {
@@ -3823,7 +4085,8 @@ body.slate-editor-resizing * {
   border: 1px solid var(--chrome-line, var(--slate-border-md));
   border-radius: 12px;
   background: var(--chrome-panel-2, var(--slate-bg-3));
-  max-height: 240px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 

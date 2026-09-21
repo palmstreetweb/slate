@@ -146,13 +146,13 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
           data-theme-name={schema.theme}
           data-theme={mode}
           {...(hasStepDecorationBackdrop(decoration) ? { 'data-has-decoration': '' } : {})}
-          style={{ height: '100%', width: '100%' }}
+          style={{ height: '100%', width: '100%', overflowX: 'hidden', overflowY: 'auto' }}
         >
           <ThemeDecoration themeName={schema.theme} step={stepIndex} />
           <ProgressBar value={progressPct} />
           <TopBar brandName={schema.brand.name} showBack={false} onBack={noop} />
 
-          <div className="slate-stage" style={{ minHeight: 'auto', padding: '48px 24px' }}>
+          <div className="slate-stage" style={{ minHeight: 'auto', padding: '48px 24px 120px' }}>
             <div
               key={selectedQuestion.id}
               className="slate-stage-content"

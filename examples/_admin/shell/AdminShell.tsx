@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ResolvedThemeMode } from '@/index.js';
 import { Header } from './Header.js';
 import { SettingsFab } from './SettingsFab.js';
+import { FeedbackButton } from './FeedbackButton.js';
 import { AdminThemeProvider } from '../adminThemeContext.js';
 import {
   ADMIN_UI_THEME_STORAGE_KEY,
@@ -75,6 +76,7 @@ export function AdminShell({ crumbs, rightSlot, children, fullBleed }: Props) {
             {children}
           </main>
           <SettingsFab />
+          <FeedbackButton />
         </div>
       </div>
     </AdminThemeProvider>

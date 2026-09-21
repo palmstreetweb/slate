@@ -5,6 +5,7 @@ import type { MultiChoiceQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import { choiceListIsSplit } from '@/utils/choiceLayout.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
 import { resolveTitle } from './_resolveTitle.js';
 
@@ -52,7 +53,11 @@ export function MultiChoiceField({
         {resolveTitle(question.title, answers)}
       </h1>
 
-      <div className="slate-choices" role="group" aria-labelledby={labelId}>
+      <div
+        className={`slate-choices${choiceListIsSplit(question.options) ? ' slate-choices--split' : ''}`}
+        role="group"
+        aria-labelledby={labelId}
+      >
         {question.options.map((opt, i) => {
           const isSelected = selected.includes(opt.value);
           return (

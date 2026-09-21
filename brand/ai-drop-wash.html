@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Slate — drop wash looks</title>
+<style>
+  :root {
+    --bg:#121418; --panel:#1c2128; --ink:#f3efe6; --muted:#8b93a0;
+    --line:#313842; --red:#e23b2d; --on:#fff;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 var(--sans); }
+  .banner {
+    position:sticky; top:0; z-index:6; padding:14px 22px;
+    background:rgb(18 20 24 / .92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line); font-weight:650;
+  }
+  .wrap { max-width:1080px; margin:0 auto; padding:28px 20px 80px; }
+  h1 { margin:0 0 6px; font-size:28px; letter-spacing:-.03em; }
+  .lead { margin:0 0 22px; color:var(--muted); max-width:68ch; }
+  .grid { display:grid; grid-template-columns:1fr; gap:18px; }
+  .opt { background:#0e1014; border:1px solid var(--line); border-radius:18px; padding:14px; }
+  .head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:10px; }
+  .n {
+    width:26px; height:26px; border-radius:8px; display:grid; place-items:center;
+    background:#232931; border:1px solid var(--line); font:700 12px/1 var(--sans); color:var(--muted);
+  }
+  h2 { margin:0; font-size:16px; letter-spacing:-.02em; }
+  .why { margin:3px 0 0; color:var(--muted); font-size:12px; }
+  button.pick {
+    appearance:none; border:0; cursor:pointer; height:32px; padding:0 12px; border-radius:999px;
+    background:var(--red); color:#fff; font:650 12px/1 var(--sans);
+  }
+  button.pick.is-on { background:#fff; color:#111; }
+  .stage {
+    position:relative; height:280px; border-radius:14px; overflow:hidden;
+    background:#1a1f26; border:1px solid var(--line);
+  }
+  .card {
+    position:absolute; left:50%; top:50%; width:min(72%, 360px);
+    transform:translate(-50%,-50%); background:#232931; border:1px solid #3a424d;
+    border-radius:16px; padding:18px; z-index:1;
+  }
+  .card .kicker { font:700 10px/1 var(--sans); letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+  .card h3 { margin:8px 0 6px; font-size:18px; }
+  .wash {
+    position:absolute; inset:0; display:grid; place-items:center; z-index:2;
+    background:var(--red); color:var(--on);
+  }
+  .wash.soft { background: color-mix(in srgb, var(--red) 82%, #000); }
+  .wash.veil { background: color-mix(in srgb, var(--red) 88%, transparent); }
+  .copy { text-align:center; padding:20px; }
+  .copy b { display:block; font-size:28px; letter-spacing:-.04em; }
+  .copy span { display:block; margin-top:8px; font-size:14px; opacity:.88; }
+  .copy.sm b { font-size:18px; letter-spacing:.18em; text-transform:uppercase; }
+  .copy.left { text-align:left; width:100%; padding:28px; }
+  .copy.left b { font-size:34px; }
+  .stack { display:grid; gap:8px; justify-items:center; }
+  .bar { width:42px; height:8px; border-radius:99px; background:#fff; opacity:.92; }
+  .bar:nth-child(1) { width:22px; }
+  .bar:nth-child(3) { width:30px; }
+</style>
+</head>
+<body>
+  <div class="banner" id="banner">Pick a number. Hover a card to see the drop.</div>
+  <div class="wrap">
+    <h1>The page fills with the theme color</h1>
+    <p class="lead">Five full-screen washes for the moment a PDF is over the window. Hover to preview. Choose, then reply with the number.</p>
+    <div class="grid" id="grid"></div>
+  </div>
+<script>
+const OPTIONS = [
+  { id:1, name:'Drop PDF', why:'Solid theme fill. Two words, huge, in the middle.' },
+  { id:2, name:'Let go', why:'Same fill. A short line under the title, like a cue.' },
+  { id:3, name:'Stack', why:'The loading bars, but on the theme color. Drop to convert.' },
+  { id:4, name:'Quiet label', why:'Small caps, centered. Less shout, still the whole page.' },
+  { id:5, name:'Corner call', why:'Fill stays full. The words sit left, like a poster.' },
+];
+
+function wash(id) {
+  if (id === 1) return `<div class="wash"><div class="copy"><b>Drop PDF</b></div></div>`;
+  if (id === 2) return `<div class="wash"><div class="copy"><b>Drop it</b><span>We’ll turn this into a form.</span></div></div>`;
+  if (id === 3) return `<div class="wash"><div class="copy"><div class="stack"><span class="bar"></span><span class="bar"></span><span class="bar"></span></div><b style="margin-top:18px;font-size:22px">Drop to convert</b></div></div>`;
+  if (id === 4) return `<div class="wash soft"><div class="copy sm"><b>Drop PDF</b><span>Anywhere on this page</span></div></div>`;
+  return `<div class="wash veil"><div class="copy left"><b>Drop PDF</b><span>Anywhere.</span></div></div>`;
+}
+
+const chosen = new Set();
+const grid = document.getElementById('grid');
+const banner = document.getElementById('banner');
+
+function paint() {
+  grid.innerHTML = OPTIONS.map((opt) => `
+    <article class="opt" data-id="${opt.id}">
+      <div class="head">
+        <div style="display:flex;gap:10px;align-items:center">
+          <div class="n">${opt.id}</div>
+          <div><h2>${opt.name}</h2><p class="why">${opt.why}</p></div>
+        </div>
+        <button class="pick${chosen.has(opt.id) ? ' is-on' : ''}" type="button" data-pick="${opt.id}">${chosen.has(opt.id) ? 'Chosen' : 'Choose'}</button>
+      </div>
+      <div class="stage">
+        <div class="card"><p class="kicker">Build with AI</p><h3>Describe your perfect form</h3></div>
+        ${wash(opt.id)}
+      </div>
+    </article>
+  `).join('');
+  const ids = [...chosen];
+  banner.textContent = ids.length ? `You picked ${ids.join(', ')}. Reply with that number.` : 'Pick a number. Hover a card to see the drop.';
+}
+
+grid.addEventListener('mouseover', (e) => {
+  const card = e.target.closest('.opt');
+  if (!card) return;
+  const stage = card.querySelector('.stage');
+  if (stage.querySelector('.live')) return;
+  const id = Number(card.dataset.id);
+  const extra = document.createElement('div');
+  extra.className = 'live';
+  extra.innerHTML = wash(id);
+  extra.style.cssText = 'position:absolute;inset:0;z-index:3';
+  stage.appendChild(extra);
+});
+grid.addEventListener('mouseout', (e) => {
+  const card = e.target.closest('.opt');
+  if (!card) return;
+  if (card.contains(e.relatedTarget)) return;
+  card.querySelectorAll('.live').forEach((n) => n.remove());
+});
+grid.addEventListener('click', (e) => {
+  const pick = e.target.closest('[data-pick]');
+  if (!pick) return;
+  const id = Number(pick.dataset.pick);
+  chosen.clear();
+  chosen.add(id);
+  paint();
+});
+paint();
+</script>
+</body>
+</html>

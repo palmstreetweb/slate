@@ -3,6 +3,7 @@
 import { useId } from 'react';
 import type { SingleChoiceQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
+import { choiceListIsSplit } from '@/utils/choiceLayout.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
 import { resolveTitle } from './_resolveTitle.js';
 
@@ -21,7 +22,11 @@ export function SingleChoiceField({ question, answers, selected, onSelect }: Pro
         {resolveTitle(question.title, answers)}
       </h1>
 
-      <div className="slate-choices" role="radiogroup" aria-labelledby={labelId}>
+      <div
+        className={`slate-choices${choiceListIsSplit(question.options) ? ' slate-choices--split' : ''}`}
+        role="radiogroup"
+        aria-labelledby={labelId}
+      >
         {question.options.map((opt, i) => {
           const isSelected = selected === opt.value;
           return (

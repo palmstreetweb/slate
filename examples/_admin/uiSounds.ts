@@ -22,6 +22,7 @@ export type UiSoundId =
   | 'open'
   | 'copy'
   | 'refresh'
+  | 'drop'
   | 'sign-out'
   | 'sign-in'
   | 'loading'
@@ -143,6 +144,19 @@ const RECIPES: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'loading' | 'n
       },
     ],
   },
+  /** Three glass taps on the assemble-bar delays (drop wash). */
+  drop: {
+    duration: 0.5,
+    layers: [
+      {
+        wave: 'sine',
+        gain: 0.04,
+        ampEnv: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.06 },
+        filter: { type: 'bandpass', freq: 2400, q: 8 },
+        repeat: { count: 3, interval: 0.12, pitchSeq: [1318.51, 1567.98, 1975.53] },
+      },
+    ],
+  },
   /** Soft cycle — down then up, like a refresh spin settling. */
   refresh: {
     duration: 0.26,
@@ -174,6 +188,7 @@ const VOLUME: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'loading' | 'no
   success: 0.55,
   open: 0.5,
   copy: 0.5,
+  drop: 0.55,
   refresh: 0.5,
 };
 

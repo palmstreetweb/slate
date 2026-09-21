@@ -46,6 +46,11 @@ Format: **ID | Phase | Severity | Surface | Root Cause | Fix | Status**
 | GS-023 | 3 | Medium | Admin / FormSubmissions | Missing `AdminShell` import; duplicate `titleOf` vs import — typecheck failed | Import `AdminShell`; remove local `titleOf`; drop dead `formatValue` | Fixed |
 | GS-024 | 1 | Low | Tooling / ESLint | `examples/dist/**` linted as source | Added ignore in `eslint.config.mjs` | Fixed |
 | GS-025 | 7 | Low | Tests / setup | Node 22+ warns when `localStorage` exists but is unusable | Probe read/write in `tests/setup.ts`; polyfill memory storage when needed | Fixed |
+| GS-026 | Prod QA | High | API / `/api/generate` | Handler written for Web `Request`/`Response` but deployed as a classic Node serverless function (no `runtime: 'edge'` opt-in, unlike `auth-email.ts`) — `request.headers.get` TypeError in `clientIp` → `FUNCTION_INVOCATION_FAILED` 500. Dev never caught it: the Vite proxy hands the handler a real `Request` | Dual-signature default export in `api/generate.ts`: web `Request` passes through, Node `(req, res)` is adapted to `Request`/`Response` | Fixed |
+| GS-027 | Prod QA | High | Engine / required validation | Public fill: a required question with an empty value advances on OK — required check skipped when value is empty (format validators only run on non-empty values) | TBD | Open |
+| GS-028 | Prod QA | Medium | Auth email | Sign-in screen promises a link **and a 6-digit code**; the Neon Auth magic-link email contains only the link (text + HTML), so the code input can never be used | TBD — add OTP to the email or drop the code UI | Open |
+| GS-029 | Prod QA | Low | Engine / Review screen | Review shows internal values: option ids (`b`), ranking ids (`two, one, three`), ISO dates, raw `slate-file://` upload URIs. Responses view maps labels correctly | Reuse `formatAnswerForQuestion` (GS-022) on the review step | Open |
+| GS-030 | Prod QA | Low | Admin / Dashboard | Response count on the form card is stale immediately after a new submission; correct after reload | TBD | Open |
 
 ---
 

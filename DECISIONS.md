@@ -524,18 +524,18 @@ Alternatives:
 - Limit to BUILD_BRIEF §5 (11 types). Superseded — the editor already ships url, date, file_upload, dropdown, yes_no, nps, etc.
 - Stream tokens. Deferred — stagger-reveal the landed object in the modal.
 - Create the form as soon as generate returns. Rejected — Undo existed only to undo that auto-create.
-Consequences: `ANTHROPIC_API_KEY` is server-only (Vercel + `.env.local`). `npm run dev` proxies `/api/generate` through a Vite middleware so localhost works without `vercel dev`; production/preview still use the Vercel function. Engine `npm run build` size is unchanged. Closing the review modal discards the draft (nothing saved).
-Revisit when: streaming schemas or per-user auth on the generate endpoint.
+Consequences: `ANTHROPIC_API_KEY` is server-only (Vercel + `.env.local`). `npm run dev` proxies `/api/generate` through a Vite middleware so localhost works without `vercel dev`; production/preview still use the Vercel function. Engine `npm run build` size is unchanged. Closing the review modal discards the draft (nothing saved). A dropped PDF is read on the server (`unpdf`, API-only) and turned into the generate prompt. Word and Pages are later. The review step is unchanged. AI drafts are capped at 24 questions (short prompts still aim for 3–8). The engine itself has no question limit.
+Revisit when: streaming schemas, per-user auth on the generate endpoint, or Word/image uploads.
 
 ## ADR-040 — Admin chrome UI sounds
 Date: 2026-09-20
 Status: accepted
 Context: Respondent forms already have opt-in step sounds (ADR-023). Studio chrome felt quiet — important actions (new form, AI, publish, confirm/delete, copy, sign-out) needed short feedback without shipping audio assets.
-Decision: (1) `examples/_admin/uiSounds.ts` with synthesized Web Audio cues (`tap`, `create`, `ai`, `confirm`, `danger`, `success`, `open`, `copy`, `refresh`). Document-level `pointerdown` (capture) maps important buttons by class / label / `data-slate-sound`, including portaled dialogs. Restore / refresh labels map to `refresh`. Soft Neon pulls on tab-return also play `refresh`. (2) Sign-out plays letter-fall from `useSignOutFlow` (timed with dissolve); sign-in plays letter-rise when session goes null→signed-in after hydrate. (3) Boot splash plays **Open resolve** (Legend-adjacent whoosh + sub + fifth) once per page load; retries on first gesture if AudioContext was locked. (4) Settings → Studio sounds On/Off persists `slate-admin-ui-sounds` (`0` = muted) and gates all of the above. Not part of the published engine package.
+Decision: (1) `examples/_admin/uiSounds.ts` with synthesized Web Audio cues (`tap`, `create`, `ai`, `confirm`, `danger`, `success`, `open`, `copy`, `refresh`, `drop`). Document-level `pointerdown` (capture) maps important buttons by class / label / `data-slate-sound`, including portaled dialogs. Restore / refresh labels map to `refresh`. Soft Neon pulls on tab-return also play `refresh`. (2) Sign-out plays letter-fall from `useSignOutFlow` (timed with dissolve); sign-in plays letter-rise when session goes null→signed-in after hydrate. (3) Boot splash plays **Open resolve** (Legend-adjacent whoosh + sub + fifth) once per page load; retries on first gesture if AudioContext was locked. (4) Settings → Studio sounds On/Off persists `slate-admin-ui-sounds` (`0` = muted) and gates all of the above. Not part of the published engine package.
 Alternatives:
 - Per-button `onClick` calls only. Rejected — easy to miss portals and new CTAs.
 - Reuse `schema.sound` presets. Rejected — those are respondent-facing and opt-in per form.
-Consequences: Studio feels more tactile. First click still unlocks AudioContext. Compact primary tabs stay silent. Mute is studio-only (form step sounds unchanged).
+Consequences: Studio feels more tactile. First click still unlocks AudioContext. Compact primary tabs stay silent. Mute is studio-only (form step sounds unchanged). Build with AI’s full-page PDF drop wash plays `drop` (glass taps timed to the assemble bars) once when the file is dropped, not while it is still hovering.
 Revisit when: distinct per-route themes, or a volume slider.
 
 ## ADR-041 — Studio toast host + publish confidence
@@ -548,6 +548,17 @@ Alternatives:
 - Auto-republish on every save. Rejected — authors often want to stage draft edits.
 Consequences: Clearer live-vs-draft mental model. Toast stack is examples-only.
 Revisit when: real-time collaborator presence or scheduled publish.
+
+## ADR-042 — Choice letter keys run A–Z
+Date: 2026-09-21
+Status: accepted
+Context: Brief §10.3 stops choice shortcuts at F. A town checklist with 16 options showed letters on the first six and blank badges after that, so the rest looked like the list had ended.
+Decision: `CHOICE_LETTERS` is A–Z. Single choice, multi choice, and picture choice show a badge and accept that key for every option through Z. Yes/no and legal still only honor their own keys. Options past 26 stay click-only.
+Alternatives:
+- Keep A–F and rely on clicks. Rejected — the blank badges read as a cutoff.
+- Double letters (AA, AB) past Z. Rejected — one keypress is the whole shortcut.
+Consequences: A long checklist can be answered from the keyboard. G–Z no longer pass through on those screens.
+Revisit when: a question type needs more than 26 keyed options.
 
 ---
 

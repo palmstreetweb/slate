@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Slate — chat box, then a file</title>
+<style>
+  :root {
+    --bg:#121418; --panel:#1c2128; --panel-2:#232931; --ink:#f3efe6; --muted:#8b93a0;
+    --line:#313842; --red:#e23b2d; --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 var(--sans); }
+  .banner {
+    position:sticky; top:0; z-index:5; padding:14px 22px;
+    background:rgb(18 20 24 / .92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line); font-weight:650;
+  }
+  .wrap { max-width:1080px; margin:0 auto; padding:28px 20px 80px; }
+  h1 { margin:0 0 6px; font-size:28px; letter-spacing:-.03em; }
+  .lead { margin:0 0 22px; color:var(--muted); max-width:68ch; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:860px) { .grid { grid-template-columns:1fr; } }
+  .opt { background:#0e1014; border:1px solid var(--line); border-radius:18px; padding:14px; }
+  .head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
+  .n {
+    width:26px; height:26px; border-radius:8px; display:grid; place-items:center; flex:none;
+    background:var(--panel-2); border:1px solid var(--line); font:700 12px/1 var(--sans); color:var(--muted);
+  }
+  .opt h2 { margin:0; font-size:15px; letter-spacing:-.02em; }
+  .why { margin:2px 0 0; color:var(--muted); font-size:12px; }
+  button.pick {
+    appearance:none; border:0; cursor:pointer; height:32px; padding:0 12px; border-radius:999px;
+    background:var(--red); color:#fff; font:650 12px/1 var(--sans); flex:none;
+  }
+  button.pick.is-on { background:#fff; color:#111; }
+  .mock { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px; }
+  .kicker { margin:0 0 6px; font:700 10px/1 var(--sans); letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+  .mock h3 { margin:0 0 10px; font-size:18px; letter-spacing:-.03em; }
+  .composer {
+    position:relative; border:1px solid var(--line); background:var(--panel-2);
+    border-radius:16px; padding:12px 12px 10px;
+  }
+  .composer.is-hot { border-color:var(--red); box-shadow:inset 0 0 0 1px var(--red); }
+  .type {
+    width:100%; min-height:78px; border:0; background:transparent; color:var(--muted);
+    font:inherit; font-size:14px; resize:none; outline:none;
+  }
+  .tools { display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .icon, .pill, .send {
+    appearance:none; border:1px solid var(--line); background:#181c22; color:var(--ink);
+    cursor:pointer; font:600 12px/1 var(--sans);
+  }
+  .icon { width:32px; height:32px; border-radius:10px; }
+  .pill { height:30px; padding:0 10px; border-radius:999px; color:var(--muted); }
+  .send { margin-left:auto; height:32px; padding:0 12px; border-radius:999px; background:var(--red); border-color:var(--red); color:#fff; }
+  .chip {
+    display:inline-flex; align-items:center; gap:8px; max-width:100%;
+    padding:6px 8px 6px 10px; border-radius:10px; background:#181c22; border:1px solid var(--line); font-size:12px;
+  }
+  .chip button { appearance:none; border:0; background:transparent; color:var(--muted); cursor:pointer; }
+  .veil {
+    display:none; position:absolute; inset:6px; border-radius:12px;
+    border:1.5px dashed var(--red); background:rgb(18 20 24 / .88);
+    place-items:center; font-weight:650;
+  }
+  .composer.show-veil .veil { display:grid; }
+  .plus {
+    width:28px; height:28px; border-radius:999px; border:1px solid var(--line); background:#181c22;
+    color:var(--ink); font:600 16px/1 var(--sans);
+  }
+</style>
+</head>
+<body>
+  <div class="banner" id="banner">Pick a number. Typing stays first.</div>
+  <div class="wrap">
+    <h1>Chat box first. File second.</h1>
+    <p class="lead">Another ten. Every one starts as a place to type. Upload and drag-and-drop are there, but they don’t take over. Click the composer to attach Brent’s notes, then Choose.</p>
+    <div class="grid" id="grid"></div>
+  </div>
+<script>
+const OPTIONS = [
+  { id:1, name:'Paperclip', why:'Type in the box. A clip in the corner attaches a file.' },
+  { id:2, name:'Send row', why:'The note is the message. Attach sits beside Send.' },
+  { id:3, name:'Chip above', why:'A file shows as a small chip over the words you’re typing.' },
+  { id:4, name:'Pocket', why:'Like a message app. Plus on the left, send on the right.' },
+  { id:5, name:'Growing line', why:'One line that feels like chat. The clip is inline.' },
+  { id:6, name:'Quiet until drag', why:'No drop box. A veil only appears while a file is over the chat.' },
+  { id:7, name:'Plus menu', why:'The box stays clean. Plus is the only way in, until you drop.' },
+  { id:8, name:'Reply clip', why:'The document hangs above the chat like a message you’re answering.' },
+  { id:9, name:'Footer whisper', why:'A one-line hint under the box: PDF or drop. Nothing else.' },
+  { id:10, name:'Attach pill', why:'A small pill under the chat. The typing area stays the largest thing.' },
+];
+
+const FILE = 'brent-site-notes.pdf';
+
+function composer(inner, hot, extra) {
+  return `<div class="composer${hot ? ' is-hot' : ''} ${extra || ''}" data-act="toggle">${inner}</div>`;
+}
+
+function mock(id, hot) {
+  const title = `<p class="kicker">Build with AI</p><h3>Describe your perfect form</h3>`;
+  const words = hot ? '' : 'A driveway quote for homeowners near Morro Bay…';
+  if (id === 1) {
+    return `${title}${composer(`
+      <textarea class="type" readonly placeholder="${words || ''}">${hot ? '' : ''}</textarea>
+      ${hot ? `<div class="chip">${FILE} <button type="button">✕</button></div>` : ''}
+      <button class="icon" type="button" style="position:absolute;right:10px;bottom:10px" aria-label="Attach">📎</button>
+    `)}`;
+  }
+  if (id === 2) {
+    return `${title}${composer(`
+      <div class="type" style="min-height:64px">${words || '…'}</div>
+      <div class="tools">
+        <button class="pill" type="button">${hot ? FILE : 'Attach'}</button>
+        <button class="send" type="button">Generate</button>
+      </div>
+    `)}`;
+  }
+  if (id === 3) {
+    return `${title}${composer(`
+      ${hot ? `<div class="chip" style="margin-bottom:8px">${FILE} <button type="button">✕</button></div>` : ''}
+      <div class="type">${words}</div>
+      <div class="tools"><button class="pill" type="button">Upload</button><span style="color:var(--muted);font-size:12px">or drop it in</span></div>
+    `)}`;
+  }
+  if (id === 4) {
+    return `${title}${composer(`
+      <div class="tools" style="margin-top:0">
+        <button class="plus" type="button">+</button>
+        <div class="type" style="min-height:36px">${hot ? FILE : words}</div>
+        <button class="send" type="button">↑</button>
+      </div>
+    `)}`;
+  }
+  if (id === 5) {
+    return `${title}${composer(`
+      <div class="tools" style="margin:0">
+        <div class="type" style="min-height:28px">${hot ? FILE : 'Message…'}</div>
+        <button class="icon" type="button">📎</button>
+      </div>
+    `)}`;
+  }
+  if (id === 6) {
+    return `${title}${composer(`
+      <div class="type" style="min-height:96px">${words}</div>
+      <div class="veil">Drop to attach</div>
+    `, hot, hot ? 'show-veil' : '')}`;
+  }
+  if (id === 7) {
+    return `${title}${composer(`
+      <div class="type" style="min-height:88px">${words}</div>
+      <div class="tools"><button class="plus" type="button">+</button>${hot ? `<span class="chip">${FILE}</span>` : `<span style="color:var(--muted);font-size:12px">Add a document</span>`}</div>
+    `)}`;
+  }
+  if (id === 8) {
+    return `${title}
+      ${hot ? `<div class="chip" style="margin-bottom:8px">Replying to ${FILE} <button type="button">✕</button></div>` : ''}
+      ${composer(`<div class="type">${words || 'What should this form ask?'}</div><div class="tools"><button class="pill" type="button">Upload</button></div>`)}`;
+  }
+  if (id === 9) {
+    return `${title}${composer(`<div class="type" style="min-height:96px">${words}</div>`)}
+      <p style="margin:8px 2px 0;color:var(--muted);font-size:12px">${hot ? FILE + ' attached' : 'PDF or text · drop it on the box'}</p>`;
+  }
+  return `${title}${composer(`<div class="type" style="min-height:88px">${words}</div>`)}
+    <div style="margin-top:8px">${hot ? `<span class="chip">${FILE} <button type="button">✕</button></span>` : `<button class="pill" type="button" data-act="toggle">Attach a document</button>`}</div>`;
+}
+
+const chosen = new Set();
+const grid = document.getElementById('grid');
+
+function paint() {
+  grid.innerHTML = OPTIONS.map((opt) => `
+    <article class="opt" data-id="${opt.id}">
+      <div class="head">
+        <div style="display:flex;gap:10px;align-items:center">
+          <div class="n">${opt.id}</div>
+          <div><h2>${opt.name}</h2><p class="why">${opt.why}</p></div>
+        </div>
+        <button class="pick${chosen.has(opt.id) ? ' is-on' : ''}" type="button" data-pick="${opt.id}">${chosen.has(opt.id) ? 'Chosen' : 'Choose'}</button>
+      </div>
+      <div class="mock">${mock(opt.id, chosen.has(opt.id))}</div>
+    </article>
+  `).join('');
+  const ids = [...chosen];
+  document.getElementById('banner').textContent = ids.length
+    ? `You picked ${ids.join(', ')}. Reply with that number.`
+    : 'Pick a number. Typing stays first.';
+}
+
+grid.addEventListener('click', (e) => {
+  const pick = e.target.closest('[data-pick]');
+  if (pick) {
+    const id = Number(pick.dataset.pick);
+    if (chosen.has(id)) chosen.delete(id); else chosen.add(id);
+    paint();
+    return;
+  }
+  if (e.target.closest('[data-act="toggle"], .composer, .pill, .icon, .plus')) {
+    const card = e.target.closest('.opt');
+    if (!card) return;
+    const id = Number(card.dataset.id);
+    if (chosen.has(id)) chosen.delete(id); else chosen.add(id);
+    paint();
+  }
+});
+
+paint();
+</script>
+</body>
+</html>

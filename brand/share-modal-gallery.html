@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Slate — share modal layouts</title>
+<style>
+  :root {
+    --bg:#121418; --panel:#1e232b; --panel-2:#23282f; --ink:#f2efe8; --muted:#8a93a1;
+    --line:#2d333d; --red:#e23b2d; --cream:#faf6ee; --qr:#2a2520;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 var(--sans); }
+  .banner {
+    position:sticky; top:0; z-index:6; padding:14px 22px;
+    background:rgb(18 20 24 / .92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line); font-weight:650;
+  }
+  .wrap { max-width:1180px; margin:0 auto; padding:28px 20px 80px; }
+  h1 { margin:0 0 6px; font-size:28px; letter-spacing:-.03em; }
+  .lead { margin:0 0 22px; color:var(--muted); max-width:70ch; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width: 980px) { .grid { grid-template-columns:1fr; } }
+  .opt { background:#0e1014; border:1px solid var(--line); border-radius:18px; padding:14px; }
+  .head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:12px; }
+  .n {
+    width:26px; height:26px; border-radius:8px; display:grid; place-items:center;
+    background:#232931; border:1px solid var(--line); font:700 12px/1 var(--sans); color:var(--muted);
+  }
+  h2 { margin:0; font-size:16px; letter-spacing:-.02em; }
+  .why { margin:3px 0 0; color:var(--muted); font-size:12px; }
+  button.pick {
+    appearance:none; border:0; cursor:pointer; height:32px; padding:0 12px; border-radius:999px;
+    background:var(--red); color:#fff; font:650 12px/1 var(--sans);
+  }
+  button.pick.is-on { background:#fff; color:#111; }
+  .stage { display:grid; place-items:center; min-height:420px; padding:8px 0 4px; }
+
+  .modal {
+    width:min(440px, 100%);
+    background:var(--panel);
+    color:var(--ink);
+    border:1px solid #313842;
+    border-radius:18px;
+    box-shadow:0 24px 48px -20px rgb(0 0 0 / .55);
+    padding:16px 16px 14px;
+  }
+  .modal.wide { width:min(520px, 100%); }
+  .top { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+  .k { margin:0; font-size:18px; font-weight:650; letter-spacing:-.03em; }
+  .sub { margin:2px 0 0; color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:280px; }
+  .x { border:0; background:transparent; color:var(--muted); font-size:16px; cursor:default; }
+  .live {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin-top:12px; padding:8px 10px; border-radius:10px;
+    background:#191d24; border:1px solid var(--line); font-size:12px; color:var(--muted);
+  }
+  .dot {
+    width:7px; height:7px; border-radius:99px; background:#3ddc97; display:inline-block;
+    margin-right:6px; vertical-align:middle;
+    box-shadow:0 0 0 0 rgb(61 220 151 / .7);
+    animation:live-pulse 2.4s ease-out infinite;
+  }
+  .liveword {
+    display:inline-flex; align-items:center; gap:6px;
+    color:#e7fff3; font:600 12px/1 var(--sans);
+  }
+  .liveword .dot { margin:0; }
+  @keyframes live-pulse {
+    0% { box-shadow:0 0 0 0 rgb(61 220 151 / .55); }
+    70% { box-shadow:0 0 0 7px rgb(61 220 151 / 0); }
+    100% { box-shadow:0 0 0 0 rgb(61 220 151 / 0); }
+  }
+  .btn, .copy, .ghost {
+    border:1px solid var(--line); background:var(--panel-2); color:var(--ink);
+    border-radius:8px; font:600 12px/1 var(--sans); height:30px; padding:0 10px; cursor:default;
+  }
+  .ghost { background:transparent; color:var(--muted); }
+  .urlrow { display:flex; gap:8px; margin-top:10px; align-items:center; }
+  .url {
+    flex:1; min-width:0; height:34px; display:flex; align-items:center; padding:0 10px;
+    border-radius:10px; background:#191d24; border:1px solid var(--line);
+    color:var(--muted); font:12px/1 var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .open { display:inline-block; margin-top:8px; color:var(--muted); font-size:12px; }
+  .qr {
+    background:var(--cream); border-radius:12px; display:grid; place-items:center; flex-shrink:0;
+  }
+  .qr i {
+    width:72%; height:72%;
+    background:
+      linear-gradient(var(--qr), var(--qr)) 0 0 / 28% 28% no-repeat,
+      linear-gradient(var(--qr), var(--qr)) 100% 0 / 28% 28% no-repeat,
+      linear-gradient(var(--qr), var(--qr)) 0 100% / 28% 28% no-repeat,
+      repeating-linear-gradient(90deg, var(--qr) 0 2px, transparent 2px 5px),
+      repeating-linear-gradient(0deg, var(--qr) 0 2px, transparent 2px 5px);
+    border-radius:2px;
+  }
+  .row { display:flex; gap:12px; align-items:center; }
+  .col { display:flex; flex-direction:column; gap:8px; min-width:0; flex:1; }
+  .qrcol { display:grid; justify-items:center; gap:8px; }
+  .pills { display:flex; gap:4px; justify-content:center; padding:3px; border-radius:999px; background:#191d24; border:1px solid var(--line); }
+  .pills span {
+    font-size:11px; color:var(--muted); border-radius:99px; padding:4px 8px;
+  }
+  .pills span.on { color:var(--ink); background:var(--panel-2); }
+  .hint { margin:0; text-align:center; color:var(--muted); font-size:11px; }
+</style>
+</head>
+<body>
+  <div class="banner" id="banner">Pulsing green dot, larger QR, Swiss / Dots / Mark. Reply with a number.</div>
+  <div class="wrap">
+    <h1>Ten compact share sheets</h1>
+    <p class="lead">Same size, no scrollbar. Live is a tiny pulsing dot, the QR is larger, and Swiss / Dots / Mark stay on every sheet. A customer’s own mark in Settings comes later.</p>
+    <div class="grid" id="grid"></div>
+  </div>
+<script>
+const URL = 'http://127.0.0.1:5173/#/f/805-seal-coating-for-brent';
+const qr = (px) => `<div class="qrcol"><div class="qr" style="width:${px}px;height:${px}px"><i></i></div><div class="pills"><span>Swiss</span><span>Dots</span><span class="on">Mark</span></div></div>`;
+const live = () => `<span class="liveword"><i class="dot"></i>Live</span>`;
+
+const OPTIONS = [
+  {
+    id: 1, name: 'Beside', why: 'Pulsing dot on the left. Larger code on the right.',
+    html: () => `
+      <div class="modal wide">
+        <div class="top"><div><p class="k">Share</p><p class="sub">805 Seal Coating for Brent</p></div><span class="x">✕</span></div>
+        <div class="row" style="margin-top:14px;align-items:center">
+          <div class="col">
+            <div style="display:flex;justify-content:space-between;align-items:center">${live()}<button class="ghost">Unpublish</button></div>
+            <div class="urlrow" style="margin-top:0"><div class="url">${URL}</div><button class="copy">Copy</button></div>
+            <span class="open">Open in browser ↗</span>
+          </div>
+          ${qr(168)}
+        </div>
+      </div>`
+  },
+  {
+    id: 2, name: 'Live in the title', why: 'The pulsing dot sits with the name. The code is the block under the link.',
+    html: () => `
+      <div class="modal">
+        <div class="top">
+          <div><p class="k">Share</p><p class="sub">805 Seal Coating for Brent</p></div>
+          <div style="display:flex;gap:8px;align-items:center">${live()}<span class="x">✕</span></div>
+        </div>
+        <div class="urlrow"><div class="url">${URL}</div><button class="copy">Copy</button></div>
+        <div class="row" style="margin-top:12px;justify-content:space-between">
+          <span class="open" style="margin:0">Open in browser ↗</span>
+          <button class="ghost">Unpublish</button>
+        </div>
+        <div style="display:grid;place-items:center;margin-top:12px">${qr(176)}</div>
+      </div>`
+  },
+  {
+    id: 3, name: 'One bar', why: 'Pulsing dot, link, and copy in one strip. The code caps the row.',
+    html: () => `
+      <div class="modal wide">
+        <div class="top"><div><p class="k">Share</p><p class="sub">805 Seal Coating for Brent</p></div><span class="x">✕</span></div>
+        <div class="row" style="margin-top:14px">
+          <div class="col">
+            <div style="display:flex;gap:8px;align-items:center">${live()}<button class="ghost">Unpublish</button></div>
+            <div class="urlrow" style="margin-top:0"><div class="url">${URL}</div><button class="copy">Copy</button></div>
+            <span class="open">Open in browser ↗</span>
+          </div>
+          ${qr(156)}
+        </div>
+      </div>`
+  },
+  {
+    id: 4, name: 'Tight stack', why: 'The pulsing dot replaces the status box. The code is larger, still one column.',
+    html: () => `
+      <div class="modal" style="width:min(400px,100%)">
+        <div class="top">
+          <div><p class="k">Share</p><p class="sub">805 Seal Coating for Brent</p></div>
+          ${live()}
+        </div>
+        <div class="urlrow"><div class="url">${URL}</div><button class="copy">Copy</button></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px"><span class="open" style="margin:0">Open in browser ↗</span><button class="ghost">Unpublish</button></div>
+        <div style="display:grid;place-items:center;margin-top:12px">${qr(188)}</div>
+      </div>`
+  },
+  {
+    id: 5, name: 'Equal split', why: 'The pulsing dot leads the left column. The code matches that column’s height.',
+    html: () => `
+      <div class="modal wide">
+        <div class="top" style="margin-bottom:12px"><div><p class="k">Share</p><p class="sub">805 Seal Coating for Brent</p></div><span class="x">✕</span></div>
+        <div class="row" style="align-items:center">
+          <div class="col">
+            ${live()}
+            <div class="url">${URL}</div>
+            <div style="display:flex;gap:8px"><button class="copy">Copy</button><button class="ghost">Open ↗</button><button class="ghost">Unpublish</button></div>
+          </div>
+          ${qr(188)}
+        </div>
+      </div>`
+  },
+  {
+    id: 6, name: 'Tools in the header', why: 'Live and Unpublish share the title row. The code sits beside the link.',
+    html: () => `
+      <div class="modal wide">
+        <div class="top">
+          <div><p class="k">Share</p><p class="sub">805 Seal Coating for Brent</p></div>
+          <div style="display:flex;gap:8px;align-items:center">${live()}<button class="ghost">Unpublish</button></div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <div class="col">
+            <div class="url">${URL}</div>
+            <div style="display:flex;gap:8px"><button class="copy">Copy</button><button class="ghost">Open ↗</button></div>
+          </div>
+          ${qr(164)}
+        </div>
+      </div>`
+  },
+  {
+    id: 7, name: 'Link is the hero', why: 'The address stays big. The dot pulses on the left. The code is a larger stamp.',
+    html: () => `
+      <div class="modal wide">
+        <div class="top"><div><p class="k">Share</p><p class="sub">805 Seal Coating for Brent</p></div><span class="x">✕</span></div>
+        <div class="url" style="margin-top:12px;height:42px">${URL}</div>
+        <div class="row" style="margin-top:12px">
+          ${live()}
+          <button class="btn">Copy link</button>
+          <button class="ghost">Open ↗</button>
+          <div style="margin-left:auto">${qr(128)}</div>
+        </div>
+      </div>`
+  },
+  {
+    id: 8, name: 'Status bar', why: 'The pulsing dot is the whole status line. Code sits on the next row.',
+    html: () => `
+      <div class="modal wide">
+        <div class="top"><p class="k">Share</p><span class="x">✕</span></div>
+        <p class="sub" style="max-width:none">805 Seal Coating for Brent</p>
+        <div class="row" style="margin-top:12px;justify-content:space-between">${live()}<button class="ghost">Unpublish</button></div>
+        <div class="row" style="margin-top:12px">
+          <div class="col">
+            <div class="url">${URL}</div>
+            <div style="display:flex;gap:8px"><button class="copy">Copy</button><span class="open" style="margin:0;align-self:center">Open in browser ↗</span></div>
+          </div>
+          ${qr(168)}
+        </div>
+      </div>`
+  },
+  {
+    id: 9, name: 'Quiet', why: 'No status box. The pulsing dot is the only live signal, next to a larger code.',
+    html: () => `
+      <div class="modal wide">
+        <div class="top">
+          <div><p class="k">Share</p><p class="sub">805 Seal Coating for Brent</p></div>
+          <span class="x">✕</span>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <div class="col">
+            ${live()}
+            <div class="urlrow" style="margin-top:0"><div class="url">${URL}</div><button class="copy">Copy</button></div>
+            <div style="display:flex;justify-content:space-between"><span class="open" style="margin:0">Open in browser ↗</span><button class="ghost">Unpublish</button></div>
+          </div>
+          ${qr(172)}
+        </div>
+      </div>`
+  },
+  {
+    id: 10, name: 'List and stamp', why: 'Live leads three short rows. The code is one larger square.',
+    html: () => `
+      <div class="modal wide">
+        <div class="row" style="align-items:center">
+          <div class="col">
+            <div class="top"><div><p class="k">Share</p><p class="sub">805 Seal Coating for Brent</p></div></div>
+            ${live()}
+            <div class="urlrow" style="margin-top:0"><div class="url">${URL}</div><button class="copy">Copy</button></div>
+            <div style="display:flex;justify-content:space-between"><span class="open" style="margin:0">Open in browser ↗</span><button class="ghost">Unpublish</button></div>
+          </div>
+          ${qr(180)}
+        </div>
+      </div>`
+  },
+];
+
+const chosen = new Set();
+const grid = document.getElementById('grid');
+const banner = document.getElementById('banner');
+
+function paint() {
+  grid.innerHTML = OPTIONS.map((opt) => `
+    <article class="opt">
+      <div class="head">
+        <div style="display:flex;gap:10px;align-items:center">
+          <div class="n">${opt.id}</div>
+          <div><h2>${opt.name}</h2><p class="why">${opt.why}</p></div>
+        </div>
+        <button class="pick${chosen.has(opt.id) ? ' is-on' : ''}" type="button" data-pick="${opt.id}">${chosen.has(opt.id) ? 'Chosen' : 'Choose'}</button>
+      </div>
+      <div class="stage">${opt.html()}</div>
+    </article>
+  `).join('');
+  const ids = [...chosen];
+  banner.textContent = ids.length
+    ? `You picked ${ids[0]}. Reply with that number.`
+    : 'Pulsing green dot, larger QR, Swiss / Dots / Mark. Reply with a number.';
+}
+
+grid.addEventListener('click', (e) => {
+  const pick = e.target.closest('[data-pick]');
+  if (!pick) return;
+  chosen.clear();
+  chosen.add(Number(pick.dataset.pick));
+  paint();
+});
+paint();
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generatedFormSchema } from '../api/generateFormSchema.js';
+import { GENERATED_QUESTION_MAX, generatedFormSchema } from '../api/generateFormSchema.js';
 import { blankGeneratedQuestion, mapGeneratedForm } from '../api/mapGeneratedForm.js';
 import { resetRateLimit, takeRateLimit } from '../api/rateLimit.js';
 import { buildGenerateUserPrompt } from '../api/runGenerate.js';
@@ -137,6 +137,31 @@ describe('Build with AI schema', () => {
     expect(
       generatedFormSchema.safeParse({ ...validDraft, questions: validDraft.questions.slice(0, 2) })
         .success,
+    ).toBe(false);
+  });
+
+  it('accepts a worksheet up to the AI cap and rejects one past it', () => {
+    const pad = (count: number) =>
+      Array.from({ length: count }, (_, i) =>
+        blankGeneratedQuestion({
+          id: `extra_${i + 1}`,
+          type: 'short_text',
+          title: `Extra ${i + 1}?`,
+          placeholder: 'A note',
+          required: false,
+        }),
+      );
+    const atCap = {
+      ...validDraft,
+      questions: [...validDraft.questions, ...pad(GENERATED_QUESTION_MAX - validDraft.questions.length)],
+    };
+    expect(atCap.questions).toHaveLength(GENERATED_QUESTION_MAX);
+    expect(generatedFormSchema.safeParse(atCap).success).toBe(true);
+    expect(
+      generatedFormSchema.safeParse({
+        ...validDraft,
+        questions: [...atCap.questions, ...pad(1).map((q) => ({ ...q, id: 'one_past' }))],
+      }).success,
     ).toBe(false);
   });
 
