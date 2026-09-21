@@ -98,6 +98,7 @@ export function Login() {
   const [magicLinkSent, setMagicLinkSent] = useState(true);
   const [resending, setResending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
   const verifyingRef = useRef(false);
   const seededCode = useMemo(() => readOtpFromHash(), []);
@@ -324,11 +325,18 @@ export function Login() {
                     <button
                       type="button"
                       className="slate-login-back"
+                      data-slate-sound="copy"
                       onClick={() => {
-                        void navigator.clipboard?.writeText(seededCode).catch(() => {});
+                        void navigator.clipboard
+                          ?.writeText(seededCode)
+                          .then(() => {
+                            setCopiedCode(true);
+                            window.setTimeout(() => setCopiedCode(false), 1600);
+                          })
+                          .catch(() => {});
                       }}
                     >
-                      Copy code
+                      {copiedCode ? 'Copied' : 'Copy code'}
                     </button>
                   </div>
                 ) : null}

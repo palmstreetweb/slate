@@ -6,7 +6,11 @@
 'use client';
 
 import { playSound, type Recipe } from '@/utils/pixieMallet.js';
+import { playLoadingOpenResolve } from './shell/loadingSound.js';
 import { playSignInLetterRise, playSignOutLetterFall } from './shell/signOutSound.js';
+
+/** localStorage — `0` mutes studio chrome (clicks, sign-in/out, boot ident). */
+export const UI_SOUND_MUTE_KEY = 'slate-admin-ui-sounds';
 
 export type UiSoundId =
   | 'tap'
@@ -19,9 +23,28 @@ export type UiSoundId =
   | 'copy'
   | 'sign-out'
   | 'sign-in'
+  | 'loading'
   | 'none';
 
-const RECIPES: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'none'>, Recipe> = {
+export function isUiSoundMuted(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(UI_SOUND_MUTE_KEY) === '0';
+  } catch {
+    return false;
+  }
+}
+
+export function setUiSoundMuted(muted: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(UI_SOUND_MUTE_KEY, muted ? '0' : '1');
+  } catch {
+    // Quota / private mode — ignore.
+  }
+  window.dispatchEvent(new CustomEvent('slate-admin-ui-sounds'));
+}
+const RECIPES: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'loading' | 'none'>, Recipe> = {
   tap: {
     duration: 0.06,
     layers: [
@@ -121,7 +144,7 @@ const RECIPES: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'none'>, Recip
   },
 };
 
-const VOLUME: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'none'>, number> = {
+const VOLUME: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'loading' | 'none'>, number> = {
   tap: 0.45,
   create: 0.55,
   ai: 0.5,
@@ -138,9 +161,10 @@ const MIN_GAP_MS = 42;
 export function playUiSound(id: UiSoundId, volumeScale = 1): void {
   if (id === 'none') return;
   if (typeof window === 'undefined') return;
+  if (isUiSoundMuted()) return;
   const now = performance.now();
-  if (now - lastPlayMs < MIN_GAP_MS) return;
-  lastPlayMs = now;
+  if (id !== 'loading' && now - lastPlayMs < MIN_GAP_MS) return;
+  if (id !== 'loading') lastPlayMs = now;
 
   try {
     if (id === 'sign-out') {
@@ -149,6 +173,10 @@ export function playUiSound(id: UiSoundId, volumeScale = 1): void {
     }
     if (id === 'sign-in') {
       playSignInLetterRise();
+      return;
+    }
+    if (id === 'loading') {
+      playLoadingOpenResolve();
       return;
     }
     playSound(VOLUME[id] * volumeScale, RECIPES[id]);
@@ -206,6 +234,10 @@ function resolveAutoSound(el: HTMLElement): UiSoundId | null {
 export function installAdminUiSounds(): () => void {
   const onPointerDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
+    // First gesture unlocks AudioContext — retry boot ident if splash is still up.
+    if (document.querySelector('.slate-loading')) {
+      playUiSound('loading');
+    }
     const raw = e.target;
     if (!(raw instanceof Element)) return;
     const el = raw.closest(

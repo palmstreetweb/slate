@@ -97,3 +97,21 @@ VITE_PUBLIC_FORM_BASE=https://slateforms.vercel.app
 ```
 
 Remove any `VITE_SUPABASE_*` keys from Vercel.
+
+## 7. Own Google OAuth (before wider launch)
+
+Neon’s shared Google keys are fine for demos. For branded production:
+
+1. Google Cloud Console → create an OAuth **Web** client
+2. Authorized JavaScript origins: `https://slateforms.vercel.app`, `http://localhost:5173`
+3. Authorized redirect URI: `{NEON_AUTH_BASE_URL}/callback/google` (from Neon Auth → Configuration)
+4. Neon Console → **Auth → Configuration → Google** → paste **your** Client ID + Secret (turn off shared keys)
+5. Confirm trusted domains include `https://slateforms.vercel.app`
+
+## 8. Rotate DB password (if it ever leaked)
+
+If a Neon role password appeared in a terminal log or chat:
+
+1. Neon Console → project → **Settings → Reset password** (or Roles)
+2. Update any saved connection strings / `DATABASE_URL` used by Functions / local `psql`
+3. SPA does **not** use the Postgres password — only `VITE_NEON_URL` (HTTPS Data API) — so no Vercel SPA env change unless you also stored the SQL URL somewhere

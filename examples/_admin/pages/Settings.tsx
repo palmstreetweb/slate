@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminShell } from '../shell/AdminShell.js';
 import { closeSettings } from '../shell/settingsNav.js';
 import { BackupPanel } from '../components/BackupPanel.js';
@@ -9,12 +9,24 @@ import { isNeonConfigured } from '../neon/env.js';
 import { useAuth } from '../neon/AuthProvider.js';
 import { useSignOutFlow } from '../shell/useSignOutFlow.js';
 import { ADMIN_UI_THEME_OPTIONS } from '../adminUiTheme.js';
+import { isUiSoundMuted, playUiSound, setUiSoundMuted } from '../uiSounds.js';
 
 function SettingsContent() {
   const { mode, setMode, uiTheme, setUiTheme } = useAdminTheme();
   const { user } = useAuth();
   const { runSignOut, leaving, overlay } = useSignOutFlow();
   const cloud = isNeonConfigured();
+  const [soundsOn, setSoundsOn] = useState(() => !isUiSoundMuted());
+
+  useEffect(() => {
+    const sync = () => setSoundsOn(!isUiSoundMuted());
+    window.addEventListener('slate-admin-ui-sounds', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('slate-admin-ui-sounds', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
 
   return (
     <div className="slate-settings" role="dialog" aria-label="Settings">
@@ -77,6 +89,42 @@ function SettingsContent() {
                 </button>
               );
             })}
+          </div>
+        </section>
+
+        <section className="slate-settings-section">
+          <h2 className="slate-settings-heading">Studio sounds</h2>
+          <p className="slate-settings-copy">
+            Clicks, sign-in / sign-out, and the boot splash. Does not change form step sounds.
+          </p>
+          <div className="slate-tabs" role="tablist" aria-label="Studio sounds">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={soundsOn}
+              className={`slate-tab${soundsOn ? ' slate-tab--active' : ''}`}
+              data-slate-sound="none"
+              onClick={() => {
+                setUiSoundMuted(false);
+                setSoundsOn(true);
+                playUiSound('tap');
+              }}
+            >
+              On
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!soundsOn}
+              className={`slate-tab${!soundsOn ? ' slate-tab--active' : ''}`}
+              data-slate-sound="none"
+              onClick={() => {
+                setUiSoundMuted(true);
+                setSoundsOn(false);
+              }}
+            >
+              Off
+            </button>
           </div>
         </section>
 

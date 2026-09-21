@@ -531,12 +531,12 @@ Revisit when: streaming schemas or per-user auth on the generate endpoint.
 Date: 2026-09-20
 Status: accepted
 Context: Respondent forms already have opt-in step sounds (ADR-023). Studio chrome felt quiet — important actions (new form, AI, publish, confirm/delete, copy, sign-out) needed short feedback without shipping audio assets.
-Decision: Add `examples/_admin/uiSounds.ts` with synthesized Web Audio cues (`tap`, `create`, `ai`, `confirm`, `danger`, `success`, `open`, `copy`, plus existing letter-fall for sign-out). A document-level `pointerdown` listener (capture) maps important buttons by class / label / `data-slate-sound`, including portaled dialogs. Sign-out still plays from `useSignOutFlow` so it stays timed with the dissolve overlay. Not part of the published engine package; no mute toggle in v1 (browser gesture unlock is enough).
+Decision: (1) `examples/_admin/uiSounds.ts` with synthesized Web Audio cues (`tap`, `create`, `ai`, `confirm`, `danger`, `success`, `open`, `copy`). Document-level `pointerdown` (capture) maps important buttons by class / label / `data-slate-sound`, including portaled dialogs. (2) Sign-out plays letter-fall from `useSignOutFlow` (timed with dissolve); sign-in plays letter-rise when session goes null→signed-in after hydrate. (3) Boot splash plays **Open resolve** (Legend-adjacent whoosh + sub + fifth) once per page load; retries on first gesture if AudioContext was locked. (4) Settings → Studio sounds On/Off persists `slate-admin-ui-sounds` (`0` = muted) and gates all of the above. Not part of the published engine package.
 Alternatives:
 - Per-button `onClick` calls only. Rejected — easy to miss portals and new CTAs.
 - Reuse `schema.sound` presets. Rejected — those are respondent-facing and opt-in per form.
-Consequences: Studio feels more tactile. First click still unlocks AudioContext. Compact primary tabs stay silent.
-Revisit when: Settings mute toggle, or distinct per-route themes.
+Consequences: Studio feels more tactile. First click still unlocks AudioContext. Compact primary tabs stay silent. Mute is studio-only (form step sounds unchanged).
+Revisit when: distinct per-route themes, or a volume slider.
 
 ---
 

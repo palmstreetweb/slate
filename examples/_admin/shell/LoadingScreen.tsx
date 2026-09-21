@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { SlateLogo } from '../components/SlateLogo.js';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { readSlateMode } from '../slateMode.js';
+import { playUiSound } from '../uiSounds.js';
 
 /**
  * Minimum branding beat. Real work (auth settle + Neon hydrate) runs in
@@ -49,6 +50,11 @@ type Props = {
 export function LoadingScreen({ label = 'Loading' }: Props) {
   const mode = readSlateMode();
   const uiTheme = detectAdminUiTheme();
+
+  useEffect(() => {
+    // Attempt immediately; if AudioContext is locked, first pointer retries via uiSounds.
+    playUiSound('loading');
+  }, []);
 
   return (
     <div
