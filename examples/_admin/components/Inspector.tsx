@@ -4,7 +4,7 @@
  * `question.type`. Logic sections collapse by default and open when needed.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Condition, Option, PictureOption, Question } from '@/index.js';
 import { TYPE_GLYPH, TYPE_LABEL } from '../questionTypeMeta.js';
 import { ConditionBuilder, JumpRulesEditor } from './LogicEditor.js';
@@ -40,7 +40,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
       <Divider />
 
-      <div className="slate-rail-pad" style={{ display: 'grid', gap: 14 }}>
+      <div className="slate-rail-pad slate-inspector-fields" style={{ display: 'grid', gap: 14 }}>
         {'title' in question && typeof question.title === 'string' && (
           <Field label="Title">
             <input
@@ -60,13 +60,12 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
 
         {'subtitle' in question && (
           <Field label="Subtitle (Optional)">
-            <textarea
-              className="slate-textarea"
+            <AutoGrowTextarea
+              key={question.id}
               value={question.subtitle ?? ''}
-              onChange={(e) =>
-                onChange({ subtitle: e.target.value || undefined } as Partial<Question>)
+              onChange={(subtitle) =>
+                onChange({ subtitle: subtitle || undefined } as Partial<Question>)
               }
-              rows={2}
             />
           </Field>
         )}
@@ -615,12 +614,71 @@ function Field({
     <label className="slate-inspector-field">
       <span className="slate-label">{label}</span>
       <span className="slate-inspector-field-control">{children}</span>
-      {hint ? (
-        <p className="slate-help">{hint}</p>
-      ) : (
-        <span className="slate-help slate-help--empty" aria-hidden />
-      )}
+      {hint ? <p className="slate-help">{hint}</p> : <span className="slate-help slate-help--empty" aria-hidden />}
     </label>
+  );
+}
+
+const AUTO_GROW_MIN_ROWS = 2;
+
+function contentBoxHeight(el: HTMLTextAreaElement): number {
+  const styles = getComputedStyle(el);
+  const line = Number.parseFloat(styles.lineHeight) || 24;
+  const pad =
+    (Number.parseFloat(styles.paddingTop) || 0) + (Number.parseFloat(styles.paddingBottom) || 0);
+  const border =
+    (Number.parseFloat(styles.borderTopWidth) || 0) +
+    (Number.parseFloat(styles.borderBottomWidth) || 0);
+  const min = AUTO_GROW_MIN_ROWS * line + pad + border;
+  const prevHeight = el.style.height;
+  const prevMin = el.style.minHeight;
+  el.style.minHeight = '0px';
+  el.style.height = 'auto';
+  const content = el.scrollHeight + border;
+  el.style.height = prevHeight;
+  el.style.minHeight = prevMin;
+  return Math.max(min, content);
+}
+
+function AutoGrowTextarea({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const dragFloorRef = useRef(0);
+
+  const fitToContent = () => {
+    const el = ref.current;
+    if (!el) return;
+    const content = contentBoxHeight(el);
+    const next = Math.max(content, dragFloorRef.current);
+    // min-height locks native resize so the box can't shrink under the copy.
+    el.style.minHeight = `${content}px`;
+    el.style.height = `${next}px`;
+  };
+
+  useLayoutEffect(() => {
+    fitToContent();
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      className="slate-textarea slate-textarea--auto"
+      value={value}
+      rows={AUTO_GROW_MIN_ROWS}
+      onChange={(e) => onChange(e.target.value)}
+      onPointerUp={() => {
+        const el = ref.current;
+        if (!el) return;
+        const content = contentBoxHeight(el);
+        dragFloorRef.current = el.offsetHeight > content + 4 ? el.offsetHeight : 0;
+        fitToContent();
+      }}
+    />
   );
 }
 

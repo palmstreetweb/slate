@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Slate — sign-out sounds</title>
+<style>
+  :root {
+    --bg:#15181D; --panel:#1E232B; --panel-2:#23282F; --ink:#F2EFE8; --muted:#8A93A1;
+    --line:#2D333D; --red:#E23B2D; --on:#fff;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:640px; margin:0 auto; padding:36px 20px 80px; }
+  .kicker { font:700 11px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+  h1 { font:600 26px/1.2 var(--sans); letter-spacing:-.03em; margin:0 0 8px; }
+  .lead { color:var(--muted); margin:0 0 20px; max-width:54ch; }
+  .unlock {
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    margin:0 0 22px; padding:12px 14px; border-radius:12px;
+    background:var(--panel); border:1px solid var(--line);
+  }
+  .unlock.is-ready { border-color:#3d6b4f; }
+  .unlock p { margin:0; font-size:13px; color:var(--muted); flex:1; min-width:200px; }
+  .grid { display:flex; flex-direction:column; gap:10px; }
+  .opt {
+    display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:14px 16px;
+  }
+  .opt.picked { outline:2px solid var(--red); outline-offset:2px; }
+  .opt.playing { border-color:var(--red); }
+  .n {
+    width:26px; height:26px; border-radius:8px; background:var(--panel-2); border:1px solid var(--line);
+    font:700 11px/26px var(--sans); text-align:center; color:var(--muted);
+  }
+  .opt h2 { margin:0; font:600 15px/1.25 var(--sans); letter-spacing:-.01em; }
+  .opt p { margin:3px 0 0; font-size:12px; color:var(--muted); }
+  .actions { display:flex; gap:8px; }
+  button {
+    appearance:none; border:0; cursor:pointer;
+    min-width:72px; height:36px; padding:0 14px; border-radius:999px;
+    font:600 13px/1 var(--sans);
+  }
+  button:disabled { opacity:0.45; cursor:not-allowed; }
+  button.play { color:var(--on); background:var(--red); }
+  button.play:hover:not(:disabled) { filter:brightness(1.06); }
+  button.pick { background:var(--panel-2); color:var(--ink); border:1px solid var(--line); }
+  button.pick.on { background:var(--ink); color:#111; border-color:var(--ink); }
+  button.unlock-btn { background:var(--ink); color:#111; min-width:120px; }
+  .status {
+    position:sticky; top:0; z-index:2; margin:-36px -20px 24px; padding:12px 20px;
+    background:rgb(21 24 29 / 0.92); border-bottom:1px solid var(--line);
+    font:600 13px/1.3 var(--sans);
+  }
+  .status.err { color:#ffb4a8; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="status" id="status">Step 1: unlock audio, then Play each cue</div>
+    <p class="kicker">Sign out · with logo dissolve</p>
+    <h1>Ten farewell sounds</h1>
+    <p class="lead">Open this page in Brave/Chrome (not an IDE preview). Click Unlock audio once, then Play. Reply with a number.</p>
+    <div class="unlock" id="unlockRow">
+      <p id="unlockHint">Browsers block sound until you unlock. One click is enough for the whole list.</p>
+      <button type="button" class="unlock-btn" id="unlock">Unlock audio</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+<script>
+const OPTIONS = [
+  { id:1, name:'Letter fall', note:'Five soft descending ticks — one per dissolving letter.' },
+  { id:2, name:'Soft latch', note:'Quiet door-latch click as the mark shrinks.' },
+  { id:3, name:'Down fifth', note:'Two warm notes falling a fifth. Classic goodbye.' },
+  { id:4, name:'Air whoosh out', note:'Reverse of a load whoosh — air leaving the room.' },
+  { id:5, name:'Glass set-down', note:'Thin glass tip as the word fades.' },
+  { id:6, name:'Page close', note:'Soft paper flutter, then a low settle.' },
+  { id:7, name:'Sub farewell', note:'Felt more than heard — deep short bloom.' },
+  { id:8, name:'Chime fade', note:'High chime with a long quiet tail.' },
+  { id:9, name:'Stamp release', note:'Tiny press then lift — session stamped out.' },
+  { id:10, name:'Clean click', note:'One dry UI click. Minimal, done.' },
+];
+
+const statusEl = document.getElementById('status');
+let ctx = null;
+let unlocked = false;
+const masterGain = { node: null };
+
+function setStatus(msg, isErr) {
+  statusEl.textContent = msg;
+  statusEl.classList.toggle('err', Boolean(isErr));
+}
+
+async function ensureAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) throw new Error('This browser has no Web Audio API.');
+  if (!ctx) {
+    ctx = new AC();
+    masterGain.node = ctx.createGain();
+    masterGain.node.gain.value = 0.9;
+    masterGain.node.connect(ctx.destination);
+  }
+  if (ctx.state === 'suspended') await ctx.resume();
+  if (ctx.state !== 'running') throw new Error('Audio still blocked — click Unlock audio again.');
+  return ctx;
+}
+
+function noiseBuf(c, dur) {
+  const n = Math.ceil(c.sampleRate * dur);
+  const buf = c.createBuffer(1, n, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+function tone(c, dest, t0, { freq, dur = 0.2, gain = 0.18, type = 'sine', slideTo } = {}) {
+  const o = c.createOscillator();
+  const g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0001, gain), t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(dest);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+
+function whoosh(c, dest, t0, { dur = 0.45, peak = 0.12, startF = 1800, endF = 220 } = {}) {
+  const src = c.createBufferSource();
+  src.buffer = noiseBuf(c, dur + 0.05);
+  const f = c.createBiquadFilter();
+  f.type = 'bandpass';
+  f.Q.value = 0.9;
+  f.frequency.setValueAtTime(startF, t0);
+  f.frequency.exponentialRampToValueAtTime(endF, t0 + dur);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(peak, t0 + dur * 0.25);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f); f.connect(g); g.connect(dest);
+  src.start(t0); src.stop(t0 + dur + 0.05);
+}
+
+const PLAY = {
+  1(c, dest, t0) {
+    [784, 698, 659, 587, 523].forEach((f, i) =>
+      tone(c, dest, t0 + i * 0.09, { freq: f, dur: 0.16, gain: 0.14 }));
+  },
+  2(c, dest, t0) {
+    tone(c, dest, t0, { freq: 220, dur: 0.09, gain: 0.2, type: 'triangle' });
+    tone(c, dest, t0 + 0.05, { freq: 140, dur: 0.14, gain: 0.14, type: 'sine' });
+  },
+  3(c, dest, t0) {
+    tone(c, dest, t0, { freq: 523.25, dur: 0.3, gain: 0.18 });
+    tone(c, dest, t0 + 0.16, { freq: 349.23, dur: 0.45, gain: 0.16 });
+  },
+  4(c, dest, t0) {
+    whoosh(c, dest, t0, { dur: 0.55, peak: 0.16, startF: 2200, endF: 180 });
+  },
+  5(c, dest, t0) {
+    tone(c, dest, t0, { freq: 1568, dur: 0.22, gain: 0.12, type: 'sine', slideTo: 990 });
+  },
+  6(c, dest, t0) {
+    whoosh(c, dest, t0, { dur: 0.28, peak: 0.1, startF: 900, endF: 400 });
+    tone(c, dest, t0 + 0.18, { freq: 180, dur: 0.24, gain: 0.14, type: 'triangle' });
+  },
+  7(c, dest, t0) {
+    tone(c, dest, t0, { freq: 70, dur: 0.4, gain: 0.28, type: 'sine', slideTo: 45 });
+  },
+  8(c, dest, t0) {
+    tone(c, dest, t0, { freq: 1318.5, dur: 0.75, gain: 0.14 });
+    tone(c, dest, t0 + 0.02, { freq: 1975.5, dur: 0.6, gain: 0.08 });
+  },
+  9(c, dest, t0) {
+    tone(c, dest, t0, { freq: 160, dur: 0.07, gain: 0.22, type: 'square' });
+    tone(c, dest, t0 + 0.07, { freq: 420, dur: 0.18, gain: 0.12, slideTo: 280 });
+  },
+  10(c, dest, t0) {
+    tone(c, dest, t0, { freq: 880, dur: 0.06, gain: 0.14, type: 'square' });
+    tone(c, dest, t0, { freq: 440, dur: 0.08, gain: 0.12, type: 'triangle' });
+  },
+};
+
+async function play(id) {
+  try {
+    const c = await ensureAudio();
+    unlocked = true;
+    markUnlocked();
+    const dest = masterGain.node || c.destination;
+    const t0 = c.currentTime + 0.03;
+    PLAY[id](c, dest, t0);
+    const name = OPTIONS.find((x) => x.id === id)?.name ?? id;
+    setStatus(`Playing ${id}: ${name}`);
+    return true;
+  } catch (err) {
+    setStatus(err instanceof Error ? err.message : 'Could not play audio', true);
+    return false;
+  }
+}
+
+function markUnlocked() {
+  const row = document.getElementById('unlockRow');
+  row.classList.add('is-ready');
+  document.getElementById('unlockHint').textContent = 'Audio unlocked. Play any cue below.';
+  document.getElementById('unlock').textContent = 'Ready';
+}
+
+document.getElementById('unlock').addEventListener('click', async () => {
+  const ok = await play(10);
+  if (ok) setStatus('Audio unlocked — try Letter fall, Soft latch, …');
+});
+
+const grid = document.getElementById('grid');
+for (const o of OPTIONS) {
+  const el = document.createElement('div');
+  el.className = 'opt';
+  el.dataset.id = o.id;
+  el.innerHTML = `
+    <div class="n">${o.id}</div>
+    <div>
+      <h2>${o.name}</h2>
+      <p>${o.note}</p>
+    </div>
+    <div class="actions">
+      <button class="play" type="button" data-play="${o.id}">Play</button>
+      <button class="pick" type="button" data-pick="${o.id}">Choose</button>
+    </div>`;
+  grid.appendChild(el);
+}
+
+grid.addEventListener('click', async (e) => {
+  const playBtn = e.target.closest('[data-play]');
+  if (playBtn) {
+    const id = Number(playBtn.dataset.play);
+    const row = playBtn.closest('.opt');
+    row.classList.add('playing');
+    await play(id);
+    window.setTimeout(() => row.classList.remove('playing'), 700);
+    return;
+  }
+  const pickBtn = e.target.closest('[data-pick]');
+  if (!pickBtn) return;
+  const id = pickBtn.dataset.pick;
+  for (const row of grid.querySelectorAll('.opt')) row.classList.toggle('picked', row.dataset.id === id);
+  for (const b of grid.querySelectorAll('[data-pick]')) {
+    const on = b.dataset.pick === id;
+    b.classList.toggle('on', on);
+    b.textContent = on ? 'Selected' : 'Choose';
+  }
+  const name = OPTIONS.find((x) => String(x.id) === id)?.name;
+  await play(Number(id));
+  setStatus(`Selected ${id}: ${name} — reply “${id}” in chat`);
+});
+</script>
+</body>
+</html>

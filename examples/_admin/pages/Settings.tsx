@@ -7,15 +7,18 @@ import { BackupPanel } from '../components/BackupPanel.js';
 import { useAdminTheme } from '../adminThemeContext.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { useAuth } from '../neon/AuthProvider.js';
+import { useSignOutFlow } from '../shell/useSignOutFlow.js';
 import { ADMIN_UI_THEME_OPTIONS } from '../adminUiTheme.js';
 
 function SettingsContent() {
   const { mode, setMode, uiTheme, setUiTheme } = useAdminTheme();
-  const { signOut, user } = useAuth();
+  const { user } = useAuth();
+  const { runSignOut, leaving, overlay } = useSignOutFlow();
   const cloud = isNeonConfigured();
 
   return (
     <div className="slate-settings" role="dialog" aria-label="Settings">
+      {overlay}
       <header className="slate-settings-header">
         <h1 className="slate-page-title">Settings</h1>
         <p className="slate-page-sub">Studio appearance — does not change form themes.</p>
@@ -91,8 +94,13 @@ function SettingsContent() {
               <p className="slate-settings-copy">
                 Signed in as {user?.email ?? 'unknown'}. Data syncs to Slate cloud.
               </p>
-              <button type="button" className="slate-btn" onClick={() => void signOut()}>
-                Sign out
+              <button
+                type="button"
+                className="slate-btn"
+                onClick={() => void runSignOut()}
+                disabled={leaving}
+              >
+                {leaving ? 'Signing out…' : 'Sign out'}
               </button>
             </section>
           </>

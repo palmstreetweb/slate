@@ -71,6 +71,10 @@ export const generatedQuestionSchema = z.object({
   options: z.array(optionSchema),
   rows: z.array(optionSchema),
   columns: z.array(optionSchema),
+  /** Earlier question id. Empty = always visible. */
+  showIfField: z.string(),
+  /** Stored answer to match (`yes`, `chicken`, option value — not the label). */
+  showIfEquals: z.string(),
 });
 
 export const generatedFormSchema = z
@@ -132,6 +136,29 @@ export const generatedFormSchema = z
       if (q.type === 'scale' && q.min >= q.max) {
         ctx.addIssue({ code: 'custom', message: 'scale min must be less than max', path: [...path] });
       }
+      const showField = q.showIfField.trim();
+      const showEquals = q.showIfEquals.trim();
+      if (showField || showEquals) {
+        if (!showField || !showEquals) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'showIf needs both field and equals',
+            path: [...path, 'showIfField'],
+          });
+        } else if (showField === q.id) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'showIf cannot reference itself',
+            path: [...path, 'showIfField'],
+          });
+        } else if (!ids.includes(showField)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `showIf field "${showField}" is not a question id`,
+            path: [...path, 'showIfField'],
+          });
+        }
+      }
     });
   });
 
@@ -143,40 +170,43 @@ export const GENERATE_SYSTEM_PROMPT = `You author first-draft conversational for
 Return one form object that matches the schema exactly. Each question is a flat object: fill unused strings with "", unused numbers with 0, unused option arrays with [].
 
 Chrome (never inside questions[]):
-- welcome — first screen. subtitle + cta required (cta often "Start").
-- thanks — last screen. subtitle + cta required (cta often "Submit another").
+- welcome — ALWAYS the first screen the respondent sees. A host greeting, not a question.
+  Title is a welcome ("Welcome.", "You're invited.", "Glad you're here.") — never ends with "?".
+  Never put "How was your visit?" or any other question on welcome. Those belong in questions[].
+  subtitle is why we're here; cta is usually "Start".
+- thanks — ALWAYS the last screen. A goodbye ("Thank you.", "You're all set.") — never a question.
+  subtitle + cta required (cta often "Submit another").
 
-questions[].type must be one of:
-statement, short_text, long_text, email, phone, url, number, date, file_upload,
-single_choice, multi_choice, dropdown, picture_choice, ranking, matrix,
-yes_no, legal, scale, nps, review.
+Default types (use these unless the user asks otherwise):
+short_text, long_text, email, phone, date, single_choice, yes_no, number.
 
-When to use each:
-- statement — info-only. Use body + cta.
-- short_text — one line. placeholder required.
-- long_text — paragraph. placeholder required.
-- email — email address. placeholder like "you@studio.com".
-- phone — phone. placeholder like "(555) 123-4567". defaultCountry usually "US".
-- url — website / portfolio. placeholder like "https://studio.com".
-- number — guests, budget, years. Set min, max, step (step usually 1).
-- date — calendar. format "MM/DD/YYYY" unless day-first.
-- file_upload — resume/photos. accept e.g. "image/*,.pdf", maxSizeMb (8), multiple, maxFiles.
-- single_choice — pick one. 2–8 options (label + value). src/alt "".
-- multi_choice — pick many. options + min + max.
-- dropdown — long lists (7+). placeholder + options.
-- picture_choice — only if the user wants images. Each option needs https src + alt. You may use https://picsum.photos/seed/<value>/400/300.
-- ranking — order priorities. options.
-- matrix — rows + columns (label + value). 2–8 each.
-- yes_no — binary. yesLabel / noLabel (Yes / No).
-- legal — consent. body + acceptLabel + declineLabel.
-- scale — min < max, minLabel + maxLabel.
-- nps — 0–10 recommend. minLabel / maxLabel (Not at all likely / Extremely likely).
-- review — at most one, last in questions[] if used. subtitle + cta.
+Use only when the prompt clearly needs them:
+- url — portfolio / website
+- file_upload — resume / photos
+- dropdown — 7+ options
+- multi_choice — pick many
+- legal — consent
+- scale — 1–5 / 1–10 rating (not NPS)
+- nps — "how likely to recommend"
+- ranking / matrix — only if the user asks to rank or grade several items
+- picture_choice — only if the user wants images. Each option needs https src + alt. You may use https://picsum.photos/seed/<value>/400/300
+- statement / review — sparingly
+
+Do not add ranking, matrix, NPS, or picture_choice to "look complete."
+
+Branching (showIfField / showIfEquals):
+- Empty strings = always visible.
+- For follow-ups (plus-one, meal, "if yes, tell us more"), set showIfField to an earlier question id and showIfEquals to that question's stored value — not the label.
+- yes_no stores "yes" or "no". legal stores "accept" or "decline". choice stores the option value (chicken, vegetarian).
+- Never point showIfField at itself.
+
+When revising a draft: keep ids stable for questions that remain. Change copy, drop extras, or add fields as asked.
 
 Rules:
 - 3–8 questions unless the user asks otherwise (hard cap 12).
 - Never put welcome or thanks inside questions[].
-- Pick the type that matches the data (email, date, url, nps, yes_no, file_upload).
+- Never use a question as the welcome or thanks title.
+- Pick the type that matches the data (email, date, phone, yes_no).
 - ids are unique snake_case starting with a letter.
 - Placeholders are specific, never "Type here".
 - Required: identity / RSVP / contact / legal usually true; comments false.

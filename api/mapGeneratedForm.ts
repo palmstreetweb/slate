@@ -2,7 +2,7 @@
  * Turn a validated AI draft into a Slate Schema (ADR-039).
  */
 
-import type { Option, PictureOption, Question } from '../src/types/Question.js';
+import type { Condition, Option, PictureOption, Question } from '../src/types/Question.js';
 import type { Schema } from '../src/types/Schema.js';
 import type { GeneratedForm, GeneratedQuestion } from './generateFormSchema.js';
 
@@ -49,19 +49,34 @@ function pictureOptionsOf(q: GeneratedQuestion): PictureOption[] {
     }));
 }
 
-function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
-  const id = slugId(q.id, used);
+function visibilityOf(
+  q: GeneratedQuestion,
+  idMap: Map<string, string>,
+): { visibleIf?: Condition } {
+  const field = q.showIfField.trim();
+  const equals = q.showIfEquals.trim();
+  if (!field || !equals) return {};
+  const mapped = idMap.get(field) ?? field;
+  if (mapped === (idMap.get(q.id) ?? q.id)) return {};
+  return { visibleIf: { field: mapped, op: 'equals', value: equals } };
+}
+
+function mapQuestion(
+  q: GeneratedQuestion,
+  id: string,
+  vis: { visibleIf?: Condition },
+): Question {
   const title = q.title;
   const required = q.required;
   switch (q.type) {
     case 'statement':
-      return { id, type: 'statement', title, body: text(q.body), cta: text(q.cta, 'Continue') };
+      return { id, type: 'statement', title, body: text(q.body), cta: text(q.cta, 'Continue'), ...vis };
     case 'short_text':
-      return { id, type: 'short_text', title, placeholder: q.placeholder, required };
+      return { id, type: 'short_text', title, placeholder: q.placeholder, required, ...vis };
     case 'long_text':
-      return { id, type: 'long_text', title, placeholder: q.placeholder, required };
+      return { id, type: 'long_text', title, placeholder: q.placeholder, required, ...vis };
     case 'email':
-      return { id, type: 'email', title, placeholder: q.placeholder, required };
+      return { id, type: 'email', title, placeholder: q.placeholder, required, ...vis };
     case 'phone':
       return {
         id,
@@ -70,9 +85,10 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         placeholder: q.placeholder,
         required,
         defaultCountry: text(q.defaultCountry, 'US'),
+        ...vis,
       };
     case 'url':
-      return { id, type: 'url', title, placeholder: q.placeholder, required };
+      return { id, type: 'url', title, placeholder: q.placeholder, required, ...vis };
     case 'number':
       return {
         id,
@@ -83,6 +99,7 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         min: q.min,
         max: q.max,
         step: q.step || 1,
+        ...vis,
       };
     case 'date':
       return {
@@ -91,6 +108,7 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         title,
         required,
         format: q.format === 'DD/MM/YYYY' ? 'DD/MM/YYYY' : 'MM/DD/YYYY',
+        ...vis,
       };
     case 'file_upload':
       return {
@@ -102,11 +120,20 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         maxSizeMb: q.maxSizeMb || undefined,
         multiple: q.multiple,
         maxFiles: q.maxFiles || undefined,
+        ...vis,
       };
     case 'single_choice':
-      return { id, type: 'single_choice', title, required, options: optionsOf(q) };
+      return { id, type: 'single_choice', title, required, options: optionsOf(q), ...vis };
     case 'multi_choice':
-      return { id, type: 'multi_choice', title, options: optionsOf(q), min: q.min, max: q.max || undefined };
+      return {
+        id,
+        type: 'multi_choice',
+        title,
+        options: optionsOf(q),
+        min: q.min,
+        max: q.max || undefined,
+        ...vis,
+      };
     case 'dropdown':
       return {
         id,
@@ -115,6 +142,7 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         options: optionsOf(q),
         placeholder: text(q.placeholder, 'Choose one'),
         required,
+        ...vis,
       };
     case 'picture_choice':
       return {
@@ -126,9 +154,10 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         required,
         min: q.min,
         max: q.max || undefined,
+        ...vis,
       };
     case 'ranking':
-      return { id, type: 'ranking', title, options: optionsOf(q) };
+      return { id, type: 'ranking', title, options: optionsOf(q), ...vis };
     case 'matrix':
       return {
         id,
@@ -138,6 +167,7 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         columns: optionsOf({ ...q, options: q.columns }),
         multiple: q.multiple,
         required,
+        ...vis,
       };
     case 'yes_no':
       return {
@@ -147,6 +177,7 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         yesLabel: text(q.yesLabel, 'Yes'),
         noLabel: text(q.noLabel, 'No'),
         required,
+        ...vis,
       };
     case 'legal':
       return {
@@ -157,6 +188,7 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         acceptLabel: text(q.acceptLabel, 'Accept'),
         declineLabel: text(q.declineLabel, 'Decline'),
         required,
+        ...vis,
       };
     case 'scale':
       return {
@@ -168,6 +200,7 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         minLabel: text(q.minLabel),
         maxLabel: text(q.maxLabel),
         required,
+        ...vis,
       };
     case 'nps':
       return {
@@ -177,9 +210,17 @@ function mapQuestion(q: GeneratedQuestion, used: Set<string>): Question {
         minLabel: text(q.minLabel, 'Not at all likely'),
         maxLabel: text(q.maxLabel, 'Extremely likely'),
         required,
+        ...vis,
       };
     case 'review':
-      return { id, type: 'review', title, subtitle: text(q.subtitle), cta: text(q.cta, 'Looks good') };
+      return {
+        id,
+        type: 'review',
+        title,
+        subtitle: text(q.subtitle),
+        cta: text(q.cta, 'Looks good'),
+        ...vis,
+      };
   }
 }
 
@@ -210,6 +251,8 @@ function blankQuestion(
     options: [],
     rows: [],
     columns: [],
+    showIfField: '',
+    showIfEquals: '',
     ...partial,
   };
 }
@@ -220,11 +263,83 @@ export function blankGeneratedQuestion(
   return blankQuestion(partial);
 }
 
+function looksLikeQuestionTitle(value: string): boolean {
+  const t = value.trim();
+  if (!t) return false;
+  if (/[?？]$/.test(t)) return true;
+  return /^(how|what|when|where|why|who|which|can you|could you|would you|will you|do you|did you|are you|is there|have you)\b/i.test(
+    t,
+  );
+}
+
+function titlesMatch(a: string, b: string): boolean {
+  const n = (s: string) =>
+    s
+      .trim()
+      .toLowerCase()
+      .replace(/[?!.]+$/g, '')
+      .replace(/\s+/g, ' ');
+  return Boolean(n(a) && n(a) === n(b));
+}
+
+function thanksGreeting(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed || looksLikeQuestionTitle(trimmed)) return 'Thank you.';
+  return trimmed;
+}
+
+/**
+ * Models often pin the first question on the welcome screen.
+ * Welcome/thanks stay chrome: a greeting, then Start.
+ */
+function chromeFor(draft: GeneratedForm): {
+  welcomeTitle: string;
+  welcomeSubtitle?: string;
+  welcomeCta?: string;
+  thanksTitle: string;
+  thanksSubtitle?: string;
+  thanksCta?: string;
+  opener: GeneratedQuestion | null;
+} {
+  const first = draft.questions[0];
+  const rawWelcome = draft.welcome.title.trim();
+  const stolenQuestion =
+    looksLikeQuestionTitle(rawWelcome) ||
+    (first ? titlesMatch(rawWelcome, first.title) : false);
+  const opener =
+    stolenQuestion && !draft.questions.some((q) => titlesMatch(q.title, rawWelcome))
+      ? blankQuestion({
+          id: 'opener',
+          type: 'long_text',
+          title: rawWelcome,
+          placeholder: 'A sentence or two is plenty.',
+          required: true,
+        })
+      : null;
+
+  return {
+    welcomeTitle: stolenQuestion ? 'Welcome.' : rawWelcome || 'Welcome.',
+    welcomeSubtitle: text(draft.welcome.subtitle, draft.description),
+    welcomeCta: text(draft.welcome.cta, 'Start'),
+    thanksTitle: thanksGreeting(draft.thanks.title),
+    thanksSubtitle: text(draft.thanks.subtitle),
+    thanksCta: text(draft.thanks.cta, 'Submit another'),
+    opener,
+  };
+}
+
 /** Convert model output into an engine Schema + dashboard name. */
 export function mapGeneratedForm(draft: GeneratedForm): { name: string; schema: Schema } {
+  const chrome = chromeFor(draft);
+  const questions = chrome.opener ? [chrome.opener, ...draft.questions] : draft.questions;
   const used = new Set<string>(['welcome', 'done']);
-  const middle = draft.questions.map((q) => mapQuestion(q, used));
-  const welcomeSubtitle = text(draft.welcome.subtitle, draft.description);
+  const idMap = new Map<string, string>();
+  for (const q of questions) {
+    idMap.set(q.id, slugId(q.id, used));
+  }
+  const middle = questions.map((q) =>
+    mapQuestion(q, idMap.get(q.id) ?? q.id, visibilityOf(q, idMap)),
+  );
   const schema: Schema = {
     brand: { name: draft.title },
     theme: draft.theme,
@@ -233,17 +348,17 @@ export function mapGeneratedForm(draft: GeneratedForm): { name: string; schema: 
       {
         id: 'welcome',
         type: 'welcome',
-        title: draft.welcome.title,
-        subtitle: welcomeSubtitle,
-        cta: text(draft.welcome.cta, 'Start'),
+        title: chrome.welcomeTitle,
+        subtitle: chrome.welcomeSubtitle,
+        cta: chrome.welcomeCta,
       },
       ...middle,
       {
         id: 'done',
         type: 'thanks',
-        title: draft.thanks.title,
-        subtitle: text(draft.thanks.subtitle),
-        cta: text(draft.thanks.cta, 'Submit another'),
+        title: chrome.thanksTitle,
+        subtitle: chrome.thanksSubtitle,
+        cta: chrome.thanksCta,
       },
     ],
   };

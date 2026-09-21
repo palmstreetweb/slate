@@ -76,4 +76,6 @@ export const ADDABLE_TYPES: ReadonlyArray<{ type: QuestionType; label: string; g
   { type: 'statement', label: TYPE_LABEL.statement, group: 'Other' },
   { type: 'legal', label: TYPE_LABEL.legal, group: 'Other' },
   { type: 'review', label: TYPE_LABEL.review, group: 'Other' },
+  { type: 'welcome', label: TYPE_LABEL.welcome, group: 'Screens' },
+  { type: 'thanks', label: TYPE_LABEL.thanks, group: 'Screens' },
 ];

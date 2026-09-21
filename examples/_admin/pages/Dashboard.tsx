@@ -39,7 +39,6 @@ import {
   IconShare,
 } from '../components/FormCardIcons.js';
 import { AdminShell } from '../shell/AdminShell.js';
-import { dismissWorkflowTip, WORKFLOW_TIP_KEY } from '../_siteSettings.js';
 import {
   animateFormGridDuplicate,
   captureFormCardRects,
@@ -67,10 +66,6 @@ export function Dashboard() {
   );
   const confirm = useConfirm();
   const gridRef = useRef<HTMLDivElement>(null);
-  const [tipDismissed, setTipDismissed] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return window.localStorage.getItem(WORKFLOW_TIP_KEY) === '1';
-  });
 
   useEffect(
     () =>
@@ -321,31 +316,6 @@ export function Dashboard() {
               Reset storage
             </button>
           </div>
-        </div>
-      )}
-
-      {!tipDismissed && (
-        <div
-          className="slate-card"
-          style={{ marginBottom: 20, padding: 16 }}
-          role="note"
-        >
-          <p style={{ margin: '0 0 8px', fontWeight: 600 }}>How Slate works on this site</p>
-          <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--slate-muted)', lineHeight: 1.5 }}>
-            {isNeonConfigured()
-              ? 'Forms and responses sync to Slate cloud. Publish a form, then Share → public fill link for clients.'
-              : 'Forms and responses save in this browser only — use the same browser and URL (slateforms.vercel.app). To send a form to someone, use Share → Shareable Link. Back up from Settings if you need a safety copy.'}
-          </p>
-          <button
-            type="button"
-            className="slate-btn"
-            onClick={() => {
-              dismissWorkflowTip();
-              setTipDismissed(true);
-            }}
-          >
-            Got it
-          </button>
         </div>
       )}
 

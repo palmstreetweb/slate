@@ -10,9 +10,8 @@
  *   └────────────────┴─────────────────────────┴────────────────┘
  *
  * Single-instance pins: only ONE welcome (first) and ONE thanks (last).
- * The Add Question picker excludes those types; adding them no-ops by
- * design. Auto-save is synchronous so navigating to Preview never reads
- * a stale schema.
+ * The Add picker lists them under Screens — choosing one focuses the pin,
+ * or restores it if a form is missing that screen.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -435,12 +434,27 @@ function FormEditorBody({ formId }: { formId: string }) {
   };
 
   const addQuestion = (type: QuestionType) => {
-    // Welcome / thanks are single-instance pins. Adding either should focus
-    // the existing one instead of duplicating (the picker hides these types
-    // anyway, but this is a defensive safeguard).
+    // Welcome / thanks are single-instance pins. Re-adding focuses the
+    // existing screen; if a form is missing one, restore it at the pin.
     if (type === 'welcome' || type === 'thanks') {
       const existing = schema.questions.find((q) => q.type === type);
-      if (existing) setSelectedId(existing.id);
+      if (existing) {
+        setSelectedId(existing.id);
+        return;
+      }
+      const preferredId = type === 'welcome' ? 'welcome' : 'done';
+      const used = new Set(schema.questions.map((q) => q.id));
+      const id = used.has(preferredId) ? uniqueQuestionId(preferredId, used) : preferredId;
+      const newQ = makeDefaultQuestion(type, id);
+      pushHistory();
+      setSchema((s) => {
+        if (!s) return s;
+        const next = [...s.questions];
+        if (type === 'welcome') next.unshift(newQ);
+        else next.push(newQ);
+        return { ...s, questions: next };
+      });
+      setSelectedId(newQ.id);
       return;
     }
 

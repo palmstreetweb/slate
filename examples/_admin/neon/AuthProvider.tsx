@@ -207,6 +207,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const unsubBetter = auth.getBetterAuthInstance?.()?.useSession?.subscribe?.((value) => {
+      // Only apply positive sessions here. Empty payloads fire during boot and
+      // would wipe a just-loaded session; signOut clears React state itself.
       if (!value.data?.session || !value.data?.user) return;
       void readUsableSession(auth).then((next) => {
         if (!mounted || !next) return;
@@ -228,7 +230,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!email) {
       setAuthError(NO_EMAIL_MSG);
       clearRemoteStores();
-      void getNeon().auth.signOut();
+      setSession(null);
+      void getNeon().auth.signOut().catch(() => {});
     } else {
       setAuthError(null);
     }
@@ -343,8 +346,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (!isNeonConfigured()) return;
+    // Same-tab sign-out often skips onAuthStateChange (same as OTP). Clear
+    // React state up front so the gate flips to Login immediately.
     clearRemoteStores();
-    await getNeon().auth.signOut();
+    setSession(null);
+    setAuthError(null);
+    setLoading(false);
+    try {
+      await getNeon().auth.signOut();
+    } catch {
+      // Local session already cleared — stay signed out even if the network call fails.
+    }
   }, []);
 
   const signedIn = Boolean(session?.access_token && session.user.email);

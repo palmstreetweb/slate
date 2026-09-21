@@ -173,7 +173,7 @@ export function Outline({
 
   useLayoutEffect(() => {
     if (!addOpen) return;
-    setOpenAddGroups(new Set(['Inputs']));
+    setOpenAddGroups(new Set(['Screens', 'Inputs']));
     repositionPopover();
   }, [addOpen]);
 

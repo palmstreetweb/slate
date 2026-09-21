@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generatedFormSchema } from '../api/generateFormSchema.js';
 import { blankGeneratedQuestion, mapGeneratedForm } from '../api/mapGeneratedForm.js';
 import { resetRateLimit, takeRateLimit } from '../api/rateLimit.js';
+import { buildGenerateUserPrompt } from '../api/runGenerate.js';
 import { checkSchema } from '../src/logic/schemaCheck.js';
 import { AI_GOLDEN_PROMPTS } from '../examples/_admin/ai/goldenPrompts.js';
 
@@ -33,6 +34,8 @@ const validDraft = {
       title: 'Meal preference',
       required: true,
       options: [opt('Chicken', 'chicken'), opt('Fish', 'fish'), opt('Vegetarian', 'vegetarian')],
+      showIfField: 'coming',
+      showIfEquals: 'yes',
     }),
     blankGeneratedQuestion({
       id: 'plus_one',
@@ -62,6 +65,61 @@ describe('Build with AI schema', () => {
     expect(schema.questions[0]?.type).toBe('welcome');
     expect(schema.questions[schema.questions.length - 1]?.type).toBe('thanks');
     expect(checkSchema(schema.questions)).toEqual([]);
+    const meal = schema.questions.find((q) => q.id === 'meal');
+    expect(meal && 'visibleIf' in meal ? meal.visibleIf : undefined).toEqual({
+      field: 'coming',
+      op: 'equals',
+      value: 'yes',
+    });
+  });
+
+  it('rejects a showIf that points at a missing question', () => {
+    const bad = {
+      ...validDraft,
+      questions: validDraft.questions.map((q) =>
+        q.id === 'meal' ? { ...q, showIfField: 'not_a_question', showIfEquals: 'yes' } : q,
+      ),
+    };
+    expect(generatedFormSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it('builds a revise prompt from the previous draft', () => {
+    const parsed = generatedFormSchema.parse(validDraft);
+    const user = buildGenerateUserPrompt({
+      prompt: 'Wedding RSVP',
+      previous: parsed,
+      instruction: 'Make it shorter',
+    });
+    expect(user).toContain('Original request:');
+    expect(user).toContain('Make it shorter');
+    expect(user).toContain('"id":"coming"');
+  });
+
+  it('turns a question pinned on welcome into a real greeting plus an opener', () => {
+    const draft = {
+      ...validDraft,
+      title: 'Restaurant Service Feedback',
+      welcome: {
+        title: 'How was your visit?',
+        subtitle: 'Your feedback helps us serve you better.',
+        cta: 'Start',
+      },
+    };
+    const parsed = generatedFormSchema.parse(draft);
+    const { schema } = mapGeneratedForm(parsed);
+    expect(schema.questions[0]).toMatchObject({ type: 'welcome', title: 'Welcome.' });
+    expect(schema.questions[0] && 'subtitle' in schema.questions[0] ? schema.questions[0].subtitle : '').toBe(
+      'Your feedback helps us serve you better.',
+    );
+    const opener = schema.questions[1];
+    expect(opener).toMatchObject({ type: 'long_text', title: 'How was your visit?' });
+    expect(checkSchema(schema.questions)).toEqual([]);
+  });
+
+  it('keeps a real welcome greeting', () => {
+    const parsed = generatedFormSchema.parse(validDraft);
+    const { schema } = mapGeneratedForm(parsed);
+    expect(schema.questions[0]).toMatchObject({ type: 'welcome', title: 'You’re invited.' });
   });
 
   it('rejects invented question types', () => {
