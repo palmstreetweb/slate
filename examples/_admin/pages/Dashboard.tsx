@@ -16,6 +16,7 @@ import {
   subscribe,
   trashForm,
   updateForm,
+  hasUnpublishedChanges,
   type FormRecord,
 } from '../_formsStore.js';
 import {
@@ -572,6 +573,17 @@ function FormCard({
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {form.status === 'published' ? (
+              <span
+                className={`slate-badge${
+                  hasUnpublishedChanges(form) ? ' slate-badge--stale' : ' slate-badge--live'
+                }`}
+              >
+                {hasUnpublishedChanges(form) ? 'Updates pending' : 'Live'}
+              </span>
+            ) : (
+              <span className="slate-badge">Draft</span>
+            )}
             <span className="slate-badge">{qCount} {qCount === 1 ? 'question' : 'questions'}</span>
             <span className={`slate-badge${subCount > 0 ? ' slate-badge--accent' : ''}`}>
               {subCount} {subCount === 1 ? 'response' : 'responses'}

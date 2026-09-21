@@ -5,6 +5,7 @@ import { seedIfEmpty } from './_admin/_formsStore.js';
 import { seedForms } from './_admin/_seedForms.js';
 import { ConfirmProvider } from './_admin/_confirm.js';
 import { PromptFormTitleProvider } from './_admin/promptFormTitle.js';
+import { ToastProvider } from './_admin/toast.js';
 import { Dashboard } from './_admin/pages/Dashboard.js';
 import { FormEditor } from './_admin/pages/FormEditor.js';
 import { FormPreview } from './_admin/pages/FormPreview.js';
@@ -234,9 +235,11 @@ createRoot(root).render(
     <UiSoundsRoot>
       <AuthProvider>
         <ConfirmProvider>
-          <PromptFormTitleProvider>
-            <Bootstrap />
-          </PromptFormTitleProvider>
+          <ToastProvider>
+            <PromptFormTitleProvider>
+              <Bootstrap />
+            </PromptFormTitleProvider>
+          </ToastProvider>
         </ConfirmProvider>
       </AuthProvider>
     </UiSoundsRoot>

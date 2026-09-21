@@ -29,6 +29,16 @@ export type FormRecord = {
   deletedAt?: string;
 };
 
+/** True when live link serves an older snapshot than the editor. */
+export function hasUnpublishedChanges(form: FormRecord | null | undefined): boolean {
+  if (!form || form.status !== 'published' || !form.publishedSchema) return false;
+  try {
+    return JSON.stringify(form.publishedSchema) !== JSON.stringify(form.schema);
+  } catch {
+    return true;
+  }
+}
+
 type Listener = (forms: FormRecord[]) => void;
 const listeners = new Set<Listener>();
 

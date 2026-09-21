@@ -538,6 +538,17 @@ Alternatives:
 Consequences: Studio feels more tactile. First click still unlocks AudioContext. Compact primary tabs stay silent. Mute is studio-only (form step sounds unchanged).
 Revisit when: distinct per-route themes, or a volume slider.
 
+## ADR-041 — Studio toast host + publish confidence
+Date: 2026-09-20
+Status: accepted
+Context: Publish / save / CSV feedback was easy to miss (header mono text or silent). Authors editing a live form had no clear “public snapshot is behind” signal.
+Decision: (1) Portaled `ToastProvider` in examples admin for success/error/info toasts (Web Audio cues via ADR-040). (2) `hasUnpublishedChanges()` compares `schema` vs `publishedSchema`. (3) Editor header shows Live / Draft / Unpublished changes + one-click Publish/Republish; Share panel primary action becomes Republish when stale. (4) Dashboard cards and Responses empty state surface the same status. (5) Editor shortcuts dialog via ⌘/ (⌘⇧S share, ⌘⇧P preview).
+Alternatives:
+- Only toast on publish. Rejected — status pills still needed at a glance.
+- Auto-republish on every save. Rejected — authors often want to stage draft edits.
+Consequences: Clearer live-vs-draft mental model. Toast stack is examples-only.
+Revisit when: real-time collaborator presence or scheduled publish.
+
 ---
 
 ## Deferred to V2

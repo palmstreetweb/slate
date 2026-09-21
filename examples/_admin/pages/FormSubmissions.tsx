@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Question } from '@/index.js';
-import { getForm, subscribe as subscribeForms } from '../_formsStore.js';
+import { getForm, subscribe as subscribeForms, hasUnpublishedChanges } from '../_formsStore.js';
 import {
   emptyTrash,
   listSubmissions,
@@ -29,6 +29,8 @@ import { ResponseFileAnswer } from '../components/ResponseFileAnswer.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { refreshSubmissionsRemote } from '../neon/submissionsRemote.js';
 import { isStoresHydrated } from '../neon/hydrate.js';
+import { SharePanel } from '../components/SharePanel.js';
+import { useToast } from '../toast.js';
 
 type Props = { formId: string };
 
@@ -38,7 +40,11 @@ export function FormSubmissions({ formId }: Props) {
   const [trashed, setTrashed] = useState<StoredSubmission[]>(() => listTrashedSubmissions(formId));
   const [open, setOpen] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'summary' | 'trash'>('list');
+  const [shareOpen, setShareOpen] = useState(false);
   const confirm = useConfirm();
+  const toast = useToast();
+  const published = form?.status === 'published';
+  const stale = hasUnpublishedChanges(form);
 
   const refresh = () => {
     setForm(getForm(formId));
@@ -121,6 +127,9 @@ export function FormSubmissions({ formId }: Props) {
           <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/edit`)}>
             ← Editor
           </button>
+          <button type="button" className="slate-btn" onClick={() => setShareOpen(true)}>
+            Share
+          </button>
           <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}`)}>
             Preview ↗
           </button>
@@ -128,7 +137,15 @@ export function FormSubmissions({ formId }: Props) {
             <button
               type="button"
               className="slate-btn"
-              onClick={() => downloadResponsesCsv(form.name, answerQuestions(form.schema.questions), subs)}
+              onClick={() => {
+                downloadResponsesCsv(form.name, answerQuestions(form.schema.questions), subs);
+                toast.push({
+                  title: 'CSV downloaded',
+                  detail: `${subs.length} ${subs.length === 1 ? 'response' : 'responses'}`,
+                  tone: 'success',
+                  sound: 'copy',
+                });
+              }}
             >
               Export CSV
             </button>
@@ -153,11 +170,20 @@ export function FormSubmissions({ formId }: Props) {
         </>
       }
     >
+      <SharePanel
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        formId={formId}
+        formName={form.name}
+        schema={form.schema}
+      />
       <div style={{ marginBottom: 24 }}>
         <h1 className="slate-page-title">Responses</h1>
         <p className="slate-page-sub">
           {subs.length === 0 && trashed.length === 0
-            ? 'Nothing yet — open Preview and submit one to see it here.'
+            ? published
+              ? 'Waiting on your first response.'
+              : 'Publish and share a link — responses land here.'
             : subs.length === 0
               ? `Inbox empty · ${trashed.length} in trash`
               : `${subs.length} ${subs.length === 1 ? 'response' : 'responses'}${trashed.length > 0 ? ` · ${trashed.length} in trash` : ''}`}
@@ -269,10 +295,27 @@ export function FormSubmissions({ formId }: Props) {
           </>
         )
       ) : subs.length === 0 ? (
-        <div className="slate-empty">
-          <p style={{ margin: 0, fontSize: 15 }}>
-            {trashed.length > 0 ? 'Inbox is empty. Check Trash to restore responses.' : 'Empty inbox.'}
+        <div className="slate-empty slate-empty--start">
+          <p className="slate-empty-title">
+            {trashed.length > 0 ? 'Inbox is empty' : 'No responses yet'}
           </p>
+          <p className="slate-empty-copy">
+            {trashed.length > 0
+              ? 'Restore something from Trash, or share the form again.'
+              : published
+                ? stale
+                  ? 'Link is live, but the public snapshot is behind your draft — republish from Share.'
+                  : 'Share your public link. New answers appear here as soon as someone submits.'
+                : 'Publish from Share to get a public fill link, then send it.'}
+          </p>
+          <div className="slate-empty-actions">
+            <button type="button" className="slate-btn slate-btn--primary" onClick={() => setShareOpen(true)}>
+              {published ? (stale ? 'Republish' : 'Share link') : 'Publish & share'}
+            </button>
+            <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}`)}>
+              Preview
+            </button>
+          </div>
         </div>
       ) : view === 'summary' ? (
         <SummaryView questions={answerQuestions(form.schema.questions)} subs={subs} />

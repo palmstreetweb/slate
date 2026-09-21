@@ -31,6 +31,8 @@ import {
   permanentlyDeleteForm,
   subscribe,
   updateForm,
+  hasUnpublishedChanges,
+  publishForm,
 } from '../_formsStore.js';
 import { clearAiDraft, isAiDraft } from '../ai/client.js';
 import { navigate } from '../_router.js';
@@ -54,6 +56,9 @@ import { clampOutlineDropIndex, resolveOutlineInsertIndex } from '../outlineDrop
 import { uniqueQuestionId } from '../questionIds.js';
 import { sanitizeSchemaLogic } from '../sanitizeSchema.js';
 import { slugify } from '../shareUrls.js';
+import { isNeonConfigured } from '../neon/env.js';
+import { useToast } from '../toast.js';
+import { playUiSound } from '../uiSounds.js';
 
 type Props = {
   formId: string | null;
@@ -162,9 +167,14 @@ function FormEditorBody({ formId }: { formId: string }) {
   });
   const confirm = useConfirm();
   const promptFormTitle = usePromptFormTitle();
+  const toast = useToast();
   const [aiDraft, setAiDraft] = useState(() => isAiDraft(formId));
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
   /** Once the editor has a schema, don't re-seed from remote (would clobber edits). */
   const seededRef = useRef(Boolean(seed));
+  const cloud = isNeonConfigured();
+  const [liveForm, setLiveForm] = useState(() => getForm(formId));
 
   useEffect(() => {
     const sync = () => {
@@ -174,6 +184,7 @@ function FormEditorBody({ formId }: { formId: string }) {
         return;
       }
       setFormExists(true);
+      setLiveForm(form);
       if (seededRef.current) return;
       seededRef.current = true;
       const sanitized = sanitizeSchemaLogic(form.schema);
@@ -234,7 +245,9 @@ function FormEditorBody({ formId }: { formId: string }) {
     const onPersistError = (event: Event) => {
       const detail = (event as CustomEvent<{ kind?: string; message?: string }>).detail;
       if (detail?.kind !== 'form') return;
-      setSaveError(detail.message || 'Could not save to the cloud.');
+      const msg = detail.message || 'Could not save to the cloud.';
+      setSaveError(msg);
+      toast.push({ title: 'Save failed', detail: msg, tone: 'error' });
     };
     const onPersistOk = (event: Event) => {
       const detail = (event as CustomEvent<{ kind?: string }>).detail;
@@ -248,7 +261,47 @@ function FormEditorBody({ formId }: { formId: string }) {
       window.removeEventListener('slate-persist-error', onPersistError);
       window.removeEventListener('slate-persist-ok', onPersistOk);
     };
-  }, []);
+  }, [toast]);
+
+  const handleShareRef = useRef<() => Promise<void>>(async () => {});
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      const target = e.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable);
+      if (meta && e.key === '/') {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
+        return;
+      }
+      if (typing) return;
+      if (meta && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        navigate(`/forms/${formId}`);
+        return;
+      }
+      if (meta && e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        void handleShareRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [formId]);
+
+  useEffect(() => {
+    if (!shortcutsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShortcutsOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [shortcutsOpen]);
 
   // If the selected question was deleted (or doesn't exist after a schema
   // mutation), fall back to the first question.
@@ -326,6 +379,39 @@ function FormEditorBody({ formId }: { formId: string }) {
       handleNameChange(next);
     }
     setShareOpen(true);
+  };
+  handleShareRef.current = handleShare;
+
+  const quickPublish = () => {
+    if (!cloud) {
+      void handleShare();
+      return;
+    }
+    const wasStale =
+      Boolean(liveForm) &&
+      hasUnpublishedChanges({
+        ...liveForm!,
+        schema,
+      });
+    setPublishBusy(true);
+    const next = publishForm(formId);
+    setPublishBusy(false);
+    if (next) {
+      playUiSound('success');
+      toast.push({
+        title: wasStale ? 'Republished' : 'You’re live',
+        detail: 'Public link updated.',
+        tone: 'success',
+        sound: 'none',
+      });
+      setLiveForm(next);
+    } else {
+      toast.push({
+        title: 'Could not publish',
+        detail: 'Check your connection and try again.',
+        tone: 'error',
+      });
+    }
   };
 
   const updateQuestion = (id: string, patch: Partial<Question>) => {
@@ -480,6 +566,20 @@ function FormEditorBody({ formId }: { formId: string }) {
   // Schema sanity (roadmap Phase 6) — recomputed on every change since
   // saving is synchronous; surfaces dangling visibleIf / jump references.
   const issues = checkSchema(schema.questions);
+  const isPublished = liveForm?.status === 'published';
+  const stale =
+    Boolean(liveForm) &&
+    hasUnpublishedChanges({
+      ...liveForm!,
+      schema,
+    });
+  const statusLabel = !cloud
+    ? null
+    : isPublished
+      ? stale
+        ? 'Unpublished changes'
+        : 'Live'
+      : 'Draft';
 
   return (
     <AdminShell
@@ -496,15 +596,41 @@ function FormEditorBody({ formId }: { formId: string }) {
       rightSlot={
         <>
           <span
-            style={{
-              fontSize: 12,
-              color: saveError ? 'var(--slate-error)' : 'var(--slate-dim)',
-              marginRight: 8,
-              fontFamily: 'var(--slate-font-mono)',
-            }}
+            className={`slate-save-status${saveError ? ' slate-save-status--err' : ''}`}
+            title="Edits save automatically"
           >
             {saveError ?? (savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved')}
           </span>
+          {statusLabel ? (
+            <span
+              className={`slate-pub-pill${
+                isPublished && !stale
+                  ? ' slate-pub-pill--live'
+                  : stale
+                    ? ' slate-pub-pill--stale'
+                    : ''
+              }`}
+              title={
+                stale
+                  ? 'Public link is serving an older snapshot'
+                  : isPublished
+                    ? 'Public fill link is live'
+                    : 'Not published yet'
+              }
+            >
+              {statusLabel}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className="slate-btn slate-btn--icon"
+            onClick={() => setShortcutsOpen(true)}
+            aria-label="Keyboard shortcuts"
+            title="Shortcuts (⌘/)"
+            data-slate-sound="none"
+          >
+            ⌘
+          </button>
           <button
             type="button"
             className="slate-btn"
@@ -515,9 +641,25 @@ function FormEditorBody({ formId }: { formId: string }) {
           <button type="button" className="slate-btn" onClick={() => void handleShare()}>
             Share
           </button>
+          {cloud ? (
+            <button
+              type="button"
+              className={`slate-btn${isPublished && !stale ? '' : ' slate-btn--primary'}`}
+              onClick={() => (isPublished && !stale ? void handleShare() : quickPublish())}
+              disabled={publishBusy}
+            >
+              {publishBusy
+                ? 'Publishing…'
+                : isPublished
+                  ? stale
+                    ? 'Republish'
+                    : 'Share link'
+                  : 'Publish'}
+            </button>
+          ) : null}
           <button
             type="button"
-            className="slate-btn slate-btn--primary"
+            className={`slate-btn${cloud ? '' : ' slate-btn--primary'}`}
             onClick={() => navigate(`/forms/${formId}`)}
           >
             Preview ↗
@@ -532,6 +674,65 @@ function FormEditorBody({ formId }: { formId: string }) {
         formName={name}
         schema={schema}
       />
+      {shortcutsOpen ? (
+        <div
+          className="slate-dialog-backdrop"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShortcutsOpen(false);
+          }}
+        >
+          <div
+            className="slate-shortcuts"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Keyboard shortcuts"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="slate-shortcuts-header">
+              <h2 className="slate-shortcuts-title">Shortcuts</h2>
+              <button
+                type="button"
+                className="slate-icon-btn"
+                aria-label="Close"
+                onClick={() => setShortcutsOpen(false)}
+              >
+                ✕
+              </button>
+            </header>
+            <ul className="slate-shortcuts-list">
+              <li>
+                <kbd>⌘</kbd>
+                <kbd>Z</kbd>
+                <span>Undo</span>
+              </li>
+              <li>
+                <kbd>⌘</kbd>
+                <kbd>⇧</kbd>
+                <kbd>Z</kbd>
+                <span>Redo</span>
+              </li>
+              <li>
+                <kbd>⌘</kbd>
+                <kbd>⇧</kbd>
+                <kbd>S</kbd>
+                <span>Share</span>
+              </li>
+              <li>
+                <kbd>⌘</kbd>
+                <kbd>⇧</kbd>
+                <kbd>P</kbd>
+                <span>Preview</span>
+              </li>
+              <li>
+                <kbd>⌘</kbd>
+                <kbd>/</kbd>
+                <span>This menu</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      ) : null}
       <div className="slate-editor-shell">
         {aiDraft && (
           <div className="slate-ai-pill-bar" role="status">

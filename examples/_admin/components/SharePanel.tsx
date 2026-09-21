@@ -20,10 +20,11 @@ import {
   writeShareQrStyle,
   type ShareQrStyle,
 } from '../shareQr.js';
-import { getForm, publishForm, unpublishForm, subscribe } from '../_formsStore.js';
+import { getForm, publishForm, unpublishForm, subscribe, hasUnpublishedChanges } from '../_formsStore.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { publicFillUrl } from '../neon/publicApi.js';
 import { playUiSound } from '../uiSounds.js';
+import { useToast } from '../toast.js';
 
 type Props = {
   open: boolean;
@@ -36,6 +37,7 @@ type Props = {
 export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
   const [qr, setQr] = useState<string | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
   const [qrStyle, setQrStyle] = useState<ShareQrStyle>(() => readShareQrStyle());
@@ -53,6 +55,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
 
   const form = getForm(formId);
   const isPublished = form?.status === 'published';
+  const stale = hasUnpublishedChanges(form);
   const slug = form?.slug ?? formId;
 
   const productionUrl = isNeonConfigured() && isPublished ? publicFillUrl(slug) : null;
@@ -133,14 +136,36 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
 
   const onPublish = () => {
     setPublishing(true);
-    publishForm(formId);
+    const next = publishForm(formId);
     setPublishing(false);
+    if (next) {
+      toast.push({
+        title: stale ? 'Republished' : 'You’re live',
+        detail: 'Public link is serving this draft.',
+        tone: 'success',
+        sound: 'success',
+      });
+    } else {
+      toast.push({
+        title: 'Could not publish',
+        detail: 'Check your connection and try again.',
+        tone: 'error',
+      });
+    }
   };
 
   const onUnpublish = () => {
     setPublishing(true);
-    unpublishForm(formId);
+    const next = unpublishForm(formId);
     setPublishing(false);
+    if (next) {
+      toast.push({
+        title: 'Unpublished',
+        detail: 'Public fill link is off. Draft stays in your library.',
+        tone: 'info',
+        sound: 'tap',
+      });
+    }
   };
 
   if (!open || typeof document === 'undefined') return null;
@@ -185,20 +210,31 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                 <p className="slate-share-kicker">Production</p>
                 {isPublished ? (
                   <p className="slate-share-hint">
-                    Live — responses sync to Slate cloud. Republish after draft edits.
+                    {stale
+                      ? 'Draft has changes the public link isn’t serving yet — republish to update.'
+                      : 'Live — responses sync to Slate cloud.'}
                   </p>
                 ) : (
-                  <p className="slate-share-hint">
-                    Publish to enable the public fill link.
-                  </p>
+                  <p className="slate-share-hint">Publish to enable the public fill link.</p>
                 )}
+                {stale ? (
+                  <p className="slate-share-stale" role="status">
+                    Unpublished changes
+                  </p>
+                ) : null}
                 <button
                   type="button"
-                  className={`slate-btn${isPublished ? '' : ' slate-btn--primary'}`}
-                  onClick={isPublished ? onUnpublish : onPublish}
+                  className={`slate-btn${isPublished && !stale ? '' : ' slate-btn--primary'}`}
+                  onClick={isPublished && !stale ? onUnpublish : onPublish}
                   disabled={publishing}
                 >
-                  {isPublished ? 'Unpublish' : 'Publish'}
+                  {publishing
+                    ? 'Working…'
+                    : isPublished
+                      ? stale
+                        ? 'Republish'
+                        : 'Unpublish'
+                      : 'Publish'}
                 </button>
               </section>
             ) : null}
