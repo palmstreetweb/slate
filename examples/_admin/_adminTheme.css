@@ -4234,4 +4234,126 @@ body.slate-editor-resizing * {
   color: var(--chrome-ink, var(--slate-text));
 }
 
+/* ---------- studio inbox + refresh ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-spin {
+  animation: slate-spin 0.7s linear infinite;
+}
+
+@keyframes slate-spin {
+  to { transform: rotate(360deg); }
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-btn {
+  position: relative;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--chrome-red, var(--slate-accent));
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+.slate-inbox {
+  position: fixed;
+  z-index: 80;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(480px, calc(100vh - 96px));
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid var(--chrome-hair, var(--slate-border));
+  background: var(--chrome-panel, var(--slate-bg-2));
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.32);
+  overflow: hidden;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--chrome-hair, var(--slate-border));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-empty {
+  margin: 0;
+  padding: 28px 18px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--chrome-muted, var(--slate-muted));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-item {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-item:hover {
+  background: color-mix(in srgb, var(--chrome-ink, var(--slate-text)) 6%, transparent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-item--unread {
+  background: color-mix(in srgb, var(--chrome-red, var(--slate-accent)) 10%, transparent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-form {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--chrome-ink, var(--slate-text));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-preview {
+  font-size: 13px;
+  color: var(--chrome-ink, var(--slate-text));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-when {
+  font-size: 11px;
+  color: var(--chrome-muted, var(--slate-muted));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slate-forms][data-theme-name='slate'] .slate-spin {
+    animation: none;
+  }
+}
+
+
 

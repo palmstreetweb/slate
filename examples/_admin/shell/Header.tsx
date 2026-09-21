@@ -4,6 +4,7 @@ import { ThemeToggle } from '@/components/chrome/ThemeToggle.js';
 import { SlateLogo } from '../components/SlateLogo.js';
 import { navigate } from '../_router.js';
 import { SignOutButton } from './SignOutButton.js';
+import { StudioInbox } from './StudioInbox.js';
 
 type Props = {
   crumbs: ReactNode;
@@ -33,6 +34,7 @@ export function Header({ crumbs, rightSlot, mode, onToggle }: Props) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <StudioInbox />
         {rightSlot}
         <SignOutButton />
         <ThemeToggle mode={mode} onToggle={onToggle} />

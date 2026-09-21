@@ -50,7 +50,6 @@ import { refreshFormsRemote } from '../neon/formsRemote.js';
 import { FORM_QUOTA_MAX, formQuotaUserMessage, isFormQuotaError } from '../formQuota.js';
 import { BuildWithAiModal, SparkleIcon } from '../components/BuildWithAiModal.js';
 import { markAiDraft, type GeneratedDraft } from '../ai/client.js';
-import { playUiSound } from '../uiSounds.js';
 
 export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
@@ -100,7 +99,6 @@ export function Dashboard() {
           if (cancelled) return;
           setForms(listForms());
           setTrashed(listTrashedForms());
-          playUiSound('refresh');
         })
         .catch((err) => {
           console.warn('[slate] Forms refresh failed', err);
