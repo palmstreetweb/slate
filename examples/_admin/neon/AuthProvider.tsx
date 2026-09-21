@@ -1,16 +1,9 @@
 'use client';
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { deriveNeonServiceUrls, getNeon, getNeonUrl, isNeonConfigured } from './env.js';
 import { clearRemoteStores } from './hydrate.js';
+import { playUiSound } from '../uiSounds.js';
 
 type AuthUser = {
   id: string;
@@ -41,12 +34,37 @@ type AuthContextValue = AuthState & {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** Neon Auth only accepts allowlisted callback origins (prod today). */
+const AUTH_CALLBACK_FALLBACK = 'https://slateforms.vercel.app';
+
 function authRedirectUrl(): string | undefined {
   if (typeof window === 'undefined') return undefined;
   const { origin, pathname, hash } = window.location;
   const safeHash =
     hash && hash !== '#' && !hash.includes('access_token=') ? hash : '#/';
-  return `${origin}${pathname || '/'}${safeHash}`;
+  let base = origin;
+  try {
+    const host = new URL(origin).hostname;
+    const loopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+    if (loopback) {
+      // Local origins are usually not on Neon’s trusted list → HTTP 403
+      // "Invalid callbackURL". Send magic links to prod; OTP still works here.
+      const configured = import.meta.env.VITE_AUTH_CALLBACK_ORIGIN?.trim().replace(/\/$/, '');
+      base = configured || AUTH_CALLBACK_FALLBACK;
+    }
+  } catch {
+    /* keep window origin */
+  }
+  return `${base}${pathname || '/'}${safeHash}`;
+}
+
+function friendlyAuthSendError(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const t = raw.trim();
+  if (/invalid callbackurl/i.test(t) || /^HTTP\s*403$/i.test(t)) {
+    return 'Could not send a sign-in email from this origin. Open slateforms.vercel.app to sign in, or add this URL under Neon Auth → Trusted origins.';
+  }
+  return t;
 }
 
 function normalizeSession(raw: unknown): AuthSession | null {
@@ -152,12 +170,13 @@ async function requestMagicLink(
     | { message?: string; error?: { message?: string } | string }
     | null;
   if (!res.ok) {
-    const message =
+    const message = friendlyAuthSendError(
       (typeof body?.error === 'object' && body.error?.message) ||
-      (typeof body?.error === 'string' && body.error) ||
-      body?.message ||
-      'Could not send a sign-in link.';
-    return { error: { message } };
+        (typeof body?.error === 'string' && body.error) ||
+        body?.message ||
+        `HTTP ${res.status}`,
+    );
+    return { error: { message: message ?? 'Could not send a sign-in link.' } };
   }
   return { error: null };
 }
@@ -166,6 +185,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(isNeonConfigured());
   const [session, setSession] = useState<AuthSession | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const hydrateDoneRef = useRef(false);
+  const wasSignedInRef = useRef(false);
 
   useEffect(() => {
     if (!isNeonConfigured()) {
@@ -224,6 +245,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Letter-rise on a real sign-in (skip the first hydrate so refresh stays quiet).
+  useEffect(() => {
+    if (loading) return;
+    const signedIn = Boolean(session?.access_token && session.user.email);
+    if (!hydrateDoneRef.current) {
+      hydrateDoneRef.current = true;
+      wasSignedInRef.current = signedIn;
+      return;
+    }
+    if (signedIn && !wasSignedInRef.current) {
+      playUiSound('sign-in');
+    }
+    wasSignedInRef.current = signedIn;
+  }, [loading, session]);
+
   useEffect(() => {
     if (!session) return;
     const email = session.user.email ?? undefined;
@@ -267,17 +303,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestMagicLink(auth, trimmed, redirectTo),
     ]);
 
-    const otpError =
+    const otpError = friendlyAuthSendError(
       otp.status === 'fulfilled'
         ? (otp.value.error?.message ?? null)
         : otp.reason instanceof Error
           ? otp.reason.message
-          : 'Could not send a code.';
-    const magicLinkSent =
-      magic.status === 'fulfilled' && !magic.value.error;
+          : 'Could not send a code.',
+    );
+    const magicError =
+      magic.status === 'fulfilled'
+        ? friendlyAuthSendError(magic.value.error?.message ?? null)
+        : magic.reason instanceof Error
+          ? friendlyAuthSendError(magic.reason.message)
+          : 'Could not send a sign-in link.';
+    const magicLinkSent = magic.status === 'fulfilled' && !magic.value.error;
 
     if (otpError && !magicLinkSent) {
-      return { error: otpError, magicLinkSent: false };
+      return { error: otpError ?? magicError ?? 'Could not send a sign-in email.', magicLinkSent: false };
     }
     return { error: null, magicLinkSent };
   }, []);

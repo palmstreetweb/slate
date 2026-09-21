@@ -336,30 +336,33 @@ export function Dashboard() {
                     quota ? ` · ${quota.used} of ${quota.max}` : ''
                   }${trashed.length > 0 ? ` · ${trashed.length} in trash` : ''}`}
         </p>
-        {(forms.length > 0 || trashed.length > 0) && (
-          <div style={{ display: 'flex', gap: 4, marginTop: 12, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className={`slate-btn slate-btn--compact${view === 'forms' ? ' slate-btn--primary' : ''}`}
-              onClick={() => setView('forms')}
-            >
-              Forms{forms.length > 0 ? ` (${forms.length})` : ''}
-            </button>
-            <button
-              type="button"
-              className={`slate-btn slate-btn--compact${view === 'trash' ? ' slate-btn--primary' : ''}`}
-              onClick={() => setView('trash')}
-            >
-              Trash{trashed.length > 0 ? ` (${trashed.length})` : ''}
-            </button>
-          </div>
-        )}
+        <div className="slate-dash-tabs" role="tablist" aria-label="Forms library">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'forms'}
+            className={`slate-btn slate-btn--compact${view === 'forms' ? ' slate-btn--primary' : ''}`}
+            onClick={() => setView('forms')}
+          >
+            Forms{forms.length > 0 ? ` (${forms.length})` : ''}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'trash'}
+            className={`slate-btn slate-btn--compact${view === 'trash' ? ' slate-btn--primary' : ''}`}
+            onClick={() => setView('trash')}
+          >
+            Trash{trashed.length > 0 ? ` (${trashed.length})` : ''}
+          </button>
+        </div>
       </div>
 
       {view === 'trash' ? (
         trashed.length === 0 ? (
-          <div className="slate-empty">
-            <p style={{ margin: 0, fontSize: 15 }}>Trash is empty.</p>
+          <div className="slate-empty slate-empty--start">
+            <p className="slate-empty-title">Trash is empty</p>
+            <p className="slate-empty-copy">Deleted forms show up here until you restore or remove them forever.</p>
           </div>
         ) : (
           <>
@@ -397,7 +400,10 @@ export function Dashboard() {
                     confirmLabel: 'Empty trash',
                     danger: true,
                   });
-                  if (ok) emptyFormTrash();
+                  if (ok) {
+                    emptyFormTrash();
+                    setView('forms');
+                  }
                 }}
               >
                 Empty trash
@@ -432,18 +438,20 @@ export function Dashboard() {
           </>
         )
       ) : forms.length === 0 ? (
-        <div className="slate-empty">
-          <p style={{ margin: '0 0 12px', fontSize: 15 }}>
-            {trashed.length > 0 ? 'No active forms. Check Trash to restore.' : 'No forms yet.'}
-          </p>
-          <div className="slate-header-actions">
-            <button type="button" className="slate-btn" onClick={openAi}>
-              <SparkleIcon /> Build with AI
-            </button>
-            <button type="button" className="slate-btn slate-btn--new" onClick={onNew}>
-              <span className="slate-btn-plus">+</span> Create your first form
-            </button>
+        <div className="slate-empty slate-empty--start">
+          <div className="slate-empty-mark" aria-hidden>
+            <span />
+            <span />
+            <span />
           </div>
+          <p className="slate-empty-title">
+            {trashed.length > 0 ? 'Nothing active right now' : 'Your library is empty'}
+          </p>
+          <p className="slate-empty-copy">
+            {trashed.length > 0
+              ? 'Restore a form from Trash, or start a new one from the top right.'
+              : 'Build with AI or New form live in the top right — pick whichever fits.'}
+          </p>
         </div>
       ) : (
         <div ref={gridRef} className="slate-form-grid">
@@ -580,7 +588,7 @@ function FormCard({
           <FormCardIconBtn label="Edit" onClick={() => navigate(`/forms/${form.id}/edit`)}>
             <IconEdit />
           </FormCardIconBtn>
-          <FormCardIconBtn label="Share" onClick={() => void handleShare()}>
+          <FormCardIconBtn label="Share" sound="open" onClick={() => void handleShare()}>
             <IconShare />
           </FormCardIconBtn>
           <FormCardIconBtn
@@ -593,7 +601,7 @@ function FormCard({
           <FormCardIconBtn label="Preview" onClick={() => navigate(`/forms/${form.id}`)}>
             <IconPreview />
           </FormCardIconBtn>
-          <FormCardIconBtn label="Duplicate" onClick={onDuplicate}>
+          <FormCardIconBtn label="Duplicate" sound="create" onClick={onDuplicate}>
             <IconDuplicate />
           </FormCardIconBtn>
           <FormCardIconBtn label="Move to trash" danger onClick={onDelete}>

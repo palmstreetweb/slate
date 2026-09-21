@@ -22,6 +22,7 @@ import { hydrateStores, isAdminSessionHydrated, clearAdminSessionHydrated, isSto
 import { isFormsHydrated } from './_admin/neon/formsRemote.js';
 import { isNeonConfigured } from './_admin/neon/env.js';
 import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
+import { installAdminUiSounds } from './_admin/uiSounds.js';
 
 import './_admin/slateChromeTokens.css';
 import '@/styles/toggle.css';
@@ -30,6 +31,11 @@ import './_admin/slateMotion.css';
 
 migrateSlateLocalStorageKeys();
 syncHashFromPathname();
+
+function UiSoundsRoot({ children }: { children: ReactNode }) {
+  useEffect(() => installAdminUiSounds(), []);
+  return children;
+}
 
 function isPublicRoute(route: Route): boolean {
   return route.name === 'respond' || route.name === 'fill' || route.name === 'dropLab';
@@ -225,12 +231,14 @@ if (!root) throw new Error('#root not found');
 
 createRoot(root).render(
   <StrictMode>
-    <AuthProvider>
-      <ConfirmProvider>
-        <PromptFormTitleProvider>
-          <Bootstrap />
-        </PromptFormTitleProvider>
-      </ConfirmProvider>
-    </AuthProvider>
+    <UiSoundsRoot>
+      <AuthProvider>
+        <ConfirmProvider>
+          <PromptFormTitleProvider>
+            <Bootstrap />
+          </PromptFormTitleProvider>
+        </ConfirmProvider>
+      </AuthProvider>
+    </UiSoundsRoot>
   </StrictMode>,
 );

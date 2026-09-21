@@ -527,6 +527,17 @@ Alternatives:
 Consequences: `ANTHROPIC_API_KEY` is server-only (Vercel + `.env.local`). `npm run dev` proxies `/api/generate` through a Vite middleware so localhost works without `vercel dev`; production/preview still use the Vercel function. Engine `npm run build` size is unchanged. Closing the review modal discards the draft (nothing saved).
 Revisit when: streaming schemas or per-user auth on the generate endpoint.
 
+## ADR-040 — Admin chrome UI sounds
+Date: 2026-09-20
+Status: accepted
+Context: Respondent forms already have opt-in step sounds (ADR-023). Studio chrome felt quiet — important actions (new form, AI, publish, confirm/delete, copy, sign-out) needed short feedback without shipping audio assets.
+Decision: Add `examples/_admin/uiSounds.ts` with synthesized Web Audio cues (`tap`, `create`, `ai`, `confirm`, `danger`, `success`, `open`, `copy`, plus existing letter-fall for sign-out). A document-level `pointerdown` listener (capture) maps important buttons by class / label / `data-slate-sound`, including portaled dialogs. Sign-out still plays from `useSignOutFlow` so it stays timed with the dissolve overlay. Not part of the published engine package; no mute toggle in v1 (browser gesture unlock is enough).
+Alternatives:
+- Per-button `onClick` calls only. Rejected — easy to miss portals and new CTAs.
+- Reuse `schema.sound` presets. Rejected — those are respondent-facing and opt-in per form.
+Consequences: Studio feels more tactile. First click still unlocks AudioContext. Compact primary tabs stay silent.
+Revisit when: Settings mute toggle, or distinct per-route themes.
+
 ---
 
 ## Deferred to V2

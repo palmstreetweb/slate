@@ -1,12 +1,13 @@
 /**
- * Sign-out farewell cue — "Letter fall" (gallery option 1).
- * Five descending ticks timed with the dissolving S-l-a-t-e letters.
- * Web Audio only; no asset files. Safe no-op if AudioContext is unavailable.
+ * Auth farewell / welcome cues — Letter fall (sign-out) and Letter rise (sign-in).
+ * Opposite five-note runs timed with dissolve / welcome. Web Audio only.
  */
 
 'use client';
 
-const NOTES = [784, 698, 659, 587, 523] as const;
+const FALL_NOTES = [784, 698, 659, 587, 523] as const;
+/** Opposite of letter-fall — ascend into the studio. */
+const RISE_NOTES = [523, 587, 659, 698, 784] as const;
 const STEP_S = 0.09;
 const NOTE_DUR_S = 0.16;
 const GAIN = 0.14;
@@ -15,7 +16,9 @@ let sharedCtx: AudioContext | null = null;
 
 function getCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null;
-  const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  const AC =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AC) return null;
   if (!sharedCtx) sharedCtx = new AC();
   return sharedCtx;
@@ -35,17 +38,26 @@ function tone(ctx: AudioContext, dest: AudioNode, t0: number, freq: number): voi
   o.stop(t0 + NOTE_DUR_S + 0.05);
 }
 
-/** Play the five-note letter-fall cue. Call from a click handler. */
-export function playSignOutLetterFall(): void {
+function playNotes(notes: readonly number[]): void {
   try {
     const ctx = getCtx();
     if (!ctx) return;
     void ctx.resume();
     const t0 = ctx.currentTime + 0.02;
-    NOTES.forEach((freq, i) => {
+    notes.forEach((freq, i) => {
       tone(ctx, ctx.destination, t0 + i * STEP_S, freq);
     });
   } catch {
-    // Audio blocked or unavailable — visual farewell still runs.
+    // Audio blocked — ignore.
   }
+}
+
+/** Descending ticks — sign-out word dissolve. */
+export function playSignOutLetterFall(): void {
+  playNotes(FALL_NOTES);
+}
+
+/** Ascending ticks — opposite of letter-fall, on successful sign-in. */
+export function playSignInLetterRise(): void {
+  playNotes(RISE_NOTES);
 }

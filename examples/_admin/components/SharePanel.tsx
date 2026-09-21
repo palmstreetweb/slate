@@ -23,6 +23,7 @@ import {
 import { getForm, publishForm, unpublishForm, subscribe } from '../_formsStore.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { publicFillUrl } from '../neon/publicApi.js';
+import { playUiSound } from '../uiSounds.js';
 
 type Props = {
   open: boolean;
@@ -114,6 +115,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
     if (!shareUrl) return;
     const ok = await copyText(shareUrl);
     if (ok) {
+      playUiSound('copy');
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     }
@@ -123,6 +125,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
     if (!qr) return;
     const ok = await copyImage(qr);
     if (ok) {
+      playUiSound('copy');
       setQrCopied(true);
       window.setTimeout(() => setQrCopied(false), 2000);
     }

@@ -8,15 +8,24 @@ type IconBtnProps = {
   children: ReactNode;
   badge?: number;
   danger?: boolean;
+  /** Optional UI sound override (see uiSounds.ts). */
+  sound?: string;
 };
 
-export function FormCardIconBtn({ label, onClick, children, badge, danger }: IconBtnProps) {
+export function FormCardIconBtn({ label, onClick, children, badge, danger, sound }: IconBtnProps) {
   const classes = ['slate-card-icon-btn', danger ? 'slate-card-icon-btn--danger' : '']
     .filter(Boolean)
     .join(' ');
 
   return (
-    <button type="button" className={classes} onClick={onClick} aria-label={label} title={label}>
+    <button
+      type="button"
+      className={classes}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      data-slate-sound={sound || undefined}
+    >
       {children}
       {badge != null && badge > 0 ? (
         <span className="slate-card-icon-badge" aria-hidden>

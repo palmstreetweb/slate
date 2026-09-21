@@ -6,8 +6,8 @@
 
 import { useCallback, useState } from 'react';
 import { useAuth } from '../neon/AuthProvider.js';
+import { playUiSound } from '../uiSounds.js';
 import { SIGN_OUT_ANIM_MS, SignOutOverlay } from './SignOutOverlay.js';
-import { playSignOutLetterFall } from './signOutSound.js';
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined') return true;
@@ -22,7 +22,7 @@ export function useSignOutFlow() {
     if (leaving) return;
     setLeaving(true);
     const quiet = prefersReducedMotion();
-    if (!quiet) playSignOutLetterFall();
+    if (!quiet) playUiSound('sign-out');
     const wait = quiet ? 0 : SIGN_OUT_ANIM_MS;
     if (wait > 0) {
       await new Promise<void>((resolve) => {
