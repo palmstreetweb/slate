@@ -31,6 +31,7 @@ import { refreshSubmissionsRemote } from '../neon/submissionsRemote.js';
 import { isStoresHydrated } from '../neon/hydrate.js';
 import { SharePanel } from '../components/SharePanel.js';
 import { useToast } from '../toast.js';
+import { playUiSound } from '../uiSounds.js';
 
 type Props = { formId: string };
 
@@ -76,7 +77,10 @@ export function FormSubmissions({ formId }: Props) {
       lastPull = now;
       void refreshSubmissionsRemote()
         .then(() => {
-          if (!cancelled) refresh();
+          if (!cancelled) {
+            refresh();
+            playUiSound('refresh');
+          }
         })
         .catch(() => {
           /* keep cache */

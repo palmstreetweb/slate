@@ -21,6 +21,7 @@ export type UiSoundId =
   | 'success'
   | 'open'
   | 'copy'
+  | 'refresh'
   | 'sign-out'
   | 'sign-in'
   | 'loading'
@@ -142,6 +143,26 @@ const RECIPES: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'loading' | 'n
       },
     ],
   },
+  /** Soft cycle — down then up, like a refresh spin settling. */
+  refresh: {
+    duration: 0.26,
+    layers: [
+      {
+        wave: 'sine',
+        gain: 0.065,
+        ampEnv: { attack: 0.003, decay: 0.12, sustain: 0, release: 0.04 },
+        repeat: { count: 3, interval: 0.055, pitchSeq: [587, 440, 698] },
+      },
+      {
+        wave: 'triangle',
+        gain: 0.035,
+        freq: 880,
+        pitchEnv: { to: 1320, time: 0.16, curve: 'exp' },
+        ampEnv: { attack: 0.01, decay: 0.18, sustain: 0, release: 0.05 },
+        filter: { type: 'highpass', freq: 600, q: 0.7 },
+      },
+    ],
+  },
 };
 
 const VOLUME: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'loading' | 'none'>, number> = {
@@ -153,6 +174,7 @@ const VOLUME: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'loading' | 'no
   success: 0.55,
   open: 0.5,
   copy: 0.5,
+  refresh: 0.5,
 };
 
 let lastPlayMs = 0;
@@ -201,6 +223,9 @@ function resolveAutoSound(el: HTMLElement): UiSoundId | null {
   if (label.includes('sign out')) return 'sign-out';
   if (label.includes('publish') && !label.includes('unpublish')) return 'confirm';
   if (label.includes('copy')) return 'copy';
+  if (label.includes('restore') || label.includes('refresh') || label.includes('reload')) {
+    return 'refresh';
+  }
   if (label.includes('open in editor')) return 'success';
   if (label.includes('email me a link') || label.includes('continue with google')) return 'confirm';
   if (label.includes('move to trash') || label.includes('delete forever') || label.includes('empty trash')) {
