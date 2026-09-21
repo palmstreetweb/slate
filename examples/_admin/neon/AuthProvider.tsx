@@ -34,35 +34,19 @@ type AuthContextValue = AuthState & {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/** Neon Auth only accepts allowlisted callback origins (prod today). */
-const AUTH_CALLBACK_FALLBACK = 'https://slateforms.vercel.app';
-
+/** Where Google and magic-link sign-in should land. Must match a Neon trusted origin. */
 function authRedirectUrl(): string | undefined {
   if (typeof window === 'undefined') return undefined;
-  const { origin, pathname, hash } = window.location;
-  const safeHash =
-    hash && hash !== '#' && !hash.includes('access_token=') ? hash : '#/';
-  let base = origin;
-  try {
-    const host = new URL(origin).hostname;
-    const loopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
-    if (loopback) {
-      // Local origins are usually not on Neon’s trusted list → HTTP 403
-      // "Invalid callbackURL". Send magic links to prod; OTP still works here.
-      const configured = import.meta.env.VITE_AUTH_CALLBACK_ORIGIN?.trim().replace(/\/$/, '');
-      base = configured || AUTH_CALLBACK_FALLBACK;
-    }
-  } catch {
-    /* keep window origin */
-  }
-  return `${base}${pathname || '/'}${safeHash}`;
+  // Stay on the site the user is actually using (local or production).
+  // Hash routes are client-only; the callback itself is the origin root.
+  return `${window.location.origin}/`;
 }
 
 function friendlyAuthSendError(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const t = raw.trim();
   if (/invalid callbackurl/i.test(t) || /^HTTP\s*403$/i.test(t)) {
-    return 'Could not send a sign-in email from this origin. Open slateforms.vercel.app to sign in, or add this URL under Neon Auth → Trusted origins.';
+    return 'This site is not allowed to finish sign-in yet. Use https://slateforms.vercel.app, or http://127.0.0.1:5173 / http://localhost:5173 for local.';
   }
   return t;
 }

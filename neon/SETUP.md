@@ -55,7 +55,7 @@ Anyone can sign up (Google, magic link, or email code). Each account owns its ow
 Each account is capped at **50 forms** including Trash (ADR-038); permanent delete frees a slot.
 Public fill links (`#/f/{slug}`) still work without login.
 
-Enable **Auth → Plugins → Magic Link** so email sign-in can send a clickable link as well as a 6-digit code. Trusted origins must include `https://slateforms.vercel.app`. Localhost (`http://localhost:5173` / `http://127.0.0.1:5173`) is optional — when missing, the admin SPA sends magic-link callbacks to production so OTP still works on local.
+Enable **Auth → Plugins → Magic Link** so email sign-in can send a clickable link as well as a 6-digit code. Trusted origins must include `https://slateforms.vercel.app`, `http://127.0.0.1:5173`, and `http://localhost:5173` (localhost allowed). Google and magic-link callbacks return to whichever of those origins the user started on.
 
 Branded mail (ADR-037): after deploying `authemail`, point **Auth → Configuration → Webhooks** at `https://slateforms.vercel.app/api/auth-email` (not the Neon Function URL — Neon rejects its own infrastructure) and subscribe to `send.otp` + `send.magic_link` (timeout 8s). That replaces Neon’s two default emails with one Slate-lockup message (link + code) via Resend.
 

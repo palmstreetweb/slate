@@ -108,6 +108,21 @@ export function Login() {
   const displayError = message ?? authError;
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('error');
+    if (!raw) return;
+    const friendly =
+      raw === 'INVALID_TOKEN'
+        ? 'That sign-in link expired or was already used. Request a new one.'
+        : 'Sign-in did not finish. Request a new link or code and try again.';
+    setStatus('error');
+    setMessage(friendly);
+    params.delete('error');
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', next);
+  }, []);
+
+  useEffect(() => {
     if (status !== 'sent') return;
     codeRef.current?.focus();
   }, [status]);
