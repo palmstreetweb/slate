@@ -12,17 +12,20 @@ import { isNeonConfigured } from '../neon/env.js';
 import { isStoresHydrated } from '../neon/hydrate.js';
 import { refreshFormsRemote } from '../neon/formsRemote.js';
 import { refreshSubmissionsRemote } from '../neon/submissionsRemote.js';
-import { leadPreview, formatSubmittedAt } from '../responsesFormat.js';
+import { leadPreview, formatSubmittedAt, formatRelativeAge } from '../responsesFormat.js';
 import { navigate } from '../_router.js';
 import { playUiSound } from '../uiSounds.js';
 import { useToast } from '../toast.js';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { readSlateMode } from '../slateMode.js';
+import { LoadingScreen } from './LoadingScreen.js';
 
 const KNOWN_KEY = 'slate-admin-known-subs';
 const UNREAD_KEY = 'slate-admin-unread-subs';
 const POLL_MS = 15000;
 const FEED_LIMIT = 24;
+/** Refresh shows the boot splash; hold it long enough for the stack to assemble. */
+const REFRESH_MIN_MS = 1400;
 
 function readIds(key: string): string[] {
   if (typeof window === 'undefined') return [];
@@ -80,7 +83,12 @@ function IconBell() {
         strokeWidth="1.75"
         strokeLinejoin="round"
       />
-      <path d="M10 20a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <path
+        d="M10 20a2 2 0 0 0 4 0"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -97,40 +105,46 @@ export function StudioInbox() {
   const seeded = useRef(false);
   const pulling = useRef(false);
 
-  const ingest = useCallback((announce: boolean) => {
-    const active = listSubmissions();
-    const ids = active.map((s) => s.id);
-    const known = readIds(KNOWN_KEY);
-    if (!seeded.current && known.length === 0 && !window.localStorage.getItem(KNOWN_KEY)) {
-      writeIds(KNOWN_KEY, ids);
+  const ingest = useCallback(
+    (announce: boolean) => {
+      const active = listSubmissions();
+      const ids = active.map((s) => s.id);
+      const known = readIds(KNOWN_KEY);
+      if (!seeded.current && known.length === 0 && !window.localStorage.getItem(KNOWN_KEY)) {
+        writeIds(KNOWN_KEY, ids);
+        seeded.current = true;
+        setTick((n) => n + 1);
+        return;
+      }
       seeded.current = true;
+      const knownSet = new Set(known);
+      const fresh = ids.filter((id) => !knownSet.has(id));
+      if (fresh.length === 0) {
+        setTick((n) => n + 1);
+        return;
+      }
+      const nextUnread = [
+        ...fresh,
+        ...readIds(UNREAD_KEY).filter((id) => !fresh.includes(id)),
+      ].slice(0, 200);
+      writeIds(UNREAD_KEY, nextUnread);
+      writeIds(KNOWN_KEY, [...fresh, ...known]);
+      setUnread(nextUnread);
       setTick((n) => n + 1);
-      return;
-    }
-    seeded.current = true;
-    const knownSet = new Set(known);
-    const fresh = ids.filter((id) => !knownSet.has(id));
-    if (fresh.length === 0) {
-      setTick((n) => n + 1);
-      return;
-    }
-    const nextUnread = [...fresh, ...readIds(UNREAD_KEY).filter((id) => !fresh.includes(id))].slice(0, 200);
-    writeIds(UNREAD_KEY, nextUnread);
-    writeIds(KNOWN_KEY, [...fresh, ...known]);
-    setUnread(nextUnread);
-    setTick((n) => n + 1);
-    if (announce) {
-      playUiSound('refresh');
-      const first = active.find((s) => s.id === fresh[0]);
-      const formName = first ? getForm(first.formId)?.name : undefined;
-      toast.push({
-        title: fresh.length === 1 ? 'New response' : `${fresh.length} new responses`,
-        detail: formName ?? 'Across your forms',
-        tone: 'success',
-        sound: 'none',
-      });
-    }
-  }, [toast]);
+      if (announce) {
+        playUiSound('refresh');
+        const first = active.find((s) => s.id === fresh[0]);
+        const formName = first ? getForm(first.formId)?.name : undefined;
+        toast.push({
+          title: fresh.length === 1 ? 'New response' : `${fresh.length} new responses`,
+          detail: formName ?? 'Across your forms',
+          tone: 'success',
+          sound: 'none',
+        });
+      }
+    },
+    [toast],
+  );
 
   const pull = useCallback(
     async (announce: boolean) => {
@@ -206,8 +220,11 @@ export function StudioInbox() {
   const onRefresh = async () => {
     if (spinning) return;
     setSpinning(true);
+    setOpen(false);
+    const started = Date.now();
     await pull(false);
-    playUiSound('refresh');
+    const remaining = REFRESH_MIN_MS - (Date.now() - started);
+    if (remaining > 0) await new Promise((r) => window.setTimeout(r, remaining));
     setSpinning(false);
   };
 
@@ -228,7 +245,8 @@ export function StudioInbox() {
           formId: sub.formId,
           formName: form?.name ?? 'Untitled form',
           preview: lead.primary === '—' ? 'New response' : lead.primary,
-          when: formatSubmittedAt(sub.receivedAt),
+          when: formatRelativeAge(sub.receivedAt),
+          whenFull: formatSubmittedAt(sub.receivedAt),
           unread: unread.includes(sub.id),
         };
       });
@@ -254,6 +272,9 @@ export function StudioInbox() {
 
   return (
     <>
+      {spinning && typeof document !== 'undefined'
+        ? createPortal(<LoadingScreen label="Refreshing" />, document.body)
+        : null}
       <button
         type="button"
         className="slate-btn slate-btn--icon"
@@ -282,7 +303,12 @@ export function StudioInbox() {
       </button>
       {open && typeof document !== 'undefined'
         ? createPortal(
-            <div data-slate-forms="" data-theme-name="slate" data-admin-ui={uiTheme} data-theme={mode}>
+            <div
+              data-slate-forms=""
+              data-theme-name="slate"
+              data-admin-ui={uiTheme}
+              data-theme={mode}
+            >
               <div
                 ref={panelRef}
                 className="slate-inbox"
@@ -291,15 +317,27 @@ export function StudioInbox() {
                 style={{ top: anchor.top, right: anchor.right }}
               >
                 <header className="slate-inbox-header">
-                  <h2 className="slate-inbox-title">Notifications</h2>
+                  <h2 className="slate-inbox-title">
+                    Notifications
+                    {unreadCount > 0 ? (
+                      <span className="slate-inbox-count">{unreadCount} new</span>
+                    ) : null}
+                  </h2>
                   {unreadCount > 0 ? (
-                    <button type="button" className="slate-link" data-slate-sound="none" onClick={markAllRead}>
+                    <button
+                      type="button"
+                      className="slate-link"
+                      data-slate-sound="none"
+                      onClick={markAllRead}
+                    >
                       Mark all read
                     </button>
                   ) : null}
                 </header>
                 {feed.length === 0 ? (
-                  <p className="slate-inbox-empty">Responses from your forms show up here as they come in.</p>
+                  <p className="slate-inbox-empty">
+                    Responses from your forms show up here as they come in.
+                  </p>
                 ) : (
                   <ul className="slate-inbox-list">
                     {feed.map((row) => (
@@ -309,10 +347,16 @@ export function StudioInbox() {
                           className={`slate-inbox-item${row.unread ? ' slate-inbox-item--unread' : ''}`}
                           data-slate-sound="none"
                           onClick={() => openItem(row.id, row.formId)}
+                          aria-label={`${row.preview}, ${row.formName}, ${row.whenFull}${row.unread ? ', unread' : ''}`}
                         >
-                          <span className="slate-inbox-form">{row.formName}</span>
-                          <span className="slate-inbox-preview">{row.preview}</span>
-                          <span className="slate-inbox-when">{row.when}</span>
+                          <span className="slate-inbox-dot" aria-hidden />
+                          <span className="slate-inbox-text">
+                            {row.preview}
+                            <span className="slate-inbox-form"> · {row.formName}</span>
+                          </span>
+                          <span className="slate-inbox-when" title={row.whenFull}>
+                            {row.when}
+                          </span>
                         </button>
                       </li>
                     ))}

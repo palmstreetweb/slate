@@ -1,6 +1,7 @@
 import { StrictMode, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { syncPathFromHash, useRoute, routeKey, type Route } from './_admin/_router.js';
+import { applyUiScale, readUiScale } from './_admin/uiScale.js';
 import { seedIfEmpty } from './_admin/_formsStore.js';
 import { seedForms } from './_admin/_seedForms.js';
 import { ConfirmProvider } from './_admin/_confirm.js';
@@ -52,6 +53,12 @@ function AppRoutes() {
   const route = useRoute();
   const { ready, allowed } = useRequiresAuth();
   const key = routeKey(route);
+  const publicRoute = isPublicRoute(route);
+
+  // Studio size preference applies to studio chrome only, never to respondents.
+  useEffect(() => {
+    applyUiScale(publicRoute ? null : readUiScale());
+  }, [publicRoute]);
 
   if (isPublicRoute(route)) {
     let page: ReactNode;

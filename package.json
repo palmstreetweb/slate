@@ -46,6 +46,7 @@
     "test:e2e": "playwright test",
     "preview:auth-email": "npx vite-node scripts/preview-auth-email.ts",
     "qa:ai": "npx vite-node scripts/qa-ai-generate.ts",
+    "seed": "npx vite-node scripts/seed.ts",
     "prepublishOnly": "npm run typecheck && npm run lint && npm run test && npm run build",
     "neon:setup": "echo See neon/SETUP.md"
   },

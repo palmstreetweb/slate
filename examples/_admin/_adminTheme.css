@@ -16,7 +16,7 @@
 
 /* Portals attach to document.body. Engine `[data-slate-forms]` is min-height
    100vh, so each open dialog used to add a blank second page under the studio. */
-body > [data-slate-forms][data-theme-name='slate'] {
+body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   min-height: 0;
   height: 0;
   background: transparent;
@@ -100,6 +100,14 @@ body > [data-slate-forms][data-theme-name='slate'] {
 [data-slate-forms][data-theme-name='slate'] :is(.slate-app, .slate-popover, .slate-select-menu)
   *:not(input):not(textarea):not(select):not([contenteditable='true']):not(.slate-selectable):not(.slate-selectable *)::selection {
   background: transparent;
+}
+
+/* Chromium 128+ inherits ::selection from ancestors, so the transparent rule
+   above would also blank out highlights inside fields. Give them one back. */
+[data-slate-forms][data-theme-name='slate'] :is(.slate-app, .slate-popover)
+  :is(input, textarea, [contenteditable='true'], .slate-selectable, .slate-selectable *)::selection {
+  background: rgb(var(--slate-accent-rgb) / 0.35);
+  color: inherit;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-header {
@@ -4529,18 +4537,20 @@ body.slate-editor-resizing * {
   text-align: center;
 }
 
+/* Notifications popover — flat rows, dot for unread, thin scrollbar (ADR-045). */
 .slate-inbox {
   position: fixed;
   z-index: 80;
-  width: min(360px, calc(100vw - 24px));
-  max-height: min(480px, calc(100vh - 96px));
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(70vh, 520px);
   display: flex;
   flex-direction: column;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid var(--chrome-hair, var(--slate-border));
   background: var(--chrome-panel, var(--slate-bg-2));
-  box-shadow: 0 18px 50px rgb(0 0 0 / 0.32);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.35);
   overflow: hidden;
+  animation: slate-dialog-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-inbox-header {
@@ -4548,69 +4558,116 @@ body.slate-editor-resizing * {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 11px 14px;
   border-bottom: 1px solid var(--chrome-hair, var(--slate-border));
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-inbox-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 650;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-count {
+  margin-left: 6px;
+  font-weight: 500;
+  color: var(--chrome-muted, var(--slate-muted));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-header .slate-link {
+  font-size: 12px;
+  color: var(--chrome-muted, var(--slate-muted));
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-inbox-empty {
   margin: 0;
-  padding: 28px 18px;
+  padding: 26px 16px;
   font-size: 13px;
   line-height: 1.45;
+  text-align: center;
   color: var(--chrome-muted, var(--slate-muted));
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-inbox-list {
   list-style: none;
   margin: 0;
-  padding: 6px;
+  padding: 0;
   overflow: auto;
+  /* Thin always-on scrollbar, no track (S1). */
+  scrollbar-width: thin;
+  scrollbar-color: var(--chrome-line, var(--slate-border)) transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-list::-webkit-scrollbar-thumb {
+  background: var(--chrome-line, var(--slate-border));
+  border-radius: 99px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-list::-webkit-scrollbar-thumb:hover {
+  background: var(--chrome-muted, var(--slate-muted));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-list li + li {
+  border-top: 1px solid var(--chrome-hair, var(--slate-border));
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-inbox-item {
   width: 100%;
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   text-align: left;
-  padding: 10px 10px;
+  padding: 9px 14px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 0;
   background: transparent;
-  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  color: var(--chrome-muted, var(--slate-muted));
   cursor: pointer;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-inbox-item:hover {
-  background: color-mix(in srgb, var(--chrome-ink, var(--slate-text)) 6%, transparent);
+  background: color-mix(in srgb, var(--chrome-ink, var(--slate-text)) 5%, transparent);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-inbox-item--unread {
-  background: color-mix(in srgb, var(--chrome-red, var(--slate-accent)) 10%, transparent);
+  color: var(--chrome-ink, var(--slate-text));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-item--unread .slate-inbox-dot {
+  background: var(--chrome-red, var(--slate-accent));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-inbox-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-inbox-form {
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--chrome-ink, var(--slate-text));
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-inbox-preview {
-  font-size: 13px;
-  color: var(--chrome-ink, var(--slate-text));
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--chrome-muted, var(--slate-muted));
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-inbox-when {
+  flex-shrink: 0;
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
   color: var(--chrome-muted, var(--slate-muted));
 }
 
@@ -4795,4 +4852,36 @@ body.slate-editor-resizing * {
   [data-slate-forms][data-theme-name='slate'] .slate-fill-gate-card {
     animation: none;
   }
+}
+
+/* ---------- Studio size (ADR-045): three steps, default is the floor ---------- */
+
+/* Studio roots only: the app mount and portaled studio chrome. Public fill
+   pages never get the body attribute, and the engine's own wrapper inside the
+   editor preview is a descendant, so it scales with the studio exactly once. */
+body[data-slate-scale='2'] #root > .slate-page > [data-slate-forms][data-theme-name='slate'],
+body[data-slate-scale='2'] > [data-slate-forms][data-theme-name='slate'] {
+  zoom: 1.1;
+}
+
+body[data-slate-scale='3'] #root > .slate-page > [data-slate-forms][data-theme-name='slate'],
+body[data-slate-scale='3'] > [data-slate-forms][data-theme-name='slate'] {
+  zoom: 1.2;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-scale-tab {
+  font-weight: 600;
+  line-height: 1;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-scale-tab--1 {
+  font-size: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-scale-tab--2 {
+  font-size: 15px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-scale-tab--3 {
+  font-size: 18px;
 }

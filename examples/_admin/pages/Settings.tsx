@@ -10,6 +10,7 @@ import { useAuth } from '../neon/AuthProvider.js';
 import { useSignOutFlow } from '../shell/useSignOutFlow.js';
 import { ADMIN_UI_THEME_OPTIONS } from '../adminUiTheme.js';
 import { isUiSoundMuted, playUiSound, setUiSoundMuted } from '../uiSounds.js';
+import { UI_SCALE_OPTIONS, readUiScale, writeUiScale, type UiScale } from '../uiScale.js';
 
 function SettingsContent() {
   const { mode, setMode, uiTheme, setUiTheme } = useAdminTheme();
@@ -17,6 +18,7 @@ function SettingsContent() {
   const { runSignOut, leaving, overlay } = useSignOutFlow();
   const cloud = isNeonConfigured();
   const [soundsOn, setSoundsOn] = useState(() => !isUiSoundMuted());
+  const [scale, setScale] = useState<UiScale>(() => readUiScale());
 
   useEffect(() => {
     const sync = () => setSoundsOn(!isUiSoundMuted());
@@ -89,6 +91,36 @@ function SettingsContent() {
                 </button>
               );
             })}
+          </div>
+        </section>
+
+        <section className="slate-settings-section">
+          <h2 className="slate-settings-heading">Studio size</h2>
+          <p className="slate-settings-copy">
+            Make the studio a little bigger. Forms and public links are not affected.
+          </p>
+          <div className="slate-tabs slate-scale-tabs" role="radiogroup" aria-label="Studio size">
+            {UI_SCALE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={scale === opt.value}
+                aria-label={`${opt.hint} size`}
+                title={opt.hint}
+                className={`slate-tab slate-scale-tab slate-scale-tab--${opt.value}${
+                  scale === opt.value ? ' slate-tab--active' : ''
+                }`}
+                data-slate-sound="none"
+                onClick={() => {
+                  writeUiScale(opt.value);
+                  setScale(opt.value);
+                  playUiSound('tap');
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </section>
 

@@ -14,25 +14,16 @@ import { readSlateMode } from '../slateMode.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
 import { useToast } from '../toast.js';
 
-function IconBug() {
+function IconFeedback() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
-        d="M8 9a4 4 0 1 1 8 0v1H8V9Z"
+        d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-5 4v-4H6.5A2.5 2.5 0 0 1 4 13.5z"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
       />
-      <path
-        d="M7 13h10v1a5 5 0 0 1-10 0v-1Z"
-        stroke="currentColor"
-        strokeWidth="1.75"
-      />
-      <path
-        d="M12 9V5M9 6l2 2M15 6l-2 2M5 11l3 1M19 11l-3 1M6 18l3-2M18 18l-3-2"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-      />
+      <path d="M9 9.5h6M9 12.5h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
@@ -102,11 +93,16 @@ export function FeedbackButton() {
         data-slate-sound="open"
         onClick={() => setOpen(true)}
       >
-        <IconBug />
+        <IconFeedback />
       </button>
       {open && typeof document !== 'undefined'
         ? createPortal(
-            <div data-slate-forms="" data-theme-name="slate" data-admin-ui={uiTheme} data-theme={mode}>
+            <div
+              data-slate-forms=""
+              data-theme-name="slate"
+              data-admin-ui={uiTheme}
+              data-theme={mode}
+            >
               <div className="slate-dialog-backdrop" role="presentation" onClick={close}>
                 <div
                   className="slate-dialog slate-feedback"
@@ -123,7 +119,7 @@ export function FeedbackButton() {
                     rows={5}
                     value={message}
                     disabled={sending}
-                    placeholder="Describe the issue"
+                    placeholder="Any feedback would be greatly appreciated, including any bugs."
                     onChange={(e) => setMessage(e.target.value)}
                   />
                   <p className="slate-dialog-message">

@@ -32,7 +32,7 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
     case 'multi_choice':
       if (Array.isArray(value)) {
         return value
-          .map((v) => (typeof v === 'string' ? optionLabel(question, v) ?? v : String(v)))
+          .map((v) => (typeof v === 'string' ? (optionLabel(question, v) ?? v) : String(v)))
           .join(', ');
       }
       return String(value);
@@ -59,15 +59,19 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
       return Array.isArray(value) ? value.join(', ') : String(value);
 
     case 'matrix':
-      if (typeof value === 'object' && value !== null && !Array.isArray(value) && 'rows' in question) {
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        'rows' in question
+      ) {
         return Object.entries(value as Record<string, unknown>)
           .map(([rowVal, col]) => {
-            const rowLabel =
-              question.rows.find((r) => r.value === rowVal)?.label ?? String(rowVal);
+            const rowLabel = question.rows.find((r) => r.value === rowVal)?.label ?? String(rowVal);
             const colVal = Array.isArray(col) ? col[0] : col;
             const colLabel =
               typeof colVal === 'string' && 'columns' in question
-                ? question.columns.find((c) => c.value === colVal)?.label ?? String(colVal)
+                ? (question.columns.find((c) => c.value === colVal)?.label ?? String(colVal))
                 : Array.isArray(col)
                   ? col.join(', ')
                   : String(col ?? '');
@@ -86,9 +90,7 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
                 return `${item.name} (${Math.round(item.size / 1024)} KB)`;
               }
               if (typeof item === 'string' && isFileUploadRef(item)) {
-                return (
-                  describeFileUploadAnswer(item, peekLocalUploadMeta(item)) ?? 'Uploaded file'
-                );
+                return describeFileUploadAnswer(item, peekLocalUploadMeta(item)) ?? 'Uploaded file';
               }
               if (typeof item === 'string') {
                 return describeFileUploadAnswer(item) ?? item;
@@ -119,7 +121,10 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
 type LeadPreview = { primary: string; secondary: string };
 
 /** Pick two human-readable preview strings for a collapsed response row. */
-export function leadPreview(questions: ReadonlyArray<Question>, answers: Record<string, unknown>): LeadPreview {
+export function leadPreview(
+  questions: ReadonlyArray<Question>,
+  answers: Record<string, unknown>,
+): LeadPreview {
   const answered = questions.filter((q) => {
     const v = answers[q.id];
     return v !== undefined && v !== null && v !== '';
@@ -139,8 +144,8 @@ export function leadPreview(questions: ReadonlyArray<Question>, answers: Record<
   const secondary = sorted[1] ? formatAnswerForQuestion(sorted[1], answers[sorted[1].id]) : '—';
 
   return {
-    primary: primary === '—' ? '—' : primary.split('\n')[0] ?? '—',
-    secondary: secondary === '—' ? '—' : secondary.split('\n')[0] ?? '—',
+    primary: primary === '—' ? '—' : (primary.split('\n')[0] ?? '—'),
+    secondary: secondary === '—' ? '—' : (secondary.split('\n')[0] ?? '—'),
   };
 }
 
@@ -186,3 +191,26 @@ export function formatAnswerForCsv(question: Question, value: unknown): string {
 }
 
 export { titleOf };
+
+/**
+ * Compact age for the notifications list: `2m`, `1h`, `Yesterday`, `Sep 19`.
+ * Year is only shown once the date is out of the current year.
+ */
+export function formatRelativeAge(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return '';
+  const diffMs = now.getTime() - then.getTime();
+  const min = Math.floor(diffMs / 60_000);
+  if (min < 1) return 'now';
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday.getTime() - 86_400_000);
+  if (then >= startOfYesterday && then < startOfToday) return 'Yesterday';
+  return then.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(then.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  });
+}
