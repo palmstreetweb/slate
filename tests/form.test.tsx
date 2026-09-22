@@ -121,7 +121,7 @@ describe('<Form> — submission', () => {
     expect(meta.completedAt).toBeInstanceOf(Date);
     expect(typeof meta.durationMs).toBe('number');
 
-    expect(await screen.findByText(/confirmation sent/i)).toBeInTheDocument();
+    expect(await screen.findByText(/response received/i)).toBeInTheDocument();
   });
 
   it('shows error + retry when onSubmit rejects, and retry can succeed', async () => {
@@ -138,7 +138,7 @@ describe('<Form> — submission', () => {
     await user.click(screen.getByRole('button', { name: /retry/i }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText(/confirmation sent/i)).toBeInTheDocument();
+    expect(await screen.findByText(/response received/i)).toBeInTheDocument();
   });
 
   it('restart CTA resets the form to the welcome screen', async () => {
@@ -146,7 +146,7 @@ describe('<Form> — submission', () => {
     render(<Form schema={makeSchema()} onSubmit={vi.fn().mockResolvedValue(undefined)} />);
 
     await walkToThanks(user);
-    await screen.findByText(/confirmation sent/i);
+    await screen.findByText(/response received/i);
 
     await user.click(screen.getByRole('button', { name: /submit another/i }));
     expect(await screen.findByText('Hey there.')).toBeInTheDocument();
@@ -395,7 +395,7 @@ describe('<Form> — save-and-resume (ADR-017)', () => {
     await user.type(await screen.findByRole('textbox'), 'ada@example.com');
     await user.click(screen.getByRole('button', { name: /ok/i }));
 
-    await screen.findByText(/confirmation sent/i);
+    await screen.findByText(/response received/i);
     expect(window.localStorage.getItem(RESUME_KEY)).toBeNull();
   });
 

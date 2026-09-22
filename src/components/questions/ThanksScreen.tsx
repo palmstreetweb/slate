@@ -31,7 +31,7 @@ export function ThanksScreen({ question, status, error, onRetry, onRestart }: Pr
 
         {status === 'success' && (
           <div aria-live="polite" className="slate-confirm-chip">
-            ✓ confirmation sent
+            ✓ response received
           </div>
         )}
 

@@ -619,6 +619,17 @@ Not done (needs a product answer or more time): per-owner notification email (ev
 Consequences: Owners must be signed in for Build with AI. `storagesign` needs `NEON_AUTH_URL` (it can derive it from `DATABASE_URL` but the env is pinned on deploy). Uploads of unusual types are stored as octet-stream and downloaded rather than previewed.
 Revisit when: custom domains (CSP `frame-ancestors`, cookies), per-respondent access codes, or a second app on the origin.
 
+## ADR-047 — v1 responses live in the app only
+Date: 2026-09-22
+Status: accepted
+Context: `submitresponse` emailed every response — respondent names, emails, free text — to one address (`PSW_NOTIFY_EMAIL`, default hello@palmstreetweb.com) regardless of who owned the form. With more than one owner that is an undisclosed disclosure of other people's respondents, an inbox flood, and a third-party call on the hot path of every submit.
+Decision: No email on submit. Responses are visible only in the studio: the bell badge, the notifications inbox (60 s poll, toast on arrival), the Responses page, and CSV export. `RESEND_API_KEY` is used by `authemail` only. The notify HTML builder is deleted rather than kept behind a flag.
+Alternatives:
+- Per-owner notification email with an opt-in setting. Deferred — it needs a verified address per owner, unsubscribe handling, and a sending reputation to protect. Worth doing when owners ask for it, not before.
+- Keep the single-address email for PSW's own forms only. Rejected — one code path that leaks under the wrong env value is not worth the convenience.
+Consequences: An owner learns about a response when they open Slate. Submit no longer waits on Resend. The thanks-screen chip now reads “response received” instead of the prototype's “confirmation sent” — nothing is sent, and the engine shouldn't promise it on a host's behalf. `PSW_NOTIFY_EMAIL` and `PUBLIC_FORM_BASE` are no longer read by any Function; remove them from the deployed env.
+Revisit when: owners ask for email or push, or a daily digest.
+
 ---
 
 ## Deferred to V2

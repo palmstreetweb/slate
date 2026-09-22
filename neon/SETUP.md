@@ -82,9 +82,7 @@ Or use `neon.ts` + `npx neonctl@latest deploy` when the project is linked.
 
 Set function env (repeatable `--env KEY=VALUE`):
 
-- `RESEND_API_KEY` (optional for submit notify; **required** on `authemail`)
-- `PSW_NOTIFY_EMAIL` (optional)
-- `PUBLIC_FORM_BASE=https://slateforms.vercel.app`
+- `RESEND_API_KEY` — **required** on `authemail` only. `submitresponse` sends no email: responses live in the app (ADR-047).
 - `authemail` and `storagesign`: `NEON_AUTH_URL` (Auth base, for JWKS — storagesign verifies owner JWTs with it, ADR-046)
 - Optional unlock rate limits (`submitresponse`, ADR-043): `UNLOCK_RATE_IP_SLUG_MAX` (40), `UNLOCK_RATE_IP_SLUG_WINDOW_SEC` (600), `UNLOCK_RATE_IP_MAX` (80), `UNLOCK_RATE_IP_WINDOW_SEC` (3600)
 - Optional upload guards (`storagesign`, ADR-031): `STORAGE_SIGN_MAX_BYTES`, `STORAGE_SIGN_IP_FORM_MAX`, `STORAGE_SIGN_IP_FORM_WINDOW_SEC`, `STORAGE_SIGN_IP_MAX`, `STORAGE_SIGN_IP_WINDOW_SEC`
