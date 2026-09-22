@@ -4065,6 +4065,8 @@ body.slate-editor-resizing * {
   margin: 4px 0 12px;
   min-height: 120px;
 }
+
+[data-slate-forms][data-theme-name='slate'] .slate-ai-textarea:focus {
   outline: none;
   border-color: var(--chrome-red, var(--slate-accent));
 }
