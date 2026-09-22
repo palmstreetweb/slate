@@ -610,7 +610,7 @@ function FormCard({
           >
             <IconResponses />
           </FormCardIconBtn>
-          <FormCardIconBtn label="Preview" onClick={() => navigate(`/forms/${form.id}`)}>
+          <FormCardIconBtn label="Preview" onClick={() => navigate(`/forms/${form.id}/preview`)}>
             <IconPreview />
           </FormCardIconBtn>
           <FormCardIconBtn label="Duplicate" sound="create" onClick={onDuplicate}>

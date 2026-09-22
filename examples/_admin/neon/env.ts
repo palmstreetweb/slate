@@ -64,7 +64,7 @@ export function getNeon(): NeonClient {
   if (!client) {
     // Prefer the SDK's single-URL form so Auth + Data API hosts stay in sync
     // with neon-js defaults (critical for JWT → RLS).
-    // allowAnonymous: public fill (`#/f/{slug}`) must call get_form_by_slug
+    // allowAnonymous: public fill (`/forms/{slug}`) must call get_form_by_slug
     // without a signed-in user — SDK fetches a short-lived anonymous JWT.
     client = createClient<Database>(url, {
       auth: {

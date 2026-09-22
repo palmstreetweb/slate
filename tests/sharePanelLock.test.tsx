@@ -19,7 +19,7 @@ vi.mock('../examples/_admin/_formsStore.js', () => ({
 }));
 vi.mock('../examples/_admin/neon/env.js', () => ({ isNeonConfigured: () => state.cloud }));
 vi.mock('../examples/_admin/neon/publicApi.js', () => ({
-  publicFillUrl: (slug: string) => `https://slate.test/#/f/${slug}`,
+  publicFillUrl: (slug: string) => `https://slate.test/forms/${slug}`,
 }));
 vi.mock('../examples/_admin/shareQr.js', () => ({
   readShareQrStyle: () => 'swiss',
@@ -88,6 +88,8 @@ describe('Share panel password lock (ADR-043)', () => {
     expect(state.setFormFillPassword).toHaveBeenCalledWith('f_1', 'abcd');
     expect((screen.getByLabelText('Share URL') as HTMLInputElement).value).toBe(urlBefore);
     expect(urlBefore).not.toContain('abcd');
+    // Display drops the scheme; the value itself is still the public link.
+    expect(urlBefore).toBe('slate.test/forms/48210377');
   });
 
   it('locked: Change / Remove; Remove clears with an empty string', async () => {

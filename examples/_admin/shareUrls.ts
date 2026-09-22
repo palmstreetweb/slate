@@ -76,9 +76,9 @@ export function resolvePrimaryShareUrl(
 
 /** Hash-route preview — schema from localStorage on this device only. */
 export function buildDevPreviewUrl(formId: string): string {
-  if (typeof window === 'undefined') return hrefFor(`/forms/${formId}`);
-  const path = hrefFor(`/forms/${formId}`);
-  return `${window.location.origin}${window.location.pathname}${path}`;
+  if (typeof window === 'undefined') return hrefFor(`/forms/${formId}/preview`);
+  const path = hrefFor(`/forms/${formId}/preview`);
+  return `${window.location.origin}${path}`;
 }
 
 export async function copyText(text: string): Promise<boolean> {

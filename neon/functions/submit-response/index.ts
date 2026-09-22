@@ -298,7 +298,7 @@ app.post('/', async (c) => {
   if (resendKey) {
     const origin =
       process.env.PUBLIC_FORM_BASE?.replace(/\/$/, '') ?? 'https://slateforms.vercel.app';
-    const responsesUrl = `${origin}/#/forms/${body.formId}/submissions`;
+    const responsesUrl = `${origin}/forms/${body.formId}/submissions`;
     const html = buildNotifyHtml({
       formName: form.name,
       responsesUrl,

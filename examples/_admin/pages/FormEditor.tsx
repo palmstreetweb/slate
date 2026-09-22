@@ -15,14 +15,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type {
-  FormSound,
-  Question,
-  QuestionType,
-  Schema,
-  ThemeMode,
-  ThemeName,
-} from '@/index.js';
+import type { FormSound, Question, QuestionType, Schema, ThemeMode, ThemeName } from '@/index.js';
 import { checkSchema, defineSchema } from '@/index.js';
 import { playFormSound } from '@/utils/formSounds.js';
 import {
@@ -272,9 +265,7 @@ function FormEditorBody({ formId }: { formId: string }) {
       const target = e.target as HTMLElement | null;
       const typing =
         target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable);
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
       if (meta && e.key === '/') {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
@@ -283,7 +274,7 @@ function FormEditorBody({ formId }: { formId: string }) {
       if (typing) return;
       if (meta && e.shiftKey && e.key.toLowerCase() === 'p') {
         e.preventDefault();
-        navigate(`/forms/${formId}`);
+        navigate(`/forms/${formId}/preview`);
         return;
       }
       if (meta && e.shiftKey && e.key.toLowerCase() === 's') {
@@ -423,9 +414,7 @@ function FormEditorBody({ formId }: { formId: string }) {
       if (!s) return s;
       return {
         ...s,
-        questions: s.questions.map((q) =>
-          q.id === id ? ({ ...q, ...patch } as Question) : q,
-        ),
+        questions: s.questions.map((q) => (q.id === id ? ({ ...q, ...patch } as Question) : q)),
       };
     });
   };
@@ -489,10 +478,7 @@ function FormEditorBody({ formId }: { formId: string }) {
       if (!original || original.type === 'welcome' || original.type === 'thanks') return s;
       const title =
         typeof original.title === 'string' ? `${original.title} (copy)` : 'Question (copy)';
-      const copyId = uniqueQuestionId(
-        title,
-        new Set(s.questions.map((q) => q.id)),
-      );
+      const copyId = uniqueQuestionId(title, new Set(s.questions.map((q) => q.id)));
       const next = [...s.questions];
       next.splice(idx + 1, 0, cloneQuestion(original, copyId));
       setSelectedId(copyId);
@@ -644,26 +630,21 @@ function FormEditorBody({ formId }: { formId: string }) {
           <button type="button" className="slate-btn" onClick={() => void handleShare()}>
             Share
           </button>
-          {cloud ? (
+          {cloud && (!isPublished || stale || publishBusy) ? (
+            // Only while there is something to push. Live + current → Share alone.
             <button
               type="button"
-              className={`slate-btn${isPublished && !stale ? '' : ' slate-btn--primary'}`}
-              onClick={() => (isPublished && !stale ? void handleShare() : quickPublish())}
+              className="slate-btn slate-btn--primary"
+              onClick={quickPublish}
               disabled={publishBusy}
             >
-              {publishBusy
-                ? 'Publishing…'
-                : isPublished
-                  ? stale
-                    ? 'Republish'
-                    : 'Share link'
-                  : 'Publish'}
+              {publishBusy ? 'Publishing…' : isPublished ? 'Republish' : 'Publish'}
             </button>
           ) : null}
           <button
             type="button"
             className={`slate-btn${cloud ? '' : ' slate-btn--primary'}`}
-            onClick={() => navigate(`/forms/${formId}`)}
+            onClick={() => navigate(`/forms/${formId}/preview`)}
           >
             Preview ↗
           </button>
@@ -763,7 +744,9 @@ function FormEditorBody({ formId }: { formId: string }) {
         )}
         {issues.length > 0 && (
           <div className="slate-editor-alert" role="alert">
-            <strong>{issues.length} schema {issues.length === 1 ? 'issue' : 'issues'}:</strong>
+            <strong>
+              {issues.length} schema {issues.length === 1 ? 'issue' : 'issues'}:
+            </strong>
             {issues.map((issue, i) => (
               <button
                 key={i}
@@ -815,8 +798,8 @@ function FormEditorBody({ formId }: { formId: string }) {
                   title: 'Delete this item?',
                   message: (
                     <>
-                      Removes <strong>{titleText}</strong> from this form. Existing responses
-                      for it stay in localStorage but won&apos;t be collected anymore.
+                      Removes <strong>{titleText}</strong> from this form. Existing responses for it
+                      stay in localStorage but won&apos;t be collected anymore.
                     </>
                   ),
                   confirmLabel: 'Delete',

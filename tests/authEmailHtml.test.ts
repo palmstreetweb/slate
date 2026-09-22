@@ -22,7 +22,7 @@ describe('buildSignInEmail', () => {
     expect(html).toContain('Copy code');
     expect(html).toContain('data-code="482195"');
     expect(html).toContain('id="slate-copy-code"');
-    expect(html).toContain('/#/?otp=482195');
+    expect(html).toContain('/?otp=482195');
     expect(text).toContain('482195');
     expect(text).toContain('https://slateforms.vercel.app/#/?token=abc');
   });
@@ -32,7 +32,7 @@ describe('buildSignInEmail', () => {
     expect(html).not.toContain('Sign in to Slate</a>');
     expect(html).toContain('111222');
     expect(html).toContain('Copy code');
-    expect(html).toContain('/#/?otp=111222');
+    expect(html).toContain('/?otp=111222');
     expect(text).not.toContain('Sign-in link');
   });
 

@@ -168,5 +168,5 @@ export function metaToPayload(meta: SubmitMeta): SubmitResponsePayload['meta'] {
 
 export function publicFillUrl(slug: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  return `${origin}/#/f/${encodeURIComponent(slug)}`;
+  return `${origin}/forms/${encodeURIComponent(slug)}`;
 }

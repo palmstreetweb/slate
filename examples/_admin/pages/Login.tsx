@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SlateLogo } from '../components/SlateLogo.js';
-import { hashSearchParams } from '../_router.js';
+import { routeSearchParams } from '../_router.js';
 import { useAuth } from '../neon/AuthProvider.js';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { readSlateMode } from '../slateMode.js';
 
-function readOtpFromHash(): string {
-  const raw = hashSearchParams().get('otp') || hashSearchParams().get('code') || '';
+function readOtpFromUrl(): string {
+  const raw = routeSearchParams().get('otp') || routeSearchParams().get('code') || '';
   return raw.replace(/\D/g, '').slice(0, 6);
 }
 
@@ -101,7 +101,7 @@ export function Login() {
   const [copiedCode, setCopiedCode] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
   const verifyingRef = useRef(false);
-  const seededCode = useMemo(() => readOtpFromHash(), []);
+  const seededCode = useMemo(() => readOtpFromUrl(), []);
   const mode = readSlateMode();
   const uiTheme = useMemo(() => detectAdminUiTheme(), []);
 
@@ -118,7 +118,7 @@ export function Login() {
     setStatus('error');
     setMessage(friendly);
     params.delete('error');
-    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash}`;
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`;
     window.history.replaceState({}, '', next);
   }, []);
 
@@ -208,12 +208,7 @@ export function Login() {
   };
 
   return (
-    <div
-      data-slate-forms=""
-      data-theme-name="slate"
-      data-theme={mode}
-      data-admin-ui={uiTheme}
-    >
+    <div data-slate-forms="" data-theme-name="slate" data-theme={mode} data-admin-ui={uiTheme}>
       <div className="slate-app slate-login">
         <div className="slate-login-card">
           <div className="slate-login-brand">
@@ -235,8 +230,8 @@ export function Login() {
                 {magicLinkSent ? (
                   <>
                     We emailed a sign-in link and a 6-digit code to{' '}
-                    <strong style={{ color: 'var(--chrome-ink)' }}>{email}</strong>. Click the
-                    link, or type the code below.
+                    <strong style={{ color: 'var(--chrome-ink)' }}>{email}</strong>. Click the link,
+                    or type the code below.
                   </>
                 ) : (
                   <>

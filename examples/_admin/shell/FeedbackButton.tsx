@@ -69,7 +69,7 @@ export function FeedbackButton() {
         owner_id: user?.id,
         email: user?.email ?? auth.email,
         message: text,
-        path: `${window.location.pathname}${window.location.hash}`,
+        path: `${window.location.pathname}${window.location.search}`,
       });
       if (insertError) {
         throw new Error(insertError.message || 'Could not send feedback.');

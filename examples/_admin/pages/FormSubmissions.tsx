@@ -130,7 +130,7 @@ export function FormSubmissions({ formId }: Props) {
           <button type="button" className="slate-btn" onClick={() => setShareOpen(true)}>
             Share
           </button>
-          <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}`)}>
+          <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/preview`)}>
             Preview ↗
           </button>
           {subs.length > 0 && (
@@ -312,7 +312,7 @@ export function FormSubmissions({ formId }: Props) {
             <button type="button" className="slate-btn slate-btn--primary" onClick={() => setShareOpen(true)}>
               {published ? (stale ? 'Republish' : 'Share link') : 'Publish & share'}
             </button>
-            <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}`)}>
+            <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/preview`)}>
               Preview
             </button>
           </div>

@@ -18,7 +18,7 @@ export type FormStatus = 'draft' | 'published';
 export type FormRecord = {
   id: string;
   name: string;
-  /** URL segment for public fill links (`#/f/{slug}`). */
+  /** URL segment for public fill links (`/forms/{slug}`). */
   slug?: string;
   createdAt: string;
   updatedAt: string;

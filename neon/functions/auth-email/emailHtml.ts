@@ -127,9 +127,9 @@ export function buildSignInEmail(
 function copyCodeHref(otp: string, link: string | null): string {
   try {
     const origin = link ? new URL(link).origin : 'https://slateforms.vercel.app';
-    return `${origin}/#/?otp=${encodeURIComponent(otp)}`;
+    return `${origin}/?otp=${encodeURIComponent(otp)}`;
   } catch {
-    return `https://slateforms.vercel.app/#/?otp=${encodeURIComponent(otp)}`;
+    return `https://slateforms.vercel.app/?otp=${encodeURIComponent(otp)}`;
   }
 }
 

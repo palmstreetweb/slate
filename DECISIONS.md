@@ -583,6 +583,17 @@ Alternatives:
 Consequences: Turning the lock on, off, or changing the word never changes the URL or QR. Respondents type it once per tab. A respondent mid-fill when the password changes gets a clear "password changed, reload" on submit. Backup restore re-creates rows, so restored forms come back unlocked. The SPA tolerates a database without 012 (falls back to the column list without `fill_locked`; unlocked rows still open), so deploy order is forgiving — but the lock row will error until 012 is applied and the Data API schema cache is refreshed.
 Revisit when: per-respondent codes, expiring access, or the custom-slug / custom-domain feature lands.
 
+## ADR-044 — Clean pathname routes; public link is `/forms/{slug}`
+Date: 2026-09-22
+Status: accepted
+Context: The studio used a hash router (`#/…`) from its static-file days. Public links read `https://…/#/f/95389890`, which looks broken on a flyer and wastes QR density. Vercel already rewrites every path to `index.html`, and Vite does the same in dev, so the hash no longer buys anything. Solo-dev stage, no external users — no compatibility constraints.
+Decision: (1) `_router.ts` reads `location.pathname`, navigates with `history.pushState`, and listens to `popstate`. (2) Public fill is the bare `/forms/{slug}`; admin verbs hang off the same prefix — `/forms/:id/edit`, `/forms/:id/preview` (was `/forms/:id`), `/forms/:id/submissions`. Later features get their own verb without touching the public shape. (3) Portable respond is `/r?d=…`; sign-in code links are `/?otp=…`. (4) Old `#/path?query` URLs are upgraded in place on load and on hash-only changes (four lines — not a commitment). (5) Share shows the link without `https://`; Copy, Open, and the QR still carry the full URL. (6) The editor header no longer relabels Publish to "Share link" once live and current — it hides, leaving one Share button.
+Alternatives:
+- Keep `/f/{slug}`. Rejected — `/forms/12345678` reads better and 8 digits is already short enough for a chunky QR.
+- Separate `/studio/…` prefix for admin. Rejected for now — more churn than it earns while there is one app.
+Consequences: Anchors are full-page loads (there are two). `vercel.json` rewrites are now load-bearing for every route, not only the root. Playwright smoke and `authEmailHtml` tests updated. Word slugs on older forms keep working at `/forms/{word}`.
+Revisit when: custom domains per customer, or a second app shares the origin.
+
 ---
 
 ## Deferred to V2

@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { syncHashFromPathname, useRoute, routeKey, type Route } from './_admin/_router.js';
+import { syncPathFromHash, useRoute, routeKey, type Route } from './_admin/_router.js';
 import { seedIfEmpty } from './_admin/_formsStore.js';
 import { seedForms } from './_admin/_seedForms.js';
 import { ConfirmProvider } from './_admin/_confirm.js';
@@ -19,7 +19,13 @@ import { AdminShell } from './_admin/shell/AdminShell.js';
 import { LoadingScreen, useMinBootMs } from './_admin/shell/LoadingScreen.js';
 import { PageTransition } from './_admin/shell/PageTransition.js';
 import { AuthProvider, useRequiresAuth } from './_admin/neon/AuthProvider.js';
-import { hydrateStores, isAdminSessionHydrated, clearAdminSessionHydrated, isStoresHydrated, markAdminSessionHydrated } from './_admin/neon/hydrate.js';
+import {
+  hydrateStores,
+  isAdminSessionHydrated,
+  clearAdminSessionHydrated,
+  isStoresHydrated,
+  markAdminSessionHydrated,
+} from './_admin/neon/hydrate.js';
 import { isFormsHydrated } from './_admin/neon/formsRemote.js';
 import { isNeonConfigured } from './_admin/neon/env.js';
 import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
@@ -31,7 +37,7 @@ import './_admin/_adminTheme.css';
 import './_admin/slateMotion.css';
 
 migrateSlateLocalStorageKeys();
-syncHashFromPathname();
+syncPathFromHash();
 
 function UiSoundsRoot({ children }: { children: ReactNode }) {
   useEffect(() => installAdminUiSounds(), []);
@@ -93,7 +99,7 @@ function AppRoutes() {
         <AdminShell crumbs={null}>
           <div className="slate-empty">
             <p style={{ margin: '0 0 12px' }}>Page not found: {route.path}</p>
-            <a href="#/" className="slate-btn slate-btn--primary" style={{ textDecoration: 'none' }}>
+            <a href="/" className="slate-btn slate-btn--primary" style={{ textDecoration: 'none' }}>
               Back to dashboard
             </a>
           </div>
@@ -123,12 +129,7 @@ function AdminCloudBootstrap() {
     // Skip re-fetch only when this tab already finished a successful hydrate
     // AND the in-memory Neon caches are still warm. Otherwise we'd paint an
     // empty library until a manual refresh.
-    if (
-      isAdminSessionHydrated() &&
-      isStoresHydrated() &&
-      isFormsHydrated() &&
-      retryToken === 0
-    ) {
+    if (isAdminSessionHydrated() && isStoresHydrated() && isFormsHydrated() && retryToken === 0) {
       setStoresReady(true);
       setHydrateError(null);
       return;

@@ -94,8 +94,8 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
    */
   const shortFormUrl =
     typeof window !== 'undefined'
-      ? `${window.location.origin}${window.location.pathname}#/forms/${formId}`
-      : `#/forms/${formId}`;
+      ? `${window.location.origin}/forms/${formId}/preview`
+      : `/forms/${formId}/preview`;
   const qrUrl = productionUrl ?? shortFormUrl;
 
   useEffect(() => {
@@ -367,7 +367,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                     <input
                       className="slate-input slate-share-url"
                       readOnly
-                      value={shareUrl}
+                      value={displayUrl(shareUrl)}
                       aria-label="Share URL"
                     />
                     <button
@@ -512,4 +512,9 @@ function LockGlyph() {
       />
     </svg>
   );
+}
+
+/** What the author sees. Copy and the QR still carry the full URL. */
+function displayUrl(url: string): string {
+  return url.replace(/^https?:\/\//, '');
 }

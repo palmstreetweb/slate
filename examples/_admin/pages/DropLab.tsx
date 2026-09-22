@@ -1,6 +1,6 @@
 /**
  * Drop Lab — interactive playground for outline drop animations. examples/ only.
- * Open at http://localhost:5173/#/lab/drop
+ * Open at http://localhost:5173/lab/drop
  */
 
 'use client';

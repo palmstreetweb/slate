@@ -37,6 +37,6 @@ describe('portableShare', () => {
 
   it('buildPortableShareUrl includes hash route', () => {
     const url = buildPortableShareUrl(sample);
-    expect(url).toContain('#/r?d=');
+    expect(url).toContain('/r?d=');
   });
 });

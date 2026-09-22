@@ -38,7 +38,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 function authRedirectUrl(): string | undefined {
   if (typeof window === 'undefined') return undefined;
   // Stay on the site the user is actually using (local or production).
-  // Hash routes are client-only; the callback itself is the origin root.
+  // Sign-in always lands on the dashboard; the callback is the origin root.
   return `${window.location.origin}/`;
 }
 

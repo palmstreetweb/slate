@@ -69,9 +69,9 @@ export function buildPortableShareUrl(
   meta?: { formId?: string; name?: string },
 ): string {
   const token = encodePortableSchema(schema, meta);
-  const hashPath = `/r?d=${encodeURIComponent(token)}`;
-  if (typeof window === 'undefined') return `#${hashPath}`;
-  return `${window.location.origin}${window.location.pathname}#${hashPath}`;
+  const path = `/r?d=${encodeURIComponent(token)}`;
+  if (typeof window === 'undefined') return path;
+  return `${window.location.origin}${path}`;
 }
 
 /** Whether a schema is small enough for a portable link (rough guard). */
