@@ -11,6 +11,8 @@ import {
   resetFormsStorage,
   restoreForm,
   trashForm,
+  updateForm,
+  duplicateForm,
 } from '../examples/_admin/_formsStore.js';
 
 const schema = defineSchema({
@@ -87,5 +89,48 @@ describe('forms store trash', () => {
     expect(listTrashedForms()).toHaveLength(1);
     permanentlyDeleteForm(form!.id);
     expect(listAllForms()).toHaveLength(0);
+  });
+});
+
+describe('fixed numeric slug (ADR-043)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('window', {
+      localStorage: {
+        store: {} as Record<string, string>,
+        getItem(key: string) {
+          return this.store[key] ?? null;
+        },
+        setItem(key: string, value: string) {
+          this.store[key] = value;
+        },
+        removeItem(key: string) {
+          delete this.store[key];
+        },
+      },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    });
+    resetFormsStorage();
+  });
+
+  it('new forms get an 8-digit slug that is not the name', () => {
+    const form = createForm({ name: 'Wild Wash Intake', schema })!;
+    expect(form.slug).toMatch(/^[1-9]\d{7}$/);
+  });
+
+  it('rename never rewrites the slug', () => {
+    const form = createForm({ name: 'Before', schema })!;
+    const [renamed] = updateForm(form.id, { name: 'After', slug: form.slug });
+    expect(renamed?.name).toBe('After');
+    expect(renamed?.slug).toBe(form.slug);
+  });
+
+  it('duplicate gets its own slug and no lock', () => {
+    const form = createForm({ name: 'Original', schema })!;
+    const copy = duplicateForm(form.id)!;
+    expect(copy.slug).toMatch(/^[1-9]\d{7}$/);
+    expect(copy.slug).not.toBe(form.slug);
+    expect(copy).not.toHaveProperty('fillLocked');
   });
 });

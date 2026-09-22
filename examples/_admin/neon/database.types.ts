@@ -18,7 +18,17 @@ export type DbFormRow = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /**
+   * Generated from `fill_password_hash is not null` (ADR-043). Read-only.
+   * The hash column itself is deliberately absent from these types — the
+   * browser never selects it.
+   */
+  fill_locked?: boolean;
 };
+
+/** Explicit owner-hydrate column list. Never `*` — that would pull `fill_password_hash`. */
+export const FORM_OWNER_COLUMNS =
+  'id,name,slug,schema,published_schema,status,owner_id,created_at,updated_at,deleted_at,fill_locked';
 
 export type DbSubmissionRow = {
   id: string;
@@ -60,7 +70,8 @@ export type Database = {
       };
       form_files: {
         Row: DbFormFileRow;
-        Insert: Partial<DbFormFileRow> & Pick<DbFormFileRow, 'form_id' | 'storage_path' | 'filename'>;
+        Insert: Partial<DbFormFileRow> &
+          Pick<DbFormFileRow, 'form_id' | 'storage_path' | 'filename'>;
         Update: Partial<DbFormFileRow>;
         Relationships: [];
       };
@@ -95,8 +106,14 @@ export type Database = {
           id: string;
           name: string;
           slug: string;
-          schema: Schema;
+          /** Missing until migration 012 is applied. */
+          locked?: boolean;
+          schema: Schema | null;
         }[];
+      };
+      set_form_fill_password: {
+        Args: { p_form_id: string; p_password: string };
+        Returns: boolean;
       };
       can_sign_in: {
         Args: { p_email: string };
@@ -140,9 +157,7 @@ export type Database = {
   };
 };
 
-export type PublishedFormPayload = {
-  id: string;
-  name: string;
-  slug: string;
-  schema: Schema;
-};
+/** `schema` is null exactly when `locked` — the gate unlocks it (ADR-043). */
+export type PublishedFormPayload =
+  | { id: string; name: string; slug: string; locked: false; schema: Schema }
+  | { id: string; name: string; slug: string; locked: true; schema: null };

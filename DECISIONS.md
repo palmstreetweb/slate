@@ -560,6 +560,29 @@ Alternatives:
 Consequences: A long checklist can be answered from the keyboard. G–Z no longer pass through on those screens.
 Revisit when: a question type needs more than 26 keyed options.
 
+## ADR-043 — Public-fill password lock + fixed numeric slugs
+Date: 2026-09-21
+Status: accepted
+Context: Some forms go on a flyer but are meant for one crew or one event. Authors want "only people I gave the word to," without a second link, a new question type, or reprinting the QR. Separately, slugs were the slugified form name and followed renames, so renaming a published form silently broke its printed QR.
+Decision:
+(1) **Lock is a Share setting on the same URL.** `forms.fill_password_hash` (bcrypt via pgcrypto `crypt` / `gen_salt('bf', 8)`) plus generated `forms.fill_locked`. Off by default, 4–72 characters. Migration `012_fill_password.sql`.
+(2) **Only one door writes the hash.** `set_form_fill_password(p_form_id, p_password)` is SECURITY DEFINER, checks `auth_uid() = owner_id`, and clears on empty string. A BEFORE INSERT/UPDATE trigger pins the column for the Data API roles (`authenticated`, `anonymous`), so an upsert can never set, change, or clear it. Editor saves, publish, unpublish, trash, and restore don't touch it.
+(3) **The hash never reaches a browser.** Owner hydrate selects `FORM_OWNER_COLUMNS` (no `*`); `FormRecord` has `fillLocked?: boolean` only. `get_form_by_slug` now returns `{ id, name, slug, locked, schema }` with `schema = null` when locked.
+(4) **Unlock rides the existing submit Function.** `VITE_SUBMIT_URL` is one endpoint, so the body is discriminated: `{ op: 'unlock', slug, password | token }` vs. the existing `{ formId, answers, meta }`. Success returns the schema plus `unlockToken = hex(hmac_sha256(data = form_id, key = fill_password_hash))`. The page keeps the token in `sessionStorage` under `slate-fill-unlock:{formId}` — per tab, never the password — and re-proves with it on reload. Changing or removing the password changes the hash, which voids every old token.
+(5) **Everything behind the gate checks the token.** Submit and `storage-sign` `public/` uploads require a timing-safe-valid `unlockToken` when a hash is set (401 otherwise). A Bearer does not substitute on `public/` uploads.
+(6) **Rate limits, fail closed.** Every unlock attempt (right, wrong, or token) consumes `consume_submit_rate`: 40 / 10 min per IP+slug and 80 / hour per IP (env-tunable `UNLOCK_RATE_*`). A conference NAT fits; a 4-digit PIN spray does not. Rate-table errors return 503.
+(7) **Respondent gate, not an admin error.** `FillGate` shows the form name, one password field, Continue. The public error state no longer offers "Back to dashboard."
+(8) **Share panel:** one fixed-height row between the link card and the QR — switch when off, field + Set while editing, `Locked · Change / Remove` when on. Cloud only; hidden in `VITE_ADMIN_OFFLINE` mode because nothing could enforce it.
+(9) **Slugs are fixed at create.** New forms get a random 8-digit numeric slug (`allocateNumericSlug`), redrawn until unique among the owner's active forms, and redrawn again if the global unique index rejects the insert. Rename no longer touches the slug; a patch can't replace an existing slug. Existing word slugs are untouched, so links already in the wild keep working. Duplicate creates a fresh row: new slug, no password.
+Alternatives:
+- Password as a first question. Rejected — schema would already be on the device; submit and uploads stay open.
+- Separate locked slug or password in the QR URL. Rejected — reprints flyers, or prints the secret on them.
+- `/unlock` subpath on the Function. Rejected — not guaranteed to route on a single-URL Neon Function.
+- Column-level `REVOKE SELECT` on the hash. Deferred — it breaks any cached SPA bundle still doing `select('*')`. Today an owner could read their *own* bcrypt hash through the Data API with a hand-written query; RLS keeps everyone else out.
+- Random signed/expiring token. Deferred — the HMAC needs no new table or secret and already dies with the password.
+Consequences: Turning the lock on, off, or changing the word never changes the URL or QR. Respondents type it once per tab. A respondent mid-fill when the password changes gets a clear "password changed, reload" on submit. Backup restore re-creates rows, so restored forms come back unlocked. The SPA tolerates a database without 012 (falls back to the column list without `fill_locked`; unlocked rows still open), so deploy order is forgiving — but the lock row will error until 012 is applied and the Data API schema cache is refreshed.
+Revisit when: per-respondent codes, expiring access, or the custom-slug / custom-domain feature lands.
+
 ---
 
 ## Deferred to V2

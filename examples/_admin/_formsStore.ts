@@ -9,6 +9,7 @@ import { isStoresHydrated } from './neon/hydrate.js';
 import * as remote from './neon/formsRemote.js';
 import { purgeSubmissions } from './_submissionStore.js';
 import type { FormQuota } from './formQuota.js';
+import { allocateNumericSlug } from './shareUrls.js';
 
 const STORAGE_KEY = 'slate-forms';
 
@@ -27,6 +28,8 @@ export type FormRecord = {
   status?: FormStatus;
   /** ISO timestamp when moved to trash; omitted while active. */
   deletedAt?: string;
+  /** Public fill asks for a password first (ADR-043). Cloud only; never the hash. */
+  fillLocked?: boolean;
 };
 
 /** True when live link serves an older snapshot than the editor. */
@@ -168,14 +171,17 @@ export function createForm(opts: { name: string; schema: Schema }): FormRecord |
   if (useRemote()) return remote.createFormRemoteSync(opts);
   if (neonNotReady()) return null;
   const now = new Date().toISOString();
+  const existing = read();
   const record: FormRecord = {
     id: id(),
     name: opts.name,
+    // Fixed numeric slug at create, same as cloud (ADR-043).
+    slug: allocateNumericSlug((c) => existing.some((f) => f.slug === c && isActive(f))),
     createdAt: now,
     updatedAt: now,
     schema: opts.schema,
   };
-  return write([record, ...read()]) ? record : null;
+  return write([record, ...existing]) ? record : null;
 }
 
 /** Prefer for New form — waits for Neon upsert so the editor never races a soft refresh. */
@@ -269,6 +275,15 @@ export function duplicateForm(formId: string): FormRecord | null {
   const src = getForm(formId);
   if (!src) return null;
   return createForm({ name: `${src.name} (Copy)`, schema: src.schema });
+}
+
+/** Public-fill password (ADR-043). Cloud only — localStorage mode has no server to enforce it. */
+export async function setFormFillPassword(
+  formId: string,
+  password: string,
+): Promise<{ ok: true; locked: boolean } | { ok: false; message: string }> {
+  if (!useRemote()) return { ok: false, message: 'Password lock needs the cloud backend.' };
+  return remote.setFormFillPasswordRemote(formId, password);
 }
 
 export function publishForm(formId: string): FormRecord | null {

@@ -5,6 +5,7 @@
  *
  * Auth model:
  * - public/ upload: anonymous OK when form is published (rate-limited).
+ *   Password-locked forms (ADR-043) also need the respondent's unlockToken.
  * - draft/ upload + all download/meta/content: Bearer JWT whose `sub` matches forms.owner_id.
  */
 
@@ -18,6 +19,7 @@ import {
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { isValidUnlockToken } from './fillLock.js';
 
 const BUCKET = process.env.NEON_STORAGE_BUCKET || 'form-uploads';
 
@@ -65,6 +67,8 @@ type SignBody = {
   path: string;
   contentType?: string;
   contentLength?: number;
+  /** public/ uploads on a password-locked form (ADR-043). */
+  unlockToken?: string;
 };
 
 const app = new Hono();
@@ -78,9 +82,7 @@ function clientIp(c: { req: { header: (name: string) => string | undefined } }):
     if (first) return first.slice(0, 64);
   }
   const real =
-    c.req.header('cf-connecting-ip') ||
-    c.req.header('x-real-ip') ||
-    c.req.header('true-client-ip');
+    c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || c.req.header('true-client-ip');
   if (real?.trim()) return real.trim().slice(0, 64);
   return 'unknown';
 }
@@ -155,13 +157,19 @@ async function loadForm(formId: string): Promise<{
   status: string;
   deleted_at: string | null;
   owner_id: string | null;
+  fill_password_hash: string | null;
 } | null> {
   const formRes = await pool.query<{
     id: string;
     status: string;
     deleted_at: string | null;
     owner_id: string | null;
-  }>(`select id, status, deleted_at, owner_id from public.forms where id = $1 limit 1`, [formId]);
+    fill_password_hash: string | null;
+  }>(
+    `select id, status, deleted_at, owner_id, fill_password_hash
+     from public.forms where id = $1 limit 1`,
+    [formId],
+  );
   return formRes.rows[0] ?? null;
 }
 
@@ -169,7 +177,10 @@ async function loadForm(formId: string): Promise<{
 async function requireFormOwner(
   authHeader: string,
   formId: string,
-): Promise<{ ok: true; form: NonNullable<Awaited<ReturnType<typeof loadForm>>> } | { ok: false; status: 401 | 403 | 404; message: string }> {
+): Promise<
+  | { ok: true; form: NonNullable<Awaited<ReturnType<typeof loadForm>>> }
+  | { ok: false; status: 401 | 403 | 404; message: string }
+> {
   const token = bearerToken(authHeader);
   if (!token) return { ok: false, status: 401, message: 'Unauthorized' };
   const uid = userIdFromToken(token);
@@ -297,6 +308,14 @@ app.post('/', async (c) => {
         if (form.status !== 'published') {
           return c.text('Form not available', 404);
         }
+        // Locked form: a Bearer does not help here — only the unlock token does,
+        // otherwise any signed-in stranger could still drop files on it.
+        if (
+          form.fill_password_hash &&
+          !isValidUnlockToken(form.id, form.fill_password_hash, body.unlockToken)
+        ) {
+          return c.json({ error: 'locked' }, 401);
+        }
       } catch (err) {
         console.error('[storagesign] form check failed', err);
         return c.text('Temporarily unavailable', 503);
@@ -348,9 +367,7 @@ app.post('/', async (c) => {
 
     if (body.op === 'meta') {
       try {
-        const head = await client.send(
-          new HeadObjectCommand({ Bucket: BUCKET, Key: body.path }),
-        );
+        const head = await client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: body.path }));
         const name = body.path.split('/').pop() || 'file';
         return c.json({
           name,

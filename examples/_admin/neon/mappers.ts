@@ -1,7 +1,7 @@
 import type { Schema } from '@/index.js';
 import type { FormRecord } from '../_formsStore.js';
 import type { StoredSubmission } from '../_submissionStore.js';
-import type { DbFormRow, DbSubmissionRow } from './database.types.js';
+import type { DbFormRow, DbSubmissionRow, PublishedFormPayload } from './database.types.js';
 
 export function rowToFormRecord(row: DbFormRow): FormRecord {
   return {
@@ -14,12 +14,33 @@ export function rowToFormRecord(row: DbFormRow): FormRecord {
     deletedAt: row.deleted_at ?? undefined,
     status: row.status,
     publishedSchema: row.published_schema ?? undefined,
+    ...(row.fill_locked ? { fillLocked: true } : {}),
   };
+}
+
+/**
+ * `get_form_by_slug` row → public payload (ADR-043). Fails closed: a locked
+ * row never carries a schema, and an unlocked row without one is unavailable.
+ */
+export function slugRowToPublishedForm(row: {
+  id: string;
+  name: string;
+  slug: string;
+  locked?: boolean | null;
+  schema?: unknown;
+}): PublishedFormPayload | null {
+  const base = { id: row.id, name: row.name, slug: row.slug };
+  if (row.locked) return { ...base, locked: true, schema: null };
+  if (!row.schema) return null;
+  return { ...base, locked: false, schema: row.schema as Schema };
 }
 
 export function formRecordToRow(
   form: FormRecord,
-): Pick<DbFormRow, 'id' | 'name' | 'slug' | 'schema' | 'published_schema' | 'status' | 'deleted_at'> {
+): Pick<
+  DbFormRow,
+  'id' | 'name' | 'slug' | 'schema' | 'published_schema' | 'status' | 'deleted_at'
+> {
   return {
     id: form.id,
     name: form.name,

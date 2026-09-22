@@ -48,8 +48,17 @@ In the Neon SQL Editor (or `psql` with the pooled connection string), run in ord
 8. `neon/migrations/008_open_signup_owner_rls.sql`
 9. `neon/migrations/009_auth_email_pending.sql`
 10. `neon/migrations/010_form_quota.sql`
+11. `neon/migrations/011_feedback.sql`
+12. `neon/migrations/012_fill_password.sql`
 
-Then **Data API → Refresh schema cache**.
+Then **Data API → Refresh schema cache**. Do this after every migration that adds a column or
+changes a function signature — 012 does both (`forms.fill_locked`, `get_form_by_slug` gains
+`locked`, new `set_form_fill_password`). Until the cache is refreshed the Share password row
+errors and locked forms can't be set.
+
+After 012, redeploy `submitresponse` and `storagesign` (section 5). They hold the unlock op and
+the unlock-token checks on submit and public uploads (ADR-043). Order that is always safe:
+SQL → refresh cache → redeploy both Functions → ship the SPA.
 
 Anyone can sign up (Google, magic link, or email code). Each account owns its own forms (ADR-036).
 Each account is capped at **50 forms** including Trash (ADR-038); permanent delete frees a slot.
@@ -76,6 +85,7 @@ Set function env (repeatable `--env KEY=VALUE`):
 - `PSW_NOTIFY_EMAIL` (optional)
 - `PUBLIC_FORM_BASE=https://slateforms.vercel.app`
 - `authemail` only: `NEON_AUTH_URL` (Auth base, for JWKS), optional `AUTH_EMAIL_FROM`
+- Optional unlock rate limits (`submitresponse`, ADR-043): `UNLOCK_RATE_IP_SLUG_MAX` (40), `UNLOCK_RATE_IP_SLUG_WINDOW_SEC` (600), `UNLOCK_RATE_IP_MAX` (80), `UNLOCK_RATE_IP_WINDOW_SEC` (3600)
 - Optional upload guards (`storagesign`, ADR-031): `STORAGE_SIGN_MAX_BYTES`, `STORAGE_SIGN_IP_FORM_MAX`, `STORAGE_SIGN_IP_FORM_WINDOW_SEC`, `STORAGE_SIGN_IP_MAX`, `STORAGE_SIGN_IP_WINDOW_SEC`
 - Object Storage credentials are injected by Neon when Storage is enabled on the branch
 

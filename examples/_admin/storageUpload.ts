@@ -4,13 +4,9 @@
  */
 
 import { SLATE_FILE_REF_PREFIX } from '@/utils/fileUploadRef.js';
-import {
-  getNeon,
-  hasStorageSignUrl,
-  getStorageSignUrl,
-  isNeonConfigured,
-} from './neon/env.js';
+import { getNeon, hasStorageSignUrl, getStorageSignUrl, isNeonConfigured } from './neon/env.js';
 import { getUploadFormId } from './uploadContext.js';
+import { readFillUnlockToken } from './fillUnlock.js';
 
 const STORAGE_PREFIX = 'storage:';
 
@@ -56,8 +52,7 @@ async function friendlySignError(res: Response): Promise<string> {
       const body = (await res.json()) as { error?: string; retryAfterSeconds?: number };
       if (body.retryAfterSeconds) retryAfter = body.retryAfterSeconds;
       return (
-        body.error ||
-        `Too many uploads. Please wait about ${retryAfter} seconds and try again.`
+        body.error || `Too many uploads. Please wait about ${retryAfter} seconds and try again.`
       );
     } catch {
       return `Too many uploads. Please wait about ${retryAfter} seconds and try again.`;
@@ -65,21 +60,18 @@ async function friendlySignError(res: Response): Promise<string> {
   }
   if (res.status === 413) return 'That file is too large.';
   if (res.status === 404) return 'This form is not accepting uploads.';
+  if (res.status === 401) return 'This form is locked. Reload the page and enter the password.';
   const text = await res.text().catch(() => '');
   return text || `Sign failed (${res.status})`;
 }
 
 export function isStorageUploadRef(ref: string): boolean {
-  const id = ref.startsWith(SLATE_FILE_REF_PREFIX)
-    ? ref.slice(SLATE_FILE_REF_PREFIX.length)
-    : ref;
+  const id = ref.startsWith(SLATE_FILE_REF_PREFIX) ? ref.slice(SLATE_FILE_REF_PREFIX.length) : ref;
   return id.startsWith(STORAGE_PREFIX);
 }
 
 export function storagePathFromRef(ref: string): string | null {
-  const id = ref.startsWith(SLATE_FILE_REF_PREFIX)
-    ? ref.slice(SLATE_FILE_REF_PREFIX.length)
-    : ref;
+  const id = ref.startsWith(SLATE_FILE_REF_PREFIX) ? ref.slice(SLATE_FILE_REF_PREFIX.length) : ref;
   if (!id.startsWith(STORAGE_PREFIX)) return null;
   return id.slice(STORAGE_PREFIX.length);
 }
@@ -127,6 +119,9 @@ export async function uploadToNeonStorage(
       path,
       contentType,
       contentLength: file.size,
+      // Locked forms refuse public/ uploads without it (ADR-043).
+      unlockToken:
+        scope === 'public' ? (readFillUnlockToken(resolvedFormId) ?? undefined) : undefined,
     }),
   });
   if (!signRes.ok) {
@@ -237,9 +232,6 @@ export async function getStorageContentBlob(ref: string): Promise<{
   if (!res.ok) return null;
   const blob = await res.blob();
   const name = path.split('/').pop() || 'file';
-  const mime =
-    res.headers.get('Content-Type') ||
-    blob.type ||
-    'application/octet-stream';
+  const mime = res.headers.get('Content-Type') || blob.type || 'application/octet-stream';
   return { blob, name, mime };
 }

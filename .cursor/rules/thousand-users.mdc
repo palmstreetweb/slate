@@ -1,0 +1,15 @@
+---
+description: 1000-users-tomorrow security and smoothness bar for studio + public fill
+alwaysApply: true
+---
+
+# Build as if 1000 people use it tomorrow
+
+Every studio / public-fill change is held to this bar:
+
+- **Rate limits** on anything anonymous can hit (reuse `consume_submit_rate`). Size them so a conference NAT still works but spraying does not.
+- **No secret leakage.** Hashes, tokens, keys, and other owners' data never reach the browser. No `select('*')` on tables that hold secrets.
+- **No extra friction** for respondents or authors. No new required steps, no retyping.
+- **No flyer-breaking URL changes.** A printed QR / public link keeps working through renames, setting changes, and republish.
+- **Fail closed on authz.** If the check or the rate table errors, deny (503/401), never allow.
+- **Keep share/fill fast on shared cafe Wi-Fi.** One round trip where possible, small payloads, no blocking extras on the fill path.

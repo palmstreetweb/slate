@@ -20,7 +20,14 @@ import {
   writeShareQrStyle,
   type ShareQrStyle,
 } from '../shareQr.js';
-import { getForm, publishForm, unpublishForm, subscribe, hasUnpublishedChanges } from '../_formsStore.js';
+import {
+  getForm,
+  publishForm,
+  unpublishForm,
+  subscribe,
+  hasUnpublishedChanges,
+  setFormFillPassword,
+} from '../_formsStore.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { publicFillUrl } from '../neon/publicApi.js';
 import { playUiSound } from '../uiSounds.js';
@@ -45,7 +52,19 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const [copied, setCopied] = useState(false);
   const [qrCopied, setQrCopied] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [lockEditing, setLockEditing] = useState(false);
+  const [lockDraft, setLockDraft] = useState('');
+  const [lockBusy, setLockBusy] = useState(false);
+  const [lockError, setLockError] = useState<string | null>(null);
   const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (open) return;
+    // Never keep a typed password around after the sheet closes.
+    setLockEditing(false);
+    setLockDraft('');
+    setLockError(null);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -60,9 +79,12 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const slug = form?.slug ?? formId;
 
   const productionUrl = isNeonConfigured() && isPublished ? publicFillUrl(slug) : null;
-  const portableUrl = canEncodePortableSchema(schema)
-    ? buildPortableShareUrl(schema, { formId, name: formName })
-    : null;
+  // A portable link carries the whole schema in the URL — it would walk straight
+  // past the password (ADR-043). Locked forms only share the real public link.
+  const portableUrl =
+    !form?.fillLocked && canEncodePortableSchema(schema)
+      ? buildPortableShareUrl(schema, { formId, name: formName })
+      : null;
   const shareUrl = productionUrl ?? portableUrl;
 
   /**
@@ -165,11 +187,143 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
     }
   };
 
+  const fillLocked = Boolean(form?.fillLocked);
+
+  const applyLock = async (password: string) => {
+    if (lockBusy) return;
+    if (password && (password.length < 4 || password.length > 72)) {
+      setLockError('Use 4 to 72 characters.');
+      return;
+    }
+    setLockBusy(true);
+    setLockError(null);
+    const result = await setFormFillPassword(formId, password);
+    setLockBusy(false);
+    if (!result.ok) {
+      setLockError(result.message);
+      return;
+    }
+    setLockEditing(false);
+    setLockDraft('');
+    toast.push(
+      result.locked
+        ? {
+            title: fillLocked ? 'Password changed' : 'Password on',
+            detail: 'Same link and QR. People enter it once per visit.',
+            tone: 'success',
+            sound: 'success',
+          }
+        : {
+            title: 'Password off',
+            detail: 'Anyone with the link can fill it in again.',
+            tone: 'info',
+            sound: 'tap',
+          },
+    );
+  };
+
   if (!open || typeof document === 'undefined') return null;
 
   const mode = readSlateMode();
   const uiTheme = detectAdminUiTheme();
   const cloud = isNeonConfigured();
+
+  const lockRow = cloud ? (
+    <section className="slate-share-lock" aria-label="Password">
+      {lockEditing ? (
+        <form
+          className="slate-share-lock-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void applyLock(lockDraft.trim());
+          }}
+        >
+          <input
+            className="slate-input slate-share-lock-input"
+            type="text"
+            value={lockDraft}
+            onChange={(e) => {
+              setLockDraft(e.target.value);
+              setLockError(null);
+            }}
+            placeholder={fillLocked ? 'New word or PIN' : 'Word or PIN'}
+            aria-label="Form password"
+            aria-invalid={lockError ? true : undefined}
+            minLength={4}
+            maxLength={72}
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            data-1p-ignore=""
+            data-lpignore="true"
+            data-bwignore=""
+            autoFocus
+          />
+          <button
+            type="submit"
+            className="slate-btn slate-btn--primary slate-btn--compact"
+            disabled={lockBusy || lockDraft.trim().length < 4}
+          >
+            {lockBusy ? 'Saving…' : 'Set'}
+          </button>
+          <button
+            type="button"
+            className="slate-share-lock-link"
+            onClick={() => {
+              setLockEditing(false);
+              setLockDraft('');
+              setLockError(null);
+            }}
+          >
+            Cancel
+          </button>
+        </form>
+      ) : (
+        <div className="slate-share-lock-row">
+          <span className="slate-share-lock-label">
+            <LockGlyph />
+            {fillLocked ? 'Locked' : 'Password'}
+          </span>
+          {fillLocked ? (
+            <span className="slate-share-lock-actions">
+              <button
+                type="button"
+                className="slate-share-lock-link"
+                onClick={() => setLockEditing(true)}
+                disabled={lockBusy}
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                className="slate-share-lock-link"
+                onClick={() => void applyLock('')}
+                disabled={lockBusy}
+              >
+                {lockBusy ? 'Removing…' : 'Remove'}
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={false}
+              aria-label="Require a password to fill this form"
+              className="slate-share-lock-switch"
+              onClick={() => setLockEditing(true)}
+            >
+              <span aria-hidden />
+            </button>
+          )}
+        </div>
+      )}
+      {lockError ? (
+        <p className="slate-share-lock-error" role="alert">
+          {lockError}
+        </p>
+      ) : null}
+    </section>
+  ) : null;
 
   return createPortal(
     <div data-slate-forms="" data-theme-name="slate" data-admin-ui={uiTheme} data-theme={mode}>
@@ -195,7 +349,12 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
               </h2>
               <p className="slate-share-sub">{formName}</p>
             </div>
-            <button type="button" className="slate-icon-btn slate-share-close" onClick={onClose} aria-label="Close">
+            <button
+              type="button"
+              className="slate-icon-btn slate-share-close"
+              onClick={onClose}
+              aria-label="Close"
+            >
               ✕
             </button>
           </header>
@@ -247,6 +406,8 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                     ) : null}
                   </div>
                 </section>
+
+                {lockRow}
 
                 <section className="slate-share-scan" aria-label="QR code">
                   <div className="slate-share-qr-frame" aria-hidden={!qr}>
@@ -309,29 +470,46 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                 </div>
               </>
             ) : (
-              <div className="slate-share-callout">
-                <p className="slate-share-kicker">Shareable link</p>
-                <p className="slate-share-hint">
-                  {cloud && !isPublished
-                    ? 'Publish this form to get a public fill link.'
-                    : 'This form is too large for a portable link. Remove questions or shorten copy and try again.'}
-                </p>
-                {cloud ? (
-                  <button
-                    type="button"
-                    className="slate-btn slate-btn--primary slate-btn--compact"
-                    onClick={onPublish}
-                    disabled={publishing}
-                  >
-                    {publishing ? 'Working…' : 'Publish'}
-                  </button>
-                ) : null}
-              </div>
+              <>
+                <div className="slate-share-callout">
+                  <p className="slate-share-kicker">Shareable link</p>
+                  <p className="slate-share-hint">
+                    {cloud && !isPublished
+                      ? 'Publish this form to get a public fill link.'
+                      : 'This form is too large for a portable link. Remove questions or shorten copy and try again.'}
+                  </p>
+                  {cloud ? (
+                    <button
+                      type="button"
+                      className="slate-btn slate-btn--primary slate-btn--compact"
+                      onClick={onPublish}
+                      disabled={publishing}
+                    >
+                      {publishing ? 'Working…' : 'Publish'}
+                    </button>
+                  ) : null}
+                </div>
+                {lockRow}
+              </>
             )}
           </div>
         </div>
       </div>
     </div>,
     document.body,
+  );
+}
+
+function LockGlyph() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="3" y="7" width="10" height="7" rx="1.75" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M5.25 7V5a2.75 2.75 0 0 1 5.5 0v2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }

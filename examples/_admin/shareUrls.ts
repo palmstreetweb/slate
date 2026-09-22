@@ -17,11 +17,30 @@ export function slugify(raw: string): string {
   return s || 'form';
 }
 
-export function resolveFormSlug(opts: {
-  slug?: string;
-  name: string;
-  id: string;
-}): string {
+/**
+ * Fixed public slug for a new form: 8 random digits, never the form name, so a
+ * rename can't move a printed QR (ADR-043). `isTaken` checks active forms;
+ * redraw until free. Older word slugs are left alone.
+ */
+export function allocateNumericSlug(
+  isTaken: (candidate: string) => boolean,
+  random: () => number = secureRandom,
+): string {
+  for (;;) {
+    // 10000000–99999999: always 8 digits, never a leading zero.
+    const candidate = String(10_000_000 + Math.floor(random() * 90_000_000));
+    if (!isTaken(candidate)) return candidate;
+  }
+}
+
+function secureRandom(): number {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    return crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32;
+  }
+  return Math.random();
+}
+
+export function resolveFormSlug(opts: { slug?: string; name: string; id: string }): string {
   const custom = opts.slug?.trim();
   if (custom) return slugify(custom);
   const fromName = slugify(opts.name);

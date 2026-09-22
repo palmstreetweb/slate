@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  allocateNumericSlug,
   buildPublicShareUrl,
   resolveFormSlug,
   resolvePrimaryShareUrl,
@@ -22,9 +23,9 @@ describe('slugify', () => {
 
 describe('resolveFormSlug', () => {
   it('prefers explicit slug', () => {
-    expect(
-      resolveFormSlug({ slug: 'custom-path', name: 'Ignored', id: 'f_abc' }),
-    ).toBe('custom-path');
+    expect(resolveFormSlug({ slug: 'custom-path', name: 'Ignored', id: 'f_abc' })).toBe(
+      'custom-path',
+    );
   });
 
   it('falls back to slugified name', () => {
@@ -57,5 +58,36 @@ describe('buildPublicShareUrl', () => {
     vi.stubEnv('VITE_PUBLIC_FORM_BASE', 'https://example.com/quote/');
     expect(buildPublicShareUrl('wild-wash')).toBe('https://example.com/quote/wild-wash');
     vi.unstubAllEnvs();
+  });
+});
+
+describe('allocateNumericSlug (ADR-043)', () => {
+  it('is always 8 digits with no leading zero, and never the form name', () => {
+    for (let i = 0; i < 200; i += 1) {
+      expect(allocateNumericSlug(() => false)).toMatch(/^[1-9]\d{7}$/);
+    }
+    expect(
+      allocateNumericSlug(
+        () => false,
+        () => 0,
+      ),
+    ).toBe('10000000');
+    expect(
+      allocateNumericSlug(
+        () => false,
+        () => 0.999999999,
+      ),
+    ).toBe('99999999');
+  });
+
+  it('redraws until it finds a slug no active form holds', () => {
+    const draws = [0, 0, 0.5];
+    const taken = new Set(['10000000']);
+    const slug = allocateNumericSlug(
+      (c) => taken.has(c),
+      () => draws.shift()!,
+    );
+    expect(slug).toBe('55000000');
+    expect(draws).toHaveLength(0);
   });
 });

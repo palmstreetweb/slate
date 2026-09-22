@@ -7,6 +7,8 @@ import type { Schema } from '@/index.js';
 import { getNeon, getSubmitUrl, isNeonConfigured } from './env.js';
 import { formatNeonError } from './neonError.js';
 import type { PublishedFormPayload } from './database.types.js';
+import { slugRowToPublishedForm } from './mappers.js';
+import { clearFillUnlockToken, readFillUnlockToken } from '../fillUnlock.js';
 
 export async function fetchPublishedFormBySlug(slug: string): Promise<PublishedFormPayload | null> {
   if (!isNeonConfigured()) return null;
@@ -17,12 +19,85 @@ export async function fetchPublishedFormBySlug(slug: string): Promise<PublishedF
   }
   if (!data || (Array.isArray(data) && data.length === 0)) return null;
   const rows = Array.isArray(data) ? data : [data];
-  const row = rows[0]!;
+  return slugRowToPublishedForm(rows[0]!);
+}
+
+export type UnlockResult =
+  | { ok: true; form: Extract<PublishedFormPayload, { locked: false }>; unlockToken: string | null }
+  | { ok: false; reason: 'wrong_password' | 'rate_limited' | 'unavailable'; message: string };
+
+/**
+ * Trade a password (or this tab's saved token) for the schema (ADR-043).
+ * Same Function URL as submit — discriminated by `op`.
+ */
+export async function unlockPublicForm(
+  slug: string,
+  proof: { password: string } | { token: string },
+): Promise<UnlockResult> {
+  let res: Response;
+  try {
+    res = await fetch(getSubmitUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'unlock', slug, ...proof }),
+    });
+  } catch {
+    return {
+      ok: false,
+      reason: 'unavailable',
+      message: 'Could not connect. Check your connection and try again.',
+    };
+  }
+  if (res.status === 401) {
+    return {
+      ok: false,
+      reason: 'wrong_password',
+      message: 'That password didn’t match. Try again.',
+    };
+  }
+  if (res.status === 429) {
+    const retryAfter = Number(res.headers.get('Retry-After') || 60);
+    const minutes = Math.max(1, Math.ceil(retryAfter / 60));
+    return {
+      ok: false,
+      reason: 'rate_limited',
+      message: `Too many tries. Please wait about ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+    };
+  }
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: 'unavailable',
+      message:
+        res.status === 404
+          ? 'This form is no longer available.'
+          : 'Something went wrong. Please try again in a moment.',
+    };
+  }
+  const body = (await res.json()) as {
+    id?: string;
+    name?: string;
+    slug?: string;
+    schema?: unknown;
+    unlockToken?: string;
+  };
+  if (!body.id || !body.name || !body.slug || !body.schema) {
+    return {
+      ok: false,
+      reason: 'unavailable',
+      message: 'Something went wrong. Please try again in a moment.',
+    };
+  }
   return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    schema: row.schema as Schema,
+    ok: true,
+    form: {
+      id: body.id,
+      name: body.name,
+      slug: body.slug,
+      locked: false,
+      schema: body.schema as Schema,
+    },
+    unlockToken: body.unlockToken ?? null,
   };
 }
 
@@ -39,14 +114,25 @@ export type SubmitResponsePayload = {
   };
 };
 
-export async function submitPublicResponse(payload: SubmitResponsePayload): Promise<{ id: string }> {
+export async function submitPublicResponse(
+  payload: SubmitResponsePayload,
+): Promise<{ id: string }> {
   const url = getSubmitUrl();
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      // Present only after a password unlock in this tab (ADR-043).
+      unlockToken: readFillUnlockToken(payload.formId) ?? undefined,
+    }),
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      // Password was changed or removed mid-fill; the old token is dead.
+      clearFillUnlockToken(payload.formId);
+      throw new Error('This form’s password changed. Reload the page and enter the new one.');
+    }
     if (res.status === 429) {
       let retryAfter = Number(res.headers.get('Retry-After') || 60);
       try {

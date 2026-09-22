@@ -4,7 +4,7 @@
 
 import type { Schema } from '@/index.js';
 import type { FormRecord } from '../_formsStore.js';
-import { slugify } from '../shareUrls.js';
+import { allocateNumericSlug, slugify } from '../shareUrls.js';
 import { getNeon } from './client.js';
 import { ensureAuthForDataApi, waitForAuthReady } from './ensureAuth.js';
 import {
@@ -16,6 +16,7 @@ import {
 } from '../formQuota.js';
 import { formatNeonError, isQuotaExceededError, isRlsOrAuthError } from './neonError.js';
 import { formRecordToRow, rowToFormRecord } from './mappers.js';
+import { FORM_OWNER_COLUMNS, type DbFormRow } from './database.types.js';
 
 type Listener = (forms: FormRecord[]) => void;
 
@@ -69,13 +70,17 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
 
   const neon = getNeon();
 
-  const fetchForms = async () => {
-    const { data, error } = await neon
-      .from('forms')
-      .select('*')
-      .order('updated_at', { ascending: false });
+  // Explicit columns, never `*` — `fill_password_hash` must not reach the browser (ADR-043).
+  const fetchForms = async (): Promise<DbFormRow[]> => {
+    const run = (columns: string) =>
+      neon.from('forms').select(columns).order('updated_at', { ascending: false });
+    let { data, error } = await run(FORM_OWNER_COLUMNS);
+    if (error && isMissingColumnError(error)) {
+      // Migration 012 / schema cache not applied yet — library must still load.
+      ({ data, error } = await run(FORM_OWNER_COLUMNS.replace(',fill_locked', '')));
+    }
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []) as DbFormRow[];
   };
 
   let rows = await fetchForms();
@@ -136,6 +141,61 @@ function isTrashed(f: FormRecord): boolean {
   return Boolean(f.deletedAt);
 }
 
+function isMissingColumnError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null;
+  return e?.code === '42703' || e?.code === 'PGRST204' || /fill_locked/.test(e?.message ?? '');
+}
+
+/** Fixed 8-digit public slug, allocated once at create (ADR-043). */
+function newFormSlug(): string {
+  return allocateNumericSlug((candidate) =>
+    read().some((f) => f.slug === candidate && isActive(f)),
+  );
+}
+
+/**
+ * Turn the fill password on / change it (`password`) or off (`''`).
+ * Goes through the owner-checked RPC — the Data API cannot write the hash.
+ */
+export async function setFormFillPasswordRemote(
+  formId: string,
+  password: string,
+): Promise<{ ok: true; locked: boolean } | { ok: false; message: string }> {
+  try {
+    await ensureAuthForDataApi();
+    const { data, error } = await getNeon().rpc('set_form_fill_password', {
+      p_form_id: formId,
+      p_password: password,
+    });
+    if (error) throw error;
+    const locked = data === true;
+    cache = read().map((f) => {
+      if (f.id !== formId) return f;
+      const { fillLocked: _drop, ...rest } = f;
+      return locked ? { ...rest, fillLocked: true } : rest;
+    });
+    // A queued editor save carries its own snapshot — keep the flag in step.
+    const queued = queuedFormWrite.get(formId);
+    if (queued) {
+      const { fillLocked: _drop, ...rest } = queued;
+      queuedFormWrite.set(formId, locked ? { ...rest, fillLocked: true } : rest);
+    }
+    notify();
+    return { ok: true, locked };
+  } catch (err) {
+    const raw = (err as { message?: string } | null)?.message ?? '';
+    if (/FILL_PASSWORD_LENGTH/.test(raw)) {
+      return { ok: false, message: 'Use 4 to 72 characters.' };
+    }
+    if ((err as { code?: string } | null)?.code === 'PGRST202') {
+      // Migration 012 applied but the Data API schema cache is stale (or 012 is missing).
+      return { ok: false, message: 'Password lock isn’t switched on for this workspace yet.' };
+    }
+    return { ok: false, message: formatNeonError(err, 'Could not update the password.') };
+  }
+}
+
+/** Only for a caller-supplied slug on a row that has none yet. */
 function uniqueSlug(base: string, excludeId?: string): string {
   const slug = slugify(base);
   let candidate = slug;
@@ -170,18 +230,41 @@ async function refreshFormQuota(): Promise<void> {
   }
 }
 
-async function insertForm(form: FormRecord): Promise<void> {
-  await ensureAuthForDataApi();
+function isSlugTakenError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string; details?: string } | null;
+  return e?.code === '23505' && /slug/i.test(`${e.message ?? ''} ${e.details ?? ''}`);
+}
 
-  const write = async () => {
+/**
+ * Insert a new row. The slug index is global across owners, and the local
+ * cache only knows this owner's forms — so on a slug clash, draw again.
+ * Returns the slug that actually landed.
+ */
+async function insertForm(form: FormRecord): Promise<string> {
+  await ensureAuthForDataApi();
+  let slug = form.slug ?? newFormSlug();
+
+  const writeOnce = async () => {
     const neon = getNeon();
-    const row = formRecordToRow(form);
+    const row = formRecordToRow({ ...form, slug });
     const { error } = await neon.from('forms').insert({
       ...row,
       created_at: form.createdAt,
       updated_at: form.updatedAt,
     });
     if (error) throw error;
+  };
+
+  const write = async () => {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await writeOnce();
+        return;
+      } catch (err) {
+        if (!isSlugTakenError(err) || attempt >= 4) throw err;
+        slug = newFormSlug();
+      }
+    }
   };
 
   try {
@@ -191,12 +274,11 @@ async function insertForm(form: FormRecord): Promise<void> {
     if (!isRlsOrAuthError(err)) throw err;
     const auth = await waitForAuthReady(3);
     if (!auth.ok) {
-      throw new Error(
-        'Could not save — session expired. Sign out and back in, then try again.',
-      );
+      throw new Error('Could not save — session expired. Sign out and back in, then try again.');
     }
     await write();
   }
+  return slug;
 }
 
 async function upsertForm(form: FormRecord): Promise<void> {
@@ -223,9 +305,7 @@ async function upsertForm(form: FormRecord): Promise<void> {
     // allowAnonymous can briefly attach an anon JWT while the UI still looks signed-in.
     const auth = await waitForAuthReady(3);
     if (!auth.ok) {
-      throw new Error(
-        'Could not save — session expired. Sign out and back in, then try again.',
-      );
+      throw new Error('Could not save — session expired. Sign out and back in, then try again.');
     }
     await write();
   }
@@ -272,9 +352,7 @@ function mergeHydratedForms(serverRows: FormRecord[]): FormRecord[] {
 function emitPersistError(kind: 'form' | 'submission', message: string): void {
   console.error(`[slate] ${kind} persist failed:`, message);
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(
-      new CustomEvent('slate-persist-error', { detail: { kind, message } }),
-    );
+    window.dispatchEvent(new CustomEvent('slate-persist-error', { detail: { kind, message } }));
   }
 }
 
@@ -341,7 +419,11 @@ function enqueueFormInsert(form: FormRecord): void {
       const latest = queuedFormWrite.get(form.id) ?? form;
       queuedFormWrite.delete(form.id);
       try {
-        await insertForm(latest);
+        const landedSlug = await insertForm(latest);
+        if (landedSlug !== latest.slug) {
+          cache = read().map((f) => (f.id === form.id ? { ...f, slug: landedSlug } : f));
+          notify();
+        }
         emitPersistOk('form');
       } catch (err) {
         dropOptimisticForm(form.id);
@@ -422,14 +504,14 @@ export async function createFormRemote(opts: {
   const record: FormRecord = {
     id: `f_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     name: opts.name,
-    slug: uniqueSlug(opts.name),
+    slug: newFormSlug(),
     createdAt: now,
     updatedAt: now,
     schema: opts.schema,
     status: 'draft',
   };
   try {
-    await insertForm(record);
+    record.slug = await insertForm(record);
     cache = [record, ...read()];
     notify();
     return record;
@@ -454,7 +536,8 @@ export async function updateFormRemote(
     id: prev.id,
     createdAt: prev.createdAt,
     updatedAt: new Date().toISOString(),
-    slug: patch.slug ? uniqueSlug(patch.slug, formId) : prev.slug ?? uniqueSlug(prev.name, formId),
+    // Slug is fixed at create — renames and patches never move a printed QR (ADR-043).
+    slug: prev.slug ?? (patch.slug ? uniqueSlug(patch.slug, formId) : newFormSlug()),
   };
   try {
     await upsertForm(next);
@@ -566,7 +649,13 @@ export async function unpublishFormRemote(formId: string): Promise<FormRecord | 
   return updated;
 }
 
-export async function replaceAllFormsRemote(forms: FormRecord[]): Promise<boolean> {
+/** Restore re-creates rows, so no password survives it — don't claim one does. */
+function withoutFillLock(forms: FormRecord[]): FormRecord[] {
+  return forms.map(({ fillLocked: _drop, ...rest }) => rest);
+}
+
+export async function replaceAllFormsRemote(input: FormRecord[]): Promise<boolean> {
+  const forms = withoutFillLock(input);
   try {
     const existing = read();
     for (const f of existing) {
@@ -584,10 +673,7 @@ export async function replaceAllFormsRemote(forms: FormRecord[]): Promise<boolea
 }
 
 /** Optimistic sync wrapper — updates cache immediately, persists in background. */
-export function createFormRemoteSync(opts: {
-  name: string;
-  schema: Schema;
-}): FormRecord | null {
+export function createFormRemoteSync(opts: { name: string; schema: Schema }): FormRecord | null {
   if (isAtFormQuotaRemote()) {
     emitPersistError('form', formQuotaUserMessage(getFormQuotaRemote()));
     return null;
@@ -596,7 +682,7 @@ export function createFormRemoteSync(opts: {
   const record: FormRecord = {
     id: `f_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     name: opts.name,
-    slug: uniqueSlug(opts.name),
+    slug: newFormSlug(),
     createdAt: now,
     updatedAt: now,
     schema: opts.schema,
@@ -621,7 +707,8 @@ export function updateFormRemoteSync(
     id: prev.id,
     createdAt: prev.createdAt,
     updatedAt: new Date().toISOString(),
-    slug: patch.slug ? uniqueSlug(patch.slug, formId) : prev.slug ?? uniqueSlug(prev.name, formId),
+    // Slug is fixed at create — renames and patches never move a printed QR (ADR-043).
+    slug: prev.slug ?? (patch.slug ? uniqueSlug(patch.slug, formId) : newFormSlug()),
   };
   const copy = [...read()];
   copy[idx] = next;
@@ -715,7 +802,8 @@ export function unpublishFormRemoteSync(formId: string): FormRecord | null {
   return updated;
 }
 
-export function replaceAllFormsRemoteSync(forms: FormRecord[]): boolean {
+export function replaceAllFormsRemoteSync(input: FormRecord[]): boolean {
+  const forms = withoutFillLock(input);
   const prev = read();
   // Never fire-and-forget a wipe — restore/backup must finish or roll back.
   cache = [...forms];

@@ -371,10 +371,8 @@ function FormEditorBody({ formId }: { formId: string }) {
     if (schema && schema.brand.name === name) {
       setSchema({ ...schema, brand: { ...schema.brand, name: next } });
     }
+    // Slug is fixed at create — a rename must never move the public link (ADR-043).
     setName(next);
-    if (slug === slugify(name)) {
-      setSlug(slugify(next));
-    }
   };
 
   const handleShare = async () => {

@@ -51,3 +51,7 @@ Conventional Commits. One commit per phase minimum (`feat:`, `chore:`, etc.). Re
 ## On asking vs. guessing
 
 The brief tells you what to do. The prototype shows you how it should feel. When both are silent: ask. Better to interrupt for thirty seconds than to drift for thirty minutes.
+
+## The 1000-user bar (always applies)
+
+Think about this app as if 1000 people will use it tomorrow. Every studio / public-fill change must hold to: rate limits on anonymous endpoints, no secret leakage to the browser, no extra friction, no flyer-breaking URL changes, fail closed on authz, and share/fill stays fast on shared cafe Wi-Fi. Mirrored for Cursor in `.cursor/rules/thousand-users.mdc`.
