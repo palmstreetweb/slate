@@ -4,11 +4,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  formatBytes,
-  isFileUploadRef,
-  type FileUploadMeta,
-} from '@/utils/fileUploadRef.js';
+import { formatBytes, isFileUploadRef, type FileUploadMeta } from '@/utils/fileUploadRef.js';
 import { convertHeicToJpegFile } from '@/utils/heicToJpeg.js';
 import { getLocalUploadBlob } from '../localFileStore.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
@@ -50,14 +46,13 @@ function isHeicNameOrMime(mime: string, name: string): boolean {
 
 /** Types we can show in the lightbox (HEIC is converted client-side). */
 function isPreviewable(mime: string, name: string): boolean {
-  const m = (mime || '').toLowerCase();
-  const n = name.toLowerCase();
-  if (isHeicNameOrMime(m, n)) return true;
-  if (m.startsWith('image/')) return true;
-  if (m === 'application/pdf' || n.endsWith('.pdf')) return true;
-  if (m.startsWith('video/') && (m.includes('mp4') || m.includes('webm'))) return true;
-  if (/\.(jpe?g|png|gif|webp|bmp|avif)$/i.test(n)) return true;
-  if (/\.(mp4|webm)$/i.test(n)) return true;
+  // The stored MIME wins. The filename only helps when storage has no type,
+  // so `evil.pdf` uploaded as text/html can never reach the PDF frame.
+  const m = previewMime(mime, name);
+  if (isHeicNameOrMime(m, name.toLowerCase())) return true;
+  if (m.startsWith('image/') && m !== 'image/svg+xml') return true;
+  if (m === 'application/pdf') return true;
+  if (m === 'video/mp4' || m === 'video/webm') return true;
   return false;
 }
 
@@ -149,10 +144,7 @@ async function resolveFileAccess(item: File | string): Promise<{
  * Fast list thumb: CORS-safe blob URL (signed S3 URLs often break in <img>).
  * Cached per ref so scrolling Responses doesn’t re-download.
  */
-const listThumbCache = new Map<
-  string,
-  { url: string; meta: FileUploadMeta; revoke: boolean }
->();
+const listThumbCache = new Map<string, { url: string; meta: FileUploadMeta; revoke: boolean }>();
 
 async function resolveListThumb(item: File | string): Promise<{
   url: string;
@@ -266,7 +258,9 @@ async function buildDisplayPreview(
 
   if (blob && isHeicNameOrMime(mime, name)) {
     try {
-      const file = new File([blob], name, { type: mime.includes('heif') ? 'image/heif' : 'image/heic' });
+      const file = new File([blob], name, {
+        type: mime.includes('heif') ? 'image/heif' : 'image/heic',
+      });
       const jpeg = await convertHeicToJpegFile(file);
       if (sourceRevoke) URL.revokeObjectURL(sourceUrl);
       return {
@@ -277,9 +271,7 @@ async function buildDisplayPreview(
       };
     } catch (err) {
       if (sourceRevoke) URL.revokeObjectURL(sourceUrl);
-      throw err instanceof Error
-        ? err
-        : new Error('Could not convert HEIC for preview.');
+      throw err instanceof Error ? err : new Error('Could not convert HEIC for preview.');
     }
   }
 
@@ -321,7 +313,7 @@ function FileLightbox({
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const openedAt = useRef(Date.now());
   const resolvedMime = previewMime(mime, name);
-  const isPdf = resolvedMime === 'application/pdf' || name.toLowerCase().endsWith('.pdf');
+  const isPdf = resolvedMime === 'application/pdf';
   const isVideo = resolvedMime.startsWith('video/');
 
   useEffect(() => {
@@ -379,6 +371,9 @@ function FileLightbox({
             {isHeicNameOrMime(mime, name) ? 'Converting HEIC…' : 'Loading preview…'}
           </p>
         ) : url && isPdf ? (
+          // Safe to frame only because storage-sign never serves text/html and
+          // the blob's own type (application/pdf) is authoritative for blob: URLs.
+          // (A sandboxed frame would block the browser's PDF plugin.)
           <iframe title={name} src={url} className="slate-file-lightbox-frame" />
         ) : url && isVideo ? (
           <video src={url} controls className="slate-file-lightbox-media" />
@@ -564,8 +559,7 @@ function FileRow({ item }: { item: File | string }) {
       });
     } catch (err) {
       if (gen !== previewGen.current) return;
-      const message =
-        err instanceof Error ? err.message : 'Could not load file for preview.';
+      const message = err instanceof Error ? err.message : 'Could not load file for preview.';
       setLightbox((cur) => (cur ? { ...cur, loading: false, loadError: message } : cur));
     } finally {
       if (gen === previewGen.current) setBusy(null);

@@ -49,10 +49,7 @@ function pictureOptionsOf(q: GeneratedQuestion): PictureOption[] {
     }));
 }
 
-function visibilityOf(
-  q: GeneratedQuestion,
-  idMap: Map<string, string>,
-): { visibleIf?: Condition } {
+function visibilityOf(q: GeneratedQuestion, idMap: Map<string, string>): { visibleIf?: Condition } {
   const field = q.showIfField.trim();
   const equals = q.showIfEquals.trim();
   if (!field || !equals) return {};
@@ -61,16 +58,19 @@ function visibilityOf(
   return { visibleIf: { field: mapped, op: 'equals', value: equals } };
 }
 
-function mapQuestion(
-  q: GeneratedQuestion,
-  id: string,
-  vis: { visibleIf?: Condition },
-): Question {
+function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condition }): Question {
   const title = q.title;
   const required = q.required;
   switch (q.type) {
     case 'statement':
-      return { id, type: 'statement', title, body: text(q.body), cta: text(q.cta, 'Continue'), ...vis };
+      return {
+        id,
+        type: 'statement',
+        title,
+        body: text(q.body),
+        cta: text(q.cta, 'Continue'),
+        ...vis,
+      };
     case 'short_text':
       return { id, type: 'short_text', title, placeholder: q.placeholder, required, ...vis };
     case 'long_text':
@@ -304,8 +304,7 @@ function chromeFor(draft: GeneratedForm): {
   const first = draft.questions[0];
   const rawWelcome = draft.welcome.title.trim();
   const stolenQuestion =
-    looksLikeQuestionTitle(rawWelcome) ||
-    (first ? titlesMatch(rawWelcome, first.title) : false);
+    looksLikeQuestionTitle(rawWelcome) || (first ? titlesMatch(rawWelcome, first.title) : false);
   const opener =
     stolenQuestion && !draft.questions.some((q) => titlesMatch(q.title, rawWelcome))
       ? blankQuestion({

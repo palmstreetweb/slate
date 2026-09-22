@@ -119,7 +119,8 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
   // otherwise the editor mounts on a cache miss → "Form not found".
   cache = mergeHydratedForms(next);
   hydrated = true;
-  await refreshFormQuota();
+  // The cap only moves on create/delete; polling it every refresh was a third request per tick.
+  if (!opts?.soft) await refreshFormQuota();
   if (gen !== writeGeneration) return;
   notify();
 }

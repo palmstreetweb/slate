@@ -51,7 +51,9 @@ app.get('/logo.png', (c) => {
 app.post('/', handleWebhook);
 app.post('/webhooks/neon-auth', handleWebhook);
 
-async function handleWebhook(c: { req: { text: () => Promise<string>; header: (name: string) => string | undefined } }) {
+async function handleWebhook(c: {
+  req: { text: () => Promise<string>; header: (name: string) => string | undefined };
+}) {
   if (!process.env.DATABASE_URL) {
     return json({ error: 'Server misconfigured' }, 500);
   }
@@ -96,6 +98,12 @@ async function handleWebhook(c: { req: { text: () => Promise<string>; header: (n
       : null;
   const expiresAt =
     typeof payload.event_data?.expires_at === 'string' ? payload.event_data.expires_at : null;
+
+  // Codes and links are only useful for minutes. Sweep stale rows on every
+  // webhook so the table never becomes a store of live-looking credentials.
+  await pool.query(
+    `delete from public.auth_email_pending where updated_at < now() - interval '1 hour'`,
+  );
 
   await pool.query(
     `insert into public.auth_email_pending (email, otp_code, link_url, expires_at, updated_at)
@@ -249,7 +257,8 @@ async function verifyNeonWebhook(
   rawBody: string,
   headers: { signature?: string; kid?: string; timestamp?: string },
 ): Promise<void> {
-  if (process.env.AUTH_WEBHOOK_SKIP_VERIFY === '1') return;
+  // Local debugging only. A public deploy with this set is an open mail relay.
+  if (process.env.AUTH_WEBHOOK_SKIP_VERIFY === '1' && process.env.NODE_ENV !== 'production') return;
   const { signature, kid, timestamp } = headers;
   if (!signature || !kid || !timestamp) {
     throw new Error('Missing Neon webhook signature headers');
@@ -270,7 +279,12 @@ async function verifyNeonWebhook(
   const signaturePayload = `${timestamp}.${payloadB64}`;
   const signaturePayloadB64 = Buffer.from(signaturePayload, 'utf8').toString('base64url');
   const signingInput = `${headerB64}.${signaturePayloadB64}`;
-  const ok = verify(null, Buffer.from(signingInput), publicKey, Buffer.from(signatureB64, 'base64url'));
+  const ok = verify(
+    null,
+    Buffer.from(signingInput),
+    publicKey,
+    Buffer.from(signatureB64, 'base64url'),
+  );
   if (!ok) throw new Error('Invalid webhook signature');
 }
 

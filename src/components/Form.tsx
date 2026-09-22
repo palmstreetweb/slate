@@ -44,6 +44,16 @@ import '@/styles/animations.css';
 import '@/styles/base.css';
 import '@/styles/questions.css';
 
+/** Absolute http(s) URL or null. Relative paths resolve against the page. */
+function httpUrlOrNull(raw: string): string | null {
+  try {
+    const u = new URL(raw, window.location.href);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export function Form<S extends Schema>({
   schema,
   onSubmit,
@@ -63,7 +73,11 @@ export function Form<S extends Schema>({
     migrateSlateLocalStorageKeys();
   }, []);
 
-  const { resolved: themeMode, toggleable, toggle } = useTheme({
+  const {
+    resolved: themeMode,
+    toggleable,
+    toggle,
+  } = useTheme({
     mode: schema.themeMode,
     wrapperRef,
     toggleRef,
@@ -173,9 +187,7 @@ export function Form<S extends Schema>({
         // Functional updater so back-to-back keypresses don't see stale state.
         setAnswer(currentQuestion.id, (prev) => {
           const cur = Array.isArray(prev) ? (prev as string[]) : [];
-          return cur.includes(opt.value)
-            ? cur.filter((v) => v !== opt.value)
-            : [...cur, opt.value];
+          return cur.includes(opt.value) ? cur.filter((v) => v !== opt.value) : [...cur, opt.value];
         });
       }
     },
@@ -270,8 +282,11 @@ export function Form<S extends Schema>({
         setSubmitStatus('success');
         // Completed — drop the save-and-resume snapshot (ADR-017).
         if (resumeEnabled) clearAutosave();
-        // Ending redirect (ADR-016) — only after a confirmed submit.
-        if (redirectUrl) window.location.assign(redirectUrl);
+        // Ending redirect (ADR-016) — only after a confirmed submit, and only
+        // to http(s). A schema can arrive from an untrusted link, so never
+        // hand `javascript:` or other schemes to the navigator.
+        const safeRedirect = redirectUrl ? httpUrlOrNull(redirectUrl) : null;
+        if (safeRedirect) window.location.assign(safeRedirect);
       })
       .catch((err: unknown) => {
         if (generation !== submitGenRef.current) return;
@@ -363,11 +378,7 @@ export function Form<S extends Schema>({
             >
               Resume
             </button>
-            <button
-              type="button"
-              className="slate-resume-btn"
-              onClick={autosave.discardSaved}
-            >
+            <button type="button" className="slate-resume-btn" onClick={autosave.discardSaved}>
               Start over
             </button>
           </div>
@@ -410,10 +421,7 @@ export function Form<S extends Schema>({
         </FormConfirmRefContext.Provider>
       </div>
 
-      {isAnswerBearing && counted > 0 && (
-        <FooterCounter current={stepNumber} total={counted} />
-      )}
+      {isAnswerBearing && counted > 0 && <FooterCounter current={stepNumber} total={counted} />}
     </div>
   );
 }
-

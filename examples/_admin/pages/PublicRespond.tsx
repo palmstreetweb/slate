@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Form } from '@/index.js';
 import { decodePortableSchema } from '../portableShare.js';
+import { sanitizeUntrustedSchema } from '../sanitizeUntrustedSchema.js';
 import { addSubmission } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
@@ -10,15 +11,26 @@ import { readSlateMode } from '../slateMode.js';
 type Props = { token: string };
 
 export function PublicRespond({ token }: Props) {
-  const payload = useMemo(() => decodePortableSchema(token), [token]);
+  const payload = useMemo(() => {
+    const decoded = decodePortableSchema(token);
+    // Anyone can mint this link — treat the schema as hostile (ADR-046).
+    return decoded ? { ...decoded, schema: sanitizeUntrustedSchema(decoded.schema) } : null;
+  }, [token]);
   const mode = readSlateMode();
 
   if (!payload) {
     return (
       <div data-slate-forms="" data-theme-name="slate" data-theme={mode} className="slate-app">
-        <div className="slate-empty" style={{ minHeight: '100vh', display: 'grid', placeContent: 'center' }}>
+        <div
+          className="slate-empty"
+          style={{ minHeight: '100vh', display: 'grid', placeContent: 'center' }}
+        >
           <p style={{ margin: '0 0 12px' }}>This share link is invalid or expired.</p>
-          <button type="button" className="slate-btn slate-btn--primary" onClick={() => navigate('/')}>
+          <button
+            type="button"
+            className="slate-btn slate-btn--primary"
+            onClick={() => navigate('/')}
+          >
             Back to dashboard
           </button>
         </div>

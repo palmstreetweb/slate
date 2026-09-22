@@ -50,6 +50,7 @@ In the Neon SQL Editor (or `psql` with the pooled connection string), run in ord
 10. `neon/migrations/010_form_quota.sql`
 11. `neon/migrations/011_feedback.sql`
 12. `neon/migrations/012_fill_password.sql`
+13. `neon/migrations/013_hardening.sql`
 
 Then **Data API → Refresh schema cache**. Do this after every migration that adds a column or
 changes a function signature — 012 does both (`forms.fill_locked`, `get_form_by_slug` gains
@@ -73,7 +74,7 @@ Branded mail (ADR-037): after deploying `authemail`, point **Auth → Configurat
 ```bash
 npx neonctl@latest auth   # once
 npx neonctl@latest functions deploy submitresponse --src neon/functions/submit-response --project-id <id>
-npx neonctl@latest functions deploy storagesign --src neon/functions/storage-sign --project-id <id>
+npx neonctl@latest functions deploy storagesign --src neon/functions/storage-sign --project-id <id> --env NEON_AUTH_URL=https://<ep>.neonauth.<region>.aws.neon.tech/neondb/auth
 npx neonctl@latest functions deploy authemail --src neon/functions/auth-email --project-id <id>
 ```
 
@@ -84,7 +85,7 @@ Set function env (repeatable `--env KEY=VALUE`):
 - `RESEND_API_KEY` (optional for submit notify; **required** on `authemail`)
 - `PSW_NOTIFY_EMAIL` (optional)
 - `PUBLIC_FORM_BASE=https://slateforms.vercel.app`
-- `authemail` only: `NEON_AUTH_URL` (Auth base, for JWKS), optional `AUTH_EMAIL_FROM`
+- `authemail` and `storagesign`: `NEON_AUTH_URL` (Auth base, for JWKS — storagesign verifies owner JWTs with it, ADR-046)
 - Optional unlock rate limits (`submitresponse`, ADR-043): `UNLOCK_RATE_IP_SLUG_MAX` (40), `UNLOCK_RATE_IP_SLUG_WINDOW_SEC` (600), `UNLOCK_RATE_IP_MAX` (80), `UNLOCK_RATE_IP_WINDOW_SEC` (3600)
 - Optional upload guards (`storagesign`, ADR-031): `STORAGE_SIGN_MAX_BYTES`, `STORAGE_SIGN_IP_FORM_MAX`, `STORAGE_SIGN_IP_FORM_WINDOW_SEC`, `STORAGE_SIGN_IP_MAX`, `STORAGE_SIGN_IP_WINDOW_SEC`
 - Object Storage credentials are injected by Neon when Storage is enabled on the branch

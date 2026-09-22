@@ -87,3 +87,37 @@ describe('csvExport', () => {
     expect(responsesCsvFilename('805 Quote')).toMatch(/^805 Quote — responses \d{4}-\d{2}-\d{2}\.csv$/);
   });
 });
+
+describe('CSV formula injection (ADR-046)', () => {
+  const csv = (value: string) =>
+    buildResponsesCsv(
+      [{ id: 'q', type: 'short_text', title: 'Q' }] as Question[],
+      [
+        {
+          id: 's1',
+          formId: 'f',
+          receivedAt: '2026-09-22T00:00:00.000Z',
+          answers: { q: value },
+          meta: {
+            startedAt: '',
+            completedAt: '',
+            durationMs: 0,
+            questionsVisited: [],
+            hiddenFields: {},
+          },
+        },
+      ] as StoredSubmission[],
+    );
+
+  it('defuses cells that a spreadsheet would execute', () => {
+    for (const bad of ['=HYPERLINK("https://evil")', '+cmd', '@SUM(1)', '-2+3', '\tx']) {
+      expect(csv(bad)).toContain(`'${bad.replace(/"/g, '""')}`);
+    }
+  });
+
+  it('leaves plain negative numbers and normal text alone', () => {
+    expect(csv('-42.5')).toContain('-42.5');
+    expect(csv('-42.5')).not.toContain("'-42.5");
+    expect(csv('hello')).not.toContain("'hello");
+  });
+});

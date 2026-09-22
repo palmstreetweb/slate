@@ -58,7 +58,8 @@ export async function extractDocumentText(doc: DocumentPayload): Promise<string>
 
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
   const mime = (doc.mime ?? '').toLowerCase();
-  const isPdf = ext === 'pdf' || mime === 'application/pdf' || bytes.subarray(0, 5).toString() === '%PDF-';
+  const isPdf =
+    ext === 'pdf' || mime === 'application/pdf' || bytes.subarray(0, 5).toString() === '%PDF-';
   if (!isPdf) {
     throw new DocumentExtractError('Start with a PDF. Word and Pages can come later.');
   }

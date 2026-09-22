@@ -76,7 +76,8 @@ export function storagePathFromRef(ref: string): string | null {
   return id.slice(STORAGE_PREFIX.length);
 }
 
-async function authHeader(): Promise<Record<string, string>> {
+/** `Authorization: Bearer <user JWT>` when signed in, else empty. */
+export async function authHeader(): Promise<Record<string, string>> {
   if (!isNeonConfigured()) return {};
   try {
     const { data } = await getNeon().auth.getSession();
@@ -127,13 +128,18 @@ export async function uploadToNeonStorage(
   if (!signRes.ok) {
     throw new Error(await friendlySignError(signRes));
   }
-  const { url, method } = (await signRes.json()) as { url: string; method?: string };
+  const {
+    url,
+    method,
+    contentType: signedType,
+  } = (await signRes.json()) as { url: string; method?: string; contentType?: string };
   let put: Response;
   try {
     put = await fetch(url, {
       method: method || 'PUT',
       headers: {
-        'Content-Type': contentType,
+        // storage-sign may have remapped the type (allowlist); the signature binds it.
+        'Content-Type': signedType || contentType,
         'Content-Length': String(file.size),
       },
       body: file,

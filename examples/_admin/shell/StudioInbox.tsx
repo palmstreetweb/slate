@@ -22,7 +22,9 @@ import { LoadingScreen } from './LoadingScreen.js';
 
 const KNOWN_KEY = 'slate-admin-known-subs';
 const UNREAD_KEY = 'slate-admin-unread-subs';
-const POLL_MS = 15000;
+/** 60s ± 20% so a thousand open tabs don't poll in lockstep. */
+const POLL_MS = 60_000;
+const pollDelay = () => POLL_MS * (0.8 + Math.random() * 0.4);
 const FEED_LIMIT = 24;
 /** Refresh shows the boot splash; hold it long enough for the stack to assemble. */
 const REFRESH_MIN_MS = 1400;
@@ -172,16 +174,18 @@ export function StudioInbox() {
   }, [ingest]);
 
   useEffect(() => {
-    const id = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      void pull(true);
-    }, POLL_MS);
+    let id = 0;
+    const tick = () => {
+      if (document.visibilityState === 'visible') void pull(true);
+      id = window.setTimeout(tick, pollDelay());
+    };
+    id = window.setTimeout(tick, pollDelay());
     const onVis = () => {
       if (document.visibilityState === 'visible') void pull(true);
     };
     document.addEventListener('visibilitychange', onVis);
     return () => {
-      window.clearInterval(id);
+      window.clearTimeout(id);
       document.removeEventListener('visibilitychange', onVis);
     };
   }, [pull]);

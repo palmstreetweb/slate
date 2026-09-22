@@ -9,6 +9,16 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { Pool } from 'pg';
 import { fillUnlockToken, isValidUnlockToken } from './fillLock.js';
+import { clientIp } from './requestIp.js';
+
+/** Hard caps on what one submission may carry (ADR-046). */
+const MAX_BODY_BYTES = 256 * 1024;
+const MAX_ANSWER_KEYS = 200;
+const MAX_STRING_CHARS = 10_000;
+const MAX_ARRAY_ITEMS = 100;
+const MAX_VISITED = 500;
+const MAX_HIDDEN_KEYS = 50;
+const NOTIFY_TIMEOUT_MS = 2500;
 
 /** Password-locked forms (ADR-043): same endpoint, discriminated by `op`. */
 type UnlockBody = {
@@ -64,16 +74,72 @@ app.use('*', cors({ origin: '*' }));
 
 app.options('*', (c) => c.body(null, 204));
 
-function clientIp(c: { req: { header: (name: string) => string | undefined } }): string {
-  const forwarded = c.req.header('x-forwarded-for');
-  if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim();
-    if (first) return first.slice(0, 64);
+/** Clamp one answer value: strings, numbers, booleans, short arrays, small objects. */
+function clampValue(v: unknown, depth = 0): unknown {
+  if (v == null) return v;
+  if (typeof v === 'string') return v.length > MAX_STRING_CHARS ? v.slice(0, MAX_STRING_CHARS) : v;
+  if (typeof v === 'number' || typeof v === 'boolean') return v;
+  if (depth >= 2) return undefined;
+  if (Array.isArray(v)) return v.slice(0, MAX_ARRAY_ITEMS).map((x) => clampValue(x, depth + 1));
+  if (typeof v === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>).slice(0, 20)) {
+      const c = clampValue(val, depth + 1);
+      if (c !== undefined) out[k.slice(0, 64)] = c;
+    }
+    return out;
   }
-  const real =
-    c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || c.req.header('true-client-ip');
-  if (real?.trim()) return real.trim().slice(0, 64);
-  return 'unknown';
+  return undefined;
+}
+
+/**
+ * Keep only answers whose key is a question in the published schema, each
+ * clamped. Stops a respondent (or a bot with a form id) from storing
+ * arbitrary blobs in someone else's table.
+ */
+function sanitizeAnswers(raw: unknown, schema: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const ids = new Set<string>();
+  const questions = (schema as { questions?: unknown } | null)?.questions;
+  if (Array.isArray(questions)) {
+    for (const q of questions) {
+      const id = (q as { id?: unknown } | null)?.id;
+      if (typeof id === 'string') ids.add(id);
+    }
+  }
+  const out: Record<string, unknown> = {};
+  let n = 0;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!ids.has(k)) continue;
+    if (n >= MAX_ANSWER_KEYS) break;
+    const c = clampValue(v);
+    if (c === undefined) continue;
+    out[k] = c;
+    n += 1;
+  }
+  return out;
+}
+
+function sanitizeMeta(raw: SubmitBody['meta']): SubmitBody['meta'] {
+  const str = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
+  const visited = Array.isArray(raw.questionsVisited)
+    ? raw.questionsVisited.filter((x): x is string => typeof x === 'string').slice(0, MAX_VISITED)
+    : [];
+  const hidden: Record<string, unknown> = {};
+  if (raw.hiddenFields && typeof raw.hiddenFields === 'object') {
+    for (const [k, v] of Object.entries(raw.hiddenFields).slice(0, MAX_HIDDEN_KEYS)) {
+      hidden[k.slice(0, 64)] = typeof v === 'string' ? v.slice(0, 500) : clampValue(v, 2);
+    }
+  }
+  const dur = Number(raw.durationMs);
+  return {
+    startedAt: str(raw.startedAt),
+    completedAt: str(raw.completedAt),
+    durationMs: Number.isFinite(dur) && dur >= 0 ? Math.min(dur, 86_400_000) : 0,
+    questionsVisited: visited,
+    hiddenFields: hidden,
+    ...(typeof raw.score === 'number' && Number.isFinite(raw.score) ? { score: raw.score } : {}),
+  };
 }
 
 async function consumeRate(
@@ -106,7 +172,7 @@ async function handleUnlock(c: Context, body: UnlockBody) {
   }
 
   // Every attempt counts, right or wrong. Fail closed if the rate table errors.
-  const ip = clientIp(c);
+  const ip = clientIp((n) => c.req.header(n));
   try {
     const perSlug = await consumeRate(
       `unlock:ipslug:${ip}:${slug}`,
@@ -165,7 +231,8 @@ async function handleUnlock(c: Context, body: UnlockBody) {
   }
 
   if (!form) {
-    return c.text('Form not available', 404);
+    // Same answer as a wrong password: no "which slugs are locked" oracle.
+    return c.json({ error: 'wrong_password' }, 401);
   }
 
   // Lock was removed since the gate rendered — just hand over the form.
@@ -200,9 +267,18 @@ app.post('/', async (c) => {
     return c.text('Server misconfigured', 500);
   }
 
+  // Refuse oversized bodies before parsing them. Content-Length can be
+  // absent on chunked requests, so the parsed size is checked again below.
+  const declared = Number(c.req.header('content-length') ?? 0);
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    return c.text('Payload too large', 413);
+  }
+
   let body: SubmitBody;
   try {
-    body = (await c.req.json()) as SubmitBody;
+    const text = await c.req.text();
+    if (text.length > MAX_BODY_BYTES) return c.text('Payload too large', 413);
+    body = JSON.parse(text) as SubmitBody;
   } catch {
     return c.text('Invalid JSON', 400);
   }
@@ -216,7 +292,7 @@ app.post('/', async (c) => {
   }
 
   // Rate-limit before work (including honeypot) so bots still burn quota.
-  const ip = clientIp(c);
+  const ip = clientIp((n) => c.req.header(n));
   try {
     const perForm = await consumeRate(
       `ipform:${ip}:${body.formId}`,
@@ -281,16 +357,20 @@ app.post('/', async (c) => {
     return c.json({ error: 'locked' }, 401);
   }
 
+  const answers = sanitizeAnswers(body.answers, form.published_schema);
+  if (!answers) return c.text('Missing fields', 400);
+  const meta = sanitizeMeta(body.meta);
+
   const submissionId = `s_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
   try {
     await pool.query(
       `insert into public.submissions (id, form_id, answers, meta, received_at)
        values ($1, $2, $3::jsonb, $4::jsonb, now())`,
-      [submissionId, body.formId, JSON.stringify(body.answers), JSON.stringify(body.meta)],
+      [submissionId, body.formId, JSON.stringify(answers), JSON.stringify(meta)],
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Insert failed';
-    return c.text(message, 500);
+    console.error('[submitresponse] insert failed', err);
+    return c.text('Could not save your response. Please try again.', 500);
   }
 
   const resendKey = process.env.RESEND_API_KEY;
@@ -302,12 +382,14 @@ app.post('/', async (c) => {
     const html = buildNotifyHtml({
       formName: form.name,
       responsesUrl,
-      answers: body.answers,
+      answers,
       schema: form.published_schema,
-      durationMs: body.meta.durationMs,
+      durationMs: meta.durationMs,
     });
     try {
+      // Bounded: the row is already saved; the respondent must not wait on Resend.
       await fetch('https://api.resend.com/emails', {
+        signal: AbortSignal.timeout(NOTIFY_TIMEOUT_MS),
         method: 'POST',
         headers: {
           Authorization: `Bearer ${resendKey}`,

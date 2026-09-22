@@ -9,6 +9,7 @@
 import { GenerateValidationError, runGenerateForm } from './runGenerate.js';
 import { generatedFormSchema, type GeneratedForm } from './generateFormSchema.js';
 import { clientIp, takeRateLimit } from './rateLimit.js';
+import { verifyUserJwt } from './authJwt.js';
 import {
   DocumentExtractError,
   documentToPrompt,
@@ -70,7 +71,20 @@ async function handleGenerate(request: Request): Promise<Response> {
   if (method === 'OPTIONS') return new Response(null, { status: 204 });
   if (method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  if (!takeRateLimit(clientIp(request))) {
+  // Build with AI is a signed-in studio feature. Anyone on the internet could
+  // otherwise spend the Anthropic key. The Vite dev middleware marks its own
+  // requests so localStorage-only local dev still works; Vercel never does.
+  const devBypass = !process.env.VERCEL && request.headers.get('x-slate-dev') === '1';
+  let subject = 'dev';
+  if (!devBypass) {
+    const m = /^Bearer\s+(\S+)/i.exec(request.headers.get('authorization') ?? '');
+    const claims = m ? await verifyUserJwt(m[1]!).catch(() => null) : null;
+    if (!claims) return json({ error: 'Sign in to use Build with AI.' }, 401);
+    subject = claims.sub;
+  }
+
+  // Per user first (a stolen session can't burn the budget), then per network.
+  if (!takeRateLimit(`u:${subject}`) || !takeRateLimit(clientIp(request))) {
     return json({ error: 'Too many generate requests. Try again in a minute.' }, 429);
   }
 
@@ -104,9 +118,7 @@ async function handleGenerate(request: Request): Promise<Response> {
       prompt = documentToPrompt(parsedDoc.doc.filename, extracted, prompt);
     } catch (err) {
       const message =
-        err instanceof DocumentExtractError
-          ? err.message
-          : 'Could not read that document.';
+        err instanceof DocumentExtractError ? err.message : 'Could not read that document.';
       return json({ error: message }, 400);
     }
   }

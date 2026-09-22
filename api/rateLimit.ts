@@ -6,10 +6,15 @@ const MAX_PER_WINDOW = 10;
 const hits = new Map<string, number[]>();
 
 export function clientIp(request: Request): string {
+  // Rightmost X-Forwarded-For entry: written by the edge, not by the client.
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim();
-    if (first) return first;
+    const parts = forwarded
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last) return last;
   }
   return request.headers.get('x-real-ip')?.trim() || 'local';
 }

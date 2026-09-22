@@ -594,6 +594,31 @@ Alternatives:
 Consequences: Anchors are full-page loads (there are two). `vercel.json` rewrites are now load-bearing for every route, not only the root. Playwright smoke and `authEmailHtml` tests updated. Word slugs on older forms keep working at `/forms/{word}`.
 Revisit when: custom domains per customer, or a second app shares the origin.
 
+## ADR-045 — Studio chrome: notifications, size, refresh splash, seed
+Date: 2026-09-22
+Status: accepted
+Context: Notifications were three-line cards with invisible read state; the studio had no text-size control; refresh gave no feedback; there was no way to fill a dev database with realistic data.
+Decision: Flat single-line notification rows with a red unread dot, relative ages, thin scrollbar. Settings → Studio size: three steps (1× / 1.1× / 1.2×) applied with `zoom` on studio roots via `body[data-slate-scale]`; public fill never scales. Refresh shows the boot splash (min 1.4 s). `npm run seed` / `--clean` fills forms + responses under one owner, tagged by id prefix.
+Consequences: Studio-only. Respondents see nothing different.
+
+## ADR-046 — Hardening for real users (audit 2026-09-22)
+Date: 2026-09-22
+Status: accepted
+Context: Four-way audit (DB/RLS, Functions + API, client, performance) against the 1000-users-tomorrow bar. Findings were verified against the live project, not just read from code.
+Decision, in blast-radius order:
+1. **storage-sign verifies JWT signatures.** It had decoded `sub` without checking the signature — a three-part string with any `sub` was an owner. Now EdDSA-verified against the Neon Auth JWKS (`authJwt.ts`), `exp` required, `iss` checked, anonymous tokens rejected, unknown `kid` refetches once. "Not yours" and "does not exist" both return 404. Read ops are rate-limited before the owner check.
+2. **Uploads can't smuggle HTML.** Stored `Content-Type` is allow-listed (images, pdf, text, office, audio, video) or becomes `application/octet-stream`; the type is part of the presigned PUT signature; `content` and `download` serve as `attachment` with `nosniff`. The studio only frames blobs whose *served* type is `application/pdf` — never by filename. (A "pdf" that was HTML executed on the studio origin as the owner.)
+3. **Rate limits key on the rightmost `X-Forwarded-For`.** The leftmost entry is client-typed; a probe with a spoofed first entry passed 45/45 before, 40 then 429 after. Neon's edge appends the real peer last.
+4. **submit-response validates.** 256 KB body cap (413), answers filtered to the published schema's question ids, strings clamped to 10 KB, meta bounded, generic error text, Resend call bounded to 2.5 s. Unlock returns the same 401 for wrong password and unknown slug.
+5. **`/api/generate` requires a signed-in user** (same JWKS check, copy in `api/authJwt.ts`), rate-limited per user then per IP. The Vite dev middleware marks its own requests (`x-slate-dev`) so local dev without Neon still works; Vercel never sets it.
+6. **Migration 013:** RLS on + forced for `submit_rate_buckets` (any signed-in user could read respondent IPs per form and reset every limit); default privileges that auto-granted `authenticated` on every future table/function removed; team-allowlist RPCs revoked; RLS forced everywhere with explicit owner-role policies; rate buckets pruned opportunistically; `(form_id, received_at desc)` index; stale OTP rows swept hourly by the auth-email Function.
+7. **Client:** engine redirect only to http(s) (`javascript:` in a portable link ran on our origin); portable schemas sanitized (https-only images, no logo, text caps); CSV cells starting with `= + - @` defused; field `::selection` restored.
+8. **Headers (`vercel.json`):** CSP with `script-src 'self'` and no inline scripts, `frame-ancestors 'none'`, `nosniff`, HSTS, immutable `/assets`, `no-cache` index. Tested by serving the production build with the exact headers.
+9. **Perf quick wins:** preconnect to the Neon auth + Data API hosts; `vite:preloadError` reloads once after a redeploy; inbox polls at 60 s ± 20 % and stops refetching the quota on every tick.
+Not done (needs a product answer or more time): per-owner notification email (every response still mails `PSW_NOTIFY_EMAIL`); studio bundle served to respondents (1.02 MB raw) — needs route-level `lazy()`; submissions fetched unbounded on boot — needs projection + limit; autosave debounce; dashboard memoization; Functions run as the table owner — needs a least-privilege role; 4-character PIN minimum; per-owner slugs are globally unique (a squatting/enumeration oracle); portable links have no "not verified by Slate" interstitial; session refresh appears to lapse after ~1 h.
+Consequences: Owners must be signed in for Build with AI. `storagesign` needs `NEON_AUTH_URL` (it can derive it from `DATABASE_URL` but the env is pinned on deploy). Uploads of unusual types are stored as octet-stream and downloaded rather than previewed.
+Revisit when: custom domains (CSP `frame-ancestors`, cookies), per-respondent access codes, or a second app on the origin.
+
 ---
 
 ## Deferred to V2

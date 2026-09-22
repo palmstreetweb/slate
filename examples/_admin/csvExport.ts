@@ -12,7 +12,19 @@ import {
   titleOf,
 } from './responsesFormat.js';
 
-function csvCell(v: string): string {
+/**
+ * Spreadsheets execute cells that start with = + - @ (and tab / CR). Prefix
+ * those with an apostrophe so a respondent can't plant a formula in an export.
+ * Plain negative numbers are left alone.
+ */
+function defuseFormula(v: string): string {
+  if (/^[=@\t\r]/.test(v)) return `'${v}`;
+  if (/^[+-]/.test(v) && !/^[+-]?\d[\d.,]*$/.test(v)) return `'${v}`;
+  return v;
+}
+
+function csvCell(raw: string): string {
+  const v = defuseFormula(raw);
   return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
@@ -35,10 +47,7 @@ type CsvColumn = {
 };
 
 /** Schema questions plus any answer keys that no longer exist on the form. */
-export function buildCsvColumns(
-  questions: Question[],
-  subs: StoredSubmission[],
-): CsvColumn[] {
+export function buildCsvColumns(questions: Question[], subs: StoredSubmission[]): CsvColumn[] {
   const known = new Set(questions.map((q) => q.id));
   const extraIds: string[] = [];
   for (const s of subs) {

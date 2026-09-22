@@ -1,6 +1,7 @@
 import type { GeneratedForm } from '../../../api/generateFormSchema.js';
 import { mapGeneratedForm } from '../../../api/mapGeneratedForm.js';
 import type { Schema } from '@/index.js';
+import { authHeader } from '../storageUpload.js';
 
 export type GeneratedDraft = {
   name: string;
@@ -19,10 +20,12 @@ export type GenerateRequest = {
   };
 };
 
-export async function requestGeneratedForm(input: GenerateRequest): Promise<GeneratedDraft & { sourcePrompt: string }> {
+export async function requestGeneratedForm(
+  input: GenerateRequest,
+): Promise<GeneratedDraft & { sourcePrompt: string }> {
   const res = await fetch('/api/generate', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...(await authHeader()) },
     body: JSON.stringify({
       prompt: input.prompt,
       previous: input.previous,
@@ -30,9 +33,11 @@ export async function requestGeneratedForm(input: GenerateRequest): Promise<Gene
       document: input.document,
     }),
   });
-  const data = (await res.json().catch(() => null)) as
-    | { form?: GeneratedForm; prompt?: string; error?: string }
-    | null;
+  const data = (await res.json().catch(() => null)) as {
+    form?: GeneratedForm;
+    prompt?: string;
+    error?: string;
+  } | null;
   if (!res.ok || !data?.form) {
     throw new Error(data?.error || `Generate failed (${res.status}).`);
   }
@@ -62,7 +67,9 @@ export function readRecentPrompts(): string[] {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 4);
+    return parsed
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .slice(0, 4);
   } catch {
     return [];
   }

@@ -6,7 +6,12 @@
  * Auth model:
  * - public/ upload: anonymous OK when form is published (rate-limited).
  *   Password-locked forms (ADR-043) also need the respondent's unlockToken.
- * - draft/ upload + all download/meta/content: Bearer JWT whose `sub` matches forms.owner_id.
+ * - draft/ upload + all download/meta/content: Bearer JWT, signature verified
+ *   against the Neon Auth JWKS, whose `sub` matches forms.owner_id.
+ *
+ * Stored objects are only ever served with a type from ALLOWED_TYPES; anything
+ * else is stored and served as application/octet-stream, as an attachment.
+ * A "pdf" that is really HTML must never reach a frame on the studio origin.
  */
 
 import { Hono } from 'hono';
@@ -20,6 +25,8 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { isValidUnlockToken } from './fillLock.js';
+import { clientIp } from './requestIp.js';
+import { verifyUserJwt } from './authJwt.js';
 
 const BUCKET = process.env.NEON_STORAGE_BUCKET || 'form-uploads';
 
@@ -34,9 +41,43 @@ const PER_IP_FORM_WINDOW_SEC = Number(process.env.STORAGE_SIGN_IP_FORM_WINDOW_SE
 const PER_IP_MAX = Number(process.env.STORAGE_SIGN_IP_MAX ?? 60);
 const PER_IP_WINDOW_SEC = Number(process.env.STORAGE_SIGN_IP_WINDOW_SEC ?? 3600);
 
-/** path: public|draft / formId / uuid / filename */
+/** path: public|draft / formId / uuid / filename — case-sensitive, one namespace. */
 const PATH_RE =
-  /^(public|draft)\/([A-Za-z0-9_-]{4,64})\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([^/]{1,120})$/i;
+  /^(public|draft)\/([A-Za-z0-9_-]{4,64})\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([^/]{1,120})$/;
+
+/** Types we will store and echo back as-is. Everything else becomes octet-stream. */
+const ALLOWED_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+  'image/bmp',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/wav',
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+]);
+
+function safeContentType(raw: string | undefined): string {
+  const t = (raw || '').trim().toLowerCase().split(';')[0]!.trim();
+  return ALLOWED_TYPES.has(t) ? t : 'application/octet-stream';
+}
+
+/** Read-op guard: 120 / 10 min per IP. Owners page through files; scrapers don't. */
+const READ_PER_IP_MAX = Number(process.env.STORAGE_SIGN_READ_IP_MAX ?? 120);
+const READ_PER_IP_WINDOW_SEC = Number(process.env.STORAGE_SIGN_READ_IP_WINDOW_SEC ?? 600);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -75,18 +116,6 @@ const app = new Hono();
 app.use('*', cors({ origin: '*' }));
 app.options('*', (c) => c.body(null, 204));
 
-function clientIp(c: { req: { header: (name: string) => string | undefined } }): string {
-  const forwarded = c.req.header('x-forwarded-for');
-  if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim();
-    if (first) return first.slice(0, 64);
-  }
-  const real =
-    c.req.header('cf-connecting-ip') || c.req.header('x-real-ip') || c.req.header('true-client-ip');
-  if (real?.trim()) return real.trim().slice(0, 64);
-  return 'unknown';
-}
-
 async function consumeRate(
   key: string,
   windowSeconds: number,
@@ -113,7 +142,7 @@ function parsePath(path: string): {
 } | null {
   const m = PATH_RE.exec(path);
   if (!m) return null;
-  const scope = m[1]!.toLowerCase() as 'public' | 'draft';
+  const scope = m[1] as 'public' | 'draft';
   return {
     scope,
     formId: m[2]!,
@@ -127,29 +156,10 @@ function bearerToken(authHeader: string): string | null {
   return m?.[1] ?? null;
 }
 
-/** Decode JWT payload (structure + exp). Signature verify needs JWKS (optional later). */
-function decodeJwtPayload(token: string): { sub?: string; id?: string; exp?: number } | null {
-  const parts = token.split('.');
-  if (parts.length !== 3) return null;
-  try {
-    const b64 = parts[1]!.replace(/-/g, '+').replace(/_/g, '/');
-    const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
-    const json = Buffer.from(b64 + pad, 'base64').toString('utf8');
-    const payload = JSON.parse(json) as { sub?: string; id?: string; exp?: number };
-    if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()) {
-      return null;
-    }
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-function userIdFromToken(token: string): string | null {
-  const payload = decodeJwtPayload(token);
-  if (!payload) return null;
-  const uid = payload.sub || payload.id;
-  return typeof uid === 'string' && uid.length > 0 ? uid : null;
+/** Verified subject, or null. A forged or expired token is the same as none. */
+async function userIdFromToken(token: string): Promise<string | null> {
+  const claims = await verifyUserJwt(token);
+  return claims?.sub ?? null;
 }
 
 async function loadForm(formId: string): Promise<{
@@ -179,17 +189,17 @@ async function requireFormOwner(
   formId: string,
 ): Promise<
   | { ok: true; form: NonNullable<Awaited<ReturnType<typeof loadForm>>> }
-  | { ok: false; status: 401 | 403 | 404; message: string }
+  | { ok: false; status: 401 | 404; message: string }
 > {
   const token = bearerToken(authHeader);
   if (!token) return { ok: false, status: 401, message: 'Unauthorized' };
-  const uid = userIdFromToken(token);
+  const uid = await userIdFromToken(token);
   if (!uid) return { ok: false, status: 401, message: 'Unauthorized' };
 
   const form = await loadForm(formId);
-  if (!form || form.deleted_at) return { ok: false, status: 404, message: 'Form not available' };
-  if (!form.owner_id || form.owner_id !== uid) {
-    return { ok: false, status: 403, message: 'Forbidden' };
+  // "Not yours" and "does not exist" look identical — no form-id oracle.
+  if (!form || form.deleted_at || !form.owner_id || form.owner_id !== uid) {
+    return { ok: false, status: 404, message: 'Form not available' };
   }
   return { ok: true, form };
 }
@@ -222,6 +232,22 @@ app.post('/', async (c) => {
     if (!process.env.DATABASE_URL) {
       return c.text('Server misconfigured', 500);
     }
+    // Meter reads BEFORE the owner check so a forged-token loop can't turn
+    // the DB pool or the bucket into a free resource. Fail closed.
+    try {
+      const perIp = await consumeRate(
+        `sign:read:${clientIp((n) => c.req.header(n))}`,
+        READ_PER_IP_WINDOW_SEC,
+        READ_PER_IP_MAX,
+      );
+      if (!perIp.allowed) {
+        c.header('Retry-After', String(perIp.retryAfterSeconds));
+        return c.json({ error: 'Too many requests. Please wait and try again.' }, 429);
+      }
+    } catch (err) {
+      console.error('[storagesign] read rate limit check failed', err);
+      return c.text('Temporarily unavailable', 503);
+    }
     try {
       const gate = await requireFormOwner(authHeader, parsed.formId);
       if (!gate.ok) return c.text(gate.message, gate.status);
@@ -237,9 +263,7 @@ app.post('/', async (c) => {
       return c.text('Server misconfigured', 500);
     }
 
-    const contentType =
-      (body.contentType || '').trim().toLowerCase().split(';')[0]!.trim() ||
-      'application/octet-stream';
+    const contentType = safeContentType(body.contentType);
 
     const contentLength = Number(body.contentLength);
     if (!Number.isFinite(contentLength) || contentLength < 1) {
@@ -249,10 +273,12 @@ app.post('/', async (c) => {
       return c.text(`File too large (max ${Math.floor(MAX_BYTES / (1024 * 1024))} MB)`, 413);
     }
 
-    const hasBearer = Boolean(bearerToken(authHeader));
+    // Only draft/ uploads passed the verified owner gate; a bare Bearer on a
+    // public/ upload earns nothing (it could be forged).
+    const hasBearer = parsed.scope === 'draft';
 
     try {
-      const ip = clientIp(c);
+      const ip = clientIp((n) => c.req.header(n));
       if (!hasBearer) {
         const perForm = await consumeRate(
           `sign:ipform:${ip}:${parsed.formId}`,
@@ -331,19 +357,33 @@ app.post('/', async (c) => {
         ContentType: contentType,
         ContentLength: contentLength,
       });
-      const url = await getSignedUrl(client, command, { expiresIn: 600 });
-      return c.json({ url, method: 'PUT', maxBytes: MAX_BYTES });
+      // Sign Content-Type as well as Content-Length so the uploader can neither
+      // oversize the body nor store the object under a type we didn't allow.
+      const url = await getSignedUrl(client, command, {
+        expiresIn: 600,
+        signableHeaders: new Set(['content-type', 'content-length']),
+      });
+      // The PUT must carry exactly this Content-Type — it is part of the signature.
+      return c.json({ url, method: 'PUT', maxBytes: MAX_BYTES, contentType });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sign failed';
-      return c.text(message, 500);
+      console.error('[storagesign] presign failed', err);
+      return c.text('Sign failed', 500);
     }
   }
 
   try {
     const client = s3();
 
+    const name = (body.path.split('/').pop() || 'file').replace(/["\r\n]/g, '');
+
     if (body.op === 'download') {
-      const command = new GetObjectCommand({ Bucket: BUCKET, Key: body.path });
+      // Force the browser to save, not render, whatever the object claims to be.
+      const command = new GetObjectCommand({
+        Bucket: BUCKET,
+        Key: body.path,
+        ResponseContentDisposition: `attachment; filename="${name}"`,
+        ResponseContentType: safeContentType(undefined),
+      });
       const url = await getSignedUrl(client, command, { expiresIn: 3600 });
       return c.json({ url });
     }
@@ -352,13 +392,14 @@ app.post('/', async (c) => {
       const out = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: body.path }));
       if (!out.Body) return c.text('Not found', 404);
       const bytes = await out.Body.transformToByteArray();
-      const name = body.path.split('/').pop() || 'file';
-      const contentType = out.ContentType || 'application/octet-stream';
       return new Response(bytes, {
         status: 200,
         headers: {
-          'Content-Type': contentType,
-          'Content-Disposition': `inline; filename="${name.replace(/"/g, '')}"`,
+          // Only allow-listed types keep their identity; the studio previews
+          // those inline via blob: URLs. Everything else is opaque bytes.
+          'Content-Type': safeContentType(out.ContentType),
+          'Content-Disposition': `attachment; filename="${name}"`,
+          'X-Content-Type-Options': 'nosniff',
           'Cache-Control': 'private, max-age=60',
           'Access-Control-Allow-Origin': '*',
         },
@@ -368,11 +409,10 @@ app.post('/', async (c) => {
     if (body.op === 'meta') {
       try {
         const head = await client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: body.path }));
-        const name = body.path.split('/').pop() || 'file';
         return c.json({
           name,
           size: head.ContentLength ?? 0,
-          mime: head.ContentType || 'application/octet-stream',
+          mime: safeContentType(head.ContentType),
         });
       } catch {
         return c.text('Not found', 404);
@@ -381,8 +421,8 @@ app.post('/', async (c) => {
 
     return c.text('Unknown op', 400);
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Sign failed';
-    return c.text(message, 500);
+    console.error('[storagesign] read op failed', err);
+    return c.text('Sign failed', 500);
   }
 });
 

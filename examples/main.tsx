@@ -40,6 +40,19 @@ import './_admin/slateMotion.css';
 migrateSlateLocalStorageKeys();
 syncPathFromHash();
 
+// A redeploy replaces hashed chunks; an open tab that lazy-loads an old one
+// would white-screen. Reload once to pick up the new build, never loop.
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault();
+  try {
+    if (sessionStorage.getItem('slate-reloaded-for-deploy') === '1') return;
+    sessionStorage.setItem('slate-reloaded-for-deploy', '1');
+  } catch {
+    /* storage off — still reload once per event */
+  }
+  window.location.reload();
+});
+
 function UiSoundsRoot({ children }: { children: ReactNode }) {
   useEffect(() => installAdminUiSounds(), []);
   return children;

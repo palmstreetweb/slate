@@ -30,6 +30,14 @@
         "5174"
       ],
       "port": 5174
+    },
+    {
+      "name": "dist-with-headers",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "/private/tmp/claude-501/-Users-caleb-AI-projects-slate/19920aa1-b8b1-4d2e-8ef8-45850209af62/scratchpad/serve-with-headers.mjs"
+      ],
+      "port": 5175
     }
   ]
 }

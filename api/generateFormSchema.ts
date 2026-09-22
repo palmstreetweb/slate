@@ -112,7 +112,11 @@ export const generatedFormSchema = z
         'ranking',
       ]);
       if (needsOptions.has(q.type) && q.options.filter((o) => o.label && o.value).length < 2) {
-        ctx.addIssue({ code: 'custom', message: `${q.type} needs at least 2 options`, path: [...path, 'options'] });
+        ctx.addIssue({
+          code: 'custom',
+          message: `${q.type} needs at least 2 options`,
+          path: [...path, 'options'],
+        });
       }
       if (q.type === 'picture_choice') {
         const pics = q.options.filter((o) => o.label && o.value && o.src);
@@ -126,7 +130,11 @@ export const generatedFormSchema = z
       }
       if (q.type === 'matrix') {
         if (q.rows.filter((o) => o.label && o.value).length < 2) {
-          ctx.addIssue({ code: 'custom', message: 'matrix needs 2+ rows', path: [...path, 'rows'] });
+          ctx.addIssue({
+            code: 'custom',
+            message: 'matrix needs 2+ rows',
+            path: [...path, 'rows'],
+          });
         }
         if (q.columns.filter((o) => o.label && o.value).length < 2) {
           ctx.addIssue({
@@ -137,7 +145,11 @@ export const generatedFormSchema = z
         }
       }
       if (q.type === 'scale' && q.min >= q.max) {
-        ctx.addIssue({ code: 'custom', message: 'scale min must be less than max', path: [...path] });
+        ctx.addIssue({
+          code: 'custom',
+          message: 'scale min must be less than max',
+          path: [...path],
+        });
       }
       const showField = q.showIfField.trim();
       const showEquals = q.showIfEquals.trim();
