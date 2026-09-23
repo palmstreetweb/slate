@@ -109,7 +109,11 @@ function makeId(): string {
   return `s_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
-export function addSubmission(formId: string, answers: Answers, meta: SubmitMeta): StoredSubmission {
+export function addSubmission(
+  formId: string,
+  answers: Answers,
+  meta: SubmitMeta,
+): StoredSubmission {
   if (useRemote() && !isLocalOnlyFormId(formId)) {
     return remote.addSubmissionRemoteSync(formId, answers, meta);
   }
@@ -160,7 +164,37 @@ export function countSubmissions(formId?: string): number {
 }
 
 export function countTrashedSubmissions(formId?: string): number {
+  if (useNeon()) return remote.countTrashedSubmissionsRemote(formId);
   return listTrashedSubmissions(formId).length;
+}
+
+export type SubmissionIndexEntry = remote.SubmissionIndexEntry;
+
+/**
+ * Every active response, slim, newest first. In cloud mode this is complete
+ * even when answers haven't been loaded (ADR-049).
+ */
+export function listSubmissionIndex(): SubmissionIndexEntry[] {
+  if (useNeon()) return remote.listSubmissionIndexRemote();
+  return listSubmissions().map(({ id, formId, receivedAt }) => ({ id, formId, receivedAt }));
+}
+
+/** One response with answers, if loaded (cloud) / present (local). */
+export function getSubmission(id: string): StoredSubmission | undefined {
+  if (useNeon()) return remote.getSubmissionRemote(id);
+  return read().find((s) => s.id === id);
+}
+
+/** Load all of a form's responses with answers (cloud). Resolves at once offline. */
+export function ensureFormSubmissions(formId: string, opts?: { force?: boolean }): Promise<void> {
+  if (!useRemote()) return Promise.resolve();
+  return remote.loadFormSubmissionsRemote(formId, opts);
+}
+
+/** True once `listSubmissions(formId)` is the complete list for that form. */
+export function isFormSubmissionsReady(formId: string): boolean {
+  if (!useNeon()) return true;
+  return remote.isFormSubmissionsLoadedRemote(formId);
 }
 
 export function lastSubmissionAt(formId?: string): string | null {
@@ -185,9 +219,7 @@ export function trashSubmissions(formId?: string): void {
     write(read().map((s) => (isActive(s) ? { ...s, deletedAt: now } : s)));
     return;
   }
-  write(
-    read().map((s) => (s.formId === formId && isActive(s) ? { ...s, deletedAt: now } : s)),
-  );
+  write(read().map((s) => (s.formId === formId && isActive(s) ? { ...s, deletedAt: now } : s)));
 }
 
 /** @deprecated Use trashSubmissions */
@@ -202,9 +234,7 @@ export function trashSubmission(submissionId: string): void {
   }
   if (neonNotReady()) return;
   const now = trashAt();
-  write(
-    read().map((s) => (s.id === submissionId && isActive(s) ? { ...s, deletedAt: now } : s)),
-  );
+  write(read().map((s) => (s.id === submissionId && isActive(s) ? { ...s, deletedAt: now } : s)));
 }
 
 /** @deprecated Use trashSubmission */

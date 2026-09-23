@@ -91,10 +91,7 @@ export function hydrateStores(opts?: { force?: boolean }): Promise<void> {
         );
       }
       await withTimeout(
-        Promise.all([
-          hydrateFormsRemote({ soft: true }),
-          hydrateSubmissionsRemote({ soft: true }),
-        ]),
+        Promise.all([hydrateFormsRemote({ soft: true }), hydrateSubmissionsRemote({ soft: true })]),
         HYDRATE_TIMEOUT_MS,
         'Neon store hydrate',
       );

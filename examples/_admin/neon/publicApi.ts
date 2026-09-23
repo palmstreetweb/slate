@@ -4,22 +4,15 @@
 
 import type { Answers, SubmitMeta } from '@/index.js';
 import type { Schema } from '@/index.js';
-import { getNeon, getSubmitUrl, isNeonConfigured } from './env.js';
-import { formatNeonError } from './neonError.js';
+import { getSubmitUrl, isNeonConfigured } from './config.js';
+import { loadPublishedForm } from './publicForm.js';
 import type { PublishedFormPayload } from './database.types.js';
-import { slugRowToPublishedForm } from './mappers.js';
 import { clearFillUnlockToken, readFillUnlockToken } from '../fillUnlock.js';
 
-export async function fetchPublishedFormBySlug(slug: string): Promise<PublishedFormPayload | null> {
-  if (!isNeonConfigured()) return null;
-  const neon = getNeon();
-  const { data, error } = await neon.rpc('get_form_by_slug', { p_slug: slug });
-  if (error) {
-    throw new Error(formatNeonError(error, 'Could not load this form.'));
-  }
-  if (!data || (Array.isArray(data) && data.length === 0)) return null;
-  const rows = Array.isArray(data) ? data : [data];
-  return slugRowToPublishedForm(rows[0]!);
+/** Published form by slug — SDK-free, shared with the app entry's prefetch (ADR-048). */
+export function fetchPublishedFormBySlug(slug: string): Promise<PublishedFormPayload | null> {
+  if (!isNeonConfigured()) return Promise.resolve(null);
+  return loadPublishedForm(slug);
 }
 
 export type UnlockResult =

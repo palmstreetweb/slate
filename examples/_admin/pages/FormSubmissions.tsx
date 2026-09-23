@@ -3,6 +3,8 @@ import type { Question } from '@/index.js';
 import { getForm, subscribe as subscribeForms, hasUnpublishedChanges } from '../_formsStore.js';
 import {
   emptyTrash,
+  ensureFormSubmissions,
+  isFormSubmissionsReady,
   listSubmissions,
   listTrashedSubmissions,
   permanentlyDeleteSubmission,
@@ -38,6 +40,10 @@ export function FormSubmissions({ formId }: Props) {
   const [form, setForm] = useState(() => getForm(formId));
   const [subs, setSubs] = useState<StoredSubmission[]>(() => listSubmissions(formId));
   const [trashed, setTrashed] = useState<StoredSubmission[]>(() => listTrashedSubmissions(formId));
+  /** Cloud: answers load per form on open (ADR-049). Offline: always ready. */
+  const [ready, setReady] = useState(() => isFormSubmissionsReady(formId));
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'summary' | 'trash'>('list');
   const [shareOpen, setShareOpen] = useState(false);
@@ -50,7 +56,26 @@ export function FormSubmissions({ formId }: Props) {
     setForm(getForm(formId));
     setSubs(listSubmissions(formId));
     setTrashed(listTrashedSubmissions(formId));
+    setReady(isFormSubmissionsReady(formId));
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadError(null);
+    void ensureFormSubmissions(formId, { force: loadAttempt > 0 })
+      .then(() => {
+        if (!cancelled) refresh();
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        console.error('[slate] Could not load responses', err);
+        setLoadError('Couldn’t load responses. Check your connection and try again.');
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- formId-scoped load
+  }, [formId, loadAttempt]);
 
   useEffect(() => {
     const sync = () => refresh();
@@ -74,7 +99,9 @@ export function FormSubmissions({ formId }: Props) {
       const now = Date.now();
       if (now - lastPull < 2500) return;
       lastPull = now;
+      // Only rows newer than the last one seen; the form's list was loaded above.
       void refreshSubmissionsRemote()
+        .then(() => ensureFormSubmissions(formId))
         .then(() => {
           if (!cancelled) refresh();
         })
@@ -99,7 +126,11 @@ export function FormSubmissions({ formId }: Props) {
       <AdminShell crumbs={null}>
         <div className="slate-empty">
           <p style={{ margin: '0 0 12px' }}>Form not found.</p>
-          <button type="button" className="slate-btn slate-btn--primary" onClick={() => navigate('/')}>
+          <button
+            type="button"
+            className="slate-btn slate-btn--primary"
+            onClick={() => navigate('/')}
+          >
             Back to dashboard
           </button>
         </div>
@@ -115,7 +146,11 @@ export function FormSubmissions({ formId }: Props) {
             Forms
           </button>
           {' / '}
-          <button type="button" className="slate-link" onClick={() => navigate(`/forms/${formId}/edit`)}>
+          <button
+            type="button"
+            className="slate-link"
+            onClick={() => navigate(`/forms/${formId}/edit`)}
+          >
             {form.name}
           </button>
           {' / '}
@@ -124,16 +159,24 @@ export function FormSubmissions({ formId }: Props) {
       }
       rightSlot={
         <>
-          <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/edit`)}>
+          <button
+            type="button"
+            className="slate-btn"
+            onClick={() => navigate(`/forms/${formId}/edit`)}
+          >
             ← Editor
           </button>
           <button type="button" className="slate-btn" onClick={() => setShareOpen(true)}>
             Share
           </button>
-          <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/preview`)}>
+          <button
+            type="button"
+            className="slate-btn"
+            onClick={() => navigate(`/forms/${formId}/preview`)}
+          >
             Preview ↗
           </button>
-          {subs.length > 0 && (
+          {ready && subs.length > 0 && (
             <button
               type="button"
               className="slate-btn"
@@ -150,7 +193,7 @@ export function FormSubmissions({ formId }: Props) {
               Export CSV
             </button>
           )}
-          {subs.length > 0 && (
+          {ready && subs.length > 0 && (
             <button
               type="button"
               className="slate-btn slate-btn--danger"
@@ -180,15 +223,19 @@ export function FormSubmissions({ formId }: Props) {
       <div style={{ marginBottom: 24 }}>
         <h1 className="slate-page-title">Responses</h1>
         <p className="slate-page-sub">
-          {subs.length === 0 && trashed.length === 0
-            ? published
-              ? 'Waiting on your first response.'
-              : 'Publish and share a link — responses land here.'
-            : subs.length === 0
-              ? `Inbox empty · ${trashed.length} in trash`
-              : `${subs.length} ${subs.length === 1 ? 'response' : 'responses'}${trashed.length > 0 ? ` · ${trashed.length} in trash` : ''}`}
+          {!ready
+            ? loadError
+              ? 'Responses didn’t load.'
+              : 'Loading responses…'
+            : subs.length === 0 && trashed.length === 0
+              ? published
+                ? 'Waiting on your first response.'
+                : 'Publish and share a link — responses land here.'
+              : subs.length === 0
+                ? `Inbox empty · ${trashed.length} in trash`
+                : `${subs.length} ${subs.length === 1 ? 'response' : 'responses'}${trashed.length > 0 ? ` · ${trashed.length} in trash` : ''}`}
         </p>
-        {(subs.length > 0 || trashed.length > 0) && (
+        {ready && (subs.length > 0 || trashed.length > 0) && (
           <div style={{ display: 'flex', gap: 4, marginTop: 12, flexWrap: 'wrap' }}>
             <button
               type="button"
@@ -217,7 +264,24 @@ export function FormSubmissions({ formId }: Props) {
         )}
       </div>
 
-      {view === 'trash' ? (
+      {!ready ? (
+        loadError ? (
+          <div className="slate-empty">
+            <p style={{ margin: '0 0 12px' }}>{loadError}</p>
+            <button
+              type="button"
+              className="slate-btn slate-btn--primary"
+              onClick={() => setLoadAttempt((n) => n + 1)}
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <p className="slate-page-sub" role="status" aria-live="polite">
+            Loading…
+          </p>
+        )
+      ) : view === 'trash' ? (
         trashed.length === 0 ? (
           <div className="slate-empty">
             <p style={{ margin: 0, fontSize: 15 }}>Trash is empty.</p>
@@ -253,7 +317,8 @@ export function FormSubmissions({ formId }: Props) {
                 onClick={async () => {
                   const ok = await confirm({
                     title: `Delete ${trashed.length} ${trashed.length === 1 ? 'response' : 'responses'} forever?`,
-                    message: 'Permanently removes trashed responses from localStorage. This cannot be undone.',
+                    message:
+                      'Permanently removes trashed responses from localStorage. This cannot be undone.',
                     confirmLabel: 'Empty trash',
                     danger: true,
                   });
@@ -309,10 +374,18 @@ export function FormSubmissions({ formId }: Props) {
                 : 'Publish from Share to get a public fill link, then send it.'}
           </p>
           <div className="slate-empty-actions">
-            <button type="button" className="slate-btn slate-btn--primary" onClick={() => setShareOpen(true)}>
+            <button
+              type="button"
+              className="slate-btn slate-btn--primary"
+              onClick={() => setShareOpen(true)}
+            >
               {published ? (stale ? 'Republish' : 'Share link') : 'Publish & share'}
             </button>
-            <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/preview`)}>
+            <button
+              type="button"
+              className="slate-btn"
+              onClick={() => navigate(`/forms/${formId}/preview`)}
+            >
               Preview
             </button>
           </div>
@@ -362,19 +435,12 @@ function distribution(
 ): Array<{ label: string; count: number }> {
   return options.map((opt) => ({
     label: opt.label,
-    count: values.filter((v) =>
-      Array.isArray(v) ? v.includes(opt.value) : v === opt.value,
-    ).length,
+    count: values.filter((v) => (Array.isArray(v) ? v.includes(opt.value) : v === opt.value))
+      .length,
   }));
 }
 
-function SummaryView({
-  questions,
-  subs,
-}: {
-  questions: Question[];
-  subs: StoredSubmission[];
-}) {
+function SummaryView({ questions, subs }: { questions: Question[]; subs: StoredSubmission[] }) {
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       {questions.map((q) => (
@@ -419,11 +485,7 @@ function QuestionSummary({ question, subs }: { question: Question; subs: StoredS
         total={answered}
       />
     );
-  } else if (
-    question.type === 'number' ||
-    question.type === 'scale' ||
-    question.type === 'nps'
-  ) {
+  } else if (question.type === 'number' || question.type === 'scale' || question.type === 'nps') {
     const nums = values.filter((v): v is number => typeof v === 'number');
     if (nums.length === 0) {
       body = <Muted>No numeric answers yet.</Muted>;
@@ -431,8 +493,8 @@ function QuestionSummary({ question, subs }: { question: Question; subs: StoredS
       const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
       body = (
         <p style={{ margin: 0, fontSize: 14 }}>
-          avg <strong>{avg.toFixed(1)}</strong> · min {Math.min(...nums)} · max{' '}
-          {Math.max(...nums)} · {nums.length} answered
+          avg <strong>{avg.toFixed(1)}</strong> · min {Math.min(...nums)} · max {Math.max(...nums)}{' '}
+          · {nums.length} answered
         </p>
       );
     }
@@ -502,12 +564,31 @@ function DistributionBars({
       {rows.map((r) => (
         <div
           key={r.label}
-          style={{ display: 'grid', gridTemplateColumns: '140px 1fr 60px', gap: 8, alignItems: 'center' }}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '140px 1fr 60px',
+            gap: 8,
+            alignItems: 'center',
+          }}
         >
-          <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span
+            style={{
+              fontSize: 13,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {r.label}
           </span>
-          <div style={{ background: 'var(--slate-bg)', borderRadius: 4, overflow: 'hidden', height: 14 }}>
+          <div
+            style={{
+              background: 'var(--slate-bg)',
+              borderRadius: 4,
+              overflow: 'hidden',
+              height: 14,
+            }}
+          >
             <div
               style={{
                 width: `${(r.count / max) * 100}%`,
@@ -575,22 +656,46 @@ function ResponseRow({
           fontSize: 14,
         }}
       >
-        <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span
+          style={{
+            fontWeight: 500,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {preview.primary}
         </span>
-        <span style={{ color: 'var(--slate-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span
+          style={{
+            color: 'var(--slate-muted)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {preview.secondary}
         </span>
-        <span style={{ color: 'var(--slate-dim)', fontSize: 12 }}>{formatDurationMs(sub.meta.durationMs)}</span>
+        <span style={{ color: 'var(--slate-dim)', fontSize: 12 }}>
+          {formatDurationMs(sub.meta.durationMs)}
+        </span>
         <span style={{ color: 'var(--slate-dim)', fontSize: 12, textAlign: 'right' }}>
           {timeAgo(when)}
         </span>
       </button>
 
       {expanded && (
-        <div style={{ borderTop: '1px solid var(--slate-border)', padding: 16, display: 'grid', gap: 14 }}>
+        <div
+          style={{
+            borderTop: '1px solid var(--slate-border)',
+            padding: 16,
+            display: 'grid',
+            gap: 14,
+          }}
+        >
           <p style={{ margin: 0, fontSize: 12, color: 'var(--slate-dim)' }}>
-            Submitted {formatSubmittedAt(sub.receivedAt)} · took {formatDurationMs(sub.meta.durationMs)}
+            Submitted {formatSubmittedAt(sub.receivedAt)} · took{' '}
+            {formatDurationMs(sub.meta.durationMs)}
             {trashed && sub.deletedAt ? ` · trashed ${timeAgo(new Date(sub.deletedAt))}` : ''}
           </p>
           <div style={{ display: 'grid', gap: 14 }}>
@@ -621,7 +726,15 @@ function ResponseRow({
             })}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--slate-border)', paddingTop: 12 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 8,
+              borderTop: '1px solid var(--slate-border)',
+              paddingTop: 12,
+            }}
+          >
             {trashed && onRestore && (
               <button type="button" className="slate-btn" onClick={onRestore}>
                 Restore

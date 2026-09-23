@@ -7,8 +7,8 @@
 import { createFileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import { saveLocalUpload } from './localFileStore.js';
-import { getNeon, hasStorageSignUrl, isNeonConfigured } from './neon/env.js';
-import { uploadToNeonStorage } from './storageUpload.js';
+import { hasStorageSignUrl, isNeonConfigured } from './neon/config.js';
+import { authHeader, uploadToNeonStorage } from './storageUpload.js';
 import { getUploadFormId } from './uploadContext.js';
 
 async function uploadToRemote(
@@ -18,12 +18,12 @@ async function uploadToRemote(
 ): Promise<string> {
   const formId = getUploadFormId();
   // Portable share links and missing context use local storage — Neon paths need a real form id.
-  const portable =
-    !formId || formId.startsWith('portable_') || formId.startsWith('local_');
+  const portable = !formId || formId.startsWith('portable_') || formId.startsWith('local_');
 
   if (isNeonConfigured() && hasStorageSignUrl() && !portable) {
-    const { data } = await getNeon().auth.getSession();
-    const scope = data?.session ? 'draft' : 'public';
+    // Signed-in owner testing their own form → draft/; everyone else → public/.
+    // Only draft/ passes the owner gate server-side, so a stray session can't widen anything.
+    const scope = (await authHeader()).Authorization ? 'draft' : 'public';
     return uploadToNeonStorage(file, { scope, formId });
   }
 

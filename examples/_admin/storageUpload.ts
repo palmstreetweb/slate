@@ -4,7 +4,7 @@
  */
 
 import { SLATE_FILE_REF_PREFIX } from '@/utils/fileUploadRef.js';
-import { getNeon, hasStorageSignUrl, getStorageSignUrl, isNeonConfigured } from './neon/env.js';
+import { hasStorageSignUrl, getStorageSignUrl, isNeonConfigured } from './neon/config.js';
 import { getUploadFormId } from './uploadContext.js';
 import { readFillUnlockToken } from './fillUnlock.js';
 
@@ -80,6 +80,8 @@ export function storagePathFromRef(ref: string): string | null {
 export async function authHeader(): Promise<Record<string, string>> {
   if (!isNeonConfigured()) return {};
   try {
+    // Lazy: the public fill app must not pull the Neon SDK just to upload (ADR-048).
+    const { getNeon } = await import('./neon/env.js');
     const { data } = await getNeon().auth.getSession();
     const session = data?.session as
       | { access_token?: string; accessToken?: string }

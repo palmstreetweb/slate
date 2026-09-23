@@ -7,7 +7,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getForm, listForms } from '../_formsStore.js';
-import { listSubmissions, subscribe as subscribeSubmissions } from '../_submissionStore.js';
+import {
+  getSubmission,
+  listSubmissionIndex,
+  subscribe as subscribeSubmissions,
+} from '../_submissionStore.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { isStoresHydrated } from '../neon/hydrate.js';
 import { refreshFormsRemote } from '../neon/formsRemote.js';
@@ -109,7 +113,8 @@ export function StudioInbox() {
 
   const ingest = useCallback(
     (announce: boolean) => {
-      const active = listSubmissions();
+      // The slim index is complete in cloud mode; answers may not be loaded yet.
+      const active = listSubmissionIndex();
       const ids = active.map((s) => s.id);
       const known = readIds(KNOWN_KEY);
       if (!seeded.current && known.length === 0 && !window.localStorage.getItem(KNOWN_KEY)) {
@@ -157,7 +162,9 @@ export function StudioInbox() {
       }
       pulling.current = true;
       try {
-        await Promise.all([refreshFormsRemote(), refreshSubmissionsRemote()]);
+        // Poll: only rows newer than the last seen. Manual Refresh also reloads
+        // the index so trash/deletes from another device show up.
+        await Promise.all([refreshFormsRemote(), refreshSubmissionsRemote({ full: !announce })]);
       } catch (err) {
         console.warn('[slate] Studio refresh failed', err);
       } finally {
@@ -234,16 +241,16 @@ export function StudioInbox() {
 
   const feed = useMemo(() => {
     const forms = new Map(listForms().map((f) => [f.id, f]));
-    return listSubmissions()
-      .slice()
-      .sort((a, b) => (a.receivedAt < b.receivedAt ? 1 : -1))
+    return listSubmissionIndex()
       .slice(0, FEED_LIMIT)
       .map((sub) => {
         const form = forms.get(sub.formId) ?? getForm(sub.formId);
         const questions = (form?.schema.questions ?? []).filter(
           (q) => q.type !== 'welcome' && q.type !== 'thanks' && q.type !== 'statement',
         );
-        const lead = leadPreview(questions, sub.answers as Record<string, unknown>);
+        // Recent rows arrive with answers; anything older reads "New response".
+        const answers = getSubmission(sub.id)?.answers as Record<string, unknown> | undefined;
+        const lead = answers ? leadPreview(questions, answers) : { primary: '—' };
         return {
           id: sub.id,
           formId: sub.formId,

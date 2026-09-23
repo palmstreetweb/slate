@@ -98,9 +98,7 @@ export async function waitForAuthReady(maxAttempts = 5): Promise<{
 
     const { data: uid, error } = await neon.rpc('auth_uid');
     if (error) {
-      throw new Error(
-        `${error.message || 'Database access check failed'} — cannot load forms.`,
-      );
+      throw new Error(`${error.message || 'Database access check failed'} — cannot load forms.`);
     }
 
     const authUid = typeof uid === 'string' && uid ? uid : null;

@@ -9,7 +9,7 @@ import {
   unlockPublicForm,
 } from '../neon/publicApi.js';
 import type { PublishedFormPayload } from '../neon/database.types.js';
-import { isNeonConfigured } from '../neon/env.js';
+import { isNeonConfigured } from '../neon/config.js';
 import { hostFileUpload } from '../hostFileUpload.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
 import { setUploadContext, clearUploadContext } from '../uploadContext.js';

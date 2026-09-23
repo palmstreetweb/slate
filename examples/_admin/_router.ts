@@ -60,7 +60,7 @@ export function routeSearchParams(): URLSearchParams {
   return new URLSearchParams(window.location.search);
 }
 
-function matchRoute(path: string): Route {
+export function matchRoute(path: string): Route {
   if (path === '/') return { name: 'dashboard' };
   if (path === '/settings') return { name: 'settings' };
   if (path === '/lab/drop') return { name: 'dropLab' };
@@ -94,6 +94,20 @@ function matchRoute(path: string): Route {
   }
 
   return { name: 'notfound', path };
+}
+
+/** Route for the current URL, outside React (the app entry uses it to pick a bundle). */
+export function readRoute(): Route {
+  return matchRoute(normalizePath());
+}
+
+/**
+ * Routes a respondent can open without signing in. `fill` and `respond` are
+ * served by the small public bundle; `dropLab` is a dev page that lives in
+ * the studio bundle but still skips sign-in.
+ */
+export function isPublicRoute(route: Route): boolean {
+  return route.name === 'respond' || route.name === 'fill' || route.name === 'dropLab';
 }
 
 /** Stable key for page transition animations. */

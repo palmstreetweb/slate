@@ -630,6 +630,28 @@ Alternatives:
 Consequences: An owner learns about a response when they open Slate. Submit no longer waits on Resend. The thanks-screen chip now reads “response received” instead of the prototype's “confirmation sent” — nothing is sent, and the engine shouldn't promise it on a host's behalf. `PSW_NOTIFY_EMAIL` and `PUBLIC_FORM_BASE` are no longer read by any Function; remove them from the deployed env.
 Revisit when: owners ask for email or push, or a daily digest.
 
+## ADR-048 — Respondent bundle split + SDK-free form fetch
+Date: 2026-09-23
+Status: accepted
+Context: A QR scan on `/forms/{slug}` downloaded the entire studio (1.02 MB raw / 267 KB gzip JS, 25 KB gzip CSS) and made three serial cross-origin calls before the welcome screen: Neon Auth `get-session` (measured 0.6–2 s), an anonymous token, then `get_form_by_slug`.
+Decision: (1) `examples/main.tsx` is a tiny entry that reads the route and dynamically imports `publicApp.tsx` (fill + portable respond) or `studioApp.tsx` (everything else, incl. dev `dropLab`). (2) For `/forms/{slug}` the entry starts the form fetch immediately, before either bundle downloads; PublicFill awaits the same memoized promise (`neon/publicForm.ts`). (3) That fetch is two plain requests — anonymous token, then the RPC — with no Neon SDK and no session call; the token is cached per tab until 60 s before expiry and refetched once on a 401. (4) SDK-free config moved to `neon/config.ts`; `env.ts` re-exports it and keeps `getNeon()`. Upload helpers load the SDK lazily. (5) The ~11 KB of CSS the respondent page needs moved from `_adminTheme.css` to `publicChrome.css`; the studio imports it right before `_adminTheme.css`, so cascade order is unchanged. Portable `/r` loads its page on demand.
+Alternatives:
+- Fetch the form through the submit Function in one hop. Rejected — it would put a per-network rate limit in front of merely viewing a form (100 people on one event Wi-Fi scanning the same QR), and measured no faster than two preconnected requests.
+- Route-level `lazy()` inside one app. Rejected — `AuthProvider` and the SDK sit at the root, so respondents would still pay for them.
+Consequences: Respondent JS 267 → 98 KB gzip; CSS 25 → 13 KB gzip; the token request starts ~17 ms after the HTML (tested on the production build with production headers). In-app navigation from a public route to a studio route does a full reload so the entry can pick the studio bundle. Two copies of nothing — rules were moved, not duplicated.
+Revisit when: a second public surface (embeds, custom domains) needs its own entry.
+
+## ADR-049 — Responses load in slices, not all at once
+Date: 2026-09-23
+Status: accepted
+Context: The studio fetched every submission the owner ever received — all answers and meta — on boot and again on every inbox poll. Fine at dozens of rows; at 50 forms × 500 responses it is ~25 MB per fetch per tab. Trash, restore, and empty-trash rewrote whole rows one request each.
+Decision: `submissionsRemote.ts` keeps two layers. (1) A slim index of every response (`id, form_id, received_at, deleted_at`), fetched once per session in 1000-row pages; it drives counts, "last response", trash counts, and new-response detection, and is O(1) per dashboard card. (2) Full rows with answers: the 50 most recent on boot, anything new since, and all of one form's rows when its Responses page opens (`ensureFormSubmissions`). Polls ask only for rows at or after the newest seen (`gte`, dedup by id); a burst of 200+ reloads the index instead. Manual Refresh reloads the index so another device's trash/deletes appear. Trash, restore, and empty trash are single `update`/`delete` requests filtered by id or form, so answers are never rewritten. The Responses page shows "Loading…" until its form is complete, and Export CSV / Move all to trash wait for it. No migration.
+Alternatives:
+- A `submission_stats()` RPC for counts. Deferred — needs another SQL paste; the slim index is small enough (~100 bytes/row) and also gives the inbox its ids. Revisit past ~20k responses per owner.
+- Paginate the Responses page. Deferred to the Responses redesign.
+Consequences: Boot is two requests; polls are usually empty. Verified live against the production database: counts match, a form opens with one request, trash/restore round-trip with answers intact. Older responses appear in the notifications list as "New response" until their form is opened.
+Revisit when: owners have tens of thousands of responses, or the Responses redesign lands.
+
 ---
 
 ## Deferred to V2

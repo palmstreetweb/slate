@@ -10,7 +10,7 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('../examples/_admin/neon/publicApi.js', () => api);
-vi.mock('../examples/_admin/neon/env.js', () => ({ isNeonConfigured: () => true }));
+vi.mock('../examples/_admin/neon/config.js', () => ({ isNeonConfigured: () => true }));
 vi.mock('../examples/_admin/shell/LoadingScreen.js', () => ({
   LoadingScreen: () => <p>loading</p>,
 }));
