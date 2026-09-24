@@ -5,6 +5,7 @@ import { SlateLogo } from '../components/SlateLogo.js';
 import { navigate } from '../_router.js';
 import { SignOutButton } from './SignOutButton.js';
 import { StudioInbox } from './StudioInbox.js';
+import { ErrorBoundary } from '../components/ErrorBoundary.js';
 
 type Props = {
   crumbs: ReactNode;
@@ -34,7 +35,10 @@ export function Header({ crumbs, rightSlot, mode, onToggle }: Props) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <StudioInbox />
+        {/* On every studio page — a bad response must never take the page down with it. */}
+        <ErrorBoundary label="notifications" fallback={null}>
+          <StudioInbox />
+        </ErrorBoundary>
         {rightSlot}
         <SignOutButton />
         <ThemeToggle mode={mode} onToggle={onToggle} />

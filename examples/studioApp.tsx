@@ -5,6 +5,7 @@
 
 import { StrictMode, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ErrorBoundary } from './_admin/components/ErrorBoundary.js';
 import { useRoute, routeKey, isPublicRoute } from './_admin/_router.js';
 import { applyUiScale, readUiScale } from './_admin/uiScale.js';
 import { seedIfEmpty } from './_admin/_formsStore.js';
@@ -233,6 +234,25 @@ function Bootstrap() {
   return <AdminCloudBootstrap />;
 }
 
+function RootCrashFallback() {
+  return (
+    <div
+      role="alert"
+      style={{
+        maxWidth: 420,
+        margin: '20vh auto',
+        padding: 24,
+        fontFamily: 'system-ui, sans-serif',
+        textAlign: 'center',
+      }}
+    >
+      <p style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px' }}>Slate hit a problem.</p>
+      <p style={{ margin: '0 0 16px', opacity: 0.75 }}>Your forms and responses are safe.</p>
+      <a href="/">Reload</a>
+    </div>
+  );
+}
+
 /** Studio bundle (ADR-048). Also serves public routes after in-app navigation. */
 export function mountStudio(root: HTMLElement): void {
   createRoot(root).render(
@@ -242,7 +262,10 @@ export function mountStudio(root: HTMLElement): void {
           <ConfirmProvider>
             <ToastProvider>
               <PromptFormTitleProvider>
-                <Bootstrap />
+                {/* Last line of defense: never leave the owner on a blank page. */}
+                <ErrorBoundary label="studio" fallback={<RootCrashFallback />}>
+                  <Bootstrap />
+                </ErrorBoundary>
               </PromptFormTitleProvider>
             </ToastProvider>
           </ConfirmProvider>

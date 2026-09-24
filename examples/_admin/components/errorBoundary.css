@@ -1,0 +1,31 @@
+/* Page crash fallback (ErrorBoundary, audit H1). */
+[data-slate-forms][data-theme-name='slate'] .slate-page-crash {
+  max-width: 460px;
+  margin: 72px auto;
+  padding: 32px 28px;
+  border: 1px solid var(--chrome-hair, var(--slate-border));
+  border-radius: 14px;
+  background: var(--chrome-panel, var(--slate-bg-2));
+  color: var(--chrome-ink, var(--slate-text));
+  text-align: center;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-page-crash-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-page-crash-body {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--chrome-muted, var(--slate-text));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-page-crash-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

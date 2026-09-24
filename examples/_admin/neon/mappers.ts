@@ -2,6 +2,7 @@ import type { Schema } from '@/index.js';
 import type { FormRecord } from '../_formsStore.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import type { DbFormRow, DbSubmissionRow, PublishedFormPayload } from './database.types.js';
+import { normalizeAnswers, normalizeMeta } from '../answerShape.js';
 
 export function rowToFormRecord(row: DbFormRow): FormRecord {
   return {
@@ -53,13 +54,13 @@ export function formRecordToRow(
 }
 
 export function rowToSubmission(row: DbSubmissionRow): StoredSubmission {
-  const meta = row.meta as StoredSubmission['meta'];
+  // Written by anonymous respondents — never trust the stored shape (audit H1).
   return {
     id: row.id,
     formId: row.form_id,
     receivedAt: row.received_at,
-    answers: row.answers as StoredSubmission['answers'],
-    meta,
+    answers: normalizeAnswers(row.answers),
+    meta: normalizeMeta(row.meta),
     deletedAt: row.deleted_at ?? undefined,
   };
 }

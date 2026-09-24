@@ -6,6 +6,7 @@
 import type { Question } from '@/index.js';
 import { describeFileUploadAnswer, isFileUploadRef } from '@/index.js';
 import { peekLocalUploadMeta } from './localFileStore.js';
+import { safeText } from './answerShape.js';
 
 const CONTACT_PRIORITY = new Set<Question['type']>(['short_text', 'email', 'phone', 'url']);
 
@@ -18,8 +19,20 @@ function optionLabel(q: Question, value: string): string | null {
   return q.options.find((o) => o.value === value)?.label ?? null;
 }
 
-/** Format one answer for display using question type context. */
+/**
+ * Format one answer for display using question type context. Total: answers
+ * come from anonymous respondents, so a hostile value falls back to plain text
+ * instead of throwing during render (audit H1).
+ */
 export function formatAnswerForQuestion(question: Question, value: unknown): string {
+  try {
+    return formatAnswer(question, value);
+  } catch {
+    return safeText(value) || '—';
+  }
+}
+
+function formatAnswer(question: Question, value: unknown): string {
   if (value === undefined || value === null || value === '') return '—';
 
   switch (question.type) {
@@ -27,36 +40,36 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
     case 'dropdown':
     case 'picture_choice':
       if (typeof value === 'string') return optionLabel(question, value) ?? value;
-      return String(value);
+      return safeText(value);
 
     case 'multi_choice':
       if (Array.isArray(value)) {
         return value
-          .map((v) => (typeof v === 'string' ? (optionLabel(question, v) ?? v) : String(v)))
+          .map((v) => (typeof v === 'string' ? (optionLabel(question, v) ?? v) : safeText(v)))
           .join(', ');
       }
-      return String(value);
+      return safeText(value);
 
     case 'yes_no':
       if (value === 'yes') return question.yesLabel ?? 'Yes';
       if (value === 'no') return question.noLabel ?? 'No';
-      return String(value);
+      return safeText(value);
 
     case 'legal':
       if (value === 'accept') return question.acceptLabel ?? 'Accept';
       if (value === 'decline') return question.declineLabel ?? 'Decline';
-      return String(value);
+      return safeText(value);
 
     case 'ranking':
       if (Array.isArray(value) && 'options' in question) {
         return value
           .map((v, i) => {
-            const label = optionLabel(question, String(v)) ?? String(v);
+            const label = optionLabel(question, safeText(v)) ?? safeText(v);
             return `${i + 1}. ${label}`;
           })
           .join('\n');
       }
-      return Array.isArray(value) ? value.join(', ') : String(value);
+      return safeText(value);
 
     case 'matrix':
       if (
@@ -67,19 +80,18 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
       ) {
         return Object.entries(value as Record<string, unknown>)
           .map(([rowVal, col]) => {
-            const rowLabel = question.rows.find((r) => r.value === rowVal)?.label ?? String(rowVal);
+            const rowLabel =
+              question.rows.find((r) => r.value === rowVal)?.label ?? safeText(rowVal);
             const colVal = Array.isArray(col) ? col[0] : col;
             const colLabel =
               typeof colVal === 'string' && 'columns' in question
-                ? (question.columns.find((c) => c.value === colVal)?.label ?? String(colVal))
-                : Array.isArray(col)
-                  ? col.join(', ')
-                  : String(col ?? '');
+                ? (question.columns.find((c) => c.value === colVal)?.label ?? safeText(colVal))
+                : safeText(col);
             return `${rowLabel}: ${colLabel}`;
           })
           .join('\n');
       }
-      return String(value);
+      return safeText(value);
 
     case 'file_upload':
       if (Array.isArray(value)) {
@@ -95,7 +107,7 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
               if (typeof item === 'string') {
                 return describeFileUploadAnswer(item) ?? item;
               }
-              return String(item);
+              return safeText(item);
             })
             .join('\n') || '—'
         );
@@ -109,12 +121,10 @@ export function formatAnswerForQuestion(question: Question, value: unknown): str
       if (typeof value === 'string') {
         return describeFileUploadAnswer(value) ?? value;
       }
-      return String(value);
+      return safeText(value);
 
     default:
-      if (Array.isArray(value)) return value.join(', ');
-      if (typeof value === 'object') return JSON.stringify(value);
-      return String(value);
+      return safeText(value);
   }
 }
 

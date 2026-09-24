@@ -10,6 +10,7 @@ import { Header } from './Header.js';
 import { SettingsFab } from './SettingsFab.js';
 import { FeedbackButton } from './FeedbackButton.js';
 import { AdminThemeProvider } from '../adminThemeContext.js';
+import { ErrorBoundary, PageCrashFallback } from '../components/ErrorBoundary.js';
 import {
   ADMIN_UI_THEME_STORAGE_KEY,
   detectAdminUiTheme,
@@ -28,6 +29,11 @@ function detectInitial(): ResolvedThemeMode {
   }
   if (window.matchMedia?.('(prefers-color-scheme: light)').matches) return 'light';
   return 'dark';
+}
+
+/** Navigating to another page clears a page crash. */
+function pageKey(): string {
+  return typeof window === 'undefined' ? '' : window.location.pathname + window.location.hash;
 }
 
 type Props = {
@@ -73,7 +79,13 @@ export function AdminShell({ crumbs, rightSlot, children, fullBleed }: Props) {
         <div className="slate-app">
           <Header crumbs={crumbs} rightSlot={rightSlot} mode={mode} onToggle={toggle} />
           <main className={`slate-content${fullBleed ? ' slate-content--full-bleed' : ''}`}>
-            {children}
+            <ErrorBoundary
+              label="page"
+              resetKey={pageKey()}
+              fallback={(reset) => <PageCrashFallback onRetry={reset} />}
+            >
+              {children}
+            </ErrorBoundary>
           </main>
           <SettingsFab />
           <FeedbackButton />
