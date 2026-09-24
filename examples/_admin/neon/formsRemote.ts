@@ -85,6 +85,18 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
 
   let rows = await fetchForms();
 
+  // An empty first load is where a token race shows up: the read ran as the
+  // anonymous role, RLS returned nothing, and the dashboard said "no forms"
+  // until a refresh (owner report, 2026-09-23). Confirm who the database sees
+  // before believing it; a transient error here makes the boot hydrate retry.
+  if (rows.length === 0 && cache.length === 0 && opts?.soft) {
+    const { data: uid } = await neon.rpc('auth_uid');
+    if (typeof uid !== 'string' || !uid) {
+      throw new Error('No auth session — cannot load forms.');
+    }
+    rows = await fetchForms();
+  }
+
   // Soft refresh: one shot. Don't re-enter auth settle sleeps on empty.
   if (rows.length === 0 && !opts?.soft) {
     const auth = await waitForAuthReady(3);
@@ -363,7 +375,11 @@ function emitPersistOk(kind: 'form' | 'submission'): void {
   }
 }
 
-function enqueueFormUpsert(form: FormRecord): void {
+/**
+ * `onFail` runs when this exact write fails, so an optimistic change (trash,
+ * restore) can be put back instead of looking done while the server disagrees.
+ */
+function enqueueFormUpsert(form: FormRecord, onFail?: () => void): void {
   if (deletedFormIds.has(form.id)) return;
   queuedFormWrite.set(form.id, form);
   const prev = formWriteChain.get(form.id) ?? Promise.resolve();
@@ -384,6 +400,7 @@ function enqueueFormUpsert(form: FormRecord): void {
           emitPersistOk('form');
         } catch (err) {
           const message = formatNeonError(err, 'Could not save form');
+          if (latest === form) onFail?.();
           emitPersistError('form', message);
           throw err;
         }
@@ -395,6 +412,8 @@ function enqueueFormUpsert(form: FormRecord): void {
       }
     });
   formWriteChain.set(form.id, next);
+  // Already reported via slate-persist-error; the chain stays rejected for awaiters.
+  next.catch(() => {});
 }
 
 function dropOptimisticForm(formId: string): void {
@@ -439,6 +458,8 @@ function enqueueFormInsert(form: FormRecord): void {
       }
     });
   formWriteChain.set(form.id, next);
+  // Already reported via slate-persist-error; the chain stays rejected for awaiters.
+  next.catch(() => {});
 }
 
 /** Cancel pending upserts, then delete — prevents soft-delete upsert resurrecting the row. */
@@ -719,29 +740,41 @@ export function updateFormRemoteSync(
   return [next, true];
 }
 
+/** Put `before` back, unless something newer has replaced `after` since. */
+function rollbackForm(before: FormRecord, after: FormRecord): void {
+  const idx = read().findIndex((f) => f.id === before.id);
+  if (idx === -1 || read()[idx] !== after) return;
+  const copy = [...read()];
+  copy[idx] = before;
+  cache = copy;
+  notify();
+}
+
 export function trashFormRemoteSync(formId: string): boolean {
   const now = new Date().toISOString();
   const idx = read().findIndex((f) => f.id === formId && isActive(f));
   if (idx === -1) return false;
-  const next = { ...read()[idx]!, deletedAt: now, updatedAt: now };
+  const before = read()[idx]!;
+  const next = { ...before, deletedAt: now, updatedAt: now };
   const copy = [...read()];
   copy[idx] = next;
   cache = copy;
   notify();
-  enqueueFormUpsert(next);
+  enqueueFormUpsert(next, () => rollbackForm(before, next));
   return true;
 }
 
 export function restoreFormRemoteSync(formId: string): boolean {
   const idx = read().findIndex((f) => f.id === formId && isTrashed(f));
   if (idx === -1) return false;
-  const { deletedAt: _r, ...rest } = read()[idx]!;
+  const before = read()[idx]!;
+  const { deletedAt: _r, ...rest } = before;
   const next = { ...rest, updatedAt: new Date().toISOString() };
   const copy = [...read()];
   copy[idx] = next;
   cache = copy;
   notify();
-  enqueueFormUpsert(next);
+  enqueueFormUpsert(next, () => rollbackForm(before, next));
   return true;
 }
 

@@ -23,6 +23,8 @@ let hydrating: Promise<void> | null = null;
 let hydrateGeneration = 0;
 /** Survives React StrictMode remounts — avoids double force-hydrate on boot. */
 let adminSessionHydrated = false;
+/** Whose forms the stores hold. A warm cache for another user is never reused. */
+let hydratedUserId: string | null = null;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -37,16 +39,20 @@ export function isStoresHydrated(): boolean {
   return hydrated || !isNeonConfigured();
 }
 
-export function isAdminSessionHydrated(): boolean {
-  return adminSessionHydrated;
+/** With `userId`, true only when that user's data is what was hydrated. */
+export function isAdminSessionHydrated(userId?: string | null): boolean {
+  if (!adminSessionHydrated) return false;
+  return userId === undefined || hydratedUserId === userId;
 }
 
-export function markAdminSessionHydrated(): void {
+export function markAdminSessionHydrated(userId?: string | null): void {
   adminSessionHydrated = true;
+  hydratedUserId = userId ?? null;
 }
 
 export function clearAdminSessionHydrated(): void {
   adminSessionHydrated = false;
+  hydratedUserId = null;
 }
 
 /** Clear module caches — call on sign-out. */
@@ -57,6 +63,7 @@ export function clearRemoteStores(): void {
   hydrating = null;
   hydrateGeneration += 1;
   adminSessionHydrated = false;
+  hydratedUserId = null;
 }
 
 /**

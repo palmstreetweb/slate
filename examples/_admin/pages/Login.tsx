@@ -66,9 +66,16 @@ function LoginOtpField({
         data-lpignore="true"
         data-form-type="other"
         pattern="[0-9]*"
-        maxLength={6}
+        // No maxLength: the browser would cut "482 913" or "Code: 482913" to six
+        // characters *before* we strip non-digits. onChange keeps the first 6 digits.
         value={digits}
         onChange={(e) => onChange(e.target.value)}
+        onPaste={(e) => {
+          const text = e.clipboardData.getData('text');
+          if (!text) return;
+          e.preventDefault();
+          onChange(text);
+        }}
         disabled={disabled}
         required
         aria-label="Sign-in code"

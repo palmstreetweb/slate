@@ -74,6 +74,9 @@ export async function ensureAuthForDataApi(): Promise<ReadyAuth> {
   }
 
   if (!token) {
+    // AuthProvider checks with the server and shows Login if the session is gone,
+    // instead of leaving a studio where every save fails (login check).
+    window.dispatchEvent(new Event('slate-auth-lost'));
     throw new Error('No auth session — cannot load forms.');
   }
 

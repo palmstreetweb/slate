@@ -28,9 +28,18 @@ type AuthContextValue = AuthState & {
   signInWithEmail: (email: string) => Promise<{ error: string | null; magicLinkSent: boolean }>;
   verifyEmailOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
-  signOut: () => Promise<void>;
+  /** Resolves once the server confirms. On `{ error }` the owner is still signed in. */
+  signOut: () => Promise<{ error: string | null }>;
   clearAuthError: () => void;
+  /** Sign-in service unreachable at boot (network / 429 / 5xx) — not the same as signed out. */
+  authUnreachable: boolean;
+  retryAuth: () => void;
 };
+
+const BOOT_RETRY_DELAYS_MS = [400, 1200, 2500];
+const SIGN_OUT_TIMEOUT_MS = 10_000;
+/** Fired by the Data API layer when it has no usable token (ensureAuth.ts). */
+export const AUTH_LOST_EVENT = 'slate-auth-lost';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -169,8 +178,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(isNeonConfigured());
   const [session, setSession] = useState<AuthSession | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authUnreachable, setAuthUnreachable] = useState(false);
+  const [bootAttempt, setBootAttempt] = useState(0);
   const hydrateDoneRef = useRef(false);
   const wasSignedInRef = useRef(false);
+  /** Whose data is in the in-memory stores. Any change of user clears them first. */
+  const userIdRef = useRef<string | null>(null);
+  /** While a sign-out is in flight, a late "signed in" event must not undo it. */
+  const signingOutRef = useRef(false);
+
+  /**
+   * Every session change goes through here. Switching accounts (or signing out
+   * in another tab) clears the previous owner's forms and responses before
+   * anything renders — otherwise the next account could see them.
+   */
+  const applySession = useCallback((next: AuthSession | null) => {
+    if (next && signingOutRef.current) return;
+    const nextId = next?.user.id ?? null;
+    if (userIdRef.current !== null && userIdRef.current !== nextId) clearRemoteStores();
+    userIdRef.current = nextId;
+    setSession(next);
+  }, []);
 
   useEffect(() => {
     if (!isNeonConfigured()) {
@@ -192,22 +220,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     };
 
-    void auth
-      .getSession()
-      .then((res) => {
+    // Boot: tell "signed out" apart from "couldn't ask". A failed check used to
+    // show a signed-in owner the Login screen with no message (login check).
+    let bootSettled = false;
+    const boot = async () => {
+      for (let attempt = 0; ; attempt++) {
+        let failed = false;
+        try {
+          const res = (await auth.getSession()) as {
+            data: { session: unknown } | null;
+            error?: unknown;
+          };
+          if (!mounted) return;
+          if (!res.error) {
+            bootSettled = true;
+            setAuthUnreachable(false);
+            applySession(normalizeSession(res.data?.session ?? null));
+            setLoading(false);
+            return;
+          }
+          failed = true;
+        } catch {
+          failed = true;
+        }
         if (!mounted) return;
-        setSession(normalizeSession(res.data?.session ?? null));
-        setLoading(false);
-      })
-      .catch(() => {
-        if (mounted) setLoading(false);
-      });
+        if (failed && attempt >= BOOT_RETRY_DELAYS_MS.length) {
+          bootSettled = true;
+          setAuthUnreachable(true);
+          setLoading(false);
+          return;
+        }
+        await sleep(BOOT_RETRY_DELAYS_MS[attempt]!);
+        if (!mounted) return;
+      }
+    };
+    void boot();
 
     const { data: sub } = auth.onAuthStateChange((_event, next) => {
       // Neon’s adapter only emits this for the first subscribe + other tabs.
       // A successful same-tab OTP still needs getSession() in verifyEmailOtp.
       if (!mounted) return;
-      setSession(normalizeSession(next));
+      const normalized = normalizeSession(next);
+      // The adapter also fires a null INITIAL_SESSION when the boot check fails;
+      // until boot settles, only a real session is worth applying.
+      if (!normalized && !bootSettled) return;
+      applySession(normalized);
+      if (normalized) setAuthUnreachable(false);
       setLoading(false);
     });
 
@@ -217,17 +275,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!value.data?.session || !value.data?.user) return;
       void readUsableSession(auth).then((next) => {
         if (!mounted || !next) return;
-        setSession(next);
+        applySession(next);
+        setAuthUnreachable(false);
         setLoading(false);
       });
     });
+
+    // The Data API layer found no token mid-use (renewal failed, cookie cleared,
+    // session revoked). Ask the server once: if it says signed out, show Login
+    // on this same URL instead of a studio where every save fails.
+    let checkingLost = false;
+    const onAuthLost = () => {
+      if (checkingLost || signingOutRef.current) return;
+      checkingLost = true;
+      void auth
+        .getSession({ forceFetch: true })
+        .then((res) => {
+          const r = res as { data: { session: unknown } | null; error?: unknown };
+          if (!mounted || r.error) return; // unreachable ≠ signed out
+          if (!normalizeSession(r.data?.session ?? null)) applySession(null);
+        })
+        .catch(() => {})
+        .finally(() => {
+          checkingLost = false;
+        });
+    };
+    window.addEventListener(AUTH_LOST_EVENT, onAuthLost);
 
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
       if (typeof unsubBetter === 'function') unsubBetter();
+      window.removeEventListener(AUTH_LOST_EVENT, onAuthLost);
     };
-  }, []);
+  }, [applySession, bootAttempt]);
 
   // Letter-rise on a real sign-in (skip the first hydrate so refresh stays quiet).
   useEffect(() => {
@@ -249,13 +330,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const email = session.user.email ?? undefined;
     if (!email) {
       setAuthError(NO_EMAIL_MSG);
-      clearRemoteStores();
-      setSession(null);
+      applySession(null);
       void getNeon().auth.signOut().catch(() => {});
     } else {
       setAuthError(null);
     }
-  }, [session]);
+  }, [session, applySession]);
 
   const signInWithEmail = useCallback(async (email: string) => {
     if (!isNeonConfigured()) {
@@ -340,7 +420,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             'That code worked, but sign-in did not finish. Try the email link, or request a new code.',
         };
       }
-      setSession(next);
+      applySession(next);
+      setAuthUnreachable(false);
       setLoading(false);
       return { error: null };
     } catch (err) {
@@ -348,7 +429,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: err instanceof Error ? err.message : 'Could not verify that code.',
       };
     }
-  }, []);
+  }, [applySession]);
 
   const signInWithGoogle = useCallback(async () => {
     if (!isNeonConfigured()) {
@@ -360,29 +441,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     const { error } = await auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: authRedirectUrl(),
-        queryParams: { prompt: 'select_account' },
-      },
+      // `queryParams: { prompt: 'select_account' }` was silently dropped by the
+      // SDK, so it's gone. Account choice is set on the Google provider in Neon.
+      options: { redirectTo: authRedirectUrl() },
     });
     return { error: error?.message ?? null };
   }, []);
 
   const clearAuthError = useCallback(() => setAuthError(null), []);
 
-  const signOut = useCallback(async () => {
-    if (!isNeonConfigured()) return;
-    // Same-tab sign-out often skips onAuthStateChange (same as OTP). Clear
-    // React state up front so the gate flips to Login immediately.
-    clearRemoteStores();
-    setSession(null);
-    setAuthError(null);
-    setLoading(false);
+  const signOut = useCallback(async (): Promise<{ error: string | null }> => {
+    if (!isNeonConfigured()) return { error: null };
+    // Only a server-confirmed sign-out counts. Clearing local state first used to
+    // "sign out" offline, then the same account came back on focus or reload —
+    // the worst case on a shared computer (login check).
+    signingOutRef.current = true;
     try {
-      await getNeon().auth.signOut();
+      const res = (await withTimeout(
+        getNeon().auth.signOut() as Promise<{ error?: { message?: string } | null } | undefined>,
+        SIGN_OUT_TIMEOUT_MS,
+        'timeout',
+      )) as { error?: { message?: string } | null } | undefined;
+      if (res?.error) throw new Error(res.error.message || 'sign-out failed');
     } catch {
-      // Local session already cleared — stay signed out even if the network call fails.
+      signingOutRef.current = false;
+      return { error: 'Couldn’t sign out — check your connection and try again.' };
     }
+    applySession(null);
+    setAuthError(null);
+    // A full load drops every in-memory cache (forms, responses, file URLs) and
+    // lands on Login, whatever page this was.
+    window.location.replace('/');
+    return { error: null };
+  }, [applySession]);
+
+  const retryAuth = useCallback(() => {
+    setAuthUnreachable(false);
+    setLoading(true);
+    setBootAttempt((n) => n + 1);
   }, []);
 
   const signedIn = Boolean(session?.access_token && session.user.email);
@@ -399,6 +495,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signOut,
       clearAuthError,
+      authUnreachable,
+      retryAuth,
     }),
     [
       loading,
@@ -410,6 +508,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signOut,
       clearAuthError,
+      authUnreachable,
+      retryAuth,
     ],
   );
 
@@ -423,10 +523,11 @@ export function useAuth(): AuthContextValue {
 }
 
 export function useRequiresAuth(): { ready: boolean; allowed: boolean } {
+  // Hook first, then branch — AuthProvider always wraps the studio.
+  const { loading, session, isPswTeam } = useAuth();
   if (!isNeonConfigured()) {
     return { ready: true, allowed: true };
   }
-  const { loading, session, isPswTeam } = useAuth();
   const hasToken = Boolean(session?.access_token);
   return {
     ready: !loading,

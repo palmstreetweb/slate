@@ -4,8 +4,9 @@
 
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useAuth } from '../neon/AuthProvider.js';
+import { useToast } from '../toast.js';
 import { playUiSound } from '../uiSounds.js';
 import { SIGN_OUT_ANIM_MS, SignOutOverlay } from './SignOutOverlay.js';
 
@@ -16,6 +17,7 @@ function prefersReducedMotion(): boolean {
 
 export function useSignOutFlow() {
   const { signOut } = useAuth();
+  const toast = useToast();
   const [leaving, setLeaving] = useState(false);
 
   const runSignOut = useCallback(async () => {
@@ -29,12 +31,20 @@ export function useSignOutFlow() {
         window.setTimeout(resolve, wait);
       });
     }
-    try {
-      await signOut();
-    } finally {
-      setLeaving(false);
+    // On success the page reloads to Login; only a failure comes back here.
+    const { error } = await signOut();
+    setLeaving(false);
+    if (error) {
+      toast.push({
+        title: 'Still signed in',
+        detail: error,
+        tone: 'error',
+        action: { label: 'Try again', onClick: () => void runSignOutRef.current() },
+      });
     }
-  }, [leaving, signOut]);
+  }, [leaving, signOut, toast]);
+  const runSignOutRef = useRef(runSignOut);
+  runSignOutRef.current = runSignOut;
 
   const overlay = <SignOutOverlay open={leaving} />;
 

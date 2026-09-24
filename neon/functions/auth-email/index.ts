@@ -9,7 +9,7 @@
  * magic link, and 6-digit code.
  */
 
-import { createPublicKey, verify } from 'node:crypto';
+import { createHash, createPublicKey, verify } from 'node:crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { Pool } from 'pg';
@@ -25,6 +25,15 @@ import { SLATE_LOCKUP_PNG_BASE64 } from './logoPng.js';
 const WAIT_MS = Number(process.env.AUTH_EMAIL_WAIT_MS ?? 1800);
 const POLL_MS = 150;
 const JWKS_TTL_MS = 60 * 60 * 1000;
+const JWKS_TIMEOUT_MS = 5000;
+
+/**
+ * Send caps (audit M-AUTH-2). Anyone can type any address into the login box,
+ * so without these the domain could be used to bomb an inbox or burn the whole
+ * Resend quota (after which nobody can sign in). A real person needs a few.
+ */
+const MAX_PER_ADDRESS_PER_HOUR = Number(process.env.AUTH_EMAIL_MAX_PER_ADDRESS ?? 6);
+const MAX_TOTAL_PER_HOUR = Number(process.env.AUTH_EMAIL_MAX_TOTAL ?? 300);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -37,7 +46,7 @@ app.options('*', (c) => c.body(null, 204));
 
 app.get('/', (c) => c.json({ ok: true, service: 'authemail' }));
 
-app.get('/logo.png', (c) => {
+app.get('/logo.png', () => {
   const bytes = Buffer.from(SLATE_LOCKUP_PNG_BASE64, 'base64');
   return new Response(bytes, {
     status: 200,
@@ -81,6 +90,15 @@ async function handleWebhook(c: {
   const eventType = payload.event_type;
   if (eventType !== 'send.otp' && eventType !== 'send.magic_link') {
     return json({ ok: true, ignored: eventType });
+  }
+  // Only sign-in codes get the "Sign in to Slate" email. A password-reset or
+  // email-verification OTP sent as a sign-in code let an attacker relay one
+  // into a persistent password on someone's account (audit M-AUTH-1).
+  // Deny the known non-sign-in types rather than allow one spelling of
+  // "sign-in": a label change on Neon's side must not stop every sign-in mail.
+  const otpType = payload.event_data?.otp_type;
+  if (eventType === 'send.otp' && typeof otpType === 'string' && isNonSignInOtp(otpType)) {
+    return json({ ok: true, ignored: `otp:${otpType}` });
   }
 
   const email = payload.user?.email?.trim().toLowerCase();
@@ -131,39 +149,68 @@ async function handleWebhook(c: {
     return json({ error: 'Nothing to send' }, 500);
   }
 
-  await pool.query('select pg_advisory_lock(hashtext($1))', [email]);
-  try {
-    const locked = await readPending(email);
-    if (!locked) {
-      return json({ error: 'Pending row missing' }, 500);
-    }
-    const lockedDigest = digestSignInEmail({
-      otpCode: locked.otp_code,
-      linkUrl: locked.link_url,
-    });
-    if (locked.sent_digest === lockedDigest && locked.sent_at) {
-      return json({ ok: true, deduped: true });
-    }
+  // Atomic claim instead of a session advisory lock: the pool could lock and
+  // unlock on different connections (duplicate mails, leaked locks — M-AUTH-3).
+  // Exactly one webhook wins the right to send this digest.
+  const claim = await pool.query<PendingRow>(
+    `update public.auth_email_pending
+     set sent_digest = $2, sent_at = now(), updated_at = now()
+     where email = $1 and sent_digest is distinct from $2
+       -- Only if the row still holds what we read; a newer code's webhook sends that one.
+       and otp_code is not distinct from $3 and link_url is not distinct from $4
+     returning email, otp_code, link_url, sent_digest, sent_at`,
+    [email, digest, row.otp_code, row.link_url],
+  );
+  const claimed = claim.rows[0];
+  if (!claimed) return json({ ok: true, deduped: true });
 
-    const emailContent = buildSignInEmail({
-      otpCode: locked.otp_code,
-      linkUrl: locked.link_url,
-    });
-    const sent = await sendResend(resendKey, email, emailContent);
-    if (!sent.ok) {
-      return json({ error: sent.error }, 502);
-    }
+  const release = () =>
+    pool
+      .query(
+        `update public.auth_email_pending set sent_digest = null, sent_at = null
+         where email = $1 and sent_digest = $2`,
+        [email, digest],
+      )
+      .catch(() => undefined);
 
-    await pool.query(
-      `update public.auth_email_pending
-       set sent_digest = $2, sent_at = now(), updated_at = now()
-       where email = $1`,
-      [email, lockedDigest],
-    );
-    return json({ ok: true, sent: true });
-  } finally {
-    await pool.query('select pg_advisory_unlock(hashtext($1))', [email]).catch(() => undefined);
+  // 200 either way so Neon doesn't retry; a capped address just gets no mail.
+  const capped = await overSendCap(email);
+  if (capped) {
+    console.warn(`[authemail] send cap reached (${capped})`);
+    return json({ ok: true, capped: true });
   }
+
+  const emailContent = buildSignInEmail({
+    otpCode: claimed.otp_code,
+    linkUrl: claimed.link_url,
+  });
+  const sent = await sendResend(resendKey, email, emailContent);
+  if (!sent.ok) {
+    await release();
+    return json({ error: sent.error }, 502);
+  }
+  return json({ ok: true, sent: true });
+}
+
+/** Password reset, email verification, email change — anything but signing in. */
+function isNonSignInOtp(otpType: string): boolean {
+  return /pass|reset|forget|forgot|verif|change/i.test(otpType);
+}
+
+/** Counts one send against both caps. Returns which cap is full, or null. */
+async function overSendCap(email: string): Promise<'address' | 'total' | null> {
+  const take = async (key: string, max: number) => {
+    const { rows } = await pool.query<{ allowed: boolean }>(
+      `select allowed from public.consume_submit_rate($1, $2, $3)`,
+      [key, 3600, max],
+    );
+    return rows[0]?.allowed !== false;
+  };
+  // Hash the address: the bucket table is not a place to keep emails.
+  const who = createHash('sha256').update(email).digest('hex').slice(0, 32);
+  if (!(await take(`authmail:to:${who}`, MAX_PER_ADDRESS_PER_HOUR))) return 'address';
+  if (!(await take('authmail:all', MAX_TOTAL_PER_HOUR))) return 'total';
+  return null;
 }
 
 type PendingRow = {
@@ -224,6 +271,7 @@ type WebhookPayload = {
   user?: { email?: string };
   event_data?: {
     otp_code?: string;
+    otp_type?: string;
     link_url?: string;
     expires_at?: string;
   };
@@ -243,7 +291,9 @@ async function loadJwks(): Promise<Jwk[]> {
   if (jwksCache && Date.now() - jwksCache.fetchedAt < JWKS_TTL_MS) {
     return jwksCache.keys;
   }
-  const res = await fetch(`${authBaseUrl()}/.well-known/jwks.json`);
+  const res = await fetch(`${authBaseUrl()}/.well-known/jwks.json`, {
+    signal: AbortSignal.timeout(JWKS_TIMEOUT_MS),
+  });
   if (!res.ok) {
     throw new Error(`JWKS fetch failed (${res.status})`);
   }
@@ -257,8 +307,7 @@ async function verifyNeonWebhook(
   rawBody: string,
   headers: { signature?: string; kid?: string; timestamp?: string },
 ): Promise<void> {
-  // Local debugging only. A public deploy with this set is an open mail relay.
-  if (process.env.AUTH_WEBHOOK_SKIP_VERIFY === '1' && process.env.NODE_ENV !== 'production') return;
+  // No bypass switch: a deploy with one set is an open mail relay.
   const { signature, kid, timestamp } = headers;
   if (!signature || !kid || !timestamp) {
     throw new Error('Missing Neon webhook signature headers');

@@ -19,10 +19,11 @@ describe('buildSignInEmail', () => {
     expect(html).toContain('https://slateforms.vercel.app/#/?token=abc');
     expect(html).toContain('Sign in to Slate');
     expect(html).toContain('Your login is ready.');
-    expect(html).toContain('Copy code');
-    expect(html).toContain('data-code="482195"');
-    expect(html).toContain('id="slate-copy-code"');
-    expect(html).toContain('/?otp=482195');
+    // Login report: the old "Copy code" link opened a JSON 404 on Neon's host.
+    expect(html).not.toContain('Copy code');
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('?otp=');
+    expect(html).toMatch(/user-select:all;">482195<\/span>/);
     expect(text).toContain('482195');
     expect(text).toContain('https://slateforms.vercel.app/#/?token=abc');
   });
@@ -31,8 +32,8 @@ describe('buildSignInEmail', () => {
     const { html, text } = buildSignInEmail({ otpCode: '111222' });
     expect(html).not.toContain('Sign in to Slate</a>');
     expect(html).toContain('111222');
-    expect(html).toContain('Copy code');
-    expect(html).toContain('/?otp=111222');
+    expect(html).toMatch(/user-select:all;">111222<\/span>/);
+    expect(html).not.toContain('?otp=');
     expect(text).not.toContain('Sign-in link');
   });
 

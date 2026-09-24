@@ -25,7 +25,7 @@ import { DropLab } from './_admin/pages/DropLab.js';
 import { AdminShell } from './_admin/shell/AdminShell.js';
 import { LoadingScreen, useMinBootMs } from './_admin/shell/LoadingScreen.js';
 import { PageTransition } from './_admin/shell/PageTransition.js';
-import { AuthProvider, useRequiresAuth } from './_admin/neon/AuthProvider.js';
+import { AuthProvider, useAuth, useRequiresAuth } from './_admin/neon/AuthProvider.js';
 import {
   hydrateStores,
   isAdminSessionHydrated,
@@ -51,6 +51,7 @@ function UiSoundsRoot({ children }: { children: ReactNode }) {
 function AppRoutes() {
   const route = useRoute();
   const { ready, allowed } = useRequiresAuth();
+  const { authUnreachable, retryAuth } = useAuth();
   const key = routeKey(route);
   const publicRoute = isPublicRoute(route);
 
@@ -77,6 +78,11 @@ function AppRoutes() {
 
   if (isNeonConfigured() && !ready) {
     return <LoadingScreen />;
+  }
+
+  // "Couldn't ask" is not "signed out": don't send an owner to Login over a blip.
+  if (isNeonConfigured() && authUnreachable) {
+    return <AuthUnreachable onRetry={retryAuth} />;
   }
 
   if (isNeonConfigured() && !allowed) {
@@ -120,7 +126,9 @@ function AppRoutes() {
 /** Fetch remote stores only after the user is authenticated (cloud mode). */
 function AdminCloudBootstrap() {
   const { ready, allowed } = useRequiresAuth();
-  const [storesReady, setStoresReady] = useState(() => isAdminSessionHydrated());
+  const { user, authUnreachable } = useAuth();
+  const userId = user?.id ?? null;
+  const [storesReady, setStoresReady] = useState(() => isAdminSessionHydrated(userId));
   const [hydrateError, setHydrateError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const minBootDone = useMinBootMs();
@@ -135,7 +143,12 @@ function AdminCloudBootstrap() {
     // Skip re-fetch only when this tab already finished a successful hydrate
     // AND the in-memory Neon caches are still warm. Otherwise we'd paint an
     // empty library until a manual refresh.
-    if (isAdminSessionHydrated() && isStoresHydrated() && isFormsHydrated() && retryToken === 0) {
+    if (
+      isAdminSessionHydrated(userId) &&
+      isStoresHydrated() &&
+      isFormsHydrated() &&
+      retryToken === 0
+    ) {
       setStoresReady(true);
       setHydrateError(null);
       return;
@@ -148,7 +161,7 @@ function AdminCloudBootstrap() {
       try {
         await hydrateStores({ force: true });
         if (cancelled) return;
-        markAdminSessionHydrated();
+        markAdminSessionHydrated(userId);
         setHydrateError(null);
         setStoresReady(true);
       } catch (err: unknown) {
@@ -175,11 +188,13 @@ function AdminCloudBootstrap() {
     return () => {
       cancelled = true;
     };
-  }, [ready, allowed, retryToken]);
+  }, [ready, allowed, retryToken, userId]);
 
   // Splash holds for the branding beat AND until auth + Neon hydrate finish.
   // Hydrate starts as soon as the session is allowed — leftover splash time is
   // not idle wait; it's covered by in-flight network + cache warm-up.
+  if (authUnreachable) return <AppRoutes />;
+
   if (!ready || (allowed && !storesReady) || !minBootDone) {
     return <LoadingScreen />;
   }
@@ -232,6 +247,34 @@ function Bootstrap() {
   }
 
   return <AdminCloudBootstrap />;
+}
+
+function AuthUnreachable({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div
+      data-slate-forms=""
+      data-theme-name="slate"
+      data-theme="dark"
+      className="slate-empty"
+      role="alert"
+      style={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeContent: 'center',
+        gap: 16,
+        padding: 24,
+        textAlign: 'center',
+      }}
+    >
+      <p style={{ margin: 0, maxWidth: 420 }}>Can’t reach sign-in right now.</p>
+      <p style={{ margin: 0, opacity: 0.7, fontSize: 13, maxWidth: 420 }}>
+        You’re probably still signed in. Check your connection, then try again.
+      </p>
+      <button type="button" className="slate-btn slate-btn--primary" onClick={onRetry}>
+        Try again
+      </button>
+    </div>
+  );
 }
 
 function RootCrashFallback() {

@@ -9,6 +9,7 @@ import type { ResolvedThemeMode } from '@/index.js';
 import { Header } from './Header.js';
 import { SettingsFab } from './SettingsFab.js';
 import { FeedbackButton } from './FeedbackButton.js';
+import { PersistErrorToasts } from './PersistErrorToasts.js';
 import { AdminThemeProvider } from '../adminThemeContext.js';
 import { ErrorBoundary, PageCrashFallback } from '../components/ErrorBoundary.js';
 import {
@@ -89,6 +90,7 @@ export function AdminShell({ crumbs, rightSlot, children, fullBleed }: Props) {
           </main>
           <SettingsFab />
           <FeedbackButton />
+          <PersistErrorToasts />
         </div>
       </div>
     </AdminThemeProvider>

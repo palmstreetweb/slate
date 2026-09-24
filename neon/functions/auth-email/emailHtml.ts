@@ -55,13 +55,11 @@ export function buildSignInEmail(
       </table>`
     : '';
 
-  const codeHtml = otp ? renderCodeBlock(otp, Boolean(link), copyCodeHref(otp, link)) : '';
+  const codeHtml = otp ? renderCodeBlock(otp, Boolean(link)) : '';
 
   const linkFallback = link
     ? `<p style="margin:28px 0 0;font:400 12px/1.55 ${SANS};color:${MUTED};word-break:break-all;">If the button does not work, paste this link into your browser:<br/><a href="${escapeAttr(link)}" style="color:${INK};text-decoration:underline;">${escapeHtml(shortLink(link))}</a></p>`
     : '';
-
-  const copyScript = otp ? renderCopyScript() : '';
 
   const html = `<!doctype html>
 <html lang="en">
@@ -112,7 +110,6 @@ export function buildSignInEmail(
       </td>
     </tr>
   </table>
-  ${copyScript}
 </body>
 </html>`;
 
@@ -124,16 +121,7 @@ export function buildSignInEmail(
   return { html, text: textParts.join('\n') };
 }
 
-function copyCodeHref(otp: string, link: string | null): string {
-  try {
-    const origin = link ? new URL(link).origin : 'https://slateforms.vercel.app';
-    return `${origin}/?otp=${encodeURIComponent(otp)}`;
-  } catch {
-    return `https://slateforms.vercel.app/?otp=${encodeURIComponent(otp)}`;
-  }
-}
-
-function renderCodeBlock(otp: string, hasLink: boolean, copyHref: string): string {
+function renderCodeBlock(otp: string, hasLink: boolean): string {
   const label = hasLink ? 'Or enter this code' : 'Your code';
   const digits = otp.length === 6 ? otp.split('') : null;
   const boxes = digits
@@ -149,66 +137,20 @@ function renderCodeBlock(otp: string, hasLink: boolean, copyHref: string): strin
       </table>`
     : `<p style="margin:0;font:700 32px/1.1 ${SANS};letter-spacing:.28em;color:${INK};text-align:center;">${escapeHtml(otp)}</p>`;
 
-  // Real https href so Gmail keeps the pill. Script copies in preview / rare clients.
-  const copyBtn = `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:18px auto 0;">
-        <tr>
-          <td align="center" bgcolor="${PANEL_2}" style="background:${PANEL_2};border:1px solid ${LINE};border-radius:999px;">
-            <a id="slate-copy-code" href="${escapeAttr(copyHref)}" data-code="${escapeAttr(otp)}" data-idle="Copy code" data-done="Copied" style="display:inline-block;background:${PANEL_2};color:${INK};font:600 13px/1 ${SANS};text-decoration:none;padding:12px 20px;border-radius:999px;letter-spacing:.01em;">Copy code</a>
-          </td>
-        </tr>
-      </table>`;
+  // One selectable run of digits. A "Copy code" link can't work in mail apps
+  // (they strip scripts, so it opened a page instead), and copying the boxes
+  // above pastes cell by cell. Long-press / double-click selects all six.
+  const copyLine = `<p style="margin:14px 0 0;font:500 13px/1.4 ${SANS};color:${MUTED};">To copy: <span style="font:600 15px/1 ${SANS};letter-spacing:.12em;color:${INK};-webkit-user-select:all;user-select:all;">${escapeHtml(otp)}</span></p>`;
 
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:${hasLink ? '28px' : '0'} 0 0;">
     <tr>
       <td align="center">
         <p style="margin:0 0 14px;font:700 11px/1 ${SANS};letter-spacing:.18em;text-transform:uppercase;color:${MUTED};">${label}</p>
         ${boxes}
-        ${copyBtn}
+        ${copyLine}
       </td>
     </tr>
   </table>`;
-}
-
-function renderCopyScript(): string {
-  return `<script>
-(function(){
-  var btn = document.getElementById('slate-copy-code');
-  if (!btn) return;
-  var idle = btn.getAttribute('data-idle') || 'Copy code';
-  var done = btn.getAttribute('data-done') || 'Copied';
-  btn.addEventListener('click', function(e){
-    var code = btn.getAttribute('data-code') || '';
-    if (!code) return;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      e.preventDefault();
-    } else {
-      return;
-    }
-    var mark = function(){
-      btn.textContent = done;
-      window.setTimeout(function(){ btn.textContent = idle; }, 1600);
-    };
-    var fallback = function(){
-      try {
-        var t = document.createElement('textarea');
-        t.value = code;
-        t.setAttribute('readonly','');
-        t.style.cssText = 'position:fixed;left:-9999px;top:0;';
-        document.body.appendChild(t);
-        t.select();
-        document.execCommand('copy');
-        document.body.removeChild(t);
-        mark();
-      } catch (err) {}
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(code).then(mark).catch(fallback);
-    } else {
-      fallback();
-    }
-  });
-})();
-</script>`;
 }
 
 function shortLink(url: string): string {
