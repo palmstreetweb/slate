@@ -52,6 +52,7 @@ In the Neon SQL Editor (or `psql` with the pooled connection string), run in ord
 12. `neon/migrations/012_fill_password.sql`
 13. `neon/migrations/013_hardening.sql`
 14. `neon/migrations/014_ai_quota.sql`
+15. `neon/migrations/015_slug_lock.sql`
 
 Then **Data API → Refresh schema cache**. Do this after every migration that adds a column or
 changes a function signature — 012 does both (`forms.fill_locked`, `get_form_by_slug` gains
@@ -67,6 +68,8 @@ fails closed with a 503 until `consume_ai_generation` exists (ADR-051). Caps: 25
 overall per UTC day — edit `ai_quota_limits()` to change them.
 
 014 also generates a server key. After pasting it, run `select key from public.ai_quota_key;` and set the value as `AI_QUOTA_KEY` on the Vercel project (Production), then redeploy. Build with AI stays at 503 until both exist (ADR-051).
+
+015 locks form links (ADR-057): a slug never changes, trashed forms keep theirs, and a permanently deleted form retires its slug for good. No cache refresh or Function redeploy.
 
 Anyone can sign up (Google, magic link, or email code). Each account owns its own forms (ADR-036).
 Each account is capped at **50 forms** including Trash (ADR-038); permanent delete frees a slot.

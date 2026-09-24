@@ -753,6 +753,29 @@ Consequences: Answers with nested objects are dropped at submit and hidden on lo
 
 Revisit when: a question type needs a nested answer shape, or Neon Auth changes its issuer format.
 
+## ADR-057 — Form links are fixed for life (slug lock)
+Date: 2026-09-24
+Status: accepted
+Context: Audit M-SLUG-1, reproduced on a throwaway branch. Slugs were unique only among live forms (`forms_slug_active_uidx … where deleted_at is null`), and `authenticated` could update the column. Once an owner trashed a form, any signed-in account could PATCH its own form's slug to the freed value: every scan of the printed QR then opened the attacker's form, and the owner's Restore failed on the clash. The column also had no contract (audit lows slug-no-contract, slug-new-collision): 5,000-character slugs, markup, look-alike Unicode, and `new`, which the router sends to the studio editor. ADR-043 fixed slugs at create, but only the studio honored it.
+
+Decision (migration `015_slug_lock.sql`, database only):
+- **Fixed on update:** `forms_slug_lock` keeps `old.slug` on every UPDATE, silently, like `owner_id`. A stale studio upsert that re-sends an older draw still saves.
+- **Unique across trash:** `forms_slug_uidx` covers every row, so a trashed form keeps its link and Restore always works.
+- **Retired on permanent delete:** a BEFORE DELETE trigger records the slug and its owner in `retired_slugs` (RLS forced, no Data API grants). A new row with a retired slug is refused with `23505 slug is retired` unless it belongs to the same account (restoring its own backup). Insert and delete take the same per-slug advisory lock, so an insert racing a delete either meets the live row or waits and meets the retired one.
+- **Shape:** every row must match `^[a-z0-9]+(-[a-z0-9]+)*$`, 64 characters at most, never `new` (`forms_slug_format`). New rows must use the 8-digit slug the studio draws. An upsert that re-sends a row's own stored slug is not new, so older word slugs keep working.
+- **Existing data:** three slugs were shared by one owner's "Untitled form" drafts (a live copy plus trashed ones). The live row (else the newest) kept each slug; the four other trashed copies got fresh 8-digit slugs, with `updated_at` untouched. No served link changed.
+- **Studio:** `insertForm` treats a slug-related `23505` or `23514` as "draw again".
+
+Alternatives:
+- Raise on a slug change instead of keeping the old value. Rejected: an upsert queued before a redraw re-sends the first draw and would fail the save.
+- Revoke UPDATE on `forms.slug` from `authenticated`. Rejected: PostgREST upserts set every payload column, so every studio save would fail.
+- Retire only the slugs of forms that were ever published. Rejected: unpublish keeps no history, so a printed link could slip through.
+- Free retired slugs after a grace period. Rejected: printed flyers stay up for years.
+
+Consequences: Another account can never reuse a slug. Each permanent delete adds one small `retired_slugs` row (the 8-digit space holds 90M). An operator who must move a slug does it in one transaction with `forms_slug_lock` disabled. Any new `/forms/<word>` route must first check that no existing word slug uses that word. Verified by 49 SQL checks on a throwaway branch (the attack before and after, stale upsert, restore, retire and reclaim, 12 malformed slugs, grants, the delete/insert race) and by `tests/slugLock.test.ts`.
+
+Revisit when: owners can pick custom links (needs a reserved-word and ownership policy), or permanent delete gets an undo.
+
 ---
 
 ## Deferred to V2

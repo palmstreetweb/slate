@@ -243,15 +243,23 @@ async function refreshFormQuota(): Promise<void> {
   }
 }
 
+/**
+ * The database won't take this slug for a new form: another form holds it
+ * (live or trashed), a permanent delete retired it, or it isn't a valid new
+ * slug (ADR-057). All of these mean "draw again".
+ */
 function isSlugTakenError(err: unknown): boolean {
   const e = err as { code?: string; message?: string; details?: string } | null;
-  return e?.code === '23505' && /slug/i.test(`${e.message ?? ''} ${e.details ?? ''}`);
+  return (
+    (e?.code === '23505' || e?.code === '23514') &&
+    /slug/i.test(`${e.message ?? ''} ${e.details ?? ''}`)
+  );
 }
 
 /**
- * Insert a new row. The slug index is global across owners, and the local
- * cache only knows this owner's forms — so on a slug clash, draw again.
- * Returns the slug that actually landed.
+ * Insert a new row. Slugs are unique across every owner and never reused,
+ * and the local cache only knows this owner's forms — so on a slug clash,
+ * draw again. Returns the slug that actually landed.
  */
 async function insertForm(form: FormRecord): Promise<string> {
   await ensureAuthForDataApi();
