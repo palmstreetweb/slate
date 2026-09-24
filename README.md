@@ -101,6 +101,8 @@ type Schema = {
 };
 ```
 
+`brand.logo` shows left of the brand name (24px tall, width from its aspect ratio, max 160px) when it is an `https:` URL, a same-origin `/path`, or a base64 PNG/JPEG/WebP/GIF `data:` URL. Anything else — or an image that fails to load — falls back to the name alone.
+
 `themeMode` decides whether to render the toggle UI:
 
 | Mode | Behavior |

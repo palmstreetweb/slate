@@ -1,15 +1,17 @@
 /**
  * POST /api/generate — Build with AI (ADR-039).
  * Server-only. ANTHROPIC_API_KEY never reaches the SPA.
+ * Spend is capped per user and globally per UTC day in Postgres (ADR-051).
  *
  * Body: { prompt, previous?, instruction? }
  * `previous` + `instruction` revises an existing draft in place.
  */
 
-import { GenerateValidationError, runGenerateForm } from './runGenerate.js';
+import { GenerateTimeoutError, GenerateValidationError, runGenerateForm } from './runGenerate.js';
 import { generatedFormSchema, type GeneratedForm } from './generateFormSchema.js';
 import { clientIp, takeRateLimit } from './rateLimit.js';
 import { verifyUserJwt } from './authJwt.js';
+import { callDataApiRpc } from './neonDataApi.js';
 import {
   DocumentExtractError,
   documentToPrompt,
@@ -17,7 +19,11 @@ import {
   type DocumentPayload,
 } from './extractDocument.js';
 
-export const config = { maxDuration: 60 };
+// Long PDF forms take well over a minute on Haiku. The route answers by its own
+// deadline (below), so a slow draft is a clear message, never a Vercel 504.
+export const config = { maxDuration: 180 };
+const DEADLINE_MS = 165_000;
+const MAX_FILENAME = 120;
 
 const MAX_PROMPT = 2000;
 const MAX_INSTRUCTION = 800;
@@ -28,9 +34,13 @@ function parseDocument(raw: unknown): { doc?: DocumentPayload; error?: string } 
   if (raw === undefined || raw === null) return {};
   if (typeof raw !== 'object') return { error: 'document must be a file.' };
   const rec = raw as Record<string, unknown>;
-  const filename =
+  const filename = (
     (typeof rec.filename === 'string' ? rec.filename.trim() : '') ||
-    (typeof rec.name === 'string' ? rec.name.trim() : '');
+    (typeof rec.name === 'string' ? rec.name.trim() : '')
+  )
+    // It lands in the model prompt: one short line, no control characters.
+    .replace(/\p{Cc}+/gu, ' ')
+    .slice(0, MAX_FILENAME);
   const mime = typeof rec.mime === 'string' ? rec.mime : undefined;
   const base64 = typeof rec.base64 === 'string' ? rec.base64 : undefined;
   if (!filename) return { error: 'document needs a filename.' };
@@ -44,11 +54,56 @@ function parseDocument(raw: unknown): { doc?: DocumentPayload; error?: string } 
   return { doc: { filename, mime: mime ?? 'application/pdf', base64 } };
 }
 
-const json = (body: unknown, status = 200) =>
+const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
+    headers: { 'content-type': 'application/json; charset=utf-8', ...headers },
   });
+
+export const AI_QUOTA_USER_MESSAGE =
+  'You’ve used today’s Build with AI limit. It resets at midnight UTC.';
+export const AI_QUOTA_GLOBAL_MESSAGE =
+  'Build with AI has reached today’s limit. It resets at midnight UTC.';
+export const AI_QUOTA_UNAVAILABLE_MESSAGE = 'Build with AI is temporarily unavailable.';
+
+type QuotaVerdict = 'allowed' | 'user' | 'global' | 'unavailable';
+
+/**
+ * Durable daily cap (ADR-051): consume_ai_generation (migration 014) as the
+ * caller. Anything but a well-formed row is 'unavailable' — the caller fails
+ * closed, so a missing migration or a Neon outage can never mean "unlimited".
+ */
+async function consumeAiQuota(token: string): Promise<QuotaVerdict> {
+  // Server-only proof the database checks (migration 014). Missing → fail closed.
+  const serverKey = process.env.AI_QUOTA_KEY?.trim();
+  if (!serverKey) {
+    console.error('[slate] ai quota check failed: AI_QUOTA_KEY is not set');
+    return 'unavailable';
+  }
+  let raw: unknown;
+  try {
+    raw = await callDataApiRpc('consume_ai_generation', token, { p_server_key: serverKey });
+  } catch (err) {
+    console.error('[slate] ai quota check failed:', err instanceof Error ? err.message : 'unknown');
+    return 'unavailable';
+  }
+  const row = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown> | null | undefined;
+  if (!row || typeof row !== 'object' || typeof row.allowed !== 'boolean') {
+    console.error('[slate] ai quota check returned an unexpected shape');
+    return 'unavailable';
+  }
+  if (row.allowed) return 'allowed';
+  // Under your own cap but refused → the shared ceiling is what's full.
+  const used = Number(row.used);
+  const cap = Number(row.per_user_daily);
+  return Number.isFinite(used) && Number.isFinite(cap) && used < cap ? 'global' : 'user';
+}
+
+function secondsUntilUtcMidnight(now = Date.now()): number {
+  const d = new Date(now);
+  const next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+  return Math.max(1, Math.ceil((next - now) / 1000));
+}
 
 function parsePrevious(raw: unknown): { form?: GeneratedForm; error?: string } {
   if (raw === undefined) return {};
@@ -67,6 +122,7 @@ function parsePrevious(raw: unknown): { form?: GeneratedForm; error?: string } {
 }
 
 async function handleGenerate(request: Request): Promise<Response> {
+  const startedAt = Date.now();
   const method = request.method.toUpperCase();
   if (method === 'OPTIONS') return new Response(null, { status: 204 });
   if (method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -76,13 +132,16 @@ async function handleGenerate(request: Request): Promise<Response> {
   // requests so localStorage-only local dev still works; Vercel never does.
   const devBypass = !process.env.VERCEL && request.headers.get('x-slate-dev') === '1';
   let subject = 'dev';
+  let token = '';
   if (!devBypass) {
-    const m = /^Bearer\s+(\S+)/i.exec(request.headers.get('authorization') ?? '');
-    const claims = m ? await verifyUserJwt(m[1]!).catch(() => null) : null;
+    token = /^Bearer\s+(\S+)/i.exec(request.headers.get('authorization') ?? '')?.[1] ?? '';
+    const claims = token ? await verifyUserJwt(token).catch(() => null) : null;
     if (!claims) return json({ error: 'Sign in to use Build with AI.' }, 401);
     subject = claims.sub;
   }
 
+  // Burst guard only — per instance, resets on cold start. The durable daily
+  // cap is consume_ai_generation, right before the model call below.
   // Per user first (a stolen session can't burn the budget), then per network.
   if (!takeRateLimit(`u:${subject}`) || !takeRateLimit(clientIp(request))) {
     return json({ error: 'Too many generate requests. Try again in a minute.' }, 429);
@@ -109,26 +168,19 @@ async function handleGenerate(request: Request): Promise<Response> {
     return json({ error: 'Send JSON: { "prompt": "…" }.' }, 400);
   }
 
-  const parsedDoc = parseDocument(documentRaw);
-  if (parsedDoc.error) return json({ error: parsedDoc.error }, 400);
-
-  if (parsedDoc.doc && !previousRaw) {
-    try {
-      const extracted = await extractDocumentText(parsedDoc.doc);
-      prompt = documentToPrompt(parsedDoc.doc.filename, extracted, prompt);
-    } catch (err) {
-      const message =
-        err instanceof DocumentExtractError ? err.message : 'Could not read that document.';
-      return json({ error: message }, 400);
-    }
-  }
-
-  if (!prompt) return json({ error: 'Describe the form you want to build.' }, 400);
-  if (!parsedDoc.doc && prompt.length > MAX_PROMPT) {
+  // The user's own text is capped whether or not a PDF comes with it (audit M-AI-1).
+  if (prompt.length > MAX_PROMPT) {
     return json({ error: 'Keep the prompt under 2,000 characters.' }, 400);
   }
   if (instruction.length > MAX_INSTRUCTION) {
     return json({ error: 'Keep the revision under 800 characters.' }, 400);
+  }
+
+  // A revision never re-reads the PDF, so a document sent with `previous` is ignored.
+  const parsedDoc = previousRaw === undefined ? parseDocument(documentRaw) : {};
+  if (parsedDoc.error) return json({ error: parsedDoc.error }, 400);
+  if (!prompt && !parsedDoc.doc) {
+    return json({ error: 'Describe the form you want to build.' }, 400);
   }
 
   const prev = parsePrevious(previousRaw);
@@ -140,16 +192,46 @@ async function handleGenerate(request: Request): Promise<Response> {
     return json({ error: 'Revisions need the current draft.' }, 400);
   }
 
+  // Last gate before any expensive work — PDF parsing included (audit M-AI-2).
+  // A request that was going to 400 never spends a unit. Skipped for the Vite
+  // dev bypass, exactly like the JWT check.
+  if (!devBypass) {
+    const quota = await consumeAiQuota(token);
+    if (quota === 'unavailable') return json({ error: AI_QUOTA_UNAVAILABLE_MESSAGE }, 503);
+    if (quota !== 'allowed') {
+      return json(
+        { error: quota === 'global' ? AI_QUOTA_GLOBAL_MESSAGE : AI_QUOTA_USER_MESSAGE },
+        429,
+        { 'retry-after': String(secondsUntilUtcMidnight()) },
+      );
+    }
+  }
+
+  if (parsedDoc.doc) {
+    try {
+      const extracted = await extractDocumentText(parsedDoc.doc);
+      prompt = documentToPrompt(parsedDoc.doc.filename, extracted, prompt);
+    } catch (err) {
+      const message =
+        err instanceof DocumentExtractError ? err.message : 'Could not read that document.';
+      return json({ error: message }, 400);
+    }
+  }
+
   try {
     const form = await runGenerateForm({
       prompt,
       previous: prev.form,
       instruction: instruction || undefined,
+      deadline: startedAt + DEADLINE_MS,
     });
     return json({ form, prompt });
   } catch (err) {
     if (err instanceof GenerateValidationError) {
       return json({ error: err.message }, 400);
+    }
+    if (err instanceof GenerateTimeoutError) {
+      return json({ error: err.message }, 504);
     }
     const message = err instanceof Error ? err.message : 'Generate failed.';
     console.error('[slate] generate failed', err);

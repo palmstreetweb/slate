@@ -1,0 +1,1401 @@
+/* ============================================================
+   Responses — Summary first view (ADR-055), ported from the
+   approved "09 Summary first" prototype. KPI tiles + bar charts
+   up top, then an expandable responses table. Colors come only
+   from the studio chrome tokens. Phone rules key off
+   .slate-rsp--phone (zoom-aware); in-between widths use a
+   container query on .rsp-sum, which follows the studio size.
+   Reduced motion is handled globally in responses.css.
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum {
+  container: rsp-sum / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  /* Muted at partial strength — the prototype's rgb(138 147 161 / a). */
+  --rsp-sum-muted-55: color-mix(in srgb, var(--chrome-muted) 55%, transparent);
+  --rsp-sum-muted-40: color-mix(in srgb, var(--chrome-muted) 40%, transparent);
+  --rsp-sum-muted-20: color-mix(in srgb, var(--chrome-muted) 20%, transparent);
+  --rsp-sum-accent-10: rgb(var(--slate-accent-rgb) / 0.1);
+  --rsp-sum-accent-14: rgb(var(--slate-accent-rgb) / 0.14);
+  --rsp-sum-accent-45: rgb(var(--slate-accent-rgb) / 0.45);
+  --rsp-sum-accent-55: rgb(var(--slate-accent-rgb) / 0.55);
+}
+
+/* Element resets stay below every class rule (shared ones included). */
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  :where(.rsp-sum)
+  :where(h2, h3, p, dl, dt, dd, ul, li) {
+  margin: 0;
+  padding: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp :where(.rsp-sum) :where(ul) {
+  list-style: none;
+}
+
+/* Bare buttons (tiles, bars, rows, pills). :where() keeps this reset
+   below every component rule; the shared .rsp-btn family has its own. */
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  :where(.rsp-sum-kpi--btn, .rsp-sum-bar, .rsp-sum-row, .rsp-sum-pill) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- top: KPI card + chart cards ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 1.25fr));
+  gap: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-top--c1 {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-top--c0 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* KPI tiles: one card, hairline-divided 2×2. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(96px, 1fr);
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--chrome-line);
+  border-radius: 12px;
+  background: var(--chrome-line);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--chrome-panel);
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 18px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--chrome-muted);
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi-label .rsp-dot {
+  width: 6px;
+  height: 6px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--chrome-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi-value small {
+  margin: 0 4px 0 1px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-kpi-value
+  span:last-child
+  > small {
+  margin-right: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi-foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-top: auto;
+  padding-top: 8px;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--chrome-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi-foot .rsp-icon {
+  width: 12px;
+  height: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-up {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--slate-success);
+  font-weight: 500;
+}
+
+/* Tiles that filter. */
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-kpi--btn:hover:not(:disabled) {
+  background: var(--chrome-panel-2);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi--btn:disabled {
+  cursor: default;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi--btn:focus-visible {
+  outline-offset: -2px;
+  border-radius: 2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi-icon {
+  position: absolute;
+  top: 13px;
+  right: 12px;
+  width: 14px;
+  height: 14px;
+  color: var(--chrome-muted);
+  opacity: 0.55;
+  transition:
+    opacity 140ms ease,
+    color 140ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-kpi--btn:is(:hover:not(:disabled), :focus-visible)
+  .rsp-sum-kpi-icon {
+  opacity: 1;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-kpi--btn[aria-pressed='true'] {
+  /* Opaque: the card behind the tiles is hairline-colored. */
+  background: color-mix(in srgb, var(--slate-accent) 10%, var(--chrome-panel));
+  box-shadow: inset 0 0 0 1px var(--rsp-sum-accent-55);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-kpi--btn[aria-pressed='true']:hover {
+  background: color-mix(in srgb, var(--slate-accent) 14%, var(--chrome-panel));
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-kpi--btn[aria-pressed='true']
+  .rsp-sum-kpi-icon {
+  opacity: 1;
+  color: var(--chrome-red);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-kpi--btn:disabled
+  .rsp-sum-kpi-icon {
+  opacity: 0;
+}
+
+/* Sparkline — 14 daily counts, this week in ink. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-spark {
+  align-items: flex-end;
+  gap: 2px;
+  height: 24px;
+  padding-top: 0;
+  overflow: visible;
+  box-shadow: inset 0 -1px 0 var(--chrome-line);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-spark-col {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 2px;
+  height: 100%;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-spark-col i {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 1px 1px 0 0;
+  background: var(--rsp-sum-muted-55);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-spark-col.is-zero i {
+  display: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-spark-col.is-now i {
+  background: var(--chrome-ink);
+}
+
+/* Chart cards. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-chart {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px 16px 8px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 12px;
+  background: var(--chrome-panel);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 20px;
+  margin-bottom: 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-chart-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--chrome-ink);
+}
+
+/* Long questions get two lines before they truncate. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-chart-text {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-qnum {
+  flex: none;
+  font-family: var(--rsp-mono);
+  font-size: 11px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-chart-meta {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--chrome-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-chart-meta b {
+  font-weight: 500;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-avg {
+  font-family: var(--rsp-mono);
+  font-size: 11.5px;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bars {
+  display: flex;
+  flex-direction: column;
+  margin: 0 -8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar {
+  --rsp-sum-label-w: clamp(76px, 34%, 180px);
+  display: grid;
+  grid-template-columns:
+    var(--rsp-sum-label-w) minmax(0, 1fr) calc(var(--rsp-sum-digits, 2) * 1ch + 4px)
+    36px;
+  align-items: center;
+  column-gap: 8px;
+  width: 100%;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--chrome-ink);
+  font-variant-numeric: tabular-nums;
+  transition: background-color 140ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-chart--numeric
+  .rsp-sum-bar {
+  --rsp-sum-label-w: calc(var(--rsp-sum-label) + 6px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar:focus-visible {
+  outline-offset: -2px;
+}
+
+/* `dir="auto"` text keeps the column's left edge but truncates RTL
+   answers at their end, not their start. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 20px;
+  color: var(--rsp-ink-86);
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-chart--numeric
+  .rsp-sum-bar-label {
+  font-family: var(--rsp-mono);
+  font-size: 11.5px;
+  text-align: right;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar-track {
+  position: relative;
+  align-self: stretch;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar-track::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: var(--chrome-line);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  :is(.rsp-sum-bar-ghost, .rsp-sum-bar-fill) {
+  position: absolute;
+  top: 50%;
+  left: 1px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 0 4px 4px 0;
+  transition:
+    width 280ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    background-color 140ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar-ghost {
+  background: var(--rsp-sum-muted-20);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar-fill {
+  background: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  :is(.rsp-sum-bar-n, .rsp-sum-bar-pct) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar-n {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar-pct {
+  font-size: 12px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar:hover {
+  background: var(--rsp-hover);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-bar:hover
+  .rsp-sum-bar-fill {
+  background: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-bar.is-dim
+  .rsp-sum-bar-label {
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-bar.is-dim
+  .rsp-sum-bar-fill {
+  background: var(--rsp-sum-muted-40);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-bar.is-dim:hover
+  .rsp-sum-bar-fill {
+  background: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-bar[aria-pressed='true'] {
+  background: var(--rsp-sum-accent-10);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-bar[aria-pressed='true']:hover {
+  background: var(--rsp-sum-accent-14);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-bar[aria-pressed='true']
+  .rsp-sum-bar-fill {
+  background: var(--chrome-red);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-bar[aria-pressed='true']
+  .rsp-sum-bar-label {
+  color: var(--chrome-ink);
+  font-weight: 600;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-bar.is-zero
+  .rsp-sum-bar-n {
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-chart-more {
+  align-self: flex-start;
+  margin: 4px 0 0 -8px;
+  color: var(--chrome-muted);
+}
+
+/* ---------- responses list ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-list {
+  min-width: 0;
+}
+
+/* The list header stays under the studio header while the rows scroll. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-head {
+  position: sticky;
+  top: var(--slate-header-h);
+  z-index: 3;
+  background: var(--chrome-bg);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  min-height: 48px;
+  padding: 8px 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heading {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-title {
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--chrome-ink);
+  border-radius: 6px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-title:focus-visible {
+  outline-offset: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-count {
+  font-family: var(--rsp-mono);
+  font-size: 12px;
+  line-height: 24px;
+  color: var(--chrome-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pills {
+  display: flex;
+  flex: 1 1 240px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-hint .rsp-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* A pill is one button: the whole chip removes the filter. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: 14px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pill-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--rsp-sum-accent-45);
+  border-radius: 14px;
+  background: var(--rsp-sum-accent-10);
+  font-size: 12.5px;
+  line-height: 16px;
+  animation: rsp-sum-pop 180ms ease-out;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pill-face .rsp-dot {
+  width: 6px;
+  height: 6px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pill-q {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--chrome-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The answer keeps its width; the question gives way first. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pill-v {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 24ch;
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--chrome-ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pill-x {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  color: var(--chrome-muted);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-pill:hover
+  .rsp-sum-pill-x {
+  background: color-mix(in srgb, var(--chrome-ink) 10%, transparent);
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pill:focus-visible {
+  outline-offset: 1px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-readall {
+  margin: 0 -8px 0 auto;
+}
+
+/* Column header. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-cols,
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-row {
+  display: grid;
+  grid-template-columns: var(--rsp-sum-cols);
+  column-gap: 12px;
+  align-items: center;
+  padding: 0 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-cols {
+  height: 32px;
+  border-top: 1px solid var(--chrome-line);
+  border-bottom: 1px solid var(--chrome-line);
+  font-size: 11.5px;
+  line-height: 16px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-cols > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-cols > .is-on {
+  color: var(--chrome-ink);
+  font-weight: 500;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-cols > .is-on::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--chrome-red);
+  vertical-align: 1px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-cols > .is-end {
+  text-align: right;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-rows {
+  padding-bottom: 8px;
+}
+
+/* Day groups. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-grouphead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px 8px;
+  border-bottom: 1px solid var(--chrome-hair);
+  font-family: var(--rsp-mono);
+  font-size: 10.5px;
+  line-height: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-group-n {
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rows. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-item {
+  border-bottom: 1px solid var(--chrome-hair);
+  transition: background-color 160ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-item.is-open {
+  margin: 8px 0;
+  border-bottom-color: transparent;
+  border-radius: 12px;
+  background: var(--chrome-panel);
+  box-shadow: 0 0 0 1px var(--chrome-line);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-row {
+  width: 100%;
+  height: 44px;
+  color: var(--chrome-ink);
+  transition: background-color 120ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-row:hover {
+  background: var(--rsp-hover);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-item.is-open .rsp-sum-row {
+  border-radius: 12px 12px 0 0;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-item.is-open
+  .rsp-sum-row:hover {
+  background: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-row:focus-visible {
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-row:not(.rsp-sum-row--card)
+  > :is(span, time) {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* `dir="auto"` cells keep the column's left edge; RTL text still
+   truncates at its own end. */
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  :is(.rsp-sum-c-name, .rsp-sum-c-choice, .rsp-sum-c-text) {
+  text-align: left;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-dot {
+  display: flex;
+  align-items: center;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-name {
+  font-weight: 500;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-choice {
+  color: var(--rsp-ink-86);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-choice.is-on {
+  color: var(--chrome-ink);
+  font-weight: 500;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-text {
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-file {
+  display: flex;
+  align-items: center;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-time {
+  font-size: 12px;
+  text-align: right;
+  color: var(--chrome-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-chev {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-chev .rsp-icon {
+  transition: transform 180ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-row:hover .rsp-sum-c-chev,
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-row[aria-expanded='true']
+  .rsp-sum-c-chev {
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-row[aria-expanded='true']
+  .rsp-sum-c-chev
+  .rsp-icon {
+  transform: rotate(180deg);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-item.is-unread
+  .rsp-sum-c-name {
+  font-weight: 650;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-sum-item.is-unread
+  .rsp-sum-c-time {
+  color: var(--chrome-ink);
+  font-weight: 500;
+}
+
+/* Expanded response. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 232px;
+  gap: 24px;
+  padding: 8px 16px 20px 32px;
+  border-top: 1px solid var(--chrome-hair);
+  animation: rsp-sum-in 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-panel .rsp-answers--grid {
+  padding-top: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 12px 0 0 24px;
+  border-left: 1px solid var(--chrome-hair);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-meta {
+  display: grid;
+  gap: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-meta dt {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-meta dd {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--chrome-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-meta-aside {
+  color: var(--chrome-muted);
+}
+
+/* Empty result + Show more. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-empty {
+  padding: 40px 12px 48px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 0 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-more-n {
+  font-family: var(--rsp-mono);
+  font-size: 11.5px;
+  color: var(--chrome-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- in-between widths (container, follows studio size) ---------- */
+
+/* Below ~1000px the KPIs become a 4-up strip above the charts, compact:
+   the footnote sits beside the value, on its baseline. The same strip
+   carries the KPIs when there is nothing to chart. */
+@container rsp-sum (max-width: 999px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-top--cn {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-top--c1 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-top .rsp-sum-kpis {
+    grid-column: 1 / -1;
+  }
+}
+
+@container rsp-sum (min-width: 760px) and (max-width: 999px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: auto;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: end;
+    column-gap: 12px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi-label {
+    grid-column: 1 / -1;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi-value {
+    grid-column: 1;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpi-foot {
+    grid-column: 2;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 5px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-spark {
+    height: 20px;
+    margin-bottom: 6px;
+    padding-bottom: 0;
+  }
+}
+
+/* No charts on a wide screen: the same compact strip. */
+@container rsp-sum (min-width: 1000px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-top--c0 .rsp-sum-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: auto;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-top--c0 .rsp-sum-kpi {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: end;
+    column-gap: 12px;
+  }
+
+  [data-slate-forms][data-theme-name='slate']
+    .slate-rsp
+    .rsp-sum
+    .rsp-sum-top--c0
+    .rsp-sum-kpi-label {
+    grid-column: 1 / -1;
+  }
+
+  [data-slate-forms][data-theme-name='slate']
+    .slate-rsp
+    .rsp-sum
+    .rsp-sum-top--c0
+    .rsp-sum-kpi-value {
+    grid-column: 1;
+  }
+
+  [data-slate-forms][data-theme-name='slate']
+    .slate-rsp
+    .rsp-sum
+    .rsp-sum-top--c0
+    .rsp-sum-kpi-foot {
+    grid-column: 2;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 5px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-top--c0 .rsp-sum-spark {
+    height: 20px;
+    margin-bottom: 6px;
+    padding-bottom: 0;
+  }
+}
+
+/* Narrower: four stacked tiles in a row; the table shares its width out. */
+@container rsp-sum (max-width: 759px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-panel {
+    grid-template-columns: minmax(0, 1fr) 208px;
+    padding-left: 24px;
+  }
+
+  [data-slate-forms][data-theme-name='slate']
+    .slate-rsp
+    .rsp-sum
+    .rsp-sum-panel
+    .rsp-answers--grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container rsp-sum (max-width: 899px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum :is(.rsp-sum-cols, .rsp-sum-row) {
+    grid-template-columns: var(--rsp-sum-cols-mid);
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-panel {
+    grid-template-columns: minmax(0, 1fr) 208px;
+  }
+}
+
+@container rsp-sum (max-width: 559px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-top--cn {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- phones (.slate-rsp--phone, zoom-aware) ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum {
+  gap: 12px;
+}
+
+/* KPI tiles 2×2, chart cards full width. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-top {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-kpi {
+  padding: 12px;
+}
+
+/* Narrow tiles (small phones, larger studio sizes): "↑ +3 vs last week"
+   wraps instead of being cut off. The sparkline stays one row. */
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp--phone
+  .rsp-sum
+  .rsp-sum-kpi-foot:not(.rsp-sum-spark) {
+  flex-wrap: wrap;
+  row-gap: 0;
+  white-space: normal;
+}
+
+/* 44px tap rows; the bar keeps its slim look and long labels get a
+   second line instead of an early ellipsis. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-bar {
+  --rsp-sum-label-w: clamp(76px, 42%, 200px);
+  height: auto;
+  min-height: 44px;
+  padding-block: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-bar-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  line-height: 16px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-chart-more {
+  margin-top: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-head {
+  position: static;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-toolbar {
+  gap: 4px 12px;
+  padding: 4px 0 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-pills {
+  flex-basis: 100%;
+  order: 3;
+}
+
+/* The pill face stays 28px; the button around it is the 44px target. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-pill {
+  min-height: 44px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-pill-face {
+  height: 32px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-rows {
+  display: grid;
+  gap: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-grouphead {
+  height: 32px;
+  padding: 0 4px 8px;
+  border-bottom: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-items {
+  display: grid;
+  gap: 8px;
+}
+
+/* Stacked cards. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-item {
+  overflow: hidden;
+  border: 1px solid var(--chrome-line);
+  border-radius: 12px;
+  background: var(--chrome-panel);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-item.is-open {
+  margin: 0;
+  border-color: var(--chrome-line);
+  box-shadow: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-row--card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  height: auto;
+  min-height: 56px;
+  padding: 12px 12px 12px 14px;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp--phone
+  .rsp-sum
+  .rsp-sum-row--card:focus-visible {
+  border-radius: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-row--card > * {
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 20px;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp--phone
+  .rsp-sum
+  .rsp-sum-card-top
+  .rsp-sum-c-dot:empty {
+  display: none;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp--phone
+  .rsp-sum
+  .rsp-sum-card-top
+  .rsp-sum-c-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp--phone
+  .rsp-sum
+  .rsp-sum-card-top
+  .rsp-sum-c-file:empty {
+  display: none;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp--phone
+  .rsp-sum
+  .rsp-sum-card-top
+  .rsp-sum-c-time {
+  flex: none;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp--phone
+  .rsp-sum
+  .rsp-sum-card-top
+  .rsp-sum-c-chev {
+  flex: none;
+  margin-right: -2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-chip {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 1px 8px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 6px;
+  background: var(--chrome-panel-2);
+  color: var(--rsp-ink-86);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-chip.is-on {
+  border-color: var(--rsp-sum-accent-45);
+  background: var(--rsp-sum-accent-10);
+  color: var(--chrome-ink);
+  font-weight: 500;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-card-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--chrome-muted);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* Open: the full answers follow, so the card head keeps name + age only. */
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp--phone
+  .rsp-sum
+  .rsp-sum-item.is-open
+  :is(.rsp-sum-chips, .rsp-sum-card-text) {
+  display: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-panel {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  padding: 4px 14px 16px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-aside {
+  padding: 16px 0 0;
+  border-top: 1px solid var(--chrome-hair);
+  border-left: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-more {
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-sum .rsp-sum-more .rsp-btn {
+  justify-content: center;
+  width: 100%;
+}
+
+/* ---------- motion ---------- */
+
+@keyframes rsp-sum-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rsp-sum-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

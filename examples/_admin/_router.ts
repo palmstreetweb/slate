@@ -30,13 +30,16 @@ export type Route =
 const NAVIGATE_EVENT = 'slate-navigate';
 
 /**
- * Old `#/path?query` links become `/path?query` on first load. Cheap
- * insurance for anything bookmarked before ADR-044.
+ * Old `/#/path?query` links become `/path?query` on first load. Cheap
+ * insurance for anything bookmarked before ADR-044. Root only.
  */
 export function syncPathFromHash(): void {
   if (typeof window === 'undefined') return;
   const { hash, search } = window.location;
   if (!hash.startsWith('#/')) return;
+  // Old links were all `/#/…`. Upgrading on any other path would let an
+  // embeddable `/forms/x#/settings` turn into a studio page (audit M-FRAME-1).
+  if (normalizePath() !== '/') return;
   const inner = hash.slice(1);
   const q = inner.indexOf('?');
   const path = q === -1 ? inner : inner.slice(0, q);

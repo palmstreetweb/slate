@@ -1,0 +1,1014 @@
+/* ============================================================
+   Responses — Inbox split view (ADR-055), ported from the
+   approved prototype "01 Inbox split view". Desktop: one
+   bordered panel, list | reader, each scrolling on its own.
+   Phones (.slate-rsp--phone): the list scrolls with the page
+   and the reader opens full width. Colors come only from the
+   studio chrome tokens; shared pieces live in responses.css.
+   ============================================================ */
+
+/* ---------- panel ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib {
+  display: grid;
+  grid-template-columns: clamp(284px, 32%, 356px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--chrome-line);
+  border-radius: var(--rsp-radius);
+  background: var(--chrome-panel);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib:focus {
+  outline: none;
+}
+
+/* Element resets stay below every class rule (shared ones included). */
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  :where(.rsp-ib)
+  :where(h2, p, ul, ol, li, dl, dt, dd) {
+  margin: 0;
+  padding: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp :where(.rsp-ib) :where(ul, ol) {
+  list-style: none;
+}
+
+/* ---------- list column ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--chrome-line);
+  container: rsp-ib-list / inline-size;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-tools {
+  display: grid;
+  gap: 8px;
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid var(--chrome-hair);
+}
+
+/* Search */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-search > .rsp-icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: var(--chrome-muted);
+  pointer-events: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-search-input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  margin: 0;
+  padding: 0 36px 0 36px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 10px;
+  background: var(--chrome-panel-2);
+  color: var(--chrome-ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-search-input::placeholder {
+  color: var(--chrome-muted);
+  opacity: 1;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-ib-search-input::-webkit-search-cancel-button,
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-ib-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-search-input:focus {
+  border-color: color-mix(in srgb, var(--chrome-ink) 45%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--chrome-ink) 10%, transparent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-search-hint {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-ib-search-input:focus
+  ~ .rsp-ib-search-hint {
+  opacity: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-search-clear {
+  position: absolute;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--chrome-muted);
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-search-clear .rsp-icon {
+  width: 14px;
+  height: 14px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-search-clear:hover {
+  background: var(--chrome-panel);
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-ib-search
+  .rsp-ib-search-clear:focus-visible {
+  outline-offset: -2px;
+}
+
+/* All / Unread + Mark all read (trash: Restore all + Empty trash) */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-filterbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-filterbar .rsp-seg > button {
+  height: 26px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-filterbar .rsp-textbtn:last-child {
+  margin-right: -4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-filterbar .rsp-ib-edge {
+  margin-left: -4px;
+}
+
+/* Rows */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 0 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--chrome-line) transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-rows:focus {
+  outline: none;
+}
+
+/* Sticky day label; one <li> per group so each label pushes the last one off. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-grp {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px 6px 32px;
+  background: var(--chrome-panel);
+  color: var(--chrome-muted);
+  font-family: var(--rsp-mono);
+  font-size: 10.5px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-grp-n {
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 4px;
+  width: calc(100% - 16px);
+  margin: 0 8px;
+  padding: 9px 12px 9px 4px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  scroll-margin: 40px 0 8px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row:hover {
+  background: var(--rsp-hover);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row--sel,
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row--sel:hover {
+  background: var(--chrome-panel-2);
+  box-shadow: inset 0 0 0 1px var(--chrome-line);
+}
+
+/* Selection accent at the panel edge. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row--sel::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--slate-accent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-rows .rsp-ib-row:focus-visible {
+  outline-offset: -2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-dot {
+  justify-self: center;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row--unread .rsp-ib-dot {
+  background: var(--chrome-red);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row-main {
+  display: block;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* `dir="auto"` text keeps the list's left edge, as in the Summary table;
+   RTL names still truncate at their own end. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-size: 13.5px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--rsp-ink-90);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row--unread .rsp-ib-name {
+  font-weight: 650;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-time {
+  flex: none;
+  font-family: var(--rsp-mono);
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--chrome-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row--unread .rsp-ib-time {
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-need {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--rsp-ink-78);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-row--unread .rsp-ib-need {
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-sep {
+  flex: none;
+  color: var(--chrome-muted);
+  opacity: 0.6;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-snip {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-clip {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-list .rsp-ib-empty {
+  padding: 24px 20px 24px 32px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-empty .rsp-empty-title {
+  overflow-wrap: anywhere;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-more {
+  display: flex;
+  justify-content: center;
+  padding: 8px 12px 0;
+}
+
+/* Shortcut legend (mouse + keyboard only; see .rsp-desktop-only). */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: none;
+  height: 40px;
+  padding: 0 16px 0 32px;
+  overflow: hidden;
+  border-top: 1px solid var(--chrome-hair);
+  color: var(--chrome-muted);
+  font-size: 11.5px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-legend .rsp-kbd {
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
+
+/* Largest studio size on a small phone: Mark all read drops under the toggle. */
+@container rsp-ib-list (max-width: 280px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-filterbar {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  [data-slate-forms][data-theme-name='slate']
+    .slate-rsp
+    .rsp-ib-filterbar
+    > .rsp-textbtn:last-child {
+    margin-left: auto;
+  }
+}
+
+@container rsp-ib-list (max-width: 330px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-legend {
+    gap: 10px;
+    padding: 0 12px 0 20px;
+  }
+}
+
+/* ---------- reader ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-read {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  container: rsp-ib-read / inline-size;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  height: 53px;
+  padding: 0 16px 0 20px;
+  border-bottom: 1px solid var(--chrome-hair);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-nav,
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-ib-bar
+  .rsp-ib-nav
+  .rsp-iconbtn[aria-disabled='true'] {
+  background: transparent;
+  color: var(--rsp-ink-86);
+  opacity: 0.4;
+  cursor: default;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-pos {
+  margin-left: 8px;
+  font-family: var(--rsp-mono);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--chrome-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--chrome-line) transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-read .rsp-ib-scroll:focus-visible {
+  outline-offset: -2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-doc {
+  max-width: 688px;
+  padding: 28px 32px 40px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-title {
+  margin: 8px 0 0;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--chrome-ink);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+/* Focus lands on the name when a phone opens a response; no ring for that. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib .rsp-ib-title:focus-visible {
+  outline: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  margin: 4px 0 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-email {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--rsp-ink-78);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  height: 24px;
+  margin: 0;
+  padding: 0 8px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--chrome-muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-copy .rsp-icon {
+  width: 12px;
+  height: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-copy:hover {
+  background: var(--chrome-panel-2);
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-copy--done,
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-copy--done:hover {
+  border-color: color-mix(in srgb, var(--slate-success) 40%, var(--chrome-line));
+  color: var(--slate-success);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--chrome-line);
+  border-bottom: 1px solid var(--chrome-line);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-facts > div {
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-facts dt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--rsp-mono);
+  font-size: 10.5px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chrome-muted);
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-facts dd {
+  margin: 4px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-fact-sub {
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-doc .rsp-ib-answers {
+  margin-top: 8px;
+}
+
+/* Other responses from the same address */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-also {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--chrome-line);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-also-row {
+  display: grid;
+  grid-template-columns: 64px auto minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-also-row:hover {
+  background: var(--chrome-panel-2);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-also-row time {
+  font-family: var(--rsp-mono);
+  font-size: 11px;
+  color: var(--chrome-muted);
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-also-need {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-also-snip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-also-row > .rsp-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--chrome-muted);
+}
+
+/* ---------- nothing open: unread digest / all caught up ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-digest {
+  max-width: 600px;
+  padding: 40px 32px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-lede {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--chrome-muted);
+  overflow-wrap: anywhere;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-more-note {
+  margin-top: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-cards {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-card {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 4px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 16px 12px 8px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 12px;
+  background: var(--chrome-panel-2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-card:hover {
+  background: color-mix(in srgb, var(--chrome-panel-2), var(--chrome-ink) 4%);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-card .rsp-ib-dot {
+  background: var(--chrome-red);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-card-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-card-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  /* Leave the answer beside it a few readable characters. */
+  max-width: 68%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-card-need {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--rsp-ink-78);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-card-top .rsp-ib-time {
+  margin-left: auto;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-card-note {
+  display: -webkit-box;
+  margin-top: 4px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--chrome-muted);
+  overflow-wrap: anywhere;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-card-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-family: var(--rsp-mono);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-card-file .rsp-icon {
+  width: 12px;
+  height: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-digest-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-done {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 16px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 12px;
+  color: var(--slate-success);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-done .rsp-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---------- narrower readers (tablets, big studio sizes) ---------- */
+
+@container rsp-ib-read (max-width: 700px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-doc {
+    padding: 24px 24px 32px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-digest {
+    padding: 32px 24px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-bar .rsp-kbd--hint {
+    display: none;
+  }
+}
+
+@container rsp-ib-read (max-width: 540px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-read .rsp-btn-long {
+    display: none;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+  }
+
+  /* "Wed, Sep 23 at 12:22 PM" gets the whole row. */
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-facts > div:first-child {
+    grid-column: 1 / -1;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-also-row {
+    grid-template-columns: 52px minmax(0, 1fr) 16px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-also-snip {
+    display: none;
+  }
+}
+
+@container rsp-ib-read (max-width: 250px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container rsp-ib-read (max-width: 460px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-pos {
+    display: none;
+  }
+}
+
+/* ---------- phones: page scroll, one column ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib {
+  display: block;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-list {
+  border-right: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-tools {
+  gap: 10px;
+  padding: 0 0 4px;
+  border-bottom: 0;
+}
+
+/* 16px keeps iOS from zooming the page on focus. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-search-input {
+  height: 44px;
+  padding-right: 48px;
+  background: var(--chrome-panel);
+  font-size: 16px;
+}
+
+/* No keycap hint on phones: the placeholder can use the full width. */
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp--phone
+  .rsp-ib-search-input:placeholder-shown {
+  padding-right: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-search-clear {
+  right: 2px;
+  width: 40px;
+  height: 40px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-filterbar .rsp-seg > button {
+  height: 40px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-rows {
+  overflow: visible;
+  padding: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-grp {
+  top: var(--slate-header-h);
+  padding: 16px 0 6px 14px;
+  background: var(--chrome-bg);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-row {
+  grid-template-columns: 14px minmax(0, 1fr);
+  width: calc(100% + 16px);
+  min-height: 44px;
+  margin: 0 -8px;
+  padding: 11px 8px 11px 4px;
+  scroll-margin-top: calc(var(--slate-header-h) + 40px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-list .rsp-ib-empty {
+  padding: 24px 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-more {
+  padding: 8px 0 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-read {
+  display: block;
+  scroll-margin-top: var(--slate-header-h);
+}
+
+/* The reader's nav stays reachable while a long response scrolls. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-bar {
+  position: sticky;
+  top: var(--slate-header-h);
+  z-index: 2;
+  height: 60px;
+  margin: 0 -16px;
+  padding: 0 16px;
+  background: var(--chrome-bg);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-bar .rsp-ib-back {
+  margin-left: -8px;
+  font-size: 13.5px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-scroll {
+  overflow: visible;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-doc {
+  max-width: none;
+  padding: 20px 0 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-title {
+  font-size: 22px;
+  line-height: 28px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-copy {
+  height: 40px;
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-contact {
+  margin-top: 6px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-ib-doc .rsp-ib-phone-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 8px;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp--phone
+  .rsp-ib-phone-actions
+  > :is(.rsp-btn, .rsp-iconbtn) {
+  flex: 0 0 auto;
+}
+
+/* ---------- trash ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib--trash .rsp-ib-filterbar {
+  min-height: 32px;
+}

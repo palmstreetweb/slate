@@ -4,7 +4,8 @@
  * Neon injects DATABASE_URL and S3-compatible Object Storage credentials.
  *
  * Auth model:
- * - public/ upload: anonymous OK when form is published (rate-limited).
+ * - public/ upload: anonymous OK when form is published (rate-limited) and its
+ *   published schema has a file question; size capped by that question (ADR-050).
  *   Password-locked forms (ADR-043) also need the respondent's unlockToken.
  * - draft/ upload + all download/meta/content: Bearer JWT, signature verified
  *   against the Neon Auth JWKS, whose `sub` matches forms.owner_id.
@@ -27,11 +28,16 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { isValidUnlockToken } from './fillLock.js';
 import { clientIp } from './requestIp.js';
 import { verifyUserJwt } from './authJwt.js';
+import { decidePublicUpload } from './uploadPolicy.js';
 
 const BUCKET = process.env.NEON_STORAGE_BUCKET || 'form-uploads';
 
 /** Default 32 MB — matches client prepareFileForUpload non-image cap. */
 const MAX_BYTES = Number(process.env.STORAGE_SIGN_MAX_BYTES ?? 32 * 1024 * 1024);
+
+function tooLargeText(maxBytes: number): string {
+  return `File too large (max ${+(maxBytes / (1024 * 1024)).toFixed(1)} MB)`;
+}
 
 /** Anonymous sign: 20 / 10 min per IP + form. */
 const PER_IP_FORM_MAX = Number(process.env.STORAGE_SIGN_IP_FORM_MAX ?? 20);
@@ -162,21 +168,23 @@ async function userIdFromToken(token: string): Promise<string | null> {
   return claims?.sub ?? null;
 }
 
-async function loadForm(formId: string): Promise<{
+type FormGateRow = {
   id: string;
   status: string;
   deleted_at: string | null;
   owner_id: string | null;
   fill_password_hash: string | null;
-} | null> {
-  const formRes = await pool.query<{
-    id: string;
-    status: string;
-    deleted_at: string | null;
-    owner_id: string | null;
-    fill_password_hash: string | null;
-  }>(
-    `select id, status, deleted_at, owner_id, fill_password_hash
+  /** Only selected for the public/ upload gate (ADR-050); owner read ops skip it. */
+  published_schema?: unknown;
+};
+
+async function loadForm(
+  formId: string,
+  opts: { withPublishedSchema?: boolean } = {},
+): Promise<FormGateRow | null> {
+  const cols = 'id, status, deleted_at, owner_id, fill_password_hash';
+  const formRes = await pool.query<FormGateRow>(
+    `select ${opts.withPublishedSchema ? `${cols}, published_schema` : cols}
      from public.forms where id = $1 limit 1`,
     [formId],
   );
@@ -270,8 +278,10 @@ app.post('/', async (c) => {
       return c.text('Missing or invalid contentLength', 400);
     }
     if (contentLength > MAX_BYTES) {
-      return c.text(`File too large (max ${Math.floor(MAX_BYTES / (1024 * 1024))} MB)`, 413);
+      return c.text(tooLargeText(MAX_BYTES), 413);
     }
+    // Tightened per form below for public/ (ADR-050); draft/ keeps the global cap.
+    let maxBytes = MAX_BYTES;
 
     // Only draft/ uploads passed the verified owner gate; a bare Bearer on a
     // public/ upload earns nothing (it could be forged).
@@ -324,10 +334,11 @@ app.post('/', async (c) => {
       return c.text('Temporarily unavailable', 503);
     }
 
-    // public/ upload: published form only (draft already gated by owner above).
+    // public/ upload: published form that asks for a file (draft already gated by owner above).
     if (parsed.scope === 'public') {
       try {
-        const form = await loadForm(parsed.formId);
+        // One query: the gate columns plus the published questions the policy reads.
+        const form = await loadForm(parsed.formId, { withPublishedSchema: true });
         if (!form || form.deleted_at) {
           return c.text('Form not available', 404);
         }
@@ -342,6 +353,16 @@ app.post('/', async (c) => {
         ) {
           return c.json({ error: 'locked' }, 401);
         }
+        // After the lock, so a locked form's questions and limits stay behind the password.
+        const decision = decidePublicUpload(form.published_schema, contentLength, MAX_BYTES);
+        if (!decision.ok) {
+          // No file question looks exactly like an unpublished form: not free storage, no oracle.
+          if (decision.reason === 'no-file-question') {
+            return c.text('Form not available', 404);
+          }
+          return c.text(tooLargeText(decision.maxBytes), 413);
+        }
+        maxBytes = decision.maxBytes;
       } catch (err) {
         console.error('[storagesign] form check failed', err);
         return c.text('Temporarily unavailable', 503);
@@ -364,7 +385,7 @@ app.post('/', async (c) => {
         signableHeaders: new Set(['content-type', 'content-length']),
       });
       // The PUT must carry exactly this Content-Type — it is part of the signature.
-      return c.json({ url, method: 'PUT', maxBytes: MAX_BYTES, contentType });
+      return c.json({ url, method: 'PUT', maxBytes, contentType });
     } catch (err) {
       console.error('[storagesign] presign failed', err);
       return c.text('Sign failed', 500);
@@ -391,7 +412,8 @@ app.post('/', async (c) => {
     if (body.op === 'content') {
       const out = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: body.path }));
       if (!out.Body) return c.text('Not found', 404);
-      const bytes = await out.Body.transformToByteArray();
+      // Type-only: the SDK says ArrayBufferLike, Response wants ArrayBuffer-backed; it is.
+      const bytes = (await out.Body.transformToByteArray()) as Uint8Array<ArrayBuffer>;
       return new Response(bytes, {
         status: 200,
         headers: {

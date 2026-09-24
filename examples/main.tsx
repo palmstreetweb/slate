@@ -37,8 +37,26 @@ if (route.name === 'fill' && isNeonConfigured()) {
   });
 }
 
+/** Cross-origin parents make `window.top` access throw — that counts as framed. */
+function isFramed(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 if (route.name === 'fill' || route.name === 'respond') {
   void import('./publicApp.js').then((m) => m.mountPublic(root));
+} else if (isFramed()) {
+  // Only public forms are embeddable (ADR-054). The studio never runs inside
+  // someone else's page — that would allow clickjacking an owner (audit M-FRAME-1).
+  const link = document.createElement('a');
+  link.href = window.location.origin;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = 'Open Slate in its own tab';
+  root.replaceChildren(link);
 } else {
   void import('./studioApp.js').then((m) => m.mountStudio(root));
 }

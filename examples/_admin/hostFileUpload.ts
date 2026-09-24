@@ -9,7 +9,7 @@ import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import { saveLocalUpload } from './localFileStore.js';
 import { hasStorageSignUrl, isNeonConfigured } from './neon/config.js';
 import { authHeader, uploadToNeonStorage } from './storageUpload.js';
-import { getUploadFormId } from './uploadContext.js';
+import { getUploadFormId, getUploadScope } from './uploadContext.js';
 
 async function uploadToRemote(
   file: File,
@@ -21,9 +21,10 @@ async function uploadToRemote(
   const portable = !formId || formId.startsWith('portable_') || formId.startsWith('local_');
 
   if (isNeonConfigured() && hasStorageSignUrl() && !portable) {
-    // Signed-in owner testing their own form → draft/; everyone else → public/.
+    // The page decides first (PublicFill pins 'public'). Otherwise a signed-in
+    // owner previewing their own form → draft/; everyone else → public/.
     // Only draft/ passes the owner gate server-side, so a stray session can't widen anything.
-    const scope = (await authHeader()).Authorization ? 'draft' : 'public';
+    const scope = getUploadScope() ?? ((await authHeader()).Authorization ? 'draft' : 'public');
     return uploadToNeonStorage(file, { scope, formId });
   }
 

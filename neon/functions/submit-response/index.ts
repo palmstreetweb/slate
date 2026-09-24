@@ -10,12 +10,11 @@ import { cors } from 'hono/cors';
 import { Pool } from 'pg';
 import { fillUnlockToken, isValidUnlockToken } from './fillLock.js';
 import { clientIp } from './requestIp.js';
+import { clampText, clampValue, isSafeKey } from './answerShape.js';
 
 /** Hard caps on what one submission may carry (ADR-046). */
 const MAX_BODY_BYTES = 256 * 1024;
 const MAX_ANSWER_KEYS = 200;
-const MAX_STRING_CHARS = 10_000;
-const MAX_ARRAY_ITEMS = 100;
 const MAX_VISITED = 500;
 const MAX_HIDDEN_KEYS = 50;
 
@@ -73,24 +72,6 @@ app.use('*', cors({ origin: '*' }));
 
 app.options('*', (c) => c.body(null, 204));
 
-/** Clamp one answer value: strings, numbers, booleans, short arrays, small objects. */
-function clampValue(v: unknown, depth = 0): unknown {
-  if (v == null) return v;
-  if (typeof v === 'string') return v.length > MAX_STRING_CHARS ? v.slice(0, MAX_STRING_CHARS) : v;
-  if (typeof v === 'number' || typeof v === 'boolean') return v;
-  if (depth >= 2) return undefined;
-  if (Array.isArray(v)) return v.slice(0, MAX_ARRAY_ITEMS).map((x) => clampValue(x, depth + 1));
-  if (typeof v === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [k, val] of Object.entries(v as Record<string, unknown>).slice(0, 20)) {
-      const c = clampValue(val, depth + 1);
-      if (c !== undefined) out[k.slice(0, 64)] = c;
-    }
-    return out;
-  }
-  return undefined;
-}
-
 /**
  * Keep only answers whose key is a question in the published schema, each
  * clamped. Stops a respondent (or a bot with a form id) from storing
@@ -127,7 +108,9 @@ function sanitizeMeta(raw: SubmitBody['meta']): SubmitBody['meta'] {
   const hidden: Record<string, unknown> = {};
   if (raw.hiddenFields && typeof raw.hiddenFields === 'object') {
     for (const [k, v] of Object.entries(raw.hiddenFields).slice(0, MAX_HIDDEN_KEYS)) {
-      hidden[k.slice(0, 64)] = typeof v === 'string' ? v.slice(0, 500) : clampValue(v, 2);
+      if (!isSafeKey(k)) continue;
+      const t = typeof v === 'string' ? v.slice(0, 500) : clampText(v);
+      if (t !== undefined) hidden[k.slice(0, 64)] = t;
     }
   }
   const dur = Number(raw.durationMs);
@@ -327,6 +310,14 @@ app.post('/', async (c) => {
   }
 
   if (body.meta.hiddenFields?._hp) {
+    // Honeypot hit (ADR-052). Logged so an autofill false positive — a real
+    // respondent silently dropped — is visible. No answers, no IP.
+    console.info('[submitresponse] honeypot drop', {
+      formId: String(body.formId).slice(0, 64),
+      answerKeys:
+        body.answers && typeof body.answers === 'object' ? Object.keys(body.answers).length : 0,
+      durationMs: Number(body.meta.durationMs) || 0,
+    });
     return c.json({ id: 'ignored' });
   }
 

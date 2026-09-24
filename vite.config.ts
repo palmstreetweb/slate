@@ -47,7 +47,8 @@ export default defineConfig(({ mode }) => {
                 body:
                   req.method === 'GET' || req.method === 'HEAD' ? undefined : Buffer.concat(chunks),
               });
-              const response = await generateHandler(request);
+              // A web Request always gets a Response back (the Node pair gets void).
+              const response = (await generateHandler(request)) as Response;
               res.statusCode = response.status;
               response.headers.forEach((value, key) => {
                 res.setHeader(key, value);

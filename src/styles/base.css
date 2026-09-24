@@ -137,6 +137,37 @@
   font-size: 13px;
 }
 
+/* brand.logo — sits left of the name, capped to the chrome row so tall or
+   wide artwork can't crowd the back button and toggle. */
+[data-slate-forms] .slate-brand--logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* A definite height, not max-height: viewBox-only SVGs have no intrinsic
+   size, so with max-height alone they count as 0px wide when the brand is
+   sized and the name wraps under them. Width follows the aspect ratio. */
+/* With a logo the brand can shrink, so the name must too — otherwise its
+   min-content width spills into the back button on phones. The logo's alt
+   already carries the accessible name, so an ellipsis loses nothing. */
+[data-slate-forms] .slate-brand--logo .slate-brand-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-slate-forms] .slate-brand-logo {
+  display: block;
+  flex-shrink: 0;
+  width: auto;
+  height: 24px;
+  max-width: min(160px, 40vw);
+  object-fit: contain;
+}
+
 [data-slate-forms] .slate-back {
   background: transparent;
   border: none;

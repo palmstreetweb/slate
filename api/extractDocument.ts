@@ -7,6 +7,8 @@ import { extractText, getDocumentProxy } from 'unpdf';
 
 const MAX_BYTES = 3_000_000;
 const MAX_TEXT = 24_000;
+/** A paper form is a few pages. Anything longer is a book, and slow to parse (audit M-AI-2). */
+const MAX_PAGES = 30;
 
 export class DocumentExtractError extends Error {
   constructor(message: string) {
@@ -64,9 +66,17 @@ export async function extractDocumentText(doc: DocumentPayload): Promise<string>
     throw new DocumentExtractError('Start with a PDF. Word and Pages can come later.');
   }
 
-  const pdf = await getDocumentProxy(new Uint8Array(bytes));
+  let pdf: Awaited<ReturnType<typeof getDocumentProxy>>;
+  try {
+    pdf = await getDocumentProxy(new Uint8Array(bytes));
+  } catch {
+    throw new DocumentExtractError('Could not read that PDF.');
+  }
+  if (pdf.numPages > MAX_PAGES) {
+    throw new DocumentExtractError(`Keep the PDF under ${MAX_PAGES} pages.`);
+  }
   const { text } = await extractText(pdf, { mergePages: true });
-  const joined = (Array.isArray(text) ? text.join('\n') : text).replace(/\u0000/g, '').trim();
+  const joined = (Array.isArray(text) ? text.join('\n') : text).replaceAll('\u0000', '').trim();
   if (joined.length < 20) {
     throw new DocumentExtractError(
       'No readable text in that PDF. Paste the questions, or export a text PDF.',

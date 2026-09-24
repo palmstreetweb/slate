@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Form } from '@/index.js';
 import {
   fetchPublishedFormBySlug,
@@ -18,11 +18,42 @@ import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { LoadingScreen } from '../shell/LoadingScreen.js';
 import { FillGate } from '../components/FillGate.js';
 import { clearFillUnlockToken, readFillUnlockToken, writeFillUnlockToken } from '../fillUnlock.js';
+import { routeSearchParams } from '../_router.js';
 
 type Props = { slug: string };
 
 type OpenForm = Extract<PublishedFormPayload, { locked: false }>;
 type LockedForm = Extract<PublishedFormPayload, { locked: true }>;
+
+/** `?embed=1` — we're inside a host site's iframe (ADR-054). */
+function readEmbedMode(): boolean {
+  return routeSearchParams().get('embed') === '1';
+}
+
+/**
+ * Embed mode: post our height to the host page so its script can size the
+ * iframe. One-way — we never read from, or listen to, the parent. The page
+ * fills the frame, so the height tracks the tallest step seen rather than
+ * shrinking between steps (the host page doesn't jump under a thumb).
+ */
+function useEmbedHeight(enabled: boolean) {
+  return useCallback(
+    (el: HTMLElement | null) => {
+      if (!enabled || !el || window.parent === window) return;
+      if (typeof ResizeObserver === 'undefined') return;
+      let last = 0;
+      const observer = new ResizeObserver(() => {
+        const height = el.offsetHeight;
+        if (height <= 0 || height === last) return;
+        last = height;
+        window.parent.postMessage({ type: 'slate:height', height }, '*');
+      });
+      observer.observe(el);
+      return () => observer.disconnect();
+    },
+    [enabled],
+  );
+}
 
 export function PublicFill({ slug }: Props) {
   const [loading, setLoading] = useState(true);
@@ -30,8 +61,13 @@ export function PublicFill({ slug }: Props) {
   const [form, setForm] = useState<OpenForm | null>(null);
   /** Locked and not yet unlocked in this tab (ADR-043). */
   const [gate, setGate] = useState<LockedForm | null>(null);
+  /** Honeypot input (ADR-052). Read at submit, never rendered from state. */
+  const trapRef = useRef<HTMLInputElement>(null);
+  const [embed] = useState(readEmbedMode);
+  const embedRef = useEmbedHeight(embed);
   const mode = readSlateMode();
   const uiTheme = detectAdminUiTheme();
+  const embedClass = embed ? ' slate-embed' : '';
 
   useEffect(() => {
     if (!isNeonConfigured()) {
@@ -43,7 +79,7 @@ export function PublicFill({ slug }: Props) {
     const open = (payload: OpenForm) => {
       setForm(payload);
       setGate(null);
-      setUploadContext(payload.id);
+      setUploadContext(payload.id, { scope: 'public' });
     };
     void (async () => {
       try {
@@ -84,7 +120,7 @@ export function PublicFill({ slug }: Props) {
       if (result.unlockToken) writeFillUnlockToken(result.form.id, result.unlockToken);
       setForm(result.form);
       setGate(null);
-      setUploadContext(result.form.id);
+      setUploadContext(result.form.id, { scope: 'public' });
       return null;
     },
     [slug],
@@ -97,11 +133,12 @@ export function PublicFill({ slug }: Props) {
   if (gate && !form) {
     return (
       <div
+        ref={embedRef}
         data-slate-forms=""
         data-theme-name="slate"
         data-admin-ui={uiTheme}
         data-theme={mode}
-        className="slate-app"
+        className={`slate-app${embedClass}`}
       >
         <FillGate formName={gate.name} onUnlock={onUnlock} />
       </div>
@@ -112,11 +149,12 @@ export function PublicFill({ slug }: Props) {
     // Anonymous scanners land here — no studio links.
     return (
       <div
+        ref={embedRef}
         data-slate-forms=""
         data-theme-name="slate"
         data-admin-ui={uiTheme}
         data-theme={mode}
-        className="slate-app"
+        className={`slate-app${embedClass}`}
       >
         <main className="slate-fill-gate">
           <p className="slate-fill-gate-notice" role="status">
@@ -128,30 +166,61 @@ export function PublicFill({ slug }: Props) {
   }
 
   return (
-    <div className="slate-public-respond" style={{ minHeight: '100vh' }}>
+    <div
+      ref={embedRef}
+      className={`slate-public-respond${embedClass}`}
+      style={{ minHeight: '100vh' }}
+    >
       <Form
         schema={form.schema}
         onFileUpload={hostFileUpload}
         resolveFileUploadMeta={resolveUploadMeta}
         onSubmit={async (answers, meta) => {
+          const payloadMeta = metaToPayload(meta);
+          // Filled trap = bot. Flag it and let the Function drop it after the
+          // rate limit; the respondent sees the same thanks screen either way.
+          const trapped = Boolean(trapRef.current?.value.trim());
           await submitPublicResponse({
             formId: form.id,
             answers,
-            meta: metaToPayload(meta),
+            meta: trapped
+              ? { ...payloadMeta, hiddenFields: { ...payloadMeta.hiddenFields, _hp: '1' } }
+              : payloadMeta,
           });
         }}
       />
-      <p
-        style={{
-          margin: 0,
-          padding: '8px 16px',
-          fontSize: 12,
-          color: 'var(--slate-muted)',
-          textAlign: 'center',
-        }}
-      >
-        {form.name}
-      </p>
+      {/* Off-screen, outside the engine: people and screen readers never reach
+          it, naive fill-every-input bots do. Neutral name so autofill skips it. */}
+      <div className="slate-fill-trap" aria-hidden="true">
+        <label>
+          Leave this field empty
+          <input
+            ref={trapRef}
+            type="text"
+            name="fill_note"
+            tabIndex={-1}
+            autoComplete="off"
+            data-1p-ignore=""
+            data-lpignore="true"
+            data-bwignore=""
+            data-form-type="other"
+          />
+        </label>
+      </div>
+      {/* Embedded, the host page names the form; a line under 100vh would only add a scrollbar. */}
+      {embed ? null : (
+        <p
+          style={{
+            margin: 0,
+            padding: '8px 16px',
+            fontSize: 12,
+            color: 'var(--slate-muted)',
+            textAlign: 'center',
+          }}
+        >
+          {form.name}
+        </p>
+      )}
     </div>
   );
 }

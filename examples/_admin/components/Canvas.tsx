@@ -150,7 +150,12 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
         >
           <ThemeDecoration themeName={schema.theme} step={stepIndex} />
           <ProgressBar value={progressPct} />
-          <TopBar brandName={schema.brand.name} showBack={false} onBack={noop} />
+          <TopBar
+            brandName={schema.brand.name}
+            brandLogo={schema.brand.logo}
+            showBack={false}
+            onBack={noop}
+          />
 
           <div className="slate-stage" style={{ minHeight: 'auto', padding: '48px 24px 120px' }}>
             <div

@@ -8,7 +8,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useFocusTrap } from '../useFocusTrap.js';
 import type { Schema } from '@/index.js';
-import { copyText, copyImage } from '../shareUrls.js';
+import { buildEmbedSnippet, copyText, copyImage } from '../shareUrls.js';
 import { buildPortableShareUrl, canEncodePortableSchema } from '../portableShare.js';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { readSlateMode } from '../slateMode.js';
@@ -50,6 +50,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const [qrError, setQrError] = useState<string | null>(null);
   const [qrStyle, setQrStyle] = useState<ShareQrStyle>(() => readShareQrStyle());
   const [copied, setCopied] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
   const [qrCopied, setQrCopied] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [lockEditing, setLockEditing] = useState(false);
@@ -142,6 +143,17 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
       window.setTimeout(() => setCopied(false), 2000);
     }
   }, [shareUrl]);
+
+  /** Only the published cloud link embeds — a portable link isn't framable (ADR-054). */
+  const doCopyEmbed = useCallback(async () => {
+    if (!productionUrl) return;
+    const ok = await copyText(buildEmbedSnippet(productionUrl, formName));
+    if (ok) {
+      playUiSound('copy');
+      setEmbedCopied(true);
+      window.setTimeout(() => setEmbedCopied(false), 2000);
+    }
+  }, [productionUrl, formName]);
 
   const onCopyQr = useCallback(async () => {
     if (!qr) return;
@@ -379,15 +391,33 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                     </button>
                   </div>
                   <div className="slate-share-actions">
-                    <a
-                      href={shareUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="slate-share-open"
-                    >
-                      Open in browser
-                      <span aria-hidden>↗</span>
-                    </a>
+                    <span className="slate-share-links">
+                      <a
+                        href={shareUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="slate-share-open"
+                      >
+                        Open in browser
+                        <span aria-hidden>↗</span>
+                      </a>
+                      {productionUrl ? (
+                        <button
+                          type="button"
+                          className={`slate-share-embed${embedCopied ? ' slate-share-embed--done' : ''}`}
+                          onClick={() => void doCopyEmbed()}
+                          title="Copy HTML that puts this form on a website"
+                        >
+                          {embedCopied ? (
+                            <>
+                              Copied <span className="slate-share-embed-more">embed code</span>
+                            </>
+                          ) : (
+                            'Embed'
+                          )}
+                        </button>
+                      ) : null}
+                    </span>
                     {cloud ? (
                       <button
                         type="button"

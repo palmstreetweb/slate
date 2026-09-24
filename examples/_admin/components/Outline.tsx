@@ -15,6 +15,7 @@ import type {
   ThemeName,
 } from '@/index.js';
 import { FORM_SOUND_OPTIONS, resolveFormSound } from '@/utils/formSounds.js';
+import { safeLogoSrc } from '@/utils/brandLogo.js';
 import { ADDABLE_TYPES, TYPE_GLYPH } from '../questionTypeMeta.js';
 import { useOutlineDrag } from '../hooks/useOutlineDrag.js';
 import { SlateSelect } from './SlateSelect.js';
@@ -55,6 +56,8 @@ type Props = {
   name: string;
   onNameChange: (v: string) => void;
   onBrandChange: (v: string) => void;
+  /** Raw input for `schema.brand.logo`; the caller drops the key when blank. */
+  onLogoChange: (v: string) => void;
   onThemeChange: (v: ThemeName) => void;
   onThemeModeChange: (v: ThemeMode) => void;
   onSoundChange: (v: FormSound) => void;
@@ -72,6 +75,7 @@ export function Outline({
   name,
   onNameChange,
   onBrandChange,
+  onLogoChange,
   onThemeChange,
   onThemeModeChange,
   onSoundChange,
@@ -127,6 +131,10 @@ export function Outline({
       : '(dynamic title)';
 
   const showDragChrome = dragActive || isSettling;
+
+  const logoValue = schema.brand.logo ?? '';
+  // Same check the engine runs before rendering, so the hint never lies.
+  const logoRejected = logoValue.trim() !== '' && safeLogoSrc(logoValue) === null;
 
   const portalRoot =
     addAnchorRef.current?.closest('[data-slate-forms][data-theme-name="slate"]') ?? document.body;
@@ -513,6 +521,31 @@ export function Outline({
                   value={schema.brand.name}
                   onChange={(e) => onBrandChange(e.target.value)}
                 />
+              </label>
+              <label>
+                <span className="slate-label">Logo URL</span>
+                <input
+                  className="slate-input"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="https://"
+                  value={logoValue}
+                  aria-describedby="form-logo-hint"
+                  onChange={(e) => onLogoChange(e.target.value)}
+                />
+                <span
+                  id="form-logo-hint"
+                  className="slate-help"
+                  style={{
+                    display: 'block',
+                    ...(logoRejected ? { color: 'var(--slate-warn)' } : {}),
+                  }}
+                >
+                  {logoRejected
+                    ? 'Not shown — use an https:// image link'
+                    : 'https:// image, shown next to your form name'}
+                </span>
               </label>
               <label>
                 <span className="slate-label">Theme</span>

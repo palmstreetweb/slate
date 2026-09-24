@@ -74,6 +74,27 @@ export function resolvePrimaryShareUrl(
   return { url: buildDevPreviewUrl(formId), mode: 'preview' };
 }
 
+/** Text that is safe inside a double- or single-quoted HTML attribute. */
+function escapeHtmlAttr(raw: string): string {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Paste-anywhere iframe for a published form (ADR-054). `?embed=1` drops the
+ * page's footer line and posts `{ type: 'slate:height', height }` to the host
+ * page so its own script can size the frame. The form name is only a title.
+ */
+export function buildEmbedSnippet(publicUrl: string, formName: string): string {
+  const src = escapeHtmlAttr(`${publicUrl}${publicUrl.includes('?') ? '&' : '?'}embed=1`);
+  const title = escapeHtmlAttr(formName.trim() || 'Form');
+  return `<iframe src="${src}" title="${title}" style="width:100%;min-height:560px;border:0" loading="lazy"></iframe>`;
+}
+
 /** Hash-route preview — schema from localStorage on this device only. */
 export function buildDevPreviewUrl(formId: string): string {
   if (typeof window === 'undefined') return hrefFor(`/forms/${formId}/preview`);

@@ -49,6 +49,7 @@ import { clampOutlineDropIndex, resolveOutlineInsertIndex } from '../outlineDrop
 import { uniqueQuestionId } from '../questionIds.js';
 import { sanitizeSchemaLogic } from '../sanitizeSchema.js';
 import { slugify } from '../shareUrls.js';
+import { withBrandLogo } from '../brandLogo.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { useToast } from '../toast.js';
 import { playUiSound } from '../uiSounds.js';
@@ -775,6 +776,7 @@ function FormEditorBody({ formId }: { formId: string }) {
               name={name}
               onNameChange={handleNameChange}
               onBrandChange={(v) => patchSchema({ brand: { ...schema.brand, name: v } })}
+              onLogoChange={(v) => patchSchema({ brand: withBrandLogo(schema.brand, v) })}
               onThemeChange={(v: ThemeName) => patchSchema({ theme: v })}
               onThemeModeChange={(v: ThemeMode) => patchSchema({ themeMode: v })}
               onSoundChange={(v: FormSound) => {

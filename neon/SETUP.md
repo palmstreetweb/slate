@@ -51,6 +51,7 @@ In the Neon SQL Editor (or `psql` with the pooled connection string), run in ord
 11. `neon/migrations/011_feedback.sql`
 12. `neon/migrations/012_fill_password.sql`
 13. `neon/migrations/013_hardening.sql`
+14. `neon/migrations/014_ai_quota.sql`
 
 Then **Data API → Refresh schema cache**. Do this after every migration that adds a column or
 changes a function signature — 012 does both (`forms.fill_locked`, `get_form_by_slug` gains
@@ -60,6 +61,12 @@ errors and locked forms can't be set.
 After 012, redeploy `submitresponse` and `storagesign` (section 5). They hold the unlock op and
 the unlock-token checks on submit and public uploads (ADR-043). Order that is always safe:
 SQL → refresh cache → redeploy both Functions → ship the SPA.
+
+Apply 014 (and refresh the cache) before deploying the `/api/generate` that calls it. Build with AI
+fails closed with a 503 until `consume_ai_generation` exists (ADR-051). Caps: 25 per user and 500
+overall per UTC day — edit `ai_quota_limits()` to change them.
+
+014 also generates a server key. After pasting it, run `select key from public.ai_quota_key;` and set the value as `AI_QUOTA_KEY` on the Vercel project (Production), then redeploy. Build with AI stays at 503 until both exist (ADR-051).
 
 Anyone can sign up (Google, magic link, or email code). Each account owns its own forms (ADR-036).
 Each account is capped at **50 forms** including Trash (ADR-038); permanent delete frees a slot.

@@ -357,6 +357,7 @@ export function Form<S extends Schema>({
 
       <TopBar
         brandName={schema.brand.name}
+        brandLogo={schema.brand.logo}
         showBack={showBack}
         onBack={backWithClear}
         rightSlot={

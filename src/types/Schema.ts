@@ -12,7 +12,12 @@ import type { FileUploadMeta } from '@/utils/fileUploadRef.js';
 
 export type BrandConfig = {
   name: string;
-  /** URL or path to a brand logo. Optional. */
+  /**
+   * URL or path to a brand logo, shown left of `name` in the top chrome.
+   * Optional. Rendered only for an `https:` URL, a same-origin `/path`, or a
+   * base64 PNG/JPEG/WebP/GIF `data:` URL; anything else, or an image that
+   * fails to load, falls back to the name alone.
+   */
   logo?: string;
 };
 

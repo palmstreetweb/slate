@@ -345,6 +345,17 @@
   }
 }
 
+/* ---------- public fill: embed mode (ADR-054) ---------- */
+
+/* `/forms/{slug}?embed=1` inside a host site's iframe. Our page's dark canvas
+   would show on overscroll and behind any rounded corner the host gives the
+   frame — let the host page show through instead. This is the frame's own
+   document; the host's page is never touched. */
+html:has(.slate-embed),
+html:has(.slate-embed) body {
+  background: transparent;
+}
+
 /* ---------- public fill: password gate + closed notice (ADR-043) ---------- */
 
 [data-slate-forms][data-theme-name='slate'] .slate-fill-gate {
@@ -414,4 +425,18 @@
   [data-slate-forms][data-theme-name='slate'] .slate-fill-gate-card {
     animation: none;
   }
+}
+
+/* ---------- public fill: honeypot (ADR-052) ---------- */
+
+/* Laid out but off-screen — bots skip display:none, so this isn't hidden.
+   Above the page, not beside it: negative top never adds a scrollbar,
+   in LTR or RTL. aria-hidden + tabindex=-1 in the markup keep people out. */
+.slate-public-respond .slate-fill-trap {
+  position: absolute;
+  top: -10000px;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
 }

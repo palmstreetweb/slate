@@ -22,36 +22,23 @@ import { playUiSound } from '../uiSounds.js';
 import { useToast } from '../toast.js';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { readSlateMode } from '../slateMode.js';
+import {
+  hasKnown,
+  markRead,
+  readKnown,
+  readUnread,
+  setUnread,
+  useUnread,
+  writeKnown,
+} from '../responses/unreadStore.js';
 import { LoadingScreen } from './LoadingScreen.js';
 
-const KNOWN_KEY = 'slate-admin-known-subs';
-const UNREAD_KEY = 'slate-admin-unread-subs';
 /** 60s ± 20% so a thousand open tabs don't poll in lockstep. */
 const POLL_MS = 60_000;
 const pollDelay = () => POLL_MS * (0.8 + Math.random() * 0.4);
 const FEED_LIMIT = 24;
 /** Refresh shows the boot splash; hold it long enough for the stack to assemble. */
 const REFRESH_MIN_MS = 1400;
-
-function readIds(key: string): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeIds(key: string, ids: string[]): void {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(ids.slice(0, 2000)));
-  } catch {
-    // ignore quota
-  }
-}
 
 function IconRefresh({ spinning }: { spinning: boolean }) {
   return (
@@ -104,7 +91,8 @@ export function StudioInbox() {
   const [spinning, setSpinning] = useState(false);
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState({ top: 64, right: 20 });
-  const [unread, setUnread] = useState<string[]>(() => readIds(UNREAD_KEY));
+  // Shared with the Responses page (ADR-055): reads there clear the badge here.
+  const unread = useUnread();
   const [tick, setTick] = useState(0);
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -116,9 +104,9 @@ export function StudioInbox() {
       // The slim index is complete in cloud mode; answers may not be loaded yet.
       const active = listSubmissionIndex();
       const ids = active.map((s) => s.id);
-      const known = readIds(KNOWN_KEY);
-      if (!seeded.current && known.length === 0 && !window.localStorage.getItem(KNOWN_KEY)) {
-        writeIds(KNOWN_KEY, ids);
+      const known = readKnown();
+      if (!seeded.current && known.length === 0 && !hasKnown()) {
+        writeKnown(ids);
         seeded.current = true;
         setTick((n) => n + 1);
         return;
@@ -130,13 +118,9 @@ export function StudioInbox() {
         setTick((n) => n + 1);
         return;
       }
-      const nextUnread = [
-        ...fresh,
-        ...readIds(UNREAD_KEY).filter((id) => !fresh.includes(id)),
-      ].slice(0, 200);
-      writeIds(UNREAD_KEY, nextUnread);
-      writeIds(KNOWN_KEY, [...fresh, ...known]);
-      setUnread(nextUnread);
+      // Store caps unread at 200 and known at 2000.
+      writeKnown([...fresh, ...known]);
+      setUnread([...fresh, ...readUnread().filter((id) => !fresh.includes(id))]);
       setTick((n) => n + 1);
       if (announce) {
         playUiSound('refresh');
@@ -258,22 +242,19 @@ export function StudioInbox() {
           preview: lead.primary === '—' ? 'New response' : lead.primary,
           when: formatRelativeAge(sub.receivedAt),
           whenFull: formatSubmittedAt(sub.receivedAt),
-          unread: unread.includes(sub.id),
+          unread: unread.has(sub.id),
         };
       });
+    // `tick` is deliberate: it re-runs this so the relative ages ("2m") stay fresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unread, tick]);
 
-  const unreadCount = unread.length;
+  const unreadCount = unread.size;
 
-  const markAllRead = () => {
-    writeIds(UNREAD_KEY, []);
-    setUnread([]);
-  };
+  const markAllRead = () => setUnread([]);
 
   const openItem = (id: string, formId: string) => {
-    const next = unread.filter((x) => x !== id);
-    writeIds(UNREAD_KEY, next);
-    setUnread(next);
+    markRead([id]);
     setOpen(false);
     navigate(`/forms/${formId}/submissions`);
   };
@@ -288,7 +269,7 @@ export function StudioInbox() {
         : null}
       <button
         type="button"
-        className="slate-btn slate-btn--icon"
+        className="slate-btn slate-btn--icon slate-refresh-btn"
         onClick={() => void onRefresh()}
         disabled={spinning}
         aria-label="Refresh"

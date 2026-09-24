@@ -25,9 +25,11 @@ export type ToastInput = {
   title: string;
   detail?: string;
   tone?: ToastTone;
-  /** ms; default 3200 */
+  /** ms; default 3200 (5200 for errors, 6000 with an action) */
   durationMs?: number;
   sound?: 'success' | 'confirm' | 'danger' | 'copy' | 'tap' | 'none';
+  /** One small text button, e.g. Undo. Clicking runs it and dismisses the toast. */
+  action?: { label: string; onClick: () => void };
 };
 
 type ToastItem = ToastInput & { id: string; tone: ToastTone };
@@ -55,7 +57,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (toast: ToastInput) => {
       const id = `t_${++idSeq}`;
       const tone = toast.tone ?? 'info';
-      const durationMs = toast.durationMs ?? (tone === 'error' ? 5200 : 3200);
+      const durationMs = toast.durationMs ?? (toast.action ? 6000 : tone === 'error' ? 5200 : 3200);
       setItems((prev) => [...prev.slice(-3), { ...toast, id, tone }]);
       if (toast.sound && toast.sound !== 'none') playUiSound(toast.sound);
       else if (tone === 'success') playUiSound('success');
@@ -101,6 +103,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                       <strong className="slate-toast-title">{item.title}</strong>
                       {item.detail ? <p className="slate-toast-detail">{item.detail}</p> : null}
                     </div>
+                    {item.action ? (
+                      <button
+                        type="button"
+                        className="rsp-toast-action"
+                        data-slate-sound="none"
+                        onClick={() => {
+                          const run = item.action?.onClick;
+                          dismiss(item.id);
+                          run?.();
+                        }}
+                      >
+                        {item.action.label}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="slate-toast-dismiss"
