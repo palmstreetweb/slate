@@ -30,13 +30,15 @@ export function getNeon(): NeonClient {
   if (!client) {
     // Prefer the SDK's single-URL form so Auth + Data API hosts stay in sync
     // with neon-js defaults (critical for JWT → RLS).
-    // allowAnonymous: studio code paths that run before sign-in (e.g. an owner
-    // previewing their own public link) still get a short-lived anonymous JWT.
-    // The public fill app itself does not use the SDK (see publicForm.ts).
+    // No anonymous fallback. With it, a request sent while the session token
+    // was still settling (right after Google sign-in) ran as `anonymous`, and
+    // owner-only RLS answered "0 rows" instead of an error — an empty dashboard
+    // or every card at 0 responses. Without it the SDK throws AuthRequiredError,
+    // which the hydrate/save retries treat as "not ready yet". Every studio
+    // caller signs in first; the public fill app does not use the SDK.
     client = createClient<Database>(url, {
       auth: {
         adapter: SupabaseAuthAdapter(),
-        allowAnonymous: true,
       },
     });
   }

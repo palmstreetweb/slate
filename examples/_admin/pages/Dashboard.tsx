@@ -24,6 +24,7 @@ import {
   lastSubmissionAt,
   probeSubmissionsStorage,
   resetSubmissionsStorage,
+  subscribe as subscribeSubmissions,
 } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { useConfirm } from '../_confirm.js';
@@ -76,6 +77,11 @@ export function Dashboard() {
       }),
     [],
   );
+
+  // Card counts read the responses store during render; without this they
+  // stayed at 0 when responses landed after the cards (or on a poll).
+  const [, setSubsVersion] = useState(0);
+  useEffect(() => subscribeSubmissions(() => setSubsVersion((n) => n + 1)), []);
 
   // Sync immediately on mount (covers subscribe-after-hydrate races). Soft
   // refresh on focus recovers from rare empty-cache glitches — hydrate never

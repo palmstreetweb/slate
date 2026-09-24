@@ -5,6 +5,7 @@
  */
 
 import { getNeon } from './client.js';
+import { isRlsOrAuthError } from './neonError.js';
 
 function tokenFromSession(session: unknown): string {
   if (!session || typeof session !== 'object') return '';
@@ -100,11 +101,12 @@ export async function waitForAuthReady(maxAttempts = 5): Promise<{
     clientEmail = ready.email;
 
     const { data: uid, error } = await neon.rpc('auth_uid');
-    if (error) {
+    // No token for the Data API yet is "not settled", not a failure — retry below.
+    if (error && !isRlsOrAuthError(error)) {
       throw new Error(`${error.message || 'Database access check failed'} — cannot load forms.`);
     }
 
-    const authUid = typeof uid === 'string' && uid ? uid : null;
+    const authUid = !error && typeof uid === 'string' && uid ? uid : null;
     if (authUid) {
       return { ok: true, authUid, clientEmail };
     }

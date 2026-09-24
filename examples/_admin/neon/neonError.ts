@@ -30,6 +30,8 @@ export function isRlsOrAuthError(err: unknown): boolean {
     msg.includes('42501') ||
     msg.includes('jwt') ||
     msg.includes('not authenticated') ||
+    // The SDK's AuthRequiredError: no session token yet (no anonymous fallback).
+    msg.includes('authentication required') ||
     msg.includes('unauthorized')
   );
 }

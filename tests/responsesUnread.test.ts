@@ -178,6 +178,20 @@ describe('notifications bell shares the store', () => {
     expect(screen.getByRole('button', { name: 'Notifications, 1 new' })).toBeInTheDocument();
   });
 
+  it('never counts another account’s unread responses (per-browser storage)', () => {
+    // Account A left 12 unread ids in this browser; account B has one response.
+    state.index = [entry('b1')];
+    writeKnown(['b1']);
+    setUnread(Array.from({ length: 12 }, (_, i) => `a${i}`));
+    render(createElement(StudioInbox));
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument();
+
+    // B's own new response still counts; A's ids stay stored for when A returns.
+    act(() => markUnread('b1'));
+    expect(screen.getByRole('button', { name: 'Notifications, 1 new' })).toBeInTheDocument();
+    expect(readUnread()).toHaveLength(13);
+  });
+
   it('seeds silently on first run: existing responses are not "new"', () => {
     state.index = [entry('a'), entry('b')];
     render(createElement(StudioInbox));

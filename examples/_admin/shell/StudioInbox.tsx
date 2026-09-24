@@ -249,9 +249,20 @@ export function StudioInbox() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unread, tick]);
 
-  const unreadCount = unread.size;
+  // Unread ids live in localStorage per browser, not per account — count only
+  // the ones this account actually has, so another account's 9+ never shows.
+  const unreadIds = useMemo(
+    () =>
+      listSubmissionIndex()
+        .filter((s) => unread.has(s.id))
+        .map((s) => s.id),
+    // `tick` re-runs this after each ingest, when the index may have changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [unread, tick],
+  );
+  const unreadCount = unreadIds.length;
 
-  const markAllRead = () => setUnread([]);
+  const markAllRead = () => markRead(unreadIds);
 
   const openItem = (id: string, formId: string) => {
     markRead([id]);

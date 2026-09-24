@@ -35,6 +35,7 @@ import {
 } from './_admin/neon/hydrate.js';
 import { isFormsHydrated } from './_admin/neon/formsRemote.js';
 import { isNeonConfigured } from './_admin/neon/env.js';
+import { formatNeonError, isRlsOrAuthError } from './_admin/neon/neonError.js';
 import { installAdminUiSounds } from './_admin/uiSounds.js';
 
 import './_admin/slateChromeTokens.css';
@@ -166,10 +167,11 @@ function AdminCloudBootstrap() {
         setStoresReady(true);
       } catch (err: unknown) {
         if (cancelled) return;
-        const message =
-          err instanceof Error ? err.message : 'Could not load your forms from the cloud.';
+        const message = formatNeonError(err, 'Could not load your forms from the cloud.');
+        // Data API errors are plain objects, so check the formatted text too.
         const transientAuth =
-          /could not resolve your user id|no auth session|session expired/i.test(message);
+          /could not resolve your user id|no auth session|session expired/i.test(message) ||
+          isRlsOrAuthError(err);
         // Auto-retry transient JWT settle races before showing the error screen.
         if (transientAuth && attempt < 3) {
           console.warn(`[slate] Hydrate auth settle — retry ${attempt + 1}/3`, err);
