@@ -30,10 +30,21 @@ export function jwksUrl(): string | null {
   }
 }
 
-/** Expected `iss`: the auth base URL (…/neondb/auth). Null when unknown. */
-function issuer(): string | null {
+/**
+ * Accepted `iss` values. Neon Auth stamps anonymous tokens with the auth base
+ * URL (…/neondb/auth) but signed-in user tokens with the bare auth origin
+ * (https://ep-….neonauth….neon.tech). Both pin this project's auth host.
+ * Null when unknown.
+ */
+export function issuers(): string[] | null {
   const url = jwksUrl();
-  return url ? url.replace(/\/\.well-known\/jwks\.json$/, '') : null;
+  if (!url) return null;
+  const base = url.replace(/\/\.well-known\/jwks\.json$/, '');
+  try {
+    return [base, new URL(base).origin];
+  } catch {
+    return [base];
+  }
 }
 
 async function loadKeys(force = false): Promise<Jwk[]> {
@@ -82,8 +93,8 @@ export async function verifyUserJwt(token: string): Promise<{ sub: string } | nu
   if (typeof sub !== 'string' || !sub) return null;
   // The anonymous public-fill token is signed by the same issuer. It is never an owner.
   if (sub === 'anonymous' || payload.role === 'anonymous') return null;
-  const expectedIss = issuer();
-  if (expectedIss && payload.iss !== expectedIss) return null;
+  const expectedIss = issuers();
+  if (expectedIss && !expectedIss.includes(payload.iss as string)) return null;
   const key = await keyFor(header.kid);
   if (!key) return null;
   let ok = false;
