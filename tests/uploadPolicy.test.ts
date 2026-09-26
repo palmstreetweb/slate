@@ -1,5 +1,7 @@
 /** @vitest-environment node */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as S3 from '@aws-sdk/client-s3';
+import { rateCalls, rateKeys, resetFnDb, type newFnDbState } from './_fnDb.js';
 import {
   decidePublicUpload,
   fileUploadLimitBytes,
@@ -117,34 +119,47 @@ describe('decidePublicUpload (ADR-050)', () => {
 
 /* ---------- route wiring: storage-sign POST / with pg + S3 stubbed ---------- */
 
-const db = vi.hoisted(() => ({
-  form: null as Record<string, unknown> | null,
-  sql: [] as string[],
+const db = vi.hoisted(() => ({ state: null as unknown as ReturnType<typeof newFnDbState> }));
+const s3 = vi.hoisted(() => ({
+  send: null as null | ((cmd: { constructor: { name: string } }) => Promise<unknown>),
 }));
+const jwt = vi.hoisted(() => ({ throws: false }));
 
-vi.mock('pg', () => ({
-  Pool: class {
-    async query(sql: string) {
-      db.sql.push(sql);
-      if (sql.includes('consume_submit_rate')) {
-        return { rows: [{ allowed: true, hit_count: 1, retry_after_seconds: 0 }] };
-      }
-      return { rows: db.form ? [db.form] : [] };
-    }
-  },
-}));
+vi.mock('pg', async () => {
+  const m = await import('./_fnDb.js');
+  db.state = m.newFnDbState();
+  return { Pool: m.fnDbPool(db.state) };
+});
 vi.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: vi.fn(async () => 'https://bucket.example/signed'),
 }));
+vi.mock('@aws-sdk/client-s3', async (importOriginal) => {
+  const real = await importOriginal<typeof S3>();
+  return {
+    ...real,
+    S3Client: class {
+      async send(cmd: { constructor: { name: string } }) {
+        if (!s3.send) throw new Error('no S3 stub');
+        return s3.send(cmd);
+      }
+    },
+  };
+});
 vi.mock('../neon/functions/storage-sign/authJwt.js', () => ({
-  verifyUserJwt: vi.fn(async (token: string) =>
-    token === 'owner-jwt' ? { sub: 'u_owner' } : null,
-  ),
+  verifyUserJwt: vi.fn(async (token: string) => {
+    if (jwt.throws) throw new Error('JWKS unavailable');
+    return token === 'owner-jwt'
+      ? { sub: 'u_owner' }
+      : token === 'other-jwt'
+        ? { sub: 'u_other' }
+        : null;
+  }),
 }));
 
-describe('storage-sign upload gate (ADR-050)', () => {
+describe('storage-sign upload gate (ADR-050, ADR-058)', () => {
   const FORM_ID = 'f_test1';
   const HASH = '$2a$08$abcdefghijklmnopqrstuuJ7gq0l1m9cQ4n3o8c5w2y1z0x9v8u7t';
+  const UUID = '0f8fad5b-d9cb-469f-a165-70867728950e';
   const ENV_KEYS = [
     'DATABASE_URL',
     'AWS_ENDPOINT_URL_S3',
@@ -153,39 +168,60 @@ describe('storage-sign upload gate (ADR-050)', () => {
   ] as const;
   const savedEnv: Record<string, string | undefined> = {};
   let app: { request: (path: string, init: RequestInit) => Response | Promise<Response> };
+  let LIMITS: Record<string, number>;
 
-  const row = (published_schema: unknown, extra: Record<string, unknown> = {}) => ({
-    id: FORM_ID,
-    status: 'published',
-    deleted_at: null,
-    owner_id: 'u_owner',
-    fill_password_hash: null,
-    published_schema,
-    ...extra,
-  });
+  const setForm = (
+    published_schema: unknown,
+    extra: Record<string, unknown> = {},
+    id = FORM_ID,
+  ) => {
+    db.state.forms.set(id, {
+      id,
+      status: 'published',
+      deleted_at: null,
+      owner_id: 'u_owner',
+      fill_password_hash: null,
+      published_schema,
+      ...extra,
+    } as never);
+  };
+
+  const post = (body: unknown, headers: Record<string, string> = {}) =>
+    app.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.7', ...headers },
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+    });
 
   const sign = (
     scope: 'public' | 'draft',
-    contentLength: number,
-    extra: { unlockToken?: string; bearer?: string } = {},
+    contentLength: unknown,
+    extra: { unlockToken?: string; bearer?: string; formId?: string; ip?: string } = {},
   ) =>
-    app.request('/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Forwarded-For': '203.0.113.7',
-        ...(extra.bearer ? { Authorization: `Bearer ${extra.bearer}` } : {}),
-      },
-      body: JSON.stringify({
+    post(
+      {
         op: 'upload',
-        path: `${scope}/${FORM_ID}/0f8fad5b-d9cb-469f-a165-70867728950e/receipt.pdf`,
+        path: `${scope}/${extra.formId ?? FORM_ID}/${UUID}/receipt.pdf`,
         contentType: 'application/pdf',
         contentLength,
         unlockToken: extra.unlockToken,
-      }),
-    });
+      },
+      {
+        ...(extra.bearer ? { Authorization: `Bearer ${extra.bearer}` } : {}),
+        ...(extra.ip ? { 'X-Forwarded-For': extra.ip } : {}),
+      },
+    );
 
-  const formQueries = () => db.sql.filter((s) => s.includes('from public.forms'));
+  const read = (op: 'meta' | 'download' | 'content', bearer?: string) =>
+    post(
+      { op, path: `public/${FORM_ID}/${UUID}/receipt.pdf` },
+      bearer ? { Authorization: `Bearer ${bearer}` } : {},
+    );
+
+  const formQueries = () =>
+    db.state.log.filter(
+      (q) => q.sql.includes('from public.forms') && !q.sql.includes('consume_submit_rates'),
+    );
 
   beforeAll(async () => {
     for (const k of ENV_KEYS) savedEnv[k] = process.env[k];
@@ -193,7 +229,9 @@ describe('storage-sign upload gate (ADR-050)', () => {
     process.env.AWS_ENDPOINT_URL_S3 = 'https://storage.example';
     process.env.AWS_ACCESS_KEY_ID = 'test';
     process.env.AWS_SECRET_ACCESS_KEY = 'test';
-    app = (await import('../neon/functions/storage-sign/index.js')).default;
+    const mod = await import('../neon/functions/storage-sign/index.js');
+    app = mod.default;
+    LIMITS = mod.LIMITS;
   });
 
   afterAll(() => {
@@ -204,24 +242,37 @@ describe('storage-sign upload gate (ADR-050)', () => {
   });
 
   beforeEach(() => {
-    db.form = null;
-    db.sql = [];
+    resetFnDb(db.state);
+    s3.send = null;
+    jwt.throws = false;
+  });
+
+  it('LIMITS match the ADR-058 table', () => {
+    expect(LIMITS).toEqual({
+      ipOwner: 8192,
+      ip: 40960,
+      draftUser: 8192,
+      readUser: 3000,
+      readIp: 15000,
+      contentMaxBytes: 10 * 1024 * 1024,
+    });
   });
 
   it('a Bearer on a public/ upload earns nothing — the file-question gate still applies', async () => {
-    db.form = row({ questions: [textQ] });
+    setForm({ questions: [textQ] });
     expect((await sign('public', 1024, { bearer: 'owner-jwt' })).status).toBe(404);
   });
 
-  it('unpublished or trashed forms never sign public uploads, file question or not', async () => {
-    db.form = row({ questions: [fileQ()] }, { status: 'draft' });
+  it('unpublished or trashed forms never sign public uploads, and charge nothing', async () => {
+    setForm({ questions: [fileQ()] }, { status: 'draft' });
     expect((await sign('public', 1024)).status).toBe(404);
-    db.form = row({ questions: [fileQ()] }, { deleted_at: '2026-01-01T00:00:00Z' });
+    setForm({ questions: [fileQ()] }, { deleted_at: '2026-01-01T00:00:00Z' });
     expect((await sign('public', 1024)).status).toBe(404);
+    expect(rateCalls(db.state)).toHaveLength(0);
   });
 
-  it('signs a public upload on a form with a file question, in one form query', async () => {
-    db.form = row({ questions: [textQ, fileQ({ maxSizeMb: 5 })] });
+  it('the gate query has no published_schema; the rate statement returns it', async () => {
+    setForm({ questions: [textQ, fileQ({ maxSizeMb: 5 })] });
     const res = await sign('public', 2 * MB);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
@@ -231,13 +282,17 @@ describe('storage-sign upload gate (ADR-050)', () => {
       contentType: 'application/pdf',
     });
     expect(formQueries()).toHaveLength(1);
-    expect(formQueries()[0]).toContain('published_schema');
+    expect(formQueries()[0]!.sql).not.toMatch(/published_schema\s*,/);
+    expect(formQueries()[0]!.sql).toContain('published_schema is not null');
+    expect(rateCalls(db.state)).toHaveLength(1);
+    expect(rateCalls(db.state)[0]!.sql).toContain('f.published_schema');
+    expect(db.state.log).toHaveLength(2);
   });
 
   it('a published form without a file question is the same 404 as a missing form', async () => {
-    db.form = row({ questions: [textQ] });
+    setForm({ questions: [textQ] });
     const noFile = await sign('public', 1024);
-    db.form = null;
+    resetFnDb(db.state);
     const missing = await sign('public', 1024);
     expect(noFile.status).toBe(404);
     expect(missing.status).toBe(404);
@@ -246,37 +301,243 @@ describe('storage-sign upload gate (ADR-050)', () => {
 
   it('null or malformed published_schema → 404', async () => {
     for (const schema of [null, { questions: 'nope' }, 'garbage']) {
-      db.form = row(schema);
+      setForm(schema);
       expect((await sign('public', 1024)).status).toBe(404);
     }
   });
 
+  it('published_schema null: 404 without any rate SQL', async () => {
+    setForm(null);
+    expect((await sign('public', 1024)).status).toBe(404);
+    expect(rateCalls(db.state)).toHaveLength(0);
+  });
+
   it('over the question limit → 413, still under the global cap', async () => {
-    db.form = row({ questions: [fileQ({ maxSizeMb: 5 })] });
+    setForm({ questions: [fileQ({ maxSizeMb: 5 })] });
     expect((await sign('public', 5 * MB + 1)).status).toBe(413);
   });
 
   it('over the global cap → 413 before any DB work', async () => {
-    db.form = row({ questions: [fileQ()] });
+    setForm({ questions: [fileQ()] });
     expect((await sign('public', CAP + 1)).status).toBe(413);
-    expect(db.sql).toHaveLength(0);
+    expect(db.state.log).toHaveLength(0);
   });
 
   it('locked form: 401 without a token even when it has no file question (no schema oracle)', async () => {
-    db.form = row({ questions: [textQ] }, { fill_password_hash: HASH });
+    setForm({ questions: [textQ] }, { fill_password_hash: HASH });
     expect((await sign('public', 1024)).status).toBe(401);
+    expect(rateCalls(db.state)).toHaveLength(0);
     // With the token, the policy applies as usual.
     const unlockToken = fillUnlockToken(FORM_ID, HASH);
     expect((await sign('public', 1024, { unlockToken })).status).toBe(404);
-    db.form = row({ questions: [fileQ()] }, { fill_password_hash: HASH });
+    setForm({ questions: [fileQ()] }, { fill_password_hash: HASH });
     expect((await sign('public', 1024, { unlockToken })).status).toBe(200);
   });
 
   it('draft/ uploads by the owner are unchanged: no schema read, global cap', async () => {
-    db.form = row({ questions: [textQ] });
+    setForm({ questions: [textQ] });
     const res = await sign('draft', 20 * MB, { bearer: 'owner-jwt' });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { maxBytes: number }).maxBytes).toBe(CAP);
-    expect(formQueries().every((s) => !s.includes('published_schema'))).toBe(true);
+    expect(formQueries().every((q) => !/published_schema\s*,/.test(q.sql))).toBe(true);
+    expect(rateCalls(db.state).every((q) => q.params.length === 4)).toBe(true);
+  });
+
+  /* ---------- ADR-058: shapes before any DB call ---------- */
+
+  it('a 9 KiB body is 413 with zero queries, with Content-Length or chunked', async () => {
+    const big = JSON.stringify({ op: 'upload', path: 'x', pad: 'a'.repeat(9 * 1024) });
+    const withLength = await app.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': String(big.length) },
+      body: big,
+    });
+    expect(withLength.status).toBe(413);
+    const bytes = new TextEncoder().encode(big);
+    const chunked = await app.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: new ReadableStream({
+        start(c) {
+          for (let i = 0; i < bytes.length; i += 1000) c.enqueue(bytes.slice(i, i + 1000));
+          c.close();
+        },
+      }),
+      duplex: 'half',
+    } as RequestInit);
+    expect(chunked.status).toBe(413);
+    expect(db.state.log).toHaveLength(0);
+  });
+
+  it('bad fields are 400 with zero queries', async () => {
+    setForm({ questions: [fileQ()] });
+    const path = `public/${FORM_ID}/${UUID}/receipt.pdf`;
+    for (const body of [
+      null,
+      [],
+      'x',
+      { op: 'delete', path },
+      { op: 'upload', path, contentLength: 1.5 },
+      { op: 'upload', path, contentLength: '12' },
+      { op: 'upload', path, contentLength: 1e20 },
+      { op: 'upload', path, contentLength: 10, contentType: 'a'.repeat(300) },
+      { op: 'upload', path, contentLength: 10, unlockToken: 'abc' },
+      { op: 'upload', path: 42, contentLength: 10 },
+    ]) {
+      const res = await post(body === 'x' ? 'x' : body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    expect((await sign('public', 32 * MB + 1)).status).toBe(413);
+    expect(db.state.log).toHaveLength(0);
+  });
+
+  it('junk formId: 404 after one form query and no rate SQL', async () => {
+    expect((await sign('public', 1024, { formId: 'f_nothere00' })).status).toBe(404);
+    expect(db.state.log).toHaveLength(1);
+    expect(rateCalls(db.state)).toHaveLength(0);
+  });
+
+  it('charges by size to IP + owner and IP', async () => {
+    setForm({ questions: [fileQ()] });
+    await sign('public', 2 * MB);
+    await sign('public', 12_000_000);
+    await sign('public', 32 * MB);
+    const calls = rateCalls(db.state);
+    expect(calls[0]!.params[0]).toEqual(['up:ipowner:203.0.113.7:u_owner', 'up:ip:203.0.113.7']);
+    expect(calls.map((q) => (q.params[3] as number[])[0])).toEqual([8, 46, 128]);
+    expect(calls[0]!.params[2]).toEqual([8192, 40960]);
+  });
+
+  it('4,096 photo signs from one IP to one owner pass, the next is 429; another owner still signs', async () => {
+    setForm({ questions: [fileQ()] });
+    setForm({ questions: [fileQ()] }, { owner_id: 'u_second' }, 'f_second');
+    for (let i = 0; i < 4096; i++) {
+      const res = await sign('public', 450_000);
+      if (res.status !== 200) throw new Error(`sign ${i} → ${res.status}`);
+    }
+    const denied = await sign('public', 450_000);
+    expect(denied.status).toBe(429);
+    const body = (await denied.json()) as { error: string; retryAfterSeconds: number };
+    expect(body.retryAfterSeconds).toBeGreaterThan(0);
+    expect(body.error).toMatch(/^Too many uploads .*mobile data/);
+    expect(denied.headers.get('Retry-After')).toBe(String(body.retryAfterSeconds));
+    expect(denied.headers.get('Access-Control-Expose-Headers')).toContain('Retry-After');
+    expect((await sign('public', 450_000, { formId: 'f_second' })).status).toBe(200);
+  });
+
+  it('OPTIONS carries Access-Control-Max-Age: 7200', async () => {
+    const res = await app.request('/', {
+      method: 'OPTIONS',
+      headers: { Origin: 'https://slate.test', 'Access-Control-Request-Method': 'POST' },
+    });
+    expect(res.headers.get('Access-Control-Max-Age')).toBe('7200');
+  });
+
+  /* ---------- ADR-058: owner reads and draft uploads ---------- */
+
+  it('meta, download and content with no Bearer: 401 with zero queries', async () => {
+    setForm({ questions: [fileQ()] });
+    for (const op of ['meta', 'download', 'content'] as const) {
+      expect((await read(op)).status).toBe(401);
+    }
+    expect(db.state.log).toHaveLength(0);
+  });
+
+  it('forged Bearer: 401 with zero queries; a verifier that throws: 503 with zero queries', async () => {
+    setForm({ questions: [fileQ()] });
+    expect((await read('meta', 'forged')).status).toBe(401);
+    jwt.throws = true;
+    expect((await read('meta', 'owner-jwt')).status).toBe(503);
+    expect(db.state.log).toHaveLength(0);
+  });
+
+  it('valid Bearer: one charge to the account and the IP before the owner lookup', async () => {
+    setForm({ questions: [fileQ()] });
+    s3.send = async () => ({ ContentLength: 10, ContentType: 'application/pdf' });
+    expect((await read('meta', 'owner-jwt')).status).toBe(200);
+    expect(db.state.log[0]!.sql).toContain('consume_submit_rates');
+    expect(db.state.log[0]!.params[0]).toEqual(['read:u:u_owner', 'read:ip:203.0.113.7']);
+    expect(db.state.log[1]!.sql).toContain('from public.forms');
+    const notYours = await read('meta', 'other-jwt');
+    resetFnDb(db.state);
+    const missing = await read('meta', 'owner-jwt');
+    expect(notYours.status).toBe(404);
+    expect(missing.status).toBe(404);
+    expect(await notYours.text()).toBe(await missing.text());
+  });
+
+  it('the 3,001st read in 10 min is 429 with retryAfterSeconds', async () => {
+    setForm({ questions: [fileQ()] });
+    s3.send = async () => ({ ContentLength: 10, ContentType: 'application/pdf' });
+    for (let i = 0; i < 3000; i++) {
+      const res = await read('meta', 'owner-jwt');
+      if (res.status !== 200) throw new Error(`read ${i} → ${res.status}`);
+    }
+    const denied = await read('meta', 'owner-jwt');
+    expect(denied.status).toBe(429);
+    expect(
+      ((await denied.json()) as { retryAfterSeconds: number }).retryAfterSeconds,
+    ).toBeGreaterThan(0);
+  });
+
+  it('a 2 MiB draft upload charges the account and the IP by size; no legacy keys', async () => {
+    setForm({ questions: [textQ] });
+    expect((await sign('draft', 2 * MB, { bearer: 'owner-jwt' })).status).toBe(200);
+    expect(rateCalls(db.state)[0]!.params[0]).toEqual(['up:draft:u_owner', 'up:ip:203.0.113.7']);
+    expect((rateCalls(db.state)[0]!.params[3] as number[])[0]).toBe(8);
+    expect(rateKeys(db.state).some((k) => /^(read:|sign:read:|sign:auth:)/.test(k))).toBe(false);
+  });
+
+  it('meta: NotFound → 404; SlowDown or 500 → 503', async () => {
+    setForm({ questions: [fileQ()] });
+    const fail = (name: string, status: number) => async () => {
+      throw Object.assign(new Error(name), { name, $metadata: { httpStatusCode: status } });
+    };
+    s3.send = fail('NotFound', 404);
+    expect((await read('meta', 'owner-jwt')).status).toBe(404);
+    s3.send = fail('SlowDown', 503);
+    expect((await read('meta', 'owner-jwt')).status).toBe(503);
+    s3.send = fail('InternalError', 500);
+    expect((await read('meta', 'owner-jwt')).status).toBe(503);
+  });
+
+  it('content: NoSuchKey → 404; over 10 MiB or no length → 413 and the body is destroyed; 1 MiB → 200', async () => {
+    setForm({ questions: [fileQ()] });
+    s3.send = async () => {
+      throw Object.assign(new Error('NoSuchKey'), { name: 'NoSuchKey' });
+    };
+    expect((await read('content', 'owner-jwt')).status).toBe(404);
+
+    const destroy = vi.fn();
+    const bodyOf = (n: number) => ({
+      transformToByteArray: async () => new Uint8Array(n),
+      destroy,
+    });
+    s3.send = async () => ({
+      Body: bodyOf(0),
+      ContentLength: 11 * MB,
+      ContentType: 'application/pdf',
+    });
+    const big = await read('content', 'owner-jwt');
+    expect(big.status).toBe(413);
+    expect(await big.json()).toEqual({ error: 'too_large_for_preview' });
+    expect(destroy).toHaveBeenCalledTimes(1);
+
+    s3.send = async () => ({ Body: bodyOf(0), ContentType: 'application/pdf' });
+    expect((await read('content', 'owner-jwt')).status).toBe(413);
+    expect(destroy).toHaveBeenCalledTimes(2);
+
+    s3.send = async () => ({ Body: bodyOf(MB), ContentLength: MB, ContentType: 'application/pdf' });
+    const ok = await read('content', 'owner-jwt');
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get('Content-Type')).toBe('application/pdf');
+    expect(ok.headers.get('Content-Disposition')).toBe('attachment; filename="receipt.pdf"');
+    expect(ok.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect((await ok.arrayBuffer()).byteLength).toBe(MB);
+
+    s3.send = async () => {
+      throw Object.assign(new Error('boom'), { name: 'InternalError' });
+    };
+    expect((await read('content', 'owner-jwt')).status).toBe(503);
   });
 });

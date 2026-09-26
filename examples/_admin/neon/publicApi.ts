@@ -49,12 +49,20 @@ export async function unlockPublicForm(
     };
   }
   if (res.status === 429) {
-    const retryAfter = Number(res.headers.get('Retry-After') || 60);
+    // The server's copy says what to do (wait, or check the password); show it as sent.
+    const b = (await res.json().catch(() => ({}))) as {
+      error?: unknown;
+      retryAfterSeconds?: unknown;
+    };
+    const retryAfter = Number(b.retryAfterSeconds) || Number(res.headers.get('Retry-After')) || 60;
     const minutes = Math.max(1, Math.ceil(retryAfter / 60));
     return {
       ok: false,
       reason: 'rate_limited',
-      message: `Too many tries. Please wait about ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+      message:
+        typeof b.error === 'string' && b.error.startsWith('Too many')
+          ? b.error
+          : `Too many tries. Please wait about ${minutes} minute${minutes === 1 ? '' : 's'}.`,
     };
   }
   if (!res.ok) {
@@ -111,15 +119,23 @@ export async function submitPublicResponse(
   payload: SubmitResponsePayload,
 ): Promise<{ id: string }> {
   const url = getSubmitUrl();
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...payload,
-      // Present only after a password unlock in this tab (ADR-043).
-      unlockToken: readFillUnlockToken(payload.formId) ?? undefined,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...payload,
+        // Present only after a password unlock in this tab (ADR-043).
+        unlockToken: readFillUnlockToken(payload.formId) ?? undefined,
+      }),
+    });
+  } catch {
+    // Offline, or a platform 429 without CORS headers: not "Failed to fetch".
+    throw new Error(
+      'Couldn’t reach Slate. Check your connection and press Retry — your answers are still here.',
+    );
+  }
   if (!res.ok) {
     if (res.status === 401) {
       // Password was changed or removed mid-fill; the old token is dead.

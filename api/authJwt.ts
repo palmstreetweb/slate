@@ -11,8 +11,16 @@ import { createPublicKey, verify, type KeyObject } from 'node:crypto';
 type Jwk = { kid?: string; kty?: string; crv?: string; x?: string; alg?: string };
 
 const JWKS_TTL_MS = 60 * 60 * 1000;
+/** Forced-refresh cooldown and failed-fetch backoff (ADR-058, jwks-refetch). */
+const RETRY_MS = 60_000;
 let cache: { at: number; keys: Jwk[] } | null = null;
 const keyObjects = new Map<string, KeyObject>();
+/** Last failed fetch of either kind. */
+let failedAt = 0;
+/** Last SUCCESSFUL forced refresh. */
+let forcedAt = 0;
+let ttlFetch: Promise<Jwk[]> | null = null;
+let forcedFetch: Promise<Jwk[]> | null = null;
 
 /**
  * `NEON_AUTH_URL` (…/neondb/auth), else derived from `VITE_NEON_URL` — the
@@ -53,8 +61,7 @@ export function issuers(): string[] | null {
   }
 }
 
-async function loadKeys(force = false): Promise<Jwk[]> {
-  if (!force && cache && Date.now() - cache.at < JWKS_TTL_MS) return cache.keys;
+async function fetchKeys(): Promise<Jwk[]> {
   const url = jwksUrl();
   if (!url) throw new Error('JWKS URL unavailable');
   const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -63,6 +70,48 @@ async function loadKeys(force = false): Promise<Jwk[]> {
   cache = { at: Date.now(), keys: Array.isArray(body.keys) ? body.keys : [] };
   keyObjects.clear();
   return cache.keys;
+}
+
+/** Single-flight per kind. forcedAt is recorded only after a forced fetch succeeds. */
+function startFetch(forced: boolean): Promise<Jwk[]> {
+  const p = fetchKeys()
+    .then((keys) => {
+      if (forced) forcedAt = Date.now();
+      return keys;
+    })
+    .catch((err: unknown) => {
+      failedAt = Date.now();
+      throw err;
+    })
+    .finally(() => {
+      if (forced) forcedFetch = null;
+      else ttlFetch = null;
+    });
+  if (forced) forcedFetch = p;
+  else ttlFetch = p;
+  return p;
+}
+
+/**
+ * Cached keys (1 h TTL). An unknown kid forces a refresh at most once per 60 s
+ * per instance, so a flood of forged kids costs no network calls. A failed
+ * fetch backs off 60 s and serves the stale keys; with nothing cached it throws.
+ */
+async function loadKeys(force = false): Promise<Jwk[]> {
+  const now = Date.now();
+  if (!force && cache && now - cache.at < JWKS_TTL_MS) return cache.keys;
+  // A forced call joins only another forced fetch, never a TTL refresh that may predate a rotation.
+  const running = force ? forcedFetch : ttlFetch;
+  if (!running && (now - failedAt < RETRY_MS || (force && now - forcedAt < RETRY_MS))) {
+    if (cache) return cache.keys;
+    throw new Error('JWKS unavailable');
+  }
+  try {
+    return await (running ?? startFetch(force));
+  } catch (err) {
+    if (cache) return cache.keys;
+    throw err;
+  }
 }
 
 function b64urlJson(part: string): Record<string, unknown> | null {

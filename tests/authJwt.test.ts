@@ -34,6 +34,18 @@ function token(claims: Record<string, unknown>, key: KeyObject = privateKey): st
   return `${head}.${body}.${sig}`;
 }
 
+function tokenWithKid(kid: string, claims: Record<string, unknown>, key: KeyObject): string {
+  const head = b64url({ alg: 'EdDSA', kid });
+  const body = b64url({
+    sub: 'user-1',
+    role: 'authenticated',
+    exp: Math.floor(Date.now() / 1000) + 900,
+    ...claims,
+  });
+  const sig = sign(null, Buffer.from(`${head}.${body}`), key).toString('base64url');
+  return `${head}.${body}.${sig}`;
+}
+
 type Verify = (token: string) => Promise<{ sub: string } | null>;
 
 // Same checks, two runtimes: the Vercel verifier and the storage-sign Function copy.
@@ -104,5 +116,108 @@ describe.each(VERIFIERS)('%s', (_name, stubEnv, load) => {
   it('rejects an expired token', async () => {
     const exp = Math.floor(Date.now() / 1000) - 60;
     await expect(verifyUserJwt(token({ iss: AUTH_ORIGIN, exp }))).resolves.toBeNull();
+  });
+
+  /* ---------- JWKS refetch bounds (ADR-058, jwks-refetch) ---------- */
+
+  describe('JWKS refetch', () => {
+    let jwks: { status: number; keys: Array<Record<string, unknown>> };
+    let fetchMock: ReturnType<typeof vi.fn>;
+    const randomKid = () => `kid-${Math.random().toString(36).slice(2)}`;
+
+    beforeEach(async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2030-01-01T00:00:00Z'));
+      jwks = { status: 200, keys: [publicJwk] };
+      fetchMock = vi.fn(async () =>
+        jwks.status === 200
+          ? new Response(JSON.stringify({ keys: jwks.keys }), { status: 200 })
+          : new Response('slow down', { status: jwks.status }),
+      );
+      vi.resetModules();
+      vi.stubGlobal('fetch', fetchMock);
+      verifyUserJwt = await load();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const t = (claims: Record<string, unknown> = {}, kid = KID, key: KeyObject = privateKey) =>
+      tokenWithKid(kid, { iss: AUTH_ORIGIN, ...claims }, key);
+
+    it('20 sequential unknown kids within 60 s: the warm load plus one forced refresh', async () => {
+      for (let i = 0; i < 20; i++) {
+        await expect(verifyUserJwt(t({}, randomKid()))).resolves.toBeNull();
+      }
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('10 concurrent unknown kids on a cold instance: one shared load, one shared forced refresh', async () => {
+      await Promise.all(Array.from({ length: 10 }, () => verifyUserJwt(t({}, randomKid()))));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('after the cooldown one more unknown kid fetches once, and a rotated key verifies', async () => {
+      await verifyUserJwt(t({}, randomKid()));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      await verifyUserJwt(t({}, randomKid()));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      vi.advanceTimersByTime(61_000);
+      await verifyUserJwt(t({}, randomKid()));
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+
+      const rotated = generateKeyPairSync('ed25519');
+      jwks.keys = [
+        publicJwk,
+        { ...rotated.publicKey.export({ format: 'jwk' }), kid: 'kid-2', alg: 'EdDSA' },
+      ];
+      vi.advanceTimersByTime(61_000);
+      await expect(verifyUserJwt(t({}, 'kid-2', rotated.privateKey))).resolves.toEqual({
+        sub: 'user-1',
+      });
+    });
+
+    it('a forced refresh that fails backs off 60 s; known kids keep verifying; retried after', async () => {
+      await expect(verifyUserJwt(t())).resolves.toEqual({ sub: 'user-1' });
+      jwks.status = 429;
+      await expect(verifyUserJwt(t({}, randomKid()))).resolves.toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      await expect(verifyUserJwt(t({}, randomKid()))).resolves.toBeNull();
+      await expect(verifyUserJwt(t())).resolves.toEqual({ sub: 'user-1' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      jwks.status = 200;
+      vi.advanceTimersByTime(61_000);
+      await verifyUserJwt(t({}, randomKid()));
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('TTL expired and the JWKS fails: a stale key still verifies after one attempt, then no fetch for 60 s', async () => {
+      const second = generateKeyPairSync('ed25519');
+      jwks.keys = [
+        publicJwk,
+        { ...second.publicKey.export({ format: 'jwk' }), kid: 'kid-2', alg: 'EdDSA' },
+      ];
+      await expect(verifyUserJwt(t())).resolves.toEqual({ sub: 'user-1' });
+      vi.advanceTimersByTime(61 * 60 * 1000);
+      jwks.status = 429;
+      const exp = Math.floor(Date.now() / 1000) + 900;
+      await expect(verifyUserJwt(t({ exp }, 'kid-2', second.privateKey))).resolves.toEqual({
+        sub: 'user-1',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      await expect(verifyUserJwt(t({ exp }, 'kid-2', second.privateKey))).resolves.toEqual({
+        sub: 'user-1',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('cold instance and the JWKS fails: throws, then throws again within 60 s without a fetch', async () => {
+      jwks.status = 429;
+      await expect(verifyUserJwt(t())).rejects.toThrow();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      await expect(verifyUserJwt(t())).rejects.toThrow();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

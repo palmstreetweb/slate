@@ -50,3 +50,31 @@ export function clampValue(v: unknown): unknown {
   }
   return undefined;
 }
+
+/** slate-file://storage:{public|draft}/{formId}/{uuid}/{name}, as uploadToNeonStorage builds it. */
+const STORAGE_REF_RE =
+  /^slate-file:[/][/]storage:(?:public|draft)[/]([A-Za-z0-9_-]{4,64})[/][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[/][^/]{1,120}$/;
+
+/**
+ * File answers keep only this form's own storage refs (ADR-058, file-fanout-dos):
+ * deduplicated, capped at the question's maxFiles (default 10, at most 100), and
+ * a single ref when `multiple: false`. Other forms' refs, URLs, local refs and
+ * non-strings are dropped, so a crafted response can't make the owner's studio
+ * fetch hundreds of objects. draft/ stays: old tabs and the stored refs use it.
+ */
+export function keepFileRefs(
+  v: unknown,
+  formId: string,
+  q: { multiple?: unknown; maxFiles?: unknown },
+): string | string[] | undefined {
+  const items = (Array.isArray(v) ? v.slice(0, MAX_ARRAY_ITEMS) : [v]).filter(
+    (x): x is string => typeof x === 'string',
+  );
+  const refs = [...new Set(items.filter((x) => STORAGE_REF_RE.exec(x)?.[1] === formId))];
+  if (q.multiple === false) return refs[0];
+  const cap =
+    typeof q.maxFiles === 'number' && Number.isFinite(q.maxFiles) && q.maxFiles >= 1
+      ? Math.min(Math.floor(q.maxFiles), MAX_ARRAY_ITEMS)
+      : 10;
+  return refs.length ? refs.slice(0, cap) : undefined;
+}

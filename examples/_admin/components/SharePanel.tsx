@@ -203,8 +203,8 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
 
   const applyLock = async (password: string) => {
     if (lockBusy) return;
-    if (password && (password.length < 4 || password.length > 72)) {
-      setLockError('Use 4 to 72 characters.');
+    if (password && (password.length < 6 || password.length > 72)) {
+      setLockError('Use 6 to 72 characters.');
       return;
     }
     setLockBusy(true);
@@ -261,7 +261,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
             placeholder={fillLocked ? 'New word or PIN' : 'Word or PIN'}
             aria-label="Form password"
             aria-invalid={lockError ? true : undefined}
-            minLength={4}
+            minLength={6}
             maxLength={72}
             autoComplete="off"
             autoCapitalize="none"
@@ -274,7 +274,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
           <button
             type="submit"
             className="slate-btn slate-btn--primary slate-btn--compact"
-            disabled={lockBusy || lockDraft.trim().length < 4}
+            disabled={lockBusy || lockDraft.trim().length < 6}
           >
             {lockBusy ? 'Saving…' : 'Set'}
           </button>

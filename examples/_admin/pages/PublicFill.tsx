@@ -177,8 +177,8 @@ export function PublicFill({ slug }: Props) {
         resolveFileUploadMeta={resolveUploadMeta}
         onSubmit={async (answers, meta) => {
           const payloadMeta = metaToPayload(meta);
-          // Filled trap = bot. Flag it and let the Function drop it after the
-          // rate limit; the respondent sees the same thanks screen either way.
+          // Filled trap = bot. Flag it and let the Function drop it before any
+          // DB work (ADR-058); the respondent sees the same thanks screen either way.
           const trapped = Boolean(trapRef.current?.value.trim());
           await submitPublicResponse({
             formId: form.id,

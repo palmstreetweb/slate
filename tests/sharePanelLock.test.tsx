@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schema } from '../src/index.js';
 
@@ -80,16 +80,28 @@ describe('Share panel password lock (ADR-043)', () => {
 
     await user.click(screen.getByRole('switch'));
     const set = screen.getByRole('button', { name: 'Set' }) as HTMLButtonElement;
-    await user.type(screen.getByLabelText('Form password'), 'abc');
-    expect(set.disabled).toBe(true); // under 4 chars
-    await user.type(screen.getByLabelText('Form password'), 'd');
+    await user.type(screen.getByLabelText('Form password'), 'abcde');
+    expect(set.disabled).toBe(true); // under 6 chars (ADR-058)
+    await user.type(screen.getByLabelText('Form password'), 'f');
     await user.click(set);
 
-    expect(state.setFormFillPassword).toHaveBeenCalledWith('f_1', 'abcd');
+    expect(state.setFormFillPassword).toHaveBeenCalledWith('f_1', 'abcdef');
     expect((screen.getByLabelText('Share URL') as HTMLInputElement).value).toBe(urlBefore);
-    expect(urlBefore).not.toContain('abcd');
+    expect(urlBefore).not.toContain('abcdef');
     // Display drops the scheme; the value itself is still the public link.
     expect(urlBefore).toBe('slate.test/forms/48210377');
+  });
+
+  it('5 characters: Set stays disabled, and a forced submit shows the rule without calling the store', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('switch'));
+    const input = screen.getByLabelText('Form password') as HTMLInputElement;
+    await user.type(input, '12345');
+    expect((screen.getByRole('button', { name: 'Set' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.submit(input.closest('form')!);
+    expect((await screen.findByRole('alert')).textContent).toBe('Use 6 to 72 characters.');
+    expect(state.setFormFillPassword).not.toHaveBeenCalled();
   });
 
   it('locked: Change / Remove; Remove clears with an empty string', async () => {

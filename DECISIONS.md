@@ -418,6 +418,7 @@ Alternatives:
 - External Redis. Rejected — extra paid service for v1 scale.
 Consequences: Legitimate rapid re-tests from one network may hit 429; raise env limits if needed. IP spoofing is mitigated by trusting platform `x-forwarded-for` from Neon/edge.
 Revisit when: per-form admin-configurable quotas or CAPTCHA are required.
+Addendum (ADR-058): superseded numbers and order. Submits now charge IP + form owner (2,000 × 4 KiB units / h) and IP (10,000 / h) in one all-or-nothing statement, after the form lookup.
 
 ## ADR-031 — Public upload signing guards (Neon Function)
 Date: 2026-09-13
@@ -431,6 +432,7 @@ Alternatives:
 - Full JWKS signature verify on every request. Deferred — owner_id match + exp blocks casual Bearer forgery; add JWKS when Neon Auth exposes a stable URL in Function env.
 Consequences: Malware can still be uploaded within size/rate limits; downloads should treat blobs as untrusted. Optional per-question `accept` remains a client picker hint only, not a server gate. Admin Responses previews require a signed-in owner session.
 Revisit when: JWKS verification on draft/download, or admin opts into a server-side MIME denylist.
+Addendum (ADR-058): (5) is replaced. Public signs are charged by declared size (256 KiB units) to IP + form owner (8,192 / h) and IP (40,960 / h), after the form lookup; draft uploads to the account and the IP.
 
 ## ADR-032 — Multi-file `file_upload` answers
 Date: 2026-09-13
@@ -582,6 +584,7 @@ Alternatives:
 - Random signed/expiring token. Deferred — the HMAC needs no new table or secret and already dies with the password.
 Consequences: Turning the lock on, off, or changing the word never changes the URL or QR. Respondents type it once per tab. A respondent mid-fill when the password changes gets a clear "password changed, reload" on submit. Backup restore re-creates rows, so restored forms come back unlocked. The SPA tolerates a database without 012 (falls back to the column list without `fill_locked`; unlocked rows still open), so deploy order is forgiving — but the lock row will error until 012 is applied and the Data API schema cache is refreshed.
 Revisit when: per-respondent codes, expiring access, or the custom-slug / custom-domain feature lands.
+Addendum (ADR-058): (1) new or changed passwords need 6–72 characters, NFC-normalized. (6) is replaced: only misses are counted, through `try_fill_password`; token reloads and unknown slugs are free, and errors read as a wrong password.
 
 ## ADR-044 — Clean pathname routes; public link is `/forms/{slug}`
 Date: 2026-09-22
@@ -618,6 +621,7 @@ Decision, in blast-radius order:
 Not done (needs a product answer or more time): per-owner notification email (every response still mails `PSW_NOTIFY_EMAIL`); studio bundle served to respondents (1.02 MB raw) — needs route-level `lazy()`; submissions fetched unbounded on boot — needs projection + limit; autosave debounce; dashboard memoization; Functions run as the table owner — needs a least-privilege role; 4-character PIN minimum; per-owner slugs are globally unique (a squatting/enumeration oracle); portable links have no "not verified by Slate" interstitial; session refresh appears to lapse after ~1 h.
 Consequences: Owners must be signed in for Build with AI. `storagesign` needs `NEON_AUTH_URL` (it can derive it from `DATABASE_URL` but the env is pinned on deploy). Uploads of unusual types are stored as octet-stream and downloaded rather than previewed.
 Revisit when: custom domains (CSP `frame-ancestors`, cookies), per-respondent access codes, or a second app on the origin.
+Addendum (ADR-058): item 1, read ops are now charged after a valid Bearer, to the account plus an IP backstop, never before. Item 4, the body cap is 64 KiB counted in bytes.
 
 ## ADR-047 — v1 responses live in the app only
 Date: 2026-09-22
@@ -665,6 +669,7 @@ Alternatives:
 Consequences: Forms without a file question can no longer be used for anonymous storage. A respondent whose page still has an older published version (a file question later removed, or its limit lowered) gets "This form is not accepting uploads." or "That file is too large." Their answer for that question would have been dropped on submit anyway. Needs a `storagesign` redeploy; no migration. A typo in `STORAGE_SIGN_MAX_BYTES` (NaN) now blocks every public upload with 413 instead of silently removing the size cap.
 Revisit when: file questions get per-question server rules (types, counts), or the sign request carries a question id.
 Addendum (integration): the public fill page now pins its upload scope to public/ (`setUploadContext(id, { scope: 'public' })`). Before, any browser signed into a Slate studio uploaded as draft/ and was refused on someone else's form; that bug predates this ADR but broke the same path.
+Addendum (ADR-058): (7) rate limits changed. The gate no longer reads `published_schema`; the rate statement returns it after the charge. Refusals for no file question or over the limit are charged.
 
 ## ADR-051 — Build with AI daily spend cap lives in Postgres
 Date: 2026-09-23
@@ -695,6 +700,7 @@ Alternatives:
 Consequences: Browser bots that fill every input are dropped silently after using up their rate-limit quota. Bots that POST straight to the Function skip the trap entirely; rate limits remain the defence there. A false positive would silently lose a real response. The layered defences above make that unlikely, but no metric tracks dropped submissions today.
 Revisit when: owners report junk responses that get past both the rate limits and the trap, or we want a count of dropped submissions (for example a log line or a counter keyed by form).
 Addendum (review): honeypot drops are logged by submitresponse (form id, answer-key count, duration — no answers, no IP) so an autofill false positive, the worst failure mode here, is visible in Function logs.
+Addendum (ADR-058): the honeypot now runs before every rate limit and any DB access, costs nothing, and is logged at most once per 10 s per isolate with per-form counts.
 
 ## ADR-053 — Brand logo in the form chrome
 Date: 2026-09-23
@@ -775,6 +781,67 @@ Alternatives:
 Consequences: Another account can never reuse a slug. Each permanent delete adds one small `retired_slugs` row (the 8-digit space holds 90M). An operator who must move a slug does it in one transaction with `forms_slug_lock` disabled. Any new `/forms/<word>` route must first check that no existing word slug uses that word. Verified by 49 SQL checks on a throwaway branch (the attack before and after, stale upsert, restore, retire and reclaim, 12 malformed slugs, grants, the delete/insert race) and by `tests/slugLock.test.ts`.
 
 Revisit when: owners can pick custom links (needs a reserved-word and ownership policy), or permanent delete gets an undo.
+
+## ADR-058 — Crowd-scale rate limits
+Date: 2026-09-26
+Status: accepted (2026-09-26)
+Context: Audit M-RL-1 and M-RL-2, plus pin-bruteforce, file-fanout-dos, jwks-refetch and body-unbounded. The IP was the only identity, and the order was wrong for a crowd. `submitresponse` charged IP+form (10 / 10 min) and then IP (30 / h) before it looked the form up, so 30 junk ids from anyone inside a venue's NAT closed every form for about an hour, and 300 people on one Wi-Fi needed about 10 hours to get their responses in. Unlock charged every attempt (right, wrong or a tab reload) at 40 per IP+slug per 10 min. `storagesign` gave a crowd 20 files per 10 min per form, and every owner read shared the venue's 120 reads per 10 min with every respondent's meta call. `consume_submit_rate` wrote a row on every call, denials included, one round trip per bucket, and a later bucket's denial left earlier ones charged. Keys were built from unchecked input, and the prune was random and unbounded.
+Decision:
+(a) **Order.** Shape checks first (0 statements), then the honeypot (0 statements), then the form lookup and lock (1 small read that never selects `published_schema`), then ONE rate statement. The schema is read in that same statement, and only when the charge went through. This deliberately reverses the audit's "per-IP first": a per-IP charge before the lookup is the lever that let junk ids lock a network out. A missing, unpublished, schema-less or locked-without-token form costs one read and writes nothing.
+(b) **All or nothing.** Migration `016_crowd_rate_limits.sql` adds `consume_submit_rates(keys[], windows[], maxes[], costs[])`. It checks every bucket read-only and reports the one that blocks longest; a denial writes nothing (the 014 rule). Otherwise it charges every bucket in one global key order, and an exception block undoes the whole call if a concurrent caller filled a bucket in between. Then it prunes at most 20 rows older than 25 h with SKIP LOCKED. Keys over 256 bytes, max < 1 and cost outside 1..max are denied without a write; bad array shapes and windows outside 1..86,400 s raise 22023 (the Functions answer 503). `consume_submit_rate` stays as a one-line wrapper with the same signature and one-row result, for `authemail` and for rollback.
+(c) **IP + form owner keys, with a 5x whole-IP backstop.** A signed-up abuser flooding their own form at a venue closes only their own forms to that network.
+(d) **Size charging.** Submits: 1 unit per 4 KiB of body (min 1), body cap 64 KiB counted in bytes, chunked bodies included (`hono/body-limit`, already in hono 4.13.7). Uploads: 1 unit per 256 KiB of declared `contentLength` (a safe integer; 1e20 is a 400).
+(e) **Honeypot ahead of every limit, free.** Logged at most once per 10 s per isolate with per-form counts.
+(f) **Unlock counts misses, not attempts.** One SECURITY DEFINER call, `try_fill_password`, reads the miss ceilings, charges a CPU guard on every attempt, runs bcrypt on the NFC-normalized password and counts the result, all in one transaction. A network with fewer than 3 misses on the form ("fresh"), or with a success there this hour ("proven"), skips the per-IP and per-form miss ceilings; a proven network's own misses are capped at the per-IP budget. Keys carry the password version (the bcrypt salt), so a new password starts fresh buckets. Any error from that call answers exactly like a wrong password. Unknown slugs, unlocked forms, token reloads and an empty password are free.
+(g) **Fill passwords need 6–72 characters** for new or changed passwords, NFC-normalized in SQL; the studio trims, and unlock trims and normalizes before the check.
+(h) **Owner reads** (`meta`, `download`, `content`) and draft uploads need a Bearer first (no DB without one), then a verified JWT, then one charge to the account plus an IP backstop, then the owner check. `content` refuses objects over 10 MiB (413 `too_large_for_preview`; the studio falls back to the signed download link). `meta` and `content` answer 404 only when the object is missing, 503 otherwise. File answers keep only this form's own storage refs, deduplicated and capped at `maxFiles` (the server half of M-DB-3 for new rows).
+(i) **Client IP** is the rightmost `X-Forwarded-For` only, port stripped, IPv6 grouped by /64 (a placeholder: the Function hosts are IPv4-only, DNS 2026-09-26), `::ffff:` mapped to IPv4, anything else `raw:` plus ≤ 64 safe characters. `X-Real-IP`, `CF-Connecting-IP` and `True-Client-IP` are no longer trusted. No XFF means the shared `noip` key at a tenth of every limit, with a loud log line at most once a minute.
+(j) **slug-oracle is deferred to step 8b.** `get_form_by_slug` is untouched; a real throttle needs a new hop that sees the client IP.
+(k) **JWKS:** a forced refresh at most once per 60 s per instance, recorded only after it succeeds; each kind of fetch is single-flight; a failed fetch backs off 60 s and serves stale keys; with nothing cached the verifier throws (storagesign 503). Both copies (`api/authJwt.ts`, storage-sign).
+(l) **Crowd UX:** both Functions send CORS `maxAge: 7200` and expose `Retry-After`. Every 429 names the wait and suggests another network. Unlock shows the server's text. Network failures on submit and upload-sign get plain copy. Public uploads never load the Neon SDK, fill the meta cache on success, and the fill page never reads stored files.
+
+Numbers (Function env overrides must be integers in range, else the default; each Function logs its effective limits once per isolate):
+
+| Bucket | Default | Window | Env |
+|---|---|---|---|
+| `sub:ipowner:{ip}:{owner}` | 2,000 units (4 KiB) | 1 h | `SUBMIT_RATE_IP_OWNER_MAX` |
+| `sub:ip:{ip}` | 10,000 units | 1 h | `SUBMIT_RATE_IP_MAX` |
+| `unlock:pw:{ip}:{owner}` | 2,000 attempts | 10 min | `UNLOCK_RATE_PW_MAX` |
+| `unlock:pw:{ip}` | 10,000 attempts | 10 min | `UNLOCK_RATE_PW_IP_MAX` |
+| `unlock:failip:{ip}` | 500 misses | 1 h | `UNLOCK_RATE_FAIL_IP_MAX` |
+| `unlock:failform:{form}:{pv}` | 300 misses | 1 h | `UNLOCK_RATE_FAIL_FORM_MAX` |
+| `up:ipowner:{ip}:{owner}` | 8,192 units (256 KiB), 2 GiB | 1 h | `STORAGE_SIGN_IP_OWNER_MAX` |
+| `up:draft:{sub}` | 8,192 units | 1 h | `STORAGE_SIGN_DRAFT_USER_MAX` |
+| `up:ip:{ip}` (public + draft) | 40,960 units, 10 GiB | 1 h | `STORAGE_SIGN_IP_MAX` |
+| `read:u:{sub}` | 3,000 reads | 10 min | `STORAGE_SIGN_READ_USER_MAX` |
+| `read:ip:{ip}` | 15,000 reads | 10 min | `STORAGE_SIGN_READ_IP_MAX` |
+
+Also: submit body ≤ 65,536 B; sign body ≤ 8,192 B; content previews ≤ 10,485,760 B (`STORAGE_SIGN_CONTENT_MAX_BYTES`, at most 32 MiB); `noip` = every IP-keyed max ÷ 10 (min 1); keys ≤ ~170 B. The new prefixes never collide with the old keys, so a rollback starts clean. Retired env names (none set in prod): `SUBMIT_RATE_IP_FORM_MAX`, `SUBMIT_RATE_IP_FORM_WINDOW_SEC`, `SUBMIT_RATE_IP_WINDOW_SEC`, `UNLOCK_RATE_IP_SLUG_*`, `UNLOCK_RATE_IP_MAX`, `UNLOCK_RATE_IP_WINDOW_SEC`, `STORAGE_SIGN_IP_FORM_*`, `STORAGE_SIGN_IP_WINDOW_SEC`, `STORAGE_SIGN_READ_IP_WINDOW_SEC`. `SUBMIT_RATE_IP_MAX`, `STORAGE_SIGN_IP_MAX` and `STORAGE_SIGN_READ_IP_MAX` keep their names but now count units (or reads) under the new keys.
+
+Crowd math: 300 people on one venue IP, one form, ~10 min: 300 submit units (15 % of IP+owner); ~360 unlock attempts with typos, and after the first success the venue is proven; 900 photos = 1,800 upload units (22 %); the organizer reviewing on the same Wi-Fi is charged to their account, not the venue. A 1,000-person session still fits (50 % submits, 73 % uploads at 3 photos each).
+Alternatives:
+- Per-IP first, as the audit suggested. Rejected: that charge is the lever that let junk ids close a network.
+- A per-form submit ceiling across all IPs. Rejected: a distributed flood would close the form to everyone.
+- An expiring or random unlock token. Deferred (ADR-043): guessing targets the password, not the 256-bit token.
+- Counting uploads per submission with a client-chosen fill id. Rejected: the client picks it. Step 11 brings server-minted keys and per-owner quotas.
+- GCRA or sliding windows. Deferred: the fixed-window all-or-nothing core is one small SQL function.
+- A CAPTCHA or per-device signal. Rejected for now: fails the no-friction bar.
+Consequences / risks:
+- The IP is still the only identity. Someone inside a crowd's NAT can close one owner's forms for up to 1 h with 2,000 submit units (≥ 125 junk rows that owner sees), every form with 10,000 units across ≥ 5 owners, and password entry for up to 10 min with 10,000 attempts across ≥ 5 owners' locked forms. Today 30 junk submits close every form.
+- Uploads are charged when signed, by declared size, and nothing ties an object to a response. The cheapest lever left: 64 signs declaring 32 MiB close one owner's file forms to the venue for up to 1 h (320 across ≥ 5 owners), with no bytes moved. Orphan objects are invisible to owners. Step 11 is the real fix.
+- Free hosting stays about today's figure per IP + owner (2 GiB/h), 10 GiB/h per IP across ≥ 5 owners; submissions storage up to ~7.8 MiB/h per IP + owner. A 100-IP botnet scales every per-IP limit by 100.
+- The submit body cap drops from 256 KiB to 64 KiB (about 21,000 CJK or 65,000 ASCII characters); such a respondent sees "Your answers are too long to send…". The largest real response is ~1.5 KB.
+- Unlock errors read as a wrong password, by design, so no guess gets a distinct answer. A DB outage, or deploying the new `submitresponse` before 016, looks like wrong passwords. Apply 016 first.
+- The unlock exemptions trade some brute-force resistance for crowd safety (~600 misses/h per form from a 100-IP botnet; a 6-digit PIN still takes ~35 days). One corner case can lock a network out of one form for up to 1 h: a distributed flood has filled that form's ceiling, nobody on the network has unlocked it this hour, and its first 3 tries all miss. Changing the password resets it.
+- Fixed windows allow up to 2x a limit across a window edge; a denied caller may wait up to 1 h.
+- No studio read queue until step 14: an owner past 3,000 reads per 10 min sees blank thumbnails for up to 10 min. Previews over 10 MiB open through the signed download link (big PDFs download, some large videos don't play inline in Safari).
+- If Neon ever stops sending `X-Forwarded-For`, public traffic hits the `noip` limits quickly (fail closed) with a loud log line.
+- Neon's default 100 concurrent invocations per account is shared by all three Functions; no Postgres bucket protects that.
+- slug-oracle stays open until 8b.
+- A denied submit is now 2 statements (the lookup, then the rate check) where it was 1, because the lookup runs first on purpose. On the branch it measured p50 ~190 ms vs ~100 ms from a laptop; accepted submits, wrong unlocks and public signs all got faster (one round trip fewer).
+
+Verified on a throwaway branch (2026-09-26): 016 applied twice, 28 SQL checks (all-or-nothing under 50 parallel calls, 0 deadlocks in 60 s × 32 clients, bounded prune on the index, fresh/proven unlock rules, NFC, grants) and 15 scenarios running the real Functions against it (`scripts/check-rate-limits.ts`).
+Revisit when: an edge limiter or per-device signal is available, the Function hosts get AAAA records (IPv6 grouping), step 11 (per-owner byte quotas, server-minted keys), or typo lockouts are reported.
 
 ---
 

@@ -10,7 +10,8 @@ Follow [`neon/SETUP.md`](./neon/SETUP.md) in full:
 - [ ] Apply `neon/migrations/001_initial.sql` … `010_form_quota.sql`
 - [ ] Refresh Data API schema cache
 - [ ] Deploy Functions: `submitresponse`, `storagesign`, `authemail` (ADR-030/031/037)
-- [ ] Function env: `STORAGE_SIGN_*` / `SUBMIT_RATE_*` / `UNLOCK_RATE_*` (optional), `authemail`: `RESEND_API_KEY` + `NEON_AUTH_URL`, `storagesign`: `NEON_AUTH_URL`
+- [ ] Function env: `STORAGE_SIGN_*` / `SUBMIT_RATE_*` / `UNLOCK_RATE_*` (optional; names, defaults and units in `neon/SETUP.md` §5, ADR-058), `authemail`: `RESEND_API_KEY` + `NEON_AUTH_URL`, `storagesign`: `NEON_AUTH_URL`
+- [ ] Apply `016_crowd_rate_limits.sql` before redeploying `submitresponse` and `storagesign` (ADR-058)
 - [ ] Auth webhooks: `send.otp` + `send.magic_link` → `https://slateforms.vercel.app/api/auth-email` (proxies to `authemail`)
 - [ ] Confirm Neon Auth / Google OAuth allows any account (not org-restricted)
 

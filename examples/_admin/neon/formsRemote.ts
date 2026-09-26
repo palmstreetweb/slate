@@ -198,7 +198,7 @@ export async function setFormFillPasswordRemote(
   } catch (err) {
     const raw = (err as { message?: string } | null)?.message ?? '';
     if (/FILL_PASSWORD_LENGTH/.test(raw)) {
-      return { ok: false, message: 'Use 4 to 72 characters.' };
+      return { ok: false, message: 'Use 6 to 72 characters.' };
     }
     if ((err as { code?: string } | null)?.code === 'PGRST202') {
       // Migration 012 applied but the Data API schema cache is stale (or 012 is missing).

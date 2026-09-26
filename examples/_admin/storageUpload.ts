@@ -5,10 +5,18 @@
 
 import { SLATE_FILE_REF_PREFIX } from '@/utils/fileUploadRef.js';
 import { hasStorageSignUrl, getStorageSignUrl, isNeonConfigured } from './neon/config.js';
-import { getUploadFormId } from './uploadContext.js';
+import { getUploadFormId, getUploadScope } from './uploadContext.js';
 import { readFillUnlockToken } from './fillUnlock.js';
 
 const STORAGE_PREFIX = 'storage:';
+
+const OFFLINE = 'Couldn’t reach Slate. Check your connection and try again.';
+
+/**
+ * Respondent pages never read stored files: storagesign serves them only to the
+ * form's owner (ADR-058), so a call from PublicFill would only ever 401.
+ */
+const respondentPage = () => getUploadScope() === 'public';
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^\w.\-()+ ]/g, '_').slice(0, 120);
@@ -111,22 +119,28 @@ export async function uploadToNeonStorage(
   const path = `${scope}/${resolvedFormId}/${uploadId}/${sanitizeFilename(file.name)}`;
 
   const contentType = normalizeUploadMime(file);
-  const signRes = await fetch(getStorageSignUrl(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(await authHeader()),
-    },
-    body: JSON.stringify({
-      op: 'upload',
-      path,
-      contentType,
-      contentLength: file.size,
-      // Locked forms refuse public/ uploads without it (ADR-043).
-      unlockToken:
-        scope === 'public' ? (readFillUnlockToken(resolvedFormId) ?? undefined) : undefined,
-    }),
-  });
+  let signRes: Response;
+  try {
+    signRes = await fetch(getStorageSignUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // public/ ignores a Bearer (ADR-050), so respondents never load the SDK for one.
+        ...(scope === 'draft' ? await authHeader() : {}),
+      },
+      body: JSON.stringify({
+        op: 'upload',
+        path,
+        contentType,
+        contentLength: file.size,
+        // Locked forms refuse public/ uploads without it (ADR-043).
+        unlockToken:
+          scope === 'public' ? (readFillUnlockToken(resolvedFormId) ?? undefined) : undefined,
+      }),
+    });
+  } catch {
+    throw new Error(OFFLINE);
+  }
   if (!signRes.ok) {
     throw new Error(await friendlySignError(signRes));
   }
@@ -157,7 +171,14 @@ export async function uploadToNeonStorage(
         : `Upload failed (${put.status}).`,
     );
   }
-  return `${SLATE_FILE_REF_PREFIX}${STORAGE_PREFIX}${path}`;
+  const ref = `${SLATE_FILE_REF_PREFIX}${STORAGE_PREFIX}${path}`;
+  // The page already knows what it uploaded: no meta call to show the chip.
+  metaCache.set(ref, {
+    name: sanitizeFilename(file.name),
+    size: file.size,
+    mime: signedType || contentType,
+  });
+  return ref;
 }
 
 /** @deprecated Use uploadToNeonStorage */
@@ -178,6 +199,7 @@ export async function getStorageUploadMeta(ref: string): Promise<{
 
   const cached = metaCache.get(ref);
   if (cached) return cached;
+  if (respondentPage()) return null;
 
   const signRes = await fetch(getStorageSignUrl(), {
     method: 'POST',
@@ -199,6 +221,7 @@ export async function getStorageUploadMeta(ref: string): Promise<{
 export async function getStorageDownloadUrl(ref: string): Promise<string | null> {
   const path = storagePathFromRef(ref);
   if (!path || !isNeonConfigured() || !hasStorageSignUrl()) return null;
+  if (respondentPage()) return null;
 
   const hit = downloadUrlCache.get(ref);
   if (hit && Date.now() - hit.at < DOWNLOAD_URL_TTL_MS) return hit.url;
@@ -229,6 +252,7 @@ export async function getStorageContentBlob(ref: string): Promise<{
 } | null> {
   const path = storagePathFromRef(ref);
   if (!path || !isNeonConfigured() || !hasStorageSignUrl()) return null;
+  if (respondentPage()) return null;
   const res = await fetch(getStorageSignUrl(), {
     method: 'POST',
     headers: {
