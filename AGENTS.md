@@ -19,7 +19,7 @@ src/
 ├── themes/        editorial.ts, swiss.ts, registry
 ├── hooks/         useFormState, useKeyboardNav, useTheme, useReducedMotion
 ├── logic/         conditional, validation, progress (pure, no React)
-├── styles/        tokens.css, toggle.css, animations.css, base.css
+├── styles/        tokens.css, toggle.css, animations.css, base.css, motion.css
 ├── utils/         focus, letters, tokens (small helpers)
 ├── types/         Question.ts, Schema.ts, Answers.ts, Theme.ts (+ barrel)
 └── index.ts       public exports barrel

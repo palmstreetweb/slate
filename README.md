@@ -266,6 +266,8 @@ Two decorations are **narrative** — instead of reshuffling, the picture *build
 - `constellation` — each step lights the next star and draws its connector, completing a star map; uses `--slate-deco-1` + `--slate-deco-line` (`constellation`).
 - `growth` — a vine climbs one segment per step and breaks into flower at the end; uses `--slate-deco-1/2/3` + `--slate-deco-line` (`bloom`).
 
+Decorations draw themselves on as the form moves (ADR-059): the newest constellation line and star, the vine's new growth, an aurora cross-fade, Swiss shapes sliding in. On a confirmed submit the narrative ones finish their picture — every star lights, the vine flowers.
+
 Both are wrapper-scoped on `[data-slate-forms]` — the package never writes to your host page's `<html>`. The PSW theme toggle is a 1:1 visual port of palmstreetweb.com (same morph, same easing).
 
 ### Customizing tokens
@@ -281,6 +283,18 @@ Override per-token via CSS specificity at the wrapper level:
 
 A custom-theme registry API ships in V1.1 (`themes.register()`).
 
+### Motion
+
+Motion follows BUILD_BRIEF §10 and ADR-059, and all of it lives in `styles.css` (no JS dependency):
+
+- **Question hand-off** — the next question rises in (480ms) while the outgoing one fades out over 220ms as an inert, `aria-hidden` copy. No View Transitions, so an embedded form never snapshots the host page.
+- **Choice commit** — on auto-advancing choices the letter badge flips to a self-drawing check and the other options step back, inside the existing ~220ms pause.
+- **Invalid input** — a 3px shake on every failed attempt, and the error slides in.
+- **Progress** — the bar moves by `transform: scaleX()` with a glowing tip that flares on advance; the footer counter rolls to the next number. The bar only reaches 100% once `onSubmit` resolves.
+- **Completion celebration** — only on a successful submit: the check draws, the chip pops and ~14 confetti pieces burst in the theme's own colours and shapes (swiss drops poster shapes, constellation sparkles, bloom petals…). With `sound` on, a short finale chord plays.
+
+`prefers-reduced-motion: reduce` turns all of it off: instant swaps, a static check, no confetti, no tip. Only `transform`, `opacity` and stroke-dash animate, and nothing loops.
+
 ## Examples
 
 The `examples/` folder isn't published. It hosts **Slate**, a supported internal dev tool (ADR-018) for building and previewing forms:
@@ -289,6 +303,7 @@ The `examples/` folder isn't published. It hosts **Slate**, a supported internal
 - Three-pane editor (outline / canvas / inspector) with drag-and-drop reordering, duplication, bulk delete, a visual logic editor (conditions, jumps, scores), and a schema-issue banner powered by `checkSchema`.
 - **Share panel** — copy link + QR for dev preview; optional public URL when `VITE_PUBLIC_FORM_BASE` is set (see `.env.example`).
 - Live `<Form>` preview (with save-and-resume on) and a responses inbox with CSV export and per-question summaries, all backed by `localStorage`.
+- **Motion gallery** at `/motion` — every animation above with a Replay button, in all twelve themes, with a Reduce-motion preview switch. Built-in demo schemas; no sign-in, nothing submitted.
 
 Run `npm run dev` and open the printed URL to use it.
 

@@ -192,7 +192,9 @@
   font-weight: 700;
 }
 
-/* Top progress bar. */
+/* Top progress bar. The fill moves by transform (scaleX) and a glowing tip
+   rides its leading edge (ADR-059); `color` carries the fill colour so the
+   bar and the tip always match. */
 [data-slate-forms] .slate-progress {
   position: absolute;
   top: 0;
@@ -200,24 +202,79 @@
   right: 0;
   height: 2px;
   background: rgba(26, 26, 26, 0.06);
+  color: var(--slate-accent);
   z-index: 20;
   overflow: hidden;
+  /* Clip sideways (the tip track parks off the left edge) but let the
+     tip's glow spill below the 2px track. Older engines keep `hidden`. */
+  overflow: clip visible;
 }
 
 [data-slate-forms][data-theme-name='swiss'] .slate-progress {
   height: 4px;
   background: rgba(0, 0, 0, 0.08);
+  color: var(--slate-text);
 }
 
 [data-slate-forms] .slate-progress-bar {
-  height: 100%;
-  background: var(--slate-accent);
-  transition: width 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  transform-origin: left center;
+  transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-slate-forms][data-theme-name='swiss'] .slate-progress-bar {
-  background: var(--slate-text);
-  transition: width 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-duration: 200ms;
+}
+
+[data-slate-forms] .slate-progress-spark {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-slate-forms][data-theme-name='swiss'] .slate-progress-spark {
+  transition-duration: 200ms;
+}
+
+[data-slate-forms] .slate-progress-tip {
+  position: absolute;
+  top: 50%;
+  right: -8px;
+  width: 24px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 999px;
+  background: radial-gradient(closest-side, currentColor, transparent);
+  opacity: 0.5;
+}
+
+[data-slate-forms] .slate-progress[data-empty] .slate-progress-tip,
+[data-slate-forms] .slate-progress--complete .slate-progress-tip {
+  opacity: 0;
+}
+
+/* Calm motion: the bar jumps, no tip. Keyed on the OS setting and on the
+   wrapper flag (which also carries the preview override). */
+@media (prefers-reduced-motion: reduce) {
+  [data-slate-forms] .slate-progress-bar,
+  [data-slate-forms] .slate-progress-spark {
+    transition: none;
+  }
+  [data-slate-forms] .slate-progress-tip {
+    display: none;
+  }
+}
+
+[data-slate-forms][data-reduced-motion] .slate-progress-bar,
+[data-slate-forms][data-reduced-motion] .slate-progress-spark {
+  transition: none;
+}
+
+[data-slate-forms][data-reduced-motion] .slate-progress-tip {
+  display: none;
 }
 
 /* Bottom-right footer counter "n / m". opacity bumped from 0.4 → 0.6 to clear
@@ -236,6 +293,17 @@
 
 [data-slate-forms][data-theme-name='swiss'] .slate-footer {
   font-weight: 700;
+}
+
+/* The current number sits in a clipped slot so it can roll (motion.css). */
+[data-slate-forms] .slate-footer-roll {
+  display: inline-flex;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+[data-slate-forms] .slate-footer-num {
+  display: inline-block;
 }
 
 /* Question step badge ("01 →"). */

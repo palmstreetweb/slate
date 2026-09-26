@@ -31,9 +31,14 @@ export function hasStepDecorationBackdrop(decoration: ThemeDecorationKind): bool
 type Props = {
   themeName: ThemeName | string;
   step: number;
+  /**
+   * A confirmed submit (ADR-059). Narrative decorations finish their picture:
+   * the constellation lights every star, the vine flowers.
+   */
+  complete?: boolean;
 };
 
-export function ThemeDecoration({ themeName, step }: Props) {
+export function ThemeDecoration({ themeName, step, complete = false }: Props) {
   const decoration = resolveThemeDecoration(themeName);
 
   switch (decoration) {
@@ -44,9 +49,9 @@ export function ThemeDecoration({ themeName, step }: Props) {
     case 'grid':
       return <GridDecoration step={step} />;
     case 'constellation':
-      return <ConstellationDecoration step={step} />;
+      return <ConstellationDecoration step={step} complete={complete} />;
     case 'growth':
-      return <GrowthDecoration step={step} />;
+      return <GrowthDecoration step={step} complete={complete} />;
     case 'riso':
       return <RisoDecoration step={step} />;
     case 'memphis':

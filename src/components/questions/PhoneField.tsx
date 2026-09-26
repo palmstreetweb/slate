@@ -11,6 +11,7 @@ import type { PhoneQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import { shakeInvalid } from '@/utils/motion.js';
 import { focusAfter } from '@/utils/focus.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import { resolveTitle } from './_resolveTitle.js';
@@ -62,6 +63,7 @@ export function PhoneField({
       const presence = validate(question, value);
       if (presence) {
         setError(presence.message);
+        shakeInvalid(inputRef.current);
         return;
       }
       if (!value.trim() && !question.required) {
@@ -77,6 +79,7 @@ export function PhoneField({
       const parsed = lib.parsePhoneNumberFromString(value, country);
       if (!parsed || !parsed.isValid()) {
         setError("That doesn't look like a valid phone number");
+        shakeInvalid(inputRef.current);
         return;
       }
       setError(null);

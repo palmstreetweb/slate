@@ -1424,7 +1424,9 @@ exports[`question types render > statement 1`] = `
 
 exports[`question types render > thanks 1`] = `
 <div>
-  <div>
+  <div
+    class="slate-thanks"
+  >
     <h1
       class="slate-title"
     >
@@ -1436,7 +1438,8 @@ exports[`question types render > thanks 1`] = `
       Talk soon.
     </p>
     <div
-      style="margin-top: 24px;"
+      aria-live="polite"
+      class="slate-thanks-status"
     />
   </div>
 </div>

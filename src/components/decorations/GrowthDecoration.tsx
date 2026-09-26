@@ -6,11 +6,18 @@
  *
  * Stem reads `--slate-deco-line`, leaves `--slate-deco-1`, petals `--slate-deco-2`,
  * flower centers `--slate-deco-3` — all defined per theme + mode in tokens.css.
+ *
+ * Growth on (ADR-059): when a node is added the stem draws its new length
+ * (stroke-dash via the Web Animations API), the new leaf unfurls from its
+ * node and the bud re-forms at the tip. On a confirmed submit (`complete`)
+ * the plant finishes growing and the flowers open one after another. Only
+ * transform / opacity / stroke-dash move; calm motion shows the result.
  */
 
 'use client';
 
-import type { ReactElement } from 'react';
+import { useLayoutEffect, useRef, type CSSProperties, type ReactElement } from 'react';
+import { useReducedMotion } from '@/hooks/useReducedMotion.js';
 
 const STEM = 'var(--slate-deco-line)';
 const LEAF = 'var(--slate-deco-1)';
@@ -45,23 +52,43 @@ function smoothPath(points: ReadonlyArray<readonly [number, number]>): string {
   return d;
 }
 
+/** transform-origin in viewBox units, so a part grows out of its own node. */
+function originAt(x: number, y: number, delayMs = 0): CSSProperties {
+  return {
+    transformOrigin: `${x}px ${y}px`,
+    '--slate-draw-delay': `${delayMs}ms`,
+  } as CSSProperties;
+}
+
 function Leaf({ x, y, side }: { x: number; y: number; side: 1 | -1 }): ReactElement {
   const cx = x + side * 26;
   const cy = y - 6;
   return (
-    <ellipse
-      cx={cx}
-      cy={cy}
-      rx={28}
-      ry={12}
-      fill={LEAF}
-      opacity="0.82"
-      transform={`rotate(${side * -26} ${cx} ${cy})`}
-    />
+    <g className="slate-deco-grow" style={originAt(x, y, 260)}>
+      <ellipse
+        cx={cx}
+        cy={cy}
+        rx={28}
+        ry={12}
+        fill={LEAF}
+        opacity="0.82"
+        transform={`rotate(${side * -26} ${cx} ${cy})`}
+      />
+    </g>
   );
 }
 
-function Flower({ x, y, scale = 1 }: { x: number; y: number; scale?: number }): ReactElement {
+function Flower({
+  x,
+  y,
+  scale = 1,
+  delayMs = 0,
+}: {
+  x: number;
+  y: number;
+  scale?: number;
+  delayMs?: number;
+}): ReactElement {
   const petals = [];
   for (let k = 0; k < 5; k++) {
     const a = (k / 5) * Math.PI * 2 - Math.PI / 2;
@@ -81,19 +108,49 @@ function Flower({ x, y, scale = 1 }: { x: number; y: number; scale?: number }): 
     );
   }
   return (
-    <g>
+    <g className="slate-deco-bloom" style={originAt(x, y, delayMs)}>
       {petals}
       <circle cx={x} cy={y} r={7.5 * scale} fill={CENTER} />
     </g>
   );
 }
 
-export function GrowthDecoration({ step }: { step: number }) {
+type Props = {
+  step: number;
+  /** A confirmed submit — finish growing and flower. */
+  complete?: boolean;
+};
+
+export function GrowthDecoration({ step, complete = false }: Props) {
   // Start with a small sprout (2 nodes), grow one node per step.
-  const grown = Math.max(2, Math.min(step + 2, NODES.length));
+  const grown = complete ? NODES.length : Math.max(2, Math.min(step + 2, NODES.length));
   const fullyGrown = grown >= NODES.length;
   const revealed = NODES.slice(0, grown);
   const tip = revealed[revealed.length - 1]!;
+  const reducedMotion = useReducedMotion();
+
+  const stemRef = useRef<SVGPathElement>(null);
+  const stemLenRef = useRef<number | null>(null);
+
+  // Draw only the stem's new length. The path is rebuilt each step, so we
+  // measure it and animate the dash offset from the old length to the new.
+  useLayoutEffect(() => {
+    const path = stemRef.current;
+    if (!path || typeof path.getTotalLength !== 'function') return;
+    const next = path.getTotalLength();
+    const prev = stemLenRef.current;
+    stemLenRef.current = next;
+    if (reducedMotion || typeof path.animate !== 'function' || !(next > 0)) return;
+    const from = prev === null ? 1 : Math.max(0, Math.min(1, (next - prev) / next));
+    if (from <= 0.001) return;
+    path.animate(
+      [
+        { strokeDasharray: '1 1', strokeDashoffset: from },
+        { strokeDasharray: '1 1', strokeDashoffset: 0 },
+      ],
+      { duration: prev === null ? 900 : 650, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    );
+  }, [grown, reducedMotion]);
 
   return (
     <svg
@@ -103,7 +160,15 @@ export function GrowthDecoration({ step }: { step: number }) {
       aria-hidden="true"
       data-testid="slate-growth-decoration"
     >
-      <path d={smoothPath(revealed)} fill="none" stroke={STEM} strokeWidth="6" strokeLinecap="round" />
+      <path
+        ref={stemRef}
+        d={smoothPath(revealed)}
+        pathLength={1}
+        fill="none"
+        stroke={STEM}
+        strokeWidth="6"
+        strokeLinecap="round"
+      />
 
       {revealed.slice(1).map(([x, y], i) => (
         <Leaf key={`l${i}`} x={x} y={y} side={i % 2 === 0 ? 1 : -1} />
@@ -111,13 +176,14 @@ export function GrowthDecoration({ step }: { step: number }) {
 
       {fullyGrown ? (
         <>
-          <Flower x={tip[0]} y={tip[1]} scale={1.15} />
-          <Flower x={NODES[6]![0]} y={NODES[6]![1]} scale={0.85} />
-          <Flower x={NODES[4]![0]} y={NODES[4]![1]} scale={0.7} />
+          <Flower x={tip[0]} y={tip[1]} scale={1.15} delayMs={380} />
+          <Flower x={NODES[6]![0]} y={NODES[6]![1]} scale={0.85} delayMs={560} />
+          <Flower x={NODES[4]![0]} y={NODES[4]![1]} scale={0.7} delayMs={740} />
         </>
       ) : (
         // A closed bud at the growing tip until the plant is fully grown.
-        <g>
+        // Keyed by tip so it re-forms at each new node.
+        <g key={`bud${grown}`} className="slate-deco-grow" style={originAt(tip[0], tip[1], 320)}>
           <ellipse cx={tip[0]} cy={tip[1] - 8} rx={10} ry={16} fill={PETAL} opacity="0.85" />
           <circle cx={tip[0]} cy={tip[1] - 16} r={5} fill={CENTER} opacity="0.9" />
         </g>

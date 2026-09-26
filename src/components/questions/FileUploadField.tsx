@@ -7,6 +7,7 @@ import type { FileAnswer, FileAnswerItem } from '@/types/Answers.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import { shakeInvalid } from '@/utils/motion.js';
 import {
   describeFileUploadAnswer,
   isFileUploadRef,
@@ -435,6 +436,7 @@ export function FileUploadField({
     const err = validate(question, value);
     if (err) {
       setError(err.message);
+      shakeInvalid(rootRef.current?.querySelector('.slate-upload-zone'));
       return;
     }
     setError(null);

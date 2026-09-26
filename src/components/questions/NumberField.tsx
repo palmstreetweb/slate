@@ -5,6 +5,7 @@ import type { NumberQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import { shakeInvalid } from '@/utils/motion.js';
 import { focusAfter } from '@/utils/focus.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import { resolveTitle } from './_resolveTitle.js';
@@ -40,11 +41,13 @@ export function NumberField({
     const num = trimmed === '' ? undefined : Number(trimmed);
     if (trimmed !== '' && Number.isNaN(num)) {
       setError('Please enter a number');
+      shakeInvalid(inputRef.current);
       return;
     }
     const err = validate(question, num);
     if (err) {
       setError(err.message);
+      shakeInvalid(inputRef.current);
       return;
     }
     setError(null);

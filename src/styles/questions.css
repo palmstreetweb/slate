@@ -994,7 +994,9 @@
 /* ---------- thanks confirmation chip ---------- */
 
 [data-slate-forms] .slate-confirm-chip {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 16px;
   margin-top: 8px;
   font-size: 11px;

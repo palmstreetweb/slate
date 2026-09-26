@@ -11,6 +11,7 @@ import type { DateQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import { shakeInvalid } from '@/utils/motion.js';
 import { focusAfter } from '@/utils/focus.js';
 import { resolveTitle } from './_resolveTitle.js';
 
@@ -42,6 +43,7 @@ export function DateField({ question, answers, initialValue, onAnswer, onAdvance
   const monthRef = useRef<HTMLInputElement>(null);
   const dayRef = useRef<HTMLInputElement>(null);
   const yearRef = useRef<HTMLInputElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
 
   const format = question.format ?? 'MM/DD/YYYY';
   const firstRef = format === 'MM/DD/YYYY' ? monthRef : dayRef;
@@ -63,6 +65,7 @@ export function DateField({ question, answers, initialValue, onAnswer, onAdvance
     const err = validate(question, iso);
     if (err) {
       setError(err.message);
+      shakeInvalid(rowRef.current);
       return;
     }
     setError(null);
@@ -135,7 +138,7 @@ export function DateField({ question, answers, initialValue, onAnswer, onAdvance
         {resolveTitle(question.title, answers)}
       </h1>
       <div style={{ marginTop: 24 }}>
-        <div className="slate-date-row" role="group" aria-labelledby={labelId}>
+        <div ref={rowRef} className="slate-date-row" role="group" aria-labelledby={labelId}>
           {format === 'MM/DD/YYYY' ? (
             <>
               {monthInput(dayRef)}

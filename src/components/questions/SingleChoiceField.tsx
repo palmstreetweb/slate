@@ -5,6 +5,8 @@ import type { SingleChoiceQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { choiceListIsSplit } from '@/utils/choiceLayout.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
+import { useChoiceCommit } from '@/hooks/useChoiceCommit.js';
+import { ChoiceBadge } from './ChoiceBadge.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -16,6 +18,7 @@ type Props = {
 
 export function SingleChoiceField({ question, answers, selected, onSelect }: Props) {
   const labelId = useId();
+  const { committed, markCommitted } = useChoiceCommit(selected);
   return (
     <div>
       <h1 id={labelId} className="slate-title">
@@ -23,22 +26,26 @@ export function SingleChoiceField({ question, answers, selected, onSelect }: Pro
       </h1>
 
       <div
-        className={`slate-choices${choiceListIsSplit(question.options) ? ' slate-choices--split' : ''}`}
+        className={`slate-choices${choiceListIsSplit(question.options) ? ' slate-choices--split' : ''}${committed ? ' slate-choices--committed' : ''}`}
         role="radiogroup"
         aria-labelledby={labelId}
       >
         {question.options.map((opt, i) => {
           const isSelected = selected === opt.value;
+          const isCommitted = isSelected && committed === opt.value;
           return (
             <button
               key={opt.value}
               type="button"
               role="radio"
               aria-checked={isSelected}
-              onClick={() => onSelect(opt.value)}
-              className={`slate-choice${isSelected ? ' slate-choice--selected' : ''}`}
+              onClick={() => {
+                markCommitted(opt.value);
+                onSelect(opt.value);
+              }}
+              className={`slate-choice${isSelected ? ' slate-choice--selected' : ''}${isCommitted ? ' slate-choice--committed' : ''}`}
             >
-              <span className="slate-choice-badge">{CHOICE_LETTERS[i] ?? ''}</span>
+              <ChoiceBadge letter={CHOICE_LETTERS[i] ?? ''} committed={isCommitted} />
               <span>
                 {opt.label}
                 {opt.description && (

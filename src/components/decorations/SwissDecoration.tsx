@@ -4,6 +4,11 @@
  * (intake-form.jsx SWISS_COMPOSITIONS); fills read the `--slate-deco-*`
  * tokens defined in src/styles/tokens.css so light/dark each get a
  * mode-appropriate palette.
+ *
+ * Each composition is keyed by its index, so a step change remounts it and
+ * motion.css slides its shapes in from the edges, staggered (ADR-059). The
+ * slide uses the individual `translate` property, which composes with the
+ * shapes' own `transform` attributes (rotated bars stay rotated).
  */
 
 'use client';
@@ -93,7 +98,8 @@ type Props = {
 };
 
 export function SwissDecoration({ step }: Props) {
-  const Comp = COMPOSITIONS[((step % COMPOSITIONS.length) + COMPOSITIONS.length) % COMPOSITIONS.length]!;
+  const index = ((step % COMPOSITIONS.length) + COMPOSITIONS.length) % COMPOSITIONS.length;
+  const Comp = COMPOSITIONS[index]!;
   return (
     <svg
       className="slate-decoration"
@@ -102,7 +108,9 @@ export function SwissDecoration({ step }: Props) {
       aria-hidden="true"
       data-testid="slate-swiss-decoration"
     >
-      <Comp />
+      <g key={index} className="slate-deco-scene">
+        <Comp />
+      </g>
     </svg>
   );
 }

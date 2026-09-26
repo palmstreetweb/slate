@@ -3,6 +3,8 @@
 import { useId } from 'react';
 import type { LegalQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
+import { useChoiceCommit } from '@/hooks/useChoiceCommit.js';
+import { ChoiceBadge } from './ChoiceBadge.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -14,6 +16,7 @@ type Props = {
 
 export function LegalField({ question, answers, selected, onSelect }: Props) {
   const labelId = useId();
+  const { committed, markCommitted } = useChoiceCommit(selected);
   const choices: ReadonlyArray<{ value: 'accept' | 'decline'; label: string; badge: string }> = [
     { value: 'accept', label: question.acceptLabel ?? 'I accept', badge: 'A' },
     { value: 'decline', label: question.declineLabel ?? "I don't accept", badge: 'B' },
@@ -26,19 +29,27 @@ export function LegalField({ question, answers, selected, onSelect }: Props) {
       </h1>
       {question.body && <p className="slate-subtitle">{question.body}</p>}
 
-      <div className="slate-choices" role="radiogroup" aria-labelledby={labelId}>
+      <div
+        className={`slate-choices${committed ? ' slate-choices--committed' : ''}`}
+        role="radiogroup"
+        aria-labelledby={labelId}
+      >
         {choices.map((c) => {
           const isSelected = selected === c.value;
+          const isCommitted = isSelected && committed === c.value;
           return (
             <button
               key={c.value}
               type="button"
               role="radio"
               aria-checked={isSelected}
-              onClick={() => onSelect(c.value)}
-              className={`slate-choice${isSelected ? ' slate-choice--selected' : ''}`}
+              onClick={() => {
+                markCommitted(c.value);
+                onSelect(c.value);
+              }}
+              className={`slate-choice${isSelected ? ' slate-choice--selected' : ''}${isCommitted ? ' slate-choice--committed' : ''}`}
             >
-              <span className="slate-choice-badge">{c.badge}</span>
+              <ChoiceBadge letter={c.badge} committed={isCommitted} />
               <span>{c.label}</span>
             </button>
           );

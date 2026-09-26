@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 import type { MultiChoiceQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import { shakeInvalid } from '@/utils/motion.js';
 import { choiceListIsSplit } from '@/utils/choiceLayout.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
 import { resolveTitle } from './_resolveTitle.js';
@@ -26,6 +27,7 @@ export function MultiChoiceField({
 }: Props) {
   const labelId = useId();
   const [error, setError] = useState<string | null>(null);
+  const choicesRef = useRef<HTMLDivElement>(null);
 
   const toggle = (value: string) => {
     const next = selected.includes(value)
@@ -39,6 +41,7 @@ export function MultiChoiceField({
     const err = validate(question, selected);
     if (err) {
       setError(err.message);
+      shakeInvalid(choicesRef.current);
       return;
     }
     setError(null);
@@ -54,6 +57,7 @@ export function MultiChoiceField({
       </h1>
 
       <div
+        ref={choicesRef}
         className={`slate-choices${choiceListIsSplit(question.options) ? ' slate-choices--split' : ''}`}
         role="group"
         aria-labelledby={labelId}

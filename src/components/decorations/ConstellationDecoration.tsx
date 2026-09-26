@@ -7,9 +7,17 @@
  * Stars read `--slate-deco-1`, connectors read `--slate-deco-line`, and the most
  * recently lit ("current") star reads `--slate-accent`. All are defined per
  * theme + mode in src/styles/tokens.css.
+ *
+ * Draw-on (ADR-059): each newly lit connector draws itself along its length
+ * (stroke-dash) and the new star pops in after it. Stars and lines already
+ * on the map never re-animate — only freshly mounted ones do. On a confirmed
+ * submit (`complete`) the rest of the map lights up in sequence and every
+ * star twinkles once. Calm motion shows the finished state with no motion.
  */
 
 'use client';
+
+import { useState, type CSSProperties } from 'react';
 
 const STAR = 'var(--slate-deco-1)';
 const LINE = 'var(--slate-deco-line)';
@@ -56,22 +64,65 @@ const DUST: ReadonlyArray<readonly [number, number, number]> = [
   [430, 700, 1.2],
 ];
 
-export function ConstellationDecoration({ step }: { step: number }) {
+/** Gap between successive draws when several light at once (resume, finale). */
+const STAGGER_MS = 110;
+
+type Props = {
+  step: number;
+  /** A confirmed submit — light the whole map. */
+  complete?: boolean;
+};
+
+export function ConstellationDecoration({ step, complete = false }: Props) {
   // At least the first star is lit; one more lights per step, capped at the path length.
-  const lit = Math.max(1, Math.min(step + 1, PATH.length));
+  const lit = complete
+    ? PATH.length
+    : Math.max(1, Math.min(step + 1, PATH.length));
+
+  // Index of the first star that is new since the previous render. Only
+  // those get a stagger delay; older ones keep delay 0 so a finished draw
+  // is never pulled back into its active interval.
+  const [seen, setSeen] = useState(lit);
+  const [firstNew, setFirstNew] = useState(0);
+  if (lit !== seen) {
+    setFirstNew(Math.min(seen, lit));
+    setSeen(lit);
+  }
+  const delayFor = (i: number) => (i >= firstNew ? (i - firstNew) * STAGGER_MS : 0);
+  // A new star lands as its connector finishes drawing.
+  const starDelay = (i: number) => (i >= firstNew && i > 0 ? delayFor(i) + 360 : 0);
+  // Finale twinkle: a ripple along the path, after any star still landing.
+  const twinkleDelay = (i: number) => (i >= firstNew ? starDelay(i) + 420 : i * 70);
 
   const connectors = [];
   for (let i = 1; i < lit; i++) {
     const [x1, y1] = PATH[i - 1]!;
     const [x2, y2] = PATH[i]!;
+    const len = Math.ceil(Math.hypot(x2 - x1, y2 - y1));
     connectors.push(
-      <line key={`c${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={LINE} strokeWidth="1.5" />,
+      <line
+        key={`c${i}`}
+        className="slate-deco-draw"
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={LINE}
+        strokeWidth="1.5"
+        strokeDasharray={len}
+        style={
+          {
+            '--slate-draw-len': len,
+            '--slate-draw-delay': `${delayFor(i)}ms`,
+          } as CSSProperties
+        }
+      />,
     );
   }
 
   return (
     <svg
-      className="slate-decoration"
+      className={`slate-decoration${complete ? ' slate-decoration--complete' : ''}`}
       viewBox="0 0 1080 1080"
       preserveAspectRatio="xMidYMid slice"
       aria-hidden="true"
@@ -82,18 +133,37 @@ export function ConstellationDecoration({ step }: { step: number }) {
       ))}
       {connectors}
       {PATH.slice(0, lit).map(([x, y], i) => {
-        const current = i === lit - 1;
+        const current = !complete && i === lit - 1;
         return (
           <circle
             key={`s${i}`}
+            className="slate-deco-star"
             cx={x}
             cy={y}
             r={current ? 7 : 4.5}
             fill={current ? ACCENT : STAR}
-            opacity={current ? 0.95 : 0.8}
+            opacity={current ? 0.95 : complete ? 1 : 0.8}
+            style={
+              {
+                '--slate-draw-delay': `${starDelay(i)}ms`,
+                '--slate-twinkle-delay': `${twinkleDelay(i)}ms`,
+              } as CSSProperties
+            }
           />
         );
       })}
+      {!complete && (
+        // Soft halo on the newest star, remounted per step so it pulses once.
+        <circle
+          key={`h${lit}`}
+          className="slate-deco-halo"
+          cx={PATH[lit - 1]![0]}
+          cy={PATH[lit - 1]![1]}
+          r={18}
+          fill={ACCENT}
+          opacity="0.16"
+        />
+      )}
     </svg>
   );
 }

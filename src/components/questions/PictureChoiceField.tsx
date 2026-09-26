@@ -6,12 +6,15 @@
 
 'use client';
 
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 import type { PictureChoiceQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
+import { useChoiceCommit } from '@/hooks/useChoiceCommit.js';
+import { shakeInvalid } from '@/utils/motion.js';
+import { ChoiceBadge } from './ChoiceBadge.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -36,6 +39,11 @@ export function PictureChoiceField({
   const labelId = useId();
   const [error, setError] = useState<string | null>(null);
   const multiple = question.multiple === true;
+  const gridRef = useRef<HTMLDivElement>(null);
+  // Single mode auto-advances, so it gets the commit beat (ADR-059).
+  const { committed, markCommitted } = useChoiceCommit(
+    multiple || typeof selected !== 'string' ? undefined : selected,
+  );
   const selectedArr = multiple
     ? Array.isArray(selected)
       ? selected
@@ -56,6 +64,7 @@ export function PictureChoiceField({
     const err = validate(question, multiple ? selectedArr : selectedArr[0]);
     if (err) {
       setError(err.message);
+      shakeInvalid(gridRef.current);
       return;
     }
     setError(null);
@@ -71,24 +80,33 @@ export function PictureChoiceField({
       </h1>
 
       <div
-        className="slate-picture-grid"
+        ref={gridRef}
+        className={`slate-picture-grid${committed ? ' slate-picture-grid--committed' : ''}`}
         role={multiple ? 'group' : 'radiogroup'}
         aria-labelledby={labelId}
       >
         {question.options.map((opt, i) => {
           const isSelected = selectedArr.includes(opt.value);
+          const isCommitted = !multiple && isSelected && committed === opt.value;
           return (
             <button
               key={opt.value}
               type="button"
               role={multiple ? 'checkbox' : 'radio'}
               aria-checked={isSelected}
-              onClick={() => (multiple ? toggle(opt.value) : onSelectSingle(opt.value))}
-              className={`slate-picture${isSelected ? ' slate-picture--selected' : ''}`}
+              onClick={() => {
+                if (multiple) {
+                  toggle(opt.value);
+                  return;
+                }
+                markCommitted(opt.value);
+                onSelectSingle(opt.value);
+              }}
+              className={`slate-picture${isSelected ? ' slate-picture--selected' : ''}${isCommitted ? ' slate-picture--committed' : ''}`}
             >
               <img src={opt.src} alt={opt.alt ?? opt.label} className="slate-picture-img" />
               <span className="slate-picture-caption">
-                <span className="slate-choice-badge">{CHOICE_LETTERS[i] ?? ''}</span>
+                <ChoiceBadge letter={CHOICE_LETTERS[i] ?? ''} committed={isCommitted} />
                 <span>{opt.label}</span>
               </span>
             </button>

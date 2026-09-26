@@ -11,11 +11,16 @@
  * there — this file doesn't change.
  *
  * onSubmit fires exactly once on entering the `thanks` step (per ADR-005).
+ *
+ * Motion (ADR-059): the outgoing question gets its 220ms exit as an inert
+ * copy laid over the stage (utils/questionHandoff.ts), and a confirmed
+ * submit — not merely reaching thanks — fills the progress bar, completes
+ * narrative decorations and plays the celebration + finale chord.
  */
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { FormProps, PartialMeta, Schema, SubmitMeta } from '@/types/Schema.js';
 import { useFormState } from '@/hooks/useFormState.js';
 import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
@@ -23,6 +28,7 @@ import { useAutosave } from '@/hooks/useAutosave.js';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
 import { FormConfirmRefContext } from '@/hooks/useRegisterFormConfirm.js';
 import { useTheme } from '@/hooks/useTheme.js';
+import { useReducedMotion } from '@/hooks/useReducedMotion.js';
 import { progress as progressFn } from '@/logic/progress.js';
 import { computeScore } from '@/logic/scoring.js';
 import { TopBar } from './chrome/TopBar.js';
@@ -35,7 +41,13 @@ import {
   hasStepDecorationBackdrop,
   resolveThemeDecoration,
 } from './ThemeDecoration.js';
-import { playFormSound, playTypewriterTick, resolveFormSound } from '@/utils/formSounds.js';
+import {
+  playFormFinale,
+  playFormSound,
+  playTypewriterTick,
+  resolveFormSound,
+} from '@/utils/formSounds.js';
+import { LEAVE_MAX_MS, snapshotLeavingQuestion } from '@/utils/questionHandoff.js';
 import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
 
 import '@/styles/tokens.css';
@@ -43,6 +55,7 @@ import '@/styles/toggle.css';
 import '@/styles/animations.css';
 import '@/styles/base.css';
 import '@/styles/questions.css';
+import '@/styles/motion.css';
 
 /** Absolute http(s) URL or null. Relative paths resolve against the page. */
 function httpUrlOrNull(raw: string): string | null {
@@ -68,6 +81,7 @@ export function Form<S extends Schema>({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const confirmStepRef = useRef<(() => void) | null>(null);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     migrateSlateLocalStorageKeys();
@@ -308,6 +322,12 @@ export function Form<S extends Schema>({
     clearAutosave,
   ]);
 
+  // Finale chord (ADR-059) — on a confirmed submit only, and only when the
+  // form's sound is on. Keyed on the status flip so it plays once per submit.
+  useEffect(() => {
+    if (submitStatus === 'success' && soundId !== 'off') playFormFinale(soundId);
+  }, [submitStatus, soundId]);
+
   const retrySubmit = useCallback(() => {
     submittedRef.current = false;
     submitGenRef.current += 1;
@@ -339,7 +359,61 @@ export function Form<S extends Schema>({
   const stepNumber = isAnswerBearing ? passedCounted + 1 : 0;
 
   const showBack = state.step > 0 && currentQuestion?.type !== 'thanks';
-  const progressPct = progressFn(state.visible, state.step);
+  // The bar only reaches 100% on a confirmed submit (ADR-059): while the
+  // thanks step is still submitting — or has failed — it holds at the last
+  // answered question's value.
+  const onThanks = currentQuestion?.type === 'thanks';
+  const submitConfirmed = onThanks && submitStatus === 'success';
+  const rawProgress = progressFn(state.visible, state.step);
+  const progressPct =
+    onThanks && !submitConfirmed && counted > 0
+      ? Math.min(rawProgress, ((counted - 1) / counted) * 100)
+      : rawProgress;
+
+  /* ---------- question hand-off (brief §10.2 outgoing 220ms) ---------- */
+
+  const stageRef = useRef<HTMLDivElement>(null);
+  const leaveHostRef = useRef<HTMLDivElement>(null);
+  const liveContentRef = useRef<HTMLDivElement | null>(null);
+  const pendingLeaveRef = useRef<HTMLElement | null>(null);
+  const reducedMotionRef = useRef(reducedMotion);
+  reducedMotionRef.current = reducedMotion;
+
+  // React calls this with null just before it removes the old question from
+  // the DOM (the key changed), which is the last moment we can copy it.
+  const stageContentRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      liveContentRef.current = node;
+      return;
+    }
+    const old = liveContentRef.current;
+    liveContentRef.current = null;
+    pendingLeaveRef.current =
+      old && !reducedMotionRef.current ? snapshotLeavingQuestion(old, stageRef.current) : null;
+  }, []);
+
+  const questionKey = currentQuestion?.id ?? 'empty';
+  useLayoutEffect(() => {
+    const leaving = pendingLeaveRef.current;
+    pendingLeaveRef.current = null;
+    const host = leaveHostRef.current;
+    if (!leaving || !host) return undefined;
+    leaving.dataset.direction = state.direction;
+    host.replaceChildren(leaving);
+    const finish = () => leaving.remove();
+    const onEnd = (e: AnimationEvent) => {
+      if (e.target === leaving) finish();
+    };
+    leaving.addEventListener('animationend', onEnd);
+    const timer = window.setTimeout(finish, LEAVE_MAX_MS);
+    return () => {
+      window.clearTimeout(timer);
+      leaving.removeEventListener('animationend', onEnd);
+      finish();
+    };
+    // Keyed on the question only; direction is read at swap time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionKey]);
 
   const decoration = resolveThemeDecoration(schema.theme);
 
@@ -350,10 +424,11 @@ export function Form<S extends Schema>({
       data-theme-name={schema.theme}
       data-theme={themeMode}
       {...(hasStepDecorationBackdrop(decoration) ? { 'data-has-decoration': '' } : {})}
+      {...(reducedMotion ? { 'data-reduced-motion': '' } : {})}
     >
-      <ThemeDecoration themeName={schema.theme} step={state.step} />
+      <ThemeDecoration themeName={schema.theme} step={state.step} complete={submitConfirmed} />
 
-      <ProgressBar value={progressPct} />
+      <ProgressBar value={progressPct} complete={submitConfirmed} />
 
       <TopBar
         brandName={schema.brand.name}
@@ -386,10 +461,13 @@ export function Form<S extends Schema>({
         </div>
       )}
 
-      <div className="slate-stage">
+      <div className="slate-stage" ref={stageRef}>
+        {/* Outgoing question copies land here (never React-managed children). */}
+        <div className="slate-q-leave-host" ref={leaveHostRef} aria-hidden="true" />
         <FormConfirmRefContext.Provider value={confirmStepRef}>
           <div
-            key={currentQuestion?.id ?? 'empty'}
+            key={questionKey}
+            ref={stageContentRef}
             className="slate-q-enter slate-stage-content"
             data-direction={state.direction}
             onAnimationEnd={animationEnd}

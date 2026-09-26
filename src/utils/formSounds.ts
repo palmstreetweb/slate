@@ -187,3 +187,54 @@ export function playTypewriterTick(volume = 0.34): void {
   _lastTypewriterMs = now;
   playSound(volume, TYPEWRITER_TICK);
 }
+
+/**
+ * Completion finale (ADR-059): a soft rising C-major arpeggio that rings out
+ * together over a warm root — a "you're done" chord rather than a step
+ * blip. Same synth engine, no assets. Played by `<Form>` once, on a
+ * confirmed submit, and only when the form's sound is on.
+ */
+const FINALE_CHORD: Recipe = {
+  duration: 1.6,
+  layers: [
+    {
+      wave: 'sine',
+      gain: 0.035,
+      freq: 261.63,
+      ampEnv: { attack: 0.02, decay: 1.3, sustain: 0, release: 0.2 },
+    },
+    {
+      wave: 'triangle',
+      gain: 0.05,
+      freq: 523.25,
+      ampEnv: { attack: 0.004, decay: 1.1, sustain: 0, release: 0.2 },
+    },
+    {
+      wave: 'triangle',
+      gain: 0.045,
+      freq: 659.25,
+      startOffset: 0.07,
+      ampEnv: { attack: 0.004, decay: 1.05, sustain: 0, release: 0.2 },
+    },
+    {
+      wave: 'triangle',
+      gain: 0.042,
+      freq: 783.99,
+      startOffset: 0.14,
+      ampEnv: { attack: 0.004, decay: 1.0, sustain: 0, release: 0.2 },
+    },
+    {
+      wave: 'sine',
+      gain: 0.05,
+      freq: 1046.5,
+      startOffset: 0.22,
+      ampEnv: { attack: 0.004, decay: 1.15, sustain: 0, release: 0.25 },
+    },
+  ],
+};
+
+/** Play the completion finale for a form whose sound is on; no-op when `off`. */
+export function playFormFinale(sound: FormSound | boolean | undefined, volume = 0.55): void {
+  if (resolveFormSound(sound) === 'off') return;
+  playSound(volume, FINALE_CHORD);
+}

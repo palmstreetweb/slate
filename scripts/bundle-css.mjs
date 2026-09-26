@@ -15,7 +15,7 @@ const SRC_STYLES = join(__dirname, '..', 'src', 'styles');
 const DIST = join(__dirname, '..', 'dist');
 
 // Concatenation order matters — tokens first so later rules can reference them.
-const ORDER = ['tokens.css', 'base.css', 'animations.css', 'toggle.css', 'questions.css'];
+const ORDER = ['tokens.css', 'base.css', 'animations.css', 'toggle.css', 'questions.css', 'motion.css'];
 
 async function main() {
   const parts = [];

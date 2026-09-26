@@ -5,6 +5,7 @@ import type { UrlQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import { shakeInvalid } from '@/utils/motion.js';
 import { focusAfter } from '@/utils/focus.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import { resolveTitle } from './_resolveTitle.js';
@@ -46,6 +47,7 @@ export function UrlField({
     const err = validate(question, value);
     if (err) {
       setError(err.message);
+      shakeInvalid(inputRef.current);
       return;
     }
     setError(null);

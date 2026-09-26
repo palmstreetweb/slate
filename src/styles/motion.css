@@ -1,0 +1,711 @@
+/* Delight pass 1 (ADR-059): completion celebration, question hand-off,
+   choice commit, invalid-input shake, progress spark + counter roll, and
+   self-drawing decorations.
+
+   Pattern: every rule outside the motion block below is a static end state,
+   which is exactly what calm motion shows. Keyframes only run inside
+   `@media (prefers-reduced-motion: no-preference)` AND on a wrapper without
+   `data-reduced-motion` (set by <Form> from useReducedMotion, which also
+   carries the preview override). Only transform, opacity and stroke-dash
+   animate. No colour literals here — colours come from tokens.css. */
+
+/* ============================================================
+   Confetti palette. Themes without decoration tokens fall back
+   to their accent family and ink.
+   ============================================================ */
+
+[data-slate-forms] {
+  --slate-cf-1: var(--slate-accent);
+  --slate-cf-2: var(--slate-deco-1, rgb(var(--slate-accent-rgb) / 0.5));
+  --slate-cf-3: var(--slate-deco-2, var(--slate-text));
+  --slate-cf-4: var(--slate-deco-3, var(--slate-deco-2, var(--slate-accent)));
+}
+
+[data-slate-forms][data-theme-name='swiss'],
+[data-slate-forms][data-theme-name='mono'] {
+  --slate-cf-1: var(--slate-deco-red);
+  --slate-cf-2: var(--slate-deco-yellow);
+  --slate-cf-3: var(--slate-deco-blue);
+  --slate-cf-4: var(--slate-deco-ink);
+}
+
+[data-slate-forms][data-theme-name='memphis'] {
+  --slate-cf-4: var(--slate-deco-line);
+}
+
+/* ============================================================
+   Question hand-off — the outgoing copy (utils/questionHandoff.ts)
+   ============================================================ */
+
+[data-slate-forms] .slate-q-leave-host {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+[data-slate-forms] .slate-q-leave {
+  pointer-events: none;
+}
+
+/* The copy is frozen on its last frame: nothing inside it replays. */
+[data-slate-forms] .slate-q-leave * {
+  animation: none !important;
+  transition: none !important;
+}
+
+@keyframes slate-q-out-back {
+  to {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+[data-slate-forms] .slate-q-leave[data-direction='backward'] {
+  animation-name: slate-q-out-back;
+}
+
+/* ============================================================
+   Choice commit — static end state
+   ============================================================ */
+
+[data-slate-forms] .slate-choices--committed .slate-choice:not(.slate-choice--committed),
+[data-slate-forms] .slate-picture-grid--committed .slate-picture:not(.slate-picture--committed) {
+  opacity: 0.4;
+  transform: scale(0.97);
+}
+
+[data-slate-forms] .slate-choice-badge {
+  position: relative;
+}
+
+[data-slate-forms] .slate-badge-key {
+  position: absolute;
+  opacity: 0;
+}
+
+[data-slate-forms] .slate-badge-check {
+  width: 62%;
+  height: 62%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 22;
+  stroke-dashoffset: 0;
+}
+
+/* ============================================================
+   Thanks screen + completion celebration — static end state
+   ============================================================ */
+
+[data-slate-forms] .slate-thanks-status {
+  margin-top: 24px;
+}
+
+[data-slate-forms] .slate-thanks-pending {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.65;
+}
+
+[data-slate-forms] .slate-thanks-restart {
+  display: block;
+  margin-top: 24px;
+  padding: 0;
+  font-size: 14px;
+  text-decoration: underline;
+  opacity: 0.7;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--slate-font-body);
+  color: var(--slate-text);
+  text-transform: var(--slate-transform);
+  transition: opacity 0.15s ease-out;
+}
+
+[data-slate-forms] .slate-thanks-restart:hover,
+[data-slate-forms] .slate-thanks-restart:focus-visible {
+  opacity: 1;
+}
+
+[data-slate-forms] .slate-confirm {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+}
+
+[data-slate-forms] .slate-confirm-check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 22;
+  stroke-dashoffset: 0;
+}
+
+/* The burst origin sits at the chip's centre; pieces rest invisible. */
+[data-slate-forms] .slate-confetti {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+[data-slate-forms] .slate-confetti-piece {
+  position: absolute;
+  left: -4px;
+  top: -6px;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--slate-cf-1);
+  opacity: 0;
+}
+
+[data-slate-forms] .slate-confetti-piece:nth-child(4n + 2) {
+  background: var(--slate-cf-2);
+}
+[data-slate-forms] .slate-confetti-piece:nth-child(4n + 3) {
+  background: var(--slate-cf-3);
+}
+[data-slate-forms] .slate-confetti-piece:nth-child(4n + 4) {
+  background: var(--slate-cf-4);
+}
+[data-slate-forms] .slate-confetti-piece:nth-child(3n) {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* Swiss / mono: poster geometry — squares, circles, triangles. */
+[data-slate-forms][data-theme-name='swiss'] .slate-confetti-piece,
+[data-slate-forms][data-theme-name='mono'] .slate-confetti-piece {
+  width: 13px;
+  height: 13px;
+  border-radius: 0;
+}
+[data-slate-forms][data-theme-name='swiss'] .slate-confetti-piece:nth-child(3n),
+[data-slate-forms][data-theme-name='mono'] .slate-confetti-piece:nth-child(3n) {
+  border-radius: 50%;
+}
+[data-slate-forms][data-theme-name='swiss'] .slate-confetti-piece:nth-child(3n + 1),
+[data-slate-forms][data-theme-name='mono'] .slate-confetti-piece:nth-child(3n + 1) {
+  width: 15px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+/* Constellation: four-point sparkles. */
+[data-slate-forms][data-theme-name='constellation'] .slate-confetti-piece {
+  width: 14px;
+  height: 14px;
+  left: -7px;
+  top: -7px;
+  border-radius: 0;
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+}
+[data-slate-forms][data-theme-name='constellation'] .slate-confetti-piece:nth-child(3n) {
+  width: 9px;
+  height: 9px;
+}
+
+/* Bloom: petals. */
+[data-slate-forms][data-theme-name='bloom'] .slate-confetti-piece {
+  width: 13px;
+  height: 9px;
+  border-radius: 80% 0 80% 0;
+}
+[data-slate-forms][data-theme-name='bloom'] .slate-confetti-piece:nth-child(3n) {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+/* Midnight / sunset (aurora): soft glowing orbs. */
+[data-slate-forms][data-theme-name='midnight'] .slate-confetti-piece,
+[data-slate-forms][data-theme-name='sunset'] .slate-confetti-piece {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  filter: blur(0.5px);
+}
+
+/* Terminal: square pixels. */
+[data-slate-forms][data-theme-name='terminal'] .slate-confetti-piece {
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
+}
+
+/* Riso: overprinting ink dots. */
+[data-slate-forms][data-theme-name='riso'] .slate-confetti-piece {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  mix-blend-mode: var(--slate-deco-blend, normal);
+}
+
+/* Memphis: triangles and chunky bars. */
+[data-slate-forms][data-theme-name='memphis'] .slate-confetti-piece:nth-child(3n + 1) {
+  width: 14px;
+  height: 12px;
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+[data-slate-forms][data-theme-name='memphis'] .slate-confetti-piece:nth-child(3n + 2) {
+  width: 5px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+/* ============================================================
+   Decorations — static helpers
+   ============================================================ */
+
+[data-slate-forms] .slate-deco-star,
+[data-slate-forms] .slate-deco-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* ============================================================
+   Preview override: `data-reduced-motion` calms the existing
+   question transitions too (animations.css keys them on the OS
+   setting only).
+   ============================================================ */
+
+[data-slate-forms][data-reduced-motion] .slate-q-enter,
+[data-slate-forms][data-reduced-motion] .slate-q-leave,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-step-badge,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-title,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-subtitle,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-input,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-choices,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-scale,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-matrix,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-upload-zone,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-upload-list,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-picture-grid,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-dropdown-list,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-ranking,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-date-row,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-review,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-cta,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-actions,
+[data-slate-forms][data-reduced-motion] .slate-q-enter .slate-choice,
+[data-slate-forms][data-reduced-motion] .slate-choice--selected,
+[data-slate-forms][data-reduced-motion] .slate-ok-btn:active:not(:disabled) {
+  animation: none !important;
+}
+
+/* ============================================================
+   Keyframes
+   ============================================================ */
+
+@keyframes slate-choice-recede {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slate-choice-commit {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.018);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Edge-on at the midpoint, where the letter hands over to the check. */
+@keyframes slate-badge-flip {
+  0% {
+    transform: perspective(160px) rotateY(0deg);
+  }
+  50% {
+    transform: perspective(160px) rotateY(90deg);
+  }
+  100% {
+    transform: perspective(160px) rotateY(0deg);
+  }
+}
+
+@keyframes slate-badge-key-out {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes slate-badge-check-in {
+  0%,
+  33% {
+    opacity: 0;
+    stroke-dashoffset: 22;
+  }
+  34% {
+    opacity: 1;
+    stroke-dashoffset: 22;
+  }
+  100% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes slate-err-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes slate-roll-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+@keyframes slate-roll-down {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes slate-chip-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes slate-check-draw {
+  from {
+    stroke-dashoffset: 22;
+  }
+}
+
+/* Out along the burst vector, then a gravity fall. */
+@keyframes slate-confetti-burst {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg) scale(0.4);
+    animation-timing-function: cubic-bezier(0.15, 0.7, 0.3, 1);
+  }
+  8% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 1;
+    transform: translate(var(--slate-cf-x), var(--slate-cf-y)) rotate(calc(var(--slate-cf-r) * 0.6))
+      scale(1);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--slate-cf-x) * 1.15), calc(var(--slate-cf-y) + 80px))
+      rotate(var(--slate-cf-r)) scale(0.9);
+  }
+}
+
+/* Swiss: shapes drop onto the poster. */
+@keyframes slate-confetti-drop {
+  0% {
+    opacity: 0;
+    transform: translate(var(--slate-cf-x), calc(var(--slate-cf-y) - 50px)) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--slate-cf-x), calc(var(--slate-cf-y) + 200px))
+      rotate(var(--slate-cf-r));
+  }
+}
+
+/* Constellation: sparkles light up in place around the chip. */
+@keyframes slate-confetti-twinkle {
+  0% {
+    opacity: 0;
+    transform: translate(var(--slate-cf-x), var(--slate-cf-y)) scale(0) rotate(0deg);
+  }
+  35% {
+    opacity: 1;
+    transform: translate(var(--slate-cf-x), var(--slate-cf-y)) scale(1.15) rotate(45deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--slate-cf-x), var(--slate-cf-y)) scale(0.3) rotate(90deg);
+  }
+}
+
+/* Aurora themes: orbs rise and dissolve. */
+@keyframes slate-confetti-float {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.3);
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--slate-cf-x) * 0.8), calc(var(--slate-cf-y) * 1.3 - 40px))
+      scale(1.3);
+  }
+}
+
+@keyframes slate-deco-draw {
+  from {
+    stroke-dashoffset: var(--slate-draw-len);
+  }
+}
+
+@keyframes slate-deco-pop {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.35);
+  }
+}
+
+@keyframes slate-deco-twinkle {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.7);
+  }
+}
+
+@keyframes slate-deco-halo {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  45% {
+    opacity: 0.4;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes slate-deco-grow {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+@keyframes slate-deco-bloom {
+  from {
+    opacity: 0;
+    transform: scale(0) rotate(-50deg);
+  }
+  70% {
+    transform: scale(1.12) rotate(6deg);
+  }
+}
+
+@keyframes slate-aurora-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes slate-shape-in {
+  from {
+    opacity: 0;
+    translate: var(--slate-shape-dx, 0) var(--slate-shape-dy, 120px);
+  }
+}
+
+/* ============================================================
+   Motion — only when allowed
+   ============================================================ */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* ---- choice commit (runs inside the ~220ms before auto-advance) ---- */
+
+  [data-slate-forms]:not([data-reduced-motion])
+    .slate-choices--committed
+    .slate-choice:not(.slate-choice--committed),
+  [data-slate-forms]:not([data-reduced-motion])
+    .slate-picture-grid--committed
+    .slate-picture:not(.slate-picture--committed) {
+    animation: slate-choice-recede 180ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-choices--committed .slate-choice--committed,
+  [data-slate-forms]:not([data-reduced-motion])
+    .slate-picture-grid--committed
+    .slate-picture--committed {
+    animation: slate-choice-commit 220ms cubic-bezier(0.34, 1.45, 0.64, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-choice--committed .slate-choice-badge,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-picture--committed .slate-choice-badge {
+    animation: slate-badge-flip 140ms ease-in-out both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-badge-key {
+    animation: slate-badge-key-out 140ms linear both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-badge-check {
+    animation: slate-badge-check-in 210ms cubic-bezier(0.65, 0, 0.35, 1) both;
+  }
+
+  /* ---- invalid input: the error slides in (the shake is WAAPI) ---- */
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-err {
+    animation: slate-err-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* ---- footer counter roll ---- */
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-footer-num[data-roll='up'] {
+    animation: slate-roll-up 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-footer-num[data-roll='down'] {
+    animation: slate-roll-down 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* ---- completion celebration ---- */
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-confirm-chip {
+    animation: slate-chip-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-confirm-check {
+    animation: slate-check-draw 420ms cubic-bezier(0.65, 0, 0.35, 1) 180ms both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-confetti-piece {
+    animation: slate-confetti-burst 1150ms var(--slate-cf-delay, 0ms) both;
+  }
+
+  [data-slate-forms][data-theme-name='swiss']:not([data-reduced-motion]) .slate-confetti-piece,
+  [data-slate-forms][data-theme-name='mono']:not([data-reduced-motion]) .slate-confetti-piece {
+    animation: slate-confetti-drop 1000ms cubic-bezier(0.55, 0, 0.9, 0.5)
+      calc(var(--slate-cf-delay, 0ms) * 2.5) both;
+  }
+
+  [data-slate-forms][data-theme-name='constellation']:not([data-reduced-motion])
+    .slate-confetti-piece {
+    animation: slate-confetti-twinkle 1300ms ease-out calc(var(--slate-cf-delay, 0ms) * 3) both;
+  }
+
+  [data-slate-forms][data-theme-name='bloom']:not([data-reduced-motion]) .slate-confetti-piece {
+    animation-duration: 1700ms;
+  }
+
+  [data-slate-forms][data-theme-name='midnight']:not([data-reduced-motion]) .slate-confetti-piece,
+  [data-slate-forms][data-theme-name='sunset']:not([data-reduced-motion]) .slate-confetti-piece {
+    animation: slate-confetti-float 1600ms cubic-bezier(0.2, 0.7, 0.3, 1)
+      var(--slate-cf-delay, 0ms) both;
+  }
+
+  /* Terminal: pixels rise in hard steps, like a redraw. */
+  [data-slate-forms][data-theme-name='terminal']:not([data-reduced-motion]) .slate-confetti-piece {
+    animation: slate-confetti-float 1200ms steps(10, end) var(--slate-cf-delay, 0ms) both;
+  }
+
+  /* ---- decorations drawing themselves on ---- */
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-draw {
+    animation: slate-deco-draw 700ms cubic-bezier(0.65, 0, 0.35, 1) var(--slate-draw-delay, 0ms)
+      backwards;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-star {
+    animation: slate-deco-pop 460ms cubic-bezier(0.34, 1.56, 0.64, 1)
+      var(--slate-draw-delay, 0ms) backwards;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-decoration--complete .slate-deco-star {
+    animation:
+      slate-deco-pop 460ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--slate-draw-delay, 0ms) backwards,
+      slate-deco-twinkle 700ms ease-in-out var(--slate-twinkle-delay, 0ms);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-halo {
+    animation: slate-deco-halo 1200ms ease-out 360ms backwards;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-grow {
+    animation: slate-deco-grow 520ms cubic-bezier(0.34, 1.4, 0.64, 1) var(--slate-draw-delay, 0ms)
+      backwards;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-bloom {
+    animation: slate-deco-bloom 820ms cubic-bezier(0.34, 1.4, 0.64, 1)
+      var(--slate-draw-delay, 0ms) backwards;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-fade-in {
+    animation: slate-aurora-in 800ms ease-out both;
+    will-change: opacity;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-scene > * {
+    animation: slate-shape-in 720ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-scene > :nth-child(1) {
+    --slate-shape-dx: 180px;
+    --slate-shape-dy: -140px;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-scene > :nth-child(2) {
+    --slate-shape-dx: -180px;
+    --slate-shape-dy: 140px;
+    animation-delay: 70ms;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-scene > :nth-child(3) {
+    --slate-shape-dx: 0px;
+    --slate-shape-dy: 200px;
+    animation-delay: 140ms;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-deco-scene > :nth-child(n + 4) {
+    --slate-shape-dx: 200px;
+    --slate-shape-dy: 0px;
+    animation-delay: 210ms;
+  }
+}

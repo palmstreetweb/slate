@@ -7,11 +7,12 @@
 
 'use client';
 
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 import type { MatrixQuestion } from '@/types/Question.js';
 import type { LooseAnswers, MatrixAnswer } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import { shakeInvalid } from '@/utils/motion.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -25,6 +26,7 @@ type Props = {
 export function MatrixField({ question, answers, initialValue, onAnswer, onAdvance }: Props) {
   const [value, setValue] = useState<MatrixAnswer>(() => ({ ...(initialValue ?? {}) }));
   const [error, setError] = useState<string | null>(null);
+  const matrixRef = useRef<HTMLDivElement>(null);
   const labelId = useId();
   const multiple = question.multiple === true;
 
@@ -53,6 +55,7 @@ export function MatrixField({ question, answers, initialValue, onAnswer, onAdvan
     const err = validate(question, value);
     if (err) {
       setError(err.message);
+      shakeInvalid(matrixRef.current);
       return;
     }
     setError(null);
@@ -71,6 +74,7 @@ export function MatrixField({ question, answers, initialValue, onAnswer, onAdvan
       </h1>
 
       <div
+        ref={matrixRef}
         className="slate-matrix"
         style={{ ['--slate-matrix-cols' as string]: colCount }}
         aria-labelledby={labelId}
