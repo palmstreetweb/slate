@@ -48,6 +48,10 @@ function isFramed(): boolean {
 
 if (route.name === 'fill' || route.name === 'respond') {
   void import('./publicApp.js').then((m) => m.mountPublic(root));
+} else if (route.name === 'motion') {
+  // Motion gallery (ADR-059): a dev demo with built-in schemas. Its own
+  // chunk — no studio, no auth, no Neon.
+  void import('./motionApp.js').then((m) => m.mountMotion(root));
 } else if (isFramed()) {
   // Only public forms are embeddable (ADR-054). The studio never runs inside
   // someone else's page — that would allow clickjacking an owner (audit M-FRAME-1).

@@ -265,6 +265,7 @@ const EVERYTHING_ELSE = [
   '/settings',
   '/r',
   '/lab/drop',
+  '/motion',
   '/index.html',
   '/assets/x.js',
   '/api/generate',

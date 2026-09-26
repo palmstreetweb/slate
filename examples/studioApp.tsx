@@ -44,6 +44,14 @@ import './_admin/publicChrome.css';
 import './_admin/_adminTheme.css';
 import './_admin/slateMotion.css';
 
+/** The gallery lives in its own bundle (ADR-059); the entry picks it on a full load. */
+function ReloadForBundle() {
+  useEffect(() => {
+    window.location.reload();
+  }, []);
+  return null;
+}
+
 function UiSoundsRoot({ children }: { children: ReactNode }) {
   useEffect(() => installAdminUiSounds(), []);
   return children;
@@ -106,6 +114,10 @@ function AppRoutes() {
       break;
     case 'submissions':
       page = <FormSubmissions formId={route.formId} />;
+      break;
+    case 'motion':
+      // Reached by in-app navigation: reload so the entry loads the gallery bundle.
+      page = <ReloadForBundle />;
       break;
     case 'notfound':
       page = (

@@ -12,6 +12,7 @@
  *   /forms/:id/edit              → editor (editing)
  *   /forms/:id/submissions       → submissions list
  *   /r?d=…                       → portable (schema-in-URL) respond
+ *   /motion                      → motion gallery (dev demo, own bundle, no sign-in; ADR-059)
  */
 
 import { useEffect, useState } from 'react';
@@ -25,6 +26,7 @@ export type Route =
   | { name: 'respond'; token: string }
   | { name: 'fill'; slug: string }
   | { name: 'dropLab' }
+  | { name: 'motion' }
   | { name: 'notfound'; path: string };
 
 const NAVIGATE_EVENT = 'slate-navigate';
@@ -67,6 +69,7 @@ export function matchRoute(path: string): Route {
   if (path === '/') return { name: 'dashboard' };
   if (path === '/settings') return { name: 'settings' };
   if (path === '/lab/drop') return { name: 'dropLab' };
+  if (path === '/motion') return { name: 'motion' };
   if (path === '/forms/new') return { name: 'editor', formId: null };
 
   if (path === '/r') {
@@ -132,6 +135,8 @@ export function routeKey(route: Route): string {
       return `/forms/${route.slug}`;
     case 'dropLab':
       return '/lab/drop';
+    case 'motion':
+      return '/motion';
     case 'notfound':
       return route.path;
   }

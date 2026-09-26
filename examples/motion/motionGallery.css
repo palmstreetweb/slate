@@ -1,0 +1,505 @@
+/* Motion gallery (ADR-059) — examples-only page chrome. The engine's own
+   styles come from src/styles via <Form>; the rules under "engine in a
+   frame" only resize the full-viewport form to fit a card. */
+
+.mg {
+  --mg-bg: #f4f1ea;
+  --mg-panel: #ffffff;
+  --mg-ink: #1d2127;
+  --mg-muted: #666d78;
+  --mg-line: #e3ded2;
+  --mg-accent: #e23b2d;
+  --mg-accent-ink: #ffffff;
+  --mg-shadow: 0 1px 2px rgb(20 20 20 / 0.04), 0 8px 24px rgb(20 20 20 / 0.06);
+  min-height: 100vh;
+  padding: 32px clamp(16px, 4vw, 48px) 64px;
+  background: var(--mg-bg);
+  color: var(--mg-ink);
+  font-family: Inter, system-ui, sans-serif;
+  box-sizing: border-box;
+}
+
+.mg[data-mode='dark'] {
+  --mg-bg: #121418;
+  --mg-panel: #1b1f25;
+  --mg-ink: #f0ede6;
+  --mg-muted: #97a0ad;
+  --mg-line: #2a2f37;
+  --mg-accent: #ff6a5c;
+  --mg-accent-ink: #1a0f0d;
+  --mg-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 30px rgb(0 0 0 / 0.25);
+}
+
+.mg *,
+.mg *::before,
+.mg *::after {
+  box-sizing: border-box;
+}
+
+/* ---------- header ---------- */
+
+.mg-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 32px;
+  max-width: 1240px;
+  margin: 0 auto 20px;
+}
+
+.mg-title {
+  max-width: 620px;
+}
+
+.mg-eyebrow {
+  display: inline-block;
+  margin-bottom: 8px;
+  font: 500 11px/1 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mg-accent);
+}
+
+.mg-title h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.mg-title p,
+.mg-section-head p,
+.mg-note {
+  margin: 0;
+  color: var(--mg-muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.mg-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mg-warn {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--mg-muted);
+}
+
+.mg-jump {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  gap: 4px;
+  max-width: 1240px;
+  margin: 0 auto 8px;
+  padding: 10px 0;
+  overflow-x: auto;
+  background: var(--mg-bg);
+  scrollbar-width: none;
+}
+
+.mg-jump a {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mg-muted);
+  text-decoration: none;
+}
+
+.mg-jump a:hover,
+.mg-jump a:focus-visible {
+  color: var(--mg-ink);
+  background: var(--mg-panel);
+}
+
+.mg section {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 28px 0 12px;
+  scroll-margin-top: 48px;
+}
+
+.mg-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 16px;
+}
+
+.mg-section-head > div:first-child {
+  max-width: 680px;
+}
+
+.mg-section-head h2 {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- controls ---------- */
+
+.mg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.mg-btn,
+.mg-switch,
+.mg-tab,
+.mg-select select {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mg-ink);
+}
+
+.mg-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--mg-line);
+  border-radius: 999px;
+  background: var(--mg-panel);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease-out,
+    transform 0.15s ease-out;
+}
+
+.mg-btn:hover {
+  border-color: var(--mg-ink);
+}
+
+.mg-btn:active {
+  transform: scale(0.97);
+}
+
+.mg-btn--primary {
+  border-color: var(--mg-accent);
+  background: var(--mg-accent);
+  color: var(--mg-accent-ink);
+}
+
+.mg-btn--primary:hover {
+  border-color: var(--mg-accent);
+  filter: brightness(1.06);
+}
+
+.mg-btn:focus-visible,
+.mg-switch:focus-visible,
+.mg-tab:focus-visible,
+.mg-select select:focus-visible {
+  outline: 2px solid var(--mg-accent);
+  outline-offset: 2px;
+}
+
+.mg-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px 0 8px;
+  border: 1px solid var(--mg-line);
+  border-radius: 999px;
+  background: var(--mg-panel);
+  cursor: pointer;
+}
+
+.mg-switch-track {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--mg-line);
+  transition: background 0.2s ease-out;
+}
+
+.mg-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--mg-panel);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: transform 0.2s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.mg-switch[aria-checked='true'] .mg-switch-track {
+  background: var(--mg-accent);
+}
+
+.mg-switch[aria-checked='true'] .mg-switch-thumb {
+  transform: translateX(12px);
+}
+
+.mg-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--mg-muted);
+}
+
+.mg-select select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--mg-line);
+  border-radius: 10px;
+  background: var(--mg-panel);
+}
+
+.mg-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.mg-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--mg-line);
+  border-radius: 999px;
+  background: var(--mg-panel);
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+
+.mg-tab {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--mg-muted);
+  cursor: pointer;
+}
+
+.mg-tab[aria-selected='true'] {
+  background: var(--mg-ink);
+  color: var(--mg-bg);
+}
+
+.mg-note {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+/* ---------- cards ---------- */
+
+.mg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+}
+
+.mg-grid--deco {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+}
+
+.mg-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--mg-line);
+  border-radius: 16px;
+  background: var(--mg-panel);
+  box-shadow: var(--mg-shadow);
+}
+
+.mg-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--mg-line);
+}
+
+.mg-card-foot--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.mg-card-foot strong {
+  display: block;
+  font-size: 14px;
+}
+
+.mg-card-foot span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--mg-muted);
+}
+
+.mg-panel,
+.mg-flow {
+  padding: 14px;
+  border: 1px solid var(--mg-line);
+  border-radius: 16px;
+  background: var(--mg-panel);
+  box-shadow: var(--mg-shadow);
+}
+
+.mg-foot {
+  max-width: 1240px;
+  margin: 40px auto 0;
+  font-size: 12px;
+  color: var(--mg-muted);
+}
+
+/* ---------- engine in a frame ---------- */
+
+.mg-frame {
+  position: relative;
+  height: 340px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.mg-frame--tall {
+  height: min(560px, 78vh);
+  border-radius: 12px;
+  border: 1px solid var(--mg-line);
+}
+
+.mg-frame > [data-slate-forms] {
+  min-height: 0;
+  height: 100%;
+}
+
+/* Beats base.css's full-viewport min-height on the bare engine wrapper. */
+.mg-surface[data-slate-forms] {
+  min-height: 0;
+}
+
+.mg-frame [data-slate-forms] .slate-stage {
+  min-height: 100%;
+  padding: 58px 20px 44px;
+}
+
+.mg-frame--tall [data-slate-forms] .slate-stage {
+  padding: 64px clamp(20px, 5vw, 56px) 56px;
+}
+
+/* Poster-sized titles are tuned for a full viewport; a card needs less. */
+.mg-frame [data-slate-forms][data-theme-name] {
+  --slate-title-size: clamp(1.45rem, 2.6vw, 1.85rem);
+}
+
+.mg-frame--tall [data-slate-forms][data-theme-name] {
+  --slate-title-size: clamp(1.7rem, 4vw, 2.6rem);
+}
+
+.mg-frame [data-slate-forms] .slate-topbar {
+  padding: 14px 16px;
+}
+
+.mg-frame [data-slate-forms] .slate-choices {
+  margin-top: 20px;
+}
+
+.mg-frame [data-slate-forms] .slate-footer {
+  bottom: 12px;
+  right: 16px;
+}
+
+.mg-surface {
+  position: relative;
+  overflow: hidden;
+}
+
+.mg-surface--progress[data-slate-forms] {
+  height: 200px;
+  border-radius: 12px;
+}
+
+/* Square, so the 1080×1080 scenes show whole instead of sliced. */
+.mg-surface--deco[data-slate-forms] {
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+
+.mg-surface-copy {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  padding: 0 24px;
+}
+
+.mg-surface-copy p {
+  margin: 0;
+  font-family: var(--slate-font-display);
+  font-size: clamp(1.2rem, 3vw, 1.6rem);
+  font-weight: var(--slate-title-weight);
+  letter-spacing: var(--slate-title-tracking);
+  text-transform: var(--slate-transform);
+  color: var(--slate-text);
+}
+
+.mg-step-pill {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font: 500 11px/1.4 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--slate-bg-2);
+  color: var(--slate-text);
+  border: 1px solid var(--slate-border-md);
+}
+
+@media (max-width: 560px) {
+  .mg {
+    padding-top: 20px;
+  }
+
+  .mg-frame {
+    height: 320px;
+  }
+
+  .mg-toolbar > .mg-actions,
+  .mg-tabs {
+    width: 100%;
+  }
+
+  .mg-card-foot--stack .mg-actions .mg-btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mg-btn,
+  .mg-switch-track,
+  .mg-switch-thumb {
+    transition: none;
+  }
+}
