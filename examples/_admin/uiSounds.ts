@@ -23,6 +23,7 @@ export type UiSoundId =
   | 'copy'
   | 'refresh'
   | 'drop'
+  | 'arrival'
   | 'sign-out'
   | 'sign-in'
   | 'loading'
@@ -157,6 +158,37 @@ const RECIPES: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'loading' | 'n
       },
     ],
   },
+  /**
+   * A response just landed (ADR-060): a soft "ding-dong" — two bell notes a
+   * sixth apart, each with an inharmonic shimmer partial (×2.76, like a real
+   * bell), over a tiny felt thump. Distinct from `success` (a clean fifth) and
+   * `refresh` (a spin).
+   */
+  arrival: {
+    duration: 0.9,
+    layers: [
+      {
+        wave: 'sine',
+        gain: 0.085,
+        ampEnv: { attack: 0.003, decay: 0.42, sustain: 0, release: 0.18 },
+        repeat: { count: 2, interval: 0.13, pitchSeq: [1318.51, 783.99] },
+      },
+      {
+        wave: 'sine',
+        gain: 0.018,
+        ampEnv: { attack: 0.002, decay: 0.16, sustain: 0, release: 0.06 },
+        repeat: { count: 2, interval: 0.13, pitchSeq: [3639.1, 2163.81] },
+      },
+      {
+        wave: 'triangle',
+        gain: 0.035,
+        freq: 196,
+        pitchEnv: { to: 150, time: 0.07, curve: 'exp' },
+        ampEnv: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.02 },
+        filter: { type: 'lowpass', freq: 700, q: 0.7 },
+      },
+    ],
+  },
   /** Soft cycle — down then up, like a refresh spin settling. */
   refresh: {
     duration: 0.26,
@@ -189,6 +221,7 @@ const VOLUME: Record<Exclude<UiSoundId, 'sign-out' | 'sign-in' | 'loading' | 'no
   open: 0.5,
   copy: 0.5,
   drop: 0.55,
+  arrival: 0.55,
   refresh: 0.5,
 };
 

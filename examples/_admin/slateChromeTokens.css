@@ -219,3 +219,17 @@
   --bg-3: var(--slate-bg-3);
   --border-md: var(--slate-border-md);
 }
+
+/* ---------- Live signal (every palette) ----------
+   The one "on air" green: the Share panel's Live dot, the editor's Live
+   pill and the publish check (ADR-060). Mode-only, so all palettes share it. */
+
+[data-slate-forms][data-theme-name='slate'] {
+  --chrome-live: #3ddc97;
+  --chrome-live-rgb: 61 220 151;
+  --chrome-live-ink: #1f8a57;
+}
+
+[data-slate-forms][data-theme-name='slate'][data-theme='dark'] {
+  --chrome-live-ink: #8ef0c0;
+}

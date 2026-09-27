@@ -18,6 +18,7 @@ import { createPortal } from 'react-dom';
 import { detectAdminUiTheme } from './adminUiTheme.js';
 import { readSlateMode } from './slateMode.js';
 import { playUiSound } from './uiSounds.js';
+import { StudioConfetti } from './delight/StudioConfetti.js';
 
 export type ToastTone = 'success' | 'error' | 'info';
 
@@ -27,9 +28,15 @@ export type ToastInput = {
   tone?: ToastTone;
   /** ms; default 3200 (5200 for errors, 6000 with an action) */
   durationMs?: number;
-  sound?: 'success' | 'confirm' | 'danger' | 'copy' | 'tap' | 'none';
+  /** `none` is silent; leaving it out plays the tone's default cue. */
+  sound?: 'success' | 'confirm' | 'danger' | 'copy' | 'tap' | 'arrival' | 'none';
   /** One small text button, e.g. Undo. Clicking runs it and dismisses the toast. */
   action?: { label: string; onClick: () => void };
+  /**
+   * A "1st" medal that bursts pass-1 confetti (ADR-060). Only for a form's
+   * very first response.
+   */
+  celebrate?: boolean;
 };
 
 type ToastItem = ToastInput & { id: string; tone: ToastTone };
@@ -59,7 +66,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       const tone = toast.tone ?? 'info';
       const durationMs = toast.durationMs ?? (toast.action ? 6000 : tone === 'error' ? 5200 : 3200);
       setItems((prev) => [...prev.slice(-3), { ...toast, id, tone }]);
-      if (toast.sound && toast.sound !== 'none') playUiSound(toast.sound);
+      if (toast.sound === 'none') {
+        // Caller plays its own cue (or none).
+      } else if (toast.sound) playUiSound(toast.sound);
       else if (tone === 'success') playUiSound('success');
       else if (tone === 'error') playUiSound('danger');
 
@@ -96,9 +105,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 {items.map((item) => (
                   <div
                     key={item.id}
-                    className={`slate-toast slate-toast--${item.tone}`}
+                    className={`slate-toast slate-toast--${item.tone}${
+                      item.celebrate ? ' slate-toast--celebrate' : ''
+                    }`}
                     role={item.tone === 'error' ? 'alert' : 'status'}
                   >
+                    {item.celebrate ? (
+                      <span className="slate-toast-medal" aria-hidden="true">
+                        1<sup>st</sup>
+                        <StudioConfetti />
+                      </span>
+                    ) : null}
                     <div className="slate-toast-body">
                       <strong className="slate-toast-title">{item.title}</strong>
                       {item.detail ? <p className="slate-toast-detail">{item.detail}</p> : null}

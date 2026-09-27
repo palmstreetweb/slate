@@ -53,6 +53,7 @@ import { withBrandLogo } from '../brandLogo.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { useToast } from '../toast.js';
 import { playUiSound } from '../uiSounds.js';
+import { FlipPill, PublishButton, usePublishIgnition } from '../delight/ignition.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
 
 type Props = {
@@ -165,7 +166,11 @@ function FormEditorBody({ formId }: { formId: string }) {
   const toast = useToast();
   const [aiDraft, setAiDraft] = useState(() => isAiDraft(formId));
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [publishBusy, setPublishBusy] = useState(false);
+  // Publish ignition (ADR-060): spinner → check → the button bows out.
+  const ignite = usePublishIgnition();
+  /** The header pill's label, kept on "Draft" until the check lands. */
+  const statusLabelRef = useRef<string | null>(null);
+  const pinnedLabelRef = useRef<string | null>(null);
   /** Once the editor has a schema, don't re-seed from remote (would clobber edits). */
   const seededRef = useRef(Boolean(seed));
   const cloud = isNeonConfigured();
@@ -381,25 +386,36 @@ function FormEditorBody({ formId }: { formId: string }) {
       void handleShare();
       return;
     }
+    if (ignite.phase !== 'idle') return;
     const wasStale =
       Boolean(liveForm) &&
       hasUnpublishedChanges({
         ...liveForm!,
         schema,
       });
-    setPublishBusy(true);
-    const next = publishForm(formId);
-    setPublishBusy(false);
-    if (next) {
-      playUiSound('success');
-      toast.push({
-        title: wasStale ? 'Republished' : 'You’re live',
-        detail: 'Public link updated.',
-        tone: 'success',
-        sound: 'none',
-      });
-      setLiveForm(next);
-    } else {
+    pinnedLabelRef.current = statusLabelRef.current;
+    // Publishes now; the check beat brings the toast and flips the pill.
+    const ok = ignite.start(
+      () => {
+        const next = publishForm(formId);
+        if (next) setLiveForm(next);
+        return Boolean(next);
+      },
+      {
+        onLive: () => {
+          pinnedLabelRef.current = null;
+          playUiSound('success');
+          toast.push({
+            title: wasStale ? 'Republished' : 'You’re live',
+            detail: 'Public link updated.',
+            tone: 'success',
+            sound: 'none',
+          });
+        },
+      },
+    );
+    if (!ok) {
+      pinnedLabelRef.current = null;
       toast.push({
         title: 'Could not publish',
         detail: 'Check your connection and try again.',
@@ -562,13 +578,19 @@ function FormEditorBody({ formId }: { formId: string }) {
       ...liveForm!,
       schema,
     });
-  const statusLabel = !cloud
+  const liveLabel = !cloud
     ? null
     : isPublished
       ? stale
         ? 'Unpublished changes'
         : 'Live'
       : 'Draft';
+  statusLabelRef.current = liveLabel;
+  // While the spinner runs the pill still reads what it said before the click.
+  const statusLabel =
+    ignite.phase === 'working' && pinnedLabelRef.current ? pinnedLabelRef.current : liveLabel;
+  const pillLive = statusLabel === 'Live';
+  const pillStale = statusLabel === 'Unpublished changes';
 
   return (
     <AdminShell
@@ -591,24 +613,19 @@ function FormEditorBody({ formId }: { formId: string }) {
             {saveError ?? (savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved')}
           </span>
           {statusLabel ? (
-            <span
+            <FlipPill
+              label={statusLabel}
               className={`slate-pub-pill${
-                isPublished && !stale
-                  ? ' slate-pub-pill--live'
-                  : stale
-                    ? ' slate-pub-pill--stale'
-                    : ''
+                pillLive ? ' slate-pub-pill--live' : pillStale ? ' slate-pub-pill--stale' : ''
               }`}
               title={
-                stale
+                pillStale
                   ? 'Public link is serving an older snapshot'
-                  : isPublished
+                  : pillLive
                     ? 'Public fill link is live'
                     : 'Not published yet'
               }
-            >
-              {statusLabel}
-            </span>
+            />
           ) : null}
           <button
             type="button"
@@ -630,16 +647,12 @@ function FormEditorBody({ formId }: { formId: string }) {
           <button type="button" className="slate-btn" onClick={() => void handleShare()}>
             Share
           </button>
-          {cloud && (!isPublished || stale || publishBusy) ? (
-            // Only while there is something to push. Live + current → Share alone.
-            <button
-              type="button"
-              className="slate-btn slate-btn--primary"
-              onClick={quickPublish}
-              disabled={publishBusy}
-            >
-              {publishBusy ? 'Publishing…' : isPublished ? 'Republish' : 'Publish'}
-            </button>
+          {cloud && (!isPublished || stale || ignite.phase !== 'idle') ? (
+            // Only while there is something to push (or the ignition is still
+            // playing). Live + current → Share alone.
+            <PublishButton phase={ignite.phase} onClick={quickPublish}>
+              {isPublished ? 'Republish' : 'Publish'}
+            </PublishButton>
           ) : null}
           <button
             type="button"

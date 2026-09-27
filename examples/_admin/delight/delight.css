@@ -1,0 +1,782 @@
+/* Delight passes 4 + 5 (ADR-060) — studio side.
+   Publish ignition, the Live dot's sonar, response arrivals (bell swing,
+   odometer, row wash), the first-response toast, Summary bars / KPIs /
+   sparklines, and the empty states.
+
+   Same pattern as the engine's motion.css (ADR-059): every rule outside the
+   motion block is the static end state, which is exactly what calm motion
+   shows. Keyframes run only inside `@media (prefers-reduced-motion:
+   no-preference)` AND on a wrapper without `data-reduced-motion` (the
+   /motion gallery's Reduce switch). Only transform and opacity animate (plus
+   stroke-dash for the self-drawing check, as in ADR-059). No loop runs more
+   than three cycles. Colours are chrome tokens only. */
+
+/* ============================================================
+   Utility
+   ============================================================ */
+
+[data-slate-forms] .slate-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================
+   Publish ignition — spinner → self-drawing check → bow out
+   ============================================================ */
+
+[data-slate-forms] .slate-ignite {
+  position: relative;
+}
+
+[data-slate-forms] .slate-ignite:disabled {
+  cursor: default;
+}
+
+[data-slate-forms] .slate-ignite-glyph {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-slate-forms] .slate-ignite-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  stroke-dasharray: 14 32;
+}
+
+[data-slate-forms] .slate-ignite-check {
+  stroke-dasharray: 12;
+  stroke-dashoffset: 12;
+}
+
+/* Check beat: the ring settles to a faint halo and the check is drawn. */
+/* Beats the studio primary button's ink colour and hairline. */
+[data-slate-forms][data-theme-name='slate'] .slate-btn:is(.slate-ignite--done, .slate-ignite--leaving) {
+  color: var(--chrome-live-ink);
+  border-color: color-mix(in srgb, var(--chrome-live) 55%, var(--chrome-line));
+}
+
+[data-slate-forms] :is(.slate-ignite--done, .slate-ignite--leaving) .slate-ignite-ring {
+  stroke-dasharray: none;
+  opacity: 0.28;
+}
+
+[data-slate-forms] :is(.slate-ignite--done, .slate-ignite--leaving) .slate-ignite-check {
+  stroke-dashoffset: 0;
+}
+
+[data-slate-forms] .slate-ignite--done::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 2px solid var(--chrome-live);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ============================================================
+   Draft → Live pill flip (editor header)
+   ============================================================ */
+
+[data-slate-forms] .slate-flip-in {
+  display: inline-block;
+}
+
+/* ============================================================
+   Share panel Live dot — stays a small dot (standing decision).
+   ::after is the settle pulse, ::before the one-time sonar ring.
+   ============================================================ */
+
+[data-slate-forms] .slate-share-live-dot::before,
+[data-slate-forms] .slate-share-live-dot::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-slate-forms] .slate-share-live-dot::after {
+  inset: 0;
+  background: var(--chrome-live);
+}
+
+[data-slate-forms] .slate-share-live-dot::before {
+  inset: -7px;
+  border: 1.5px solid var(--chrome-live);
+}
+
+/* ============================================================
+   New response: bell swing
+   ============================================================ */
+
+[data-slate-forms] .slate-bell {
+  overflow: visible;
+}
+
+[data-slate-forms] .slate-bell,
+[data-slate-forms] .slate-bell-clapper {
+  transform-box: fill-box;
+}
+
+/* ============================================================
+   Odometer (dashboard card count)
+   ============================================================ */
+
+[data-slate-forms] .slate-odo {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms] .slate-odo--rolling,
+[data-slate-forms] .slate-odo-digits {
+  display: inline-flex;
+}
+
+[data-slate-forms] .slate-odo-col {
+  display: block;
+  height: 1.25em;
+  overflow: hidden;
+}
+
+[data-slate-forms] .slate-odo-reel {
+  display: block;
+  transform: translateY(var(--odo-end, 0));
+}
+
+[data-slate-forms] .slate-odo-digit {
+  display: block;
+  height: 1.25em;
+  line-height: 1.25em;
+  text-align: center;
+}
+
+/* ============================================================
+   Arrivals: new rows wash in with the accent, then fade (~2 s).
+   Bell panel rows and the Responses inbox list.
+   ============================================================ */
+
+[data-slate-forms] .slate-inbox-item {
+  position: relative;
+}
+
+[data-slate-forms] :is(.slate-inbox-item, .rsp-ib-row).is-arrived::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--chrome-red) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--chrome-red);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ============================================================
+   First response! toast
+   ============================================================ */
+
+[data-slate-forms] .slate-toast-medal {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--chrome-red);
+  color: var(--slate-on-accent);
+  font: 700 13px/1 var(--slate-font-mono, ui-monospace, monospace);
+}
+
+[data-slate-forms] .slate-toast-medal sup {
+  font-size: 8px;
+  line-height: 0;
+}
+
+/* Pass-1 confetti, above the toast, in studio colours. */
+[data-slate-forms][data-theme-name='slate'] .slate-toast-medal .slate-confetti {
+  z-index: 3;
+  --slate-cf-1: var(--chrome-red);
+  --slate-cf-2: var(--chrome-live);
+  --slate-cf-3: var(--chrome-ink);
+  --slate-cf-4: var(--slate-warn);
+}
+
+/* ============================================================
+   Responses Summary — bars grow on view, sparkline draws on
+   ============================================================ */
+
+[data-slate-forms] .rsp-sum-chart :is(.rsp-sum-bar-fill, .rsp-sum-bar-ghost) {
+  transform-origin: left center;
+}
+
+[data-slate-forms] .rsp-sum-spark-col i {
+  transform-origin: center bottom;
+}
+
+/* ============================================================
+   Empty states
+   ============================================================ */
+
+[data-slate-forms] .slate-empty {
+  position: relative;
+}
+
+/* The loop that used to breathe the border forever (WCAG 2.2.2) is now an
+   opacity-only glow that runs three times. */
+[data-slate-forms][data-theme-name='slate'] .slate-empty::after {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border: 1.5px solid color-mix(in srgb, var(--chrome-red) 40%, var(--chrome-line));
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-slate-forms] .slate-empty-mark span {
+  transform-origin: left center;
+}
+
+/* "No responses yet" radar. */
+[data-slate-forms] .slate-radar {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+}
+
+[data-slate-forms] .slate-radar::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px solid color-mix(in srgb, var(--chrome-red) 28%, transparent);
+  border-radius: 50%;
+}
+
+[data-slate-forms] .slate-radar-ring {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--chrome-red);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+[data-slate-forms] .slate-radar-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--chrome-red);
+}
+
+/* The Share nudge: a ring glints off the button as each ping lands. */
+[data-slate-forms] .slate-nudge {
+  position: relative;
+}
+
+[data-slate-forms] .slate-nudge::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 2px solid var(--chrome-red);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ============================================================
+   Motion
+   ============================================================ */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* -- publish ignition -- */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-ignite--working .slate-ignite-glyph {
+    animation: slate-spin 0.7s linear 2;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-ignite--working .slate-ignite-label,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-ignite--done .slate-ignite-label {
+    animation: slate-ignite-label-in 240ms var(--slate-ease-out) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-ignite--done .slate-ignite-glyph {
+    animation: slate-ignite-pop 520ms var(--slate-ease-spring) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-ignite--done .slate-ignite-ring {
+    animation: slate-ignite-ring-close 420ms var(--slate-ease-out) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-ignite--done .slate-ignite-check {
+    animation: slate-ignite-check-draw 340ms var(--slate-ease-out) 90ms both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-ignite--done::after {
+    animation: slate-ignite-flash 720ms var(--slate-ease-out) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-ignite--leaving {
+    animation: slate-ignite-leave 220ms ease-in both;
+  }
+
+  /* -- Draft → Live flip -- */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-flip-in {
+    animation: slate-flip-in 480ms var(--slate-ease-spring) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-pub-pill--live:has(> .slate-flip-in) {
+    animation: slate-pill-glint 620ms var(--slate-ease-out) both;
+  }
+
+  /* -- Live dot: a settle pulse, three times, then a still dot -- */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-share-live-dot::after {
+    animation: slate-live-pulse 1.6s ease-out 300ms 3 both;
+  }
+
+  /* Just published: the dot pops, fires one sonar ring, then pulses. */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-share-live--ignite {
+    animation: slate-ignite-label-in 320ms var(--slate-ease-out) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-share-live--ignite .slate-share-live-dot {
+    animation: slate-live-pop 520ms var(--slate-ease-spring) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion])
+    .slate-share-live--ignite
+    .slate-share-live-dot::before {
+    animation: slate-live-sonar 1200ms cubic-bezier(0.2, 0.7, 0.2, 1) 140ms both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion])
+    .slate-share-live--ignite
+    .slate-share-live-dot::after {
+    animation-delay: 1200ms;
+  }
+
+  /* -- bell swing -- */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-bell--swing {
+    transform-origin: 50% 8%;
+    animation: slate-bell-swing 1100ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-bell--swing .slate-bell-clapper {
+    animation: slate-bell-clapper 1100ms ease-out 40ms both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-inbox-btn--ring .slate-inbox-badge {
+    animation: slate-badge-pop 460ms var(--slate-ease-spring) 120ms both;
+  }
+
+  /* -- odometer -- */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-odo-reel {
+    animation: slate-odo-roll 820ms cubic-bezier(0.16, 1, 0.3, 1) var(--odo-delay, 0ms) both;
+  }
+
+  [data-slate-forms][data-theme-name='slate']:not([data-reduced-motion])
+    .slate-badge:has(> .slate-odo--rolling) {
+    animation: slate-odo-bump 640ms var(--slate-ease-spring) both;
+  }
+
+  /* -- arrivals -- */
+  [data-slate-forms][data-theme-name='slate']:not([data-reduced-motion])
+    :is(.slate-inbox-item, .rsp-ib-row).is-arrived {
+    animation: slate-arrive-in 520ms var(--slate-ease-out) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion])
+    :is(.slate-inbox-item, .rsp-ib-row).is-arrived::after {
+    animation: slate-arrive-wash 2000ms ease-out both;
+  }
+
+  /* -- first response toast -- */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-toast-medal {
+    animation: slate-live-pop 560ms var(--slate-ease-spring) 60ms both;
+  }
+
+  /* -- Summary: bars grow from zero as their card scrolls in -- */
+  [data-slate-forms]:not([data-reduced-motion])
+    .rsp-sum-chart[data-reveal='pending']
+    :is(.rsp-sum-bar-fill, .rsp-sum-bar-ghost) {
+    transform: scaleX(0);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion])
+    .rsp-sum-chart[data-reveal='pending']
+    :is(.rsp-sum-bar-n, .rsp-sum-bar-pct) {
+    opacity: 0;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion])
+    .rsp-sum-chart[data-reveal='in']
+    :is(.rsp-sum-bar-fill, .rsp-sum-bar-ghost) {
+    animation: slate-bar-grow 760ms cubic-bezier(0.16, 1, 0.3, 1)
+      calc(60ms + var(--rsp-i, 0) * 55ms) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion])
+    .rsp-sum-chart[data-reveal='in']
+    :is(.rsp-sum-bar-n, .rsp-sum-bar-pct) {
+    animation: slate-fade-in-num 420ms ease-out calc(260ms + var(--rsp-i, 0) * 55ms) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .rsp-sum-spark-col i {
+    animation: slate-spark-draw 560ms cubic-bezier(0.16, 1, 0.3, 1)
+      calc(140ms + var(--rsp-i, 0) * 30ms) both;
+  }
+
+  /* -- empty states -- */
+  [data-slate-forms][data-theme-name='slate']:not([data-reduced-motion]) .slate-empty::after {
+    animation: slate-empty-glow 1.6s ease-in-out 700ms 3 both;
+  }
+
+  [data-slate-forms][data-theme-name='slate']:not([data-reduced-motion])
+    .slate-empty
+    .slate-btn:not(.slate-nudge) {
+    animation: slate-float-soft 1.6s ease-in-out 900ms 3;
+  }
+
+  /* The dashboard's three-bar mark assembles like the loading stack. */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-empty-mark span {
+    animation: slate-mark-assemble 900ms cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-empty-mark span:nth-child(2) {
+    animation-delay: 380ms;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-empty-mark span:nth-child(3) {
+    animation-delay: 500ms;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-radar-ring {
+    animation: slate-radar-ping 1.6s cubic-bezier(0.2, 0.6, 0.3, 1) 300ms 3 both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-radar-ring:nth-child(2) {
+    animation-delay: 1100ms;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-radar-dot {
+    animation: slate-radar-beat 1.6s ease-out 300ms 3 both;
+  }
+
+  [data-slate-forms][data-theme-name='slate']:not([data-reduced-motion]) .slate-nudge {
+    animation: slate-nudge 1.6s ease-in-out 1100ms 3 both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-nudge::after {
+    animation: slate-nudge-ring 1.6s ease-out 1100ms 3 both;
+  }
+}
+
+/* ============================================================
+   Keyframes (transform / opacity / stroke-dash only)
+   ============================================================ */
+
+@keyframes slate-ignite-label-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes slate-ignite-pop {
+  0% {
+    transform: scale(0.7);
+  }
+  55% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes slate-ignite-ring-close {
+  from {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes slate-ignite-check-draw {
+  from {
+    stroke-dashoffset: 12;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes slate-ignite-flash {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+}
+
+@keyframes slate-ignite-leave {
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes slate-flip-in {
+  0% {
+    opacity: 0;
+    transform: perspective(160px) rotateX(-90deg);
+  }
+  45% {
+    opacity: 1;
+  }
+  100% {
+    transform: perspective(160px) rotateX(0deg);
+  }
+}
+
+@keyframes slate-pill-glint {
+  0% {
+    transform: scale(0.94);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes slate-live-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes slate-live-sonar {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.35);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+@keyframes slate-live-pulse {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(3);
+  }
+}
+
+@keyframes slate-bell-swing {
+  0% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(18deg);
+  }
+  24% {
+    transform: rotate(-14deg);
+  }
+  38% {
+    transform: rotate(10deg);
+  }
+  52% {
+    transform: rotate(-6deg);
+  }
+  66% {
+    transform: rotate(3deg);
+  }
+  80% {
+    transform: rotate(-1deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes slate-bell-clapper {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  14% {
+    transform: translateX(-1.6px);
+  }
+  28% {
+    transform: translateX(1.4px);
+  }
+  42% {
+    transform: translateX(-1px);
+  }
+  56% {
+    transform: translateX(0.6px);
+  }
+}
+
+@keyframes slate-odo-roll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--odo-end, 0));
+  }
+}
+
+@keyframes slate-odo-bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes slate-arrive-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes slate-arrive-wash {
+  0%,
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes slate-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes slate-fade-in-num {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes slate-spark-draw {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes slate-empty-glow {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* The first quarter of the boot splash's slate-loading-stack-in (same
+   start scale, same ease), held at the end instead of fading out. */
+@keyframes slate-mark-assemble {
+  from {
+    opacity: 0;
+    transform: scaleX(0.2);
+  }
+}
+
+@keyframes slate-radar-ping {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.25);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes slate-radar-beat {
+  0%,
+  30%,
+  100% {
+    transform: scale(1);
+  }
+  12% {
+    transform: scale(1.25);
+  }
+}
+
+@keyframes slate-nudge {
+  0%,
+  40%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  52% {
+    transform: translateY(-2px) scale(1.03);
+  }
+  66% {
+    transform: translateY(0) scale(0.995);
+  }
+}
+
+@keyframes slate-nudge-ring {
+  0%,
+  40% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  48% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}

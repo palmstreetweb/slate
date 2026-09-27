@@ -51,6 +51,7 @@ import { refreshFormsRemote } from '../neon/formsRemote.js';
 import { FORM_QUOTA_MAX, formQuotaUserMessage, isFormQuotaError } from '../formQuota.js';
 import { BuildWithAiModal, SparkleIcon } from '../components/BuildWithAiModal.js';
 import { markAiDraft, type GeneratedDraft } from '../ai/client.js';
+import { Odometer } from '../delight/Odometer.js';
 
 export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
@@ -592,7 +593,8 @@ function FormCard({
             )}
             <span className="slate-badge">{qCount} {qCount === 1 ? 'question' : 'questions'}</span>
             <span className={`slate-badge${subCount > 0 ? ' slate-badge--accent' : ''}`}>
-              {subCount} {subCount === 1 ? 'response' : 'responses'}
+              {/* Rolls up like an odometer when a response lands (ADR-060). */}
+              <Odometer value={subCount} /> {subCount === 1 ? 'response' : 'responses'}
             </span>
             {lastAt && (
               <span className="slate-badge">last {timeAgo(new Date(lastAt))}</span>

@@ -58,6 +58,8 @@ import {
   IconFilter,
   IconX,
 } from './icons.js';
+import { CountUp } from '../delight/CountUp.js';
+import { useReveal } from '../delight/useReveal.js';
 import './responses.css';
 import './summary.css';
 
@@ -169,7 +171,8 @@ const Sparkline = memo(function Sparkline({ k }: { k: Kpis }) {
             className={`rsp-sum-spark-col${n ? '' : ' is-zero'}${now ? ' is-now' : ''}`}
             title={day ? `${shortDay(day)}: ${plural(n, 'response', 'responses')}` : undefined}
           >
-            <i style={h ? { height: h } : undefined} />
+            {/* --rsp-i staggers the draw-on, left to right (ADR-060). */}
+            <i style={h ? ({ height: h, '--rsp-i': i } as CSSProperties) : undefined} />
           </span>
         );
       })}
@@ -210,7 +213,7 @@ const KpiTiles = memo(function KpiTiles({ k, newOn, weekOn, onToggleNew, onToggl
     <div className="rsp-sum-kpis" role="group" aria-label="Key numbers">
       <div className="rsp-sum-kpi">
         <span className="rsp-sum-kpi-label">Responses</span>
-        <span className="rsp-sum-kpi-value">{k.total}</span>
+        <CountUp className="rsp-sum-kpi-value" srClassName="rsp-sr" value={k.total} />
         <Sparkline k={k} />
       </div>
       <button
@@ -226,7 +229,7 @@ const KpiTiles = memo(function KpiTiles({ k, newOn, weekOn, onToggleNew, onToggl
           {k.unread > 0 ? <span className="rsp-dot" aria-hidden="true" /> : null}
           New
         </span>
-        <span className="rsp-sum-kpi-value">{k.unread}</span>
+        <CountUp className="rsp-sum-kpi-value" srClassName="rsp-sr" value={k.unread} />
         <span className="rsp-sum-kpi-foot">{k.unread > 0 ? 'unread' : 'All caught up'}</span>
         <IconFilter size={14} className="rsp-sum-kpi-icon" />
       </button>
@@ -240,7 +243,7 @@ const KpiTiles = memo(function KpiTiles({ k, newOn, weekOn, onToggleNew, onToggl
         onClick={onToggleWeek}
       >
         <span className="rsp-sum-kpi-label">This week</span>
-        <span className="rsp-sum-kpi-value">{k.thisWeek}</span>
+        <CountUp className="rsp-sum-kpi-value" srClassName="rsp-sr" value={k.thisWeek} />
         <span className="rsp-sum-kpi-foot">
           {diff > 0 ? (
             <>
@@ -305,6 +308,8 @@ const ChartCard = memo(function ChartCard({
   /** Roving tab stop: one per chart; arrow keys move between bars. */
   const [cursor, setCursor] = useState<string | null>(null);
   const titleId = useId();
+  // Bars grow from zero the first time this card scrolls into view (ADR-060).
+  const revealRef = useReveal<HTMLElement>();
   const title = titleOf(question);
   const current = crossed ?? total;
   const byValue = useMemo(() => new Map(current.rows.map((r) => [r.value, r])), [current]);
@@ -325,6 +330,7 @@ const ChartCard = memo(function ChartCard({
 
   return (
     <article
+      ref={revealRef}
       className={`rsp-sum-chart${total.kind === 'numeric' ? ' rsp-sum-chart--numeric' : ''}`}
       aria-labelledby={titleId}
       style={style}
@@ -354,7 +360,7 @@ const ChartCard = memo(function ChartCard({
         role="group"
         aria-label={`${title}. Choose an answer to filter the list.`}
       >
-        {rows.map((row) => {
+        {rows.map((row, index) => {
           const now = byValue.get(row.value);
           const count = now?.count ?? 0;
           const pct = now?.pct ?? 0;
@@ -370,6 +376,7 @@ const ChartCard = memo(function ChartCard({
                 crossed ? ' of matching' : ''
               }. Filter the list to this answer.`}
               tabIndex={row.value === tabStop ? 0 : -1}
+              style={{ '--rsp-i': index } as CSSProperties}
               onFocus={() => setCursor(row.value)}
               onClick={() => onToggle(question.id, row.value)}
             >

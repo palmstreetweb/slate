@@ -2048,31 +2048,15 @@ body.slate-editor-resizing * {
   color: #e7fff3;
 }
 
+/* A small dot, never a pill (standing decision). Its pulse and the publish
+   sonar live in delight/delight.css: opacity + transform, three cycles, then
+   still (ADR-060). */
 [data-slate-forms][data-theme-name='slate'] .slate-share-live-dot {
+  position: relative;
   width: 7px;
   height: 7px;
   border-radius: 99px;
-  background: #3ddc97;
-  box-shadow: 0 0 0 0 rgb(61 220 151 / 0.55);
-  animation: slate-share-live-pulse 2.4s ease-out infinite;
-}
-
-@keyframes slate-share-live-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgb(61 220 151 / 0.55);
-  }
-  70% {
-    box-shadow: 0 0 0 7px rgb(61 220 151 / 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgb(61 220 151 / 0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-slate-forms][data-theme-name='slate'] .slate-share-live-dot {
-    animation: none;
-  }
+  background: var(--chrome-live);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-link-card {

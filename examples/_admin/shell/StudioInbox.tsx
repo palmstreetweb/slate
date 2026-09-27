@@ -32,6 +32,9 @@ import {
   writeKnown,
 } from '../responses/unreadStore.js';
 import { LoadingScreen } from './LoadingScreen.js';
+import { isArrival, noteArrivals, useArrivalsVersion } from '../delight/arrivals.js';
+import { IconBell } from '../delight/BellIcon.js';
+import { firstResponseForms, markFirstCelebrated } from '../delight/firstResponse.js';
 
 /** 60s ± 20% so a thousand open tabs don't poll in lockstep. */
 const POLL_MS = 60_000;
@@ -67,25 +70,6 @@ function IconRefresh({ spinning }: { spinning: boolean }) {
   );
 }
 
-function IconBell() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M6 9a6 6 0 1 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9Z"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M10 20a2 2 0 0 0 4 0"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 export function StudioInbox() {
   const toast = useToast();
   const [spinning, setSpinning] = useState(false);
@@ -98,6 +82,17 @@ export function StudioInbox() {
   const panelRef = useRef<HTMLDivElement>(null);
   const seeded = useRef(false);
   const pulling = useRef(false);
+  /**
+   * True while a background poll is pulling. The pull's store update reaches
+   * `ingest` through the subscription first, so this is how that ingest
+   * knows to announce (otherwise it marks the rows known silently and the
+   * poll's own ingest finds nothing new).
+   */
+  const announcing = useRef(false);
+  /** Bumps to ring the bell once per batch of live arrivals (ADR-060). */
+  const [ring, setRing] = useState(0);
+  // Re-render the panel rows when arrivals are noted, so they wash in.
+  useArrivalsVersion();
 
   const ingest = useCallback(
     (announce: boolean) => {
@@ -122,8 +117,37 @@ export function StudioInbox() {
       writeKnown([...fresh, ...known]);
       setUnread([...fresh, ...readUnread().filter((id) => !fresh.includes(id))]);
       setTick((n) => n + 1);
+
+      // Live arrivals (not the batch that loads with the page): rows wash in
+      // and the bell rings. The hydrate notify lands before the stores
+      // report hydrated, so that first batch stays quiet.
+      if (isStoresHydrated()) {
+        noteArrivals(fresh);
+        setRing((n) => n + 1);
+      }
+
+      // A form's very first response gets its own toast, once per form.
+      const firsts = firstResponseForms(fresh, active);
+      if (firsts.length > 0) {
+        markFirstCelebrated(firsts);
+        playUiSound('arrival');
+        const names = firsts.map((id) => getForm(id)?.name ?? 'Your form');
+        toast.push({
+          title: firsts.length === 1 ? 'First response!' : 'First responses!',
+          detail:
+            names.length === 1
+              ? `${names[0]} just heard back.`
+              : `${names.slice(0, 2).join(' and ')}${names.length > 2 ? ` and ${names.length - 2} more` : ''} just heard back.`,
+          tone: 'success',
+          sound: 'none',
+          celebrate: true,
+          durationMs: 5600,
+        });
+        return;
+      }
+
       if (announce) {
-        playUiSound('refresh');
+        playUiSound('arrival');
         const first = active.find((s) => s.id === fresh[0]);
         const formName = first ? getForm(first.formId)?.name : undefined;
         toast.push({
@@ -145,6 +169,7 @@ export function StudioInbox() {
         return;
       }
       pulling.current = true;
+      announcing.current = announce;
       try {
         // Poll: only rows newer than the last seen. Manual Refresh also reloads
         // the index so trash/deletes from another device show up.
@@ -153,6 +178,7 @@ export function StudioInbox() {
         console.warn('[slate] Studio refresh failed', err);
       } finally {
         pulling.current = false;
+        announcing.current = false;
         ingest(announce);
       }
     },
@@ -161,7 +187,7 @@ export function StudioInbox() {
 
   useEffect(() => {
     ingest(false);
-    return subscribeSubmissions(() => ingest(false));
+    return subscribeSubmissions(() => ingest(announcing.current));
   }, [ingest]);
 
   useEffect(() => {
@@ -292,16 +318,20 @@ export function StudioInbox() {
       <button
         ref={btnRef}
         type="button"
-        className={`slate-btn slate-btn--icon slate-inbox-btn${open ? ' slate-inbox-btn--open' : ''}`}
+        className={`slate-btn slate-btn--icon slate-inbox-btn${open ? ' slate-inbox-btn--open' : ''}${
+          ring > 0 ? ' slate-inbox-btn--ring' : ''
+        }`}
         onClick={() => setOpen((v) => !v)}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} new` : 'Notifications'}
         aria-expanded={open}
         title="Notifications"
         data-slate-sound="open"
       >
-        <IconBell />
+        <IconBell key={`bell-${ring}`} swing={ring > 0} />
         {unreadCount > 0 ? (
-          <span className="slate-inbox-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+          <span key={`badge-${ring}`} className="slate-inbox-badge">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
         ) : null}
       </button>
       {open && typeof document !== 'undefined'
@@ -347,7 +377,11 @@ export function StudioInbox() {
                       <li key={row.id}>
                         <button
                           type="button"
-                          className={`slate-inbox-item${row.unread ? ' slate-inbox-item--unread' : ''}`}
+                          className={`slate-inbox-item${row.unread ? ' slate-inbox-item--unread' : ''}${
+                            // Read at render, not in the memo: opening the panel
+                            // later must not replay an old arrival.
+                            isArrival(row.id) ? ' is-arrived' : ''
+                          }`}
                           data-slate-sound="none"
                           onClick={() => openItem(row.id, row.formId)}
                           aria-label={`${row.preview}, ${row.formName}, ${row.whenFull}${row.unread ? ', unread' : ''}`}

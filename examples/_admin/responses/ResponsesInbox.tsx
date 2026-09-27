@@ -60,6 +60,7 @@ import {
   IconTrash,
   IconX,
 } from './icons.js';
+import { isArrival, useArrivalsVersion } from '../delight/arrivals.js';
 import './responses.css';
 import './inbox.css';
 
@@ -229,6 +230,8 @@ type RowProps = {
   row: RowData;
   age: string;
   unread: boolean;
+  /** Landed while the page was open: slides in with an accent wash (ADR-060). */
+  arrived: boolean;
   selected: boolean;
   tabbable: boolean;
   terms: ReadonlyArray<string>;
@@ -239,6 +242,7 @@ const InboxRow = memo(function InboxRow({
   row,
   age,
   unread,
+  arrived,
   selected,
   tabbable,
   terms,
@@ -249,7 +253,9 @@ const InboxRow = memo(function InboxRow({
     <li>
       <button
         type="button"
-        className={`rsp-ib-row${unread ? ' rsp-ib-row--unread' : ''}${selected ? ' rsp-ib-row--sel' : ''}`}
+        className={`rsp-ib-row${unread ? ' rsp-ib-row--unread' : ''}${selected ? ' rsp-ib-row--sel' : ''}${
+          arrived ? ' is-arrived' : ''
+        }`}
         data-focus={`row:${sub.id}`}
         tabIndex={tabbable ? 0 : -1}
         aria-current={selected ? 'true' : undefined}
@@ -354,6 +360,8 @@ export function ResponsesInbox({
   onEmptyTrash,
 }: InboxProps) {
   const trash = mode === 'trash';
+  // Re-render when the bell notes live arrivals, so their rows wash in.
+  useArrivalsVersion();
   const phone = usePhone();
   const finePointer = useFinePointer();
   const now = useNow();
@@ -747,6 +755,7 @@ export function ResponsesInbox({
                 row={rowOf(s)}
                 age={ageOf(s.receivedAt)}
                 unread={!trash && unread.has(s.id)}
+                arrived={!trash && isArrival(s.id)}
                 selected={s.id === openId}
                 tabbable={s.id === anchorId}
                 terms={terms}

@@ -183,16 +183,6 @@
   }
 }
 
-@keyframes slate-empty-breathe {
-  0%,
-  100% {
-    border-color: var(--chrome-line);
-  }
-  50% {
-    border-color: color-mix(in srgb, var(--chrome-red) 40%, var(--chrome-line));
-  }
-}
-
 /* ---------- shell ---------- */
 
 .slate-page {
@@ -400,12 +390,10 @@
 
 /* ---------- empty ---------- */
 
+/* The border glow and button float used to loop forever (WCAG 2.2.2). They
+   now run three short cycles from delight/delight.css (ADR-060). */
 [data-slate-forms][data-theme-name='slate'] .slate-empty {
-  animation: slate-rise-in 560ms var(--slate-ease-out) 80ms both, slate-empty-breathe 4.5s ease-in-out 700ms infinite;
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-empty .slate-btn {
-  animation: slate-float-soft 3.2s ease-in-out 900ms infinite;
+  animation: slate-rise-in 560ms var(--slate-ease-out) 80ms both;
 }
 
 /* ---------- dialogs ---------- */

@@ -33,6 +33,7 @@ import { publicFillUrl } from '../neon/publicApi.js';
 import { playUiSound } from '../uiSounds.js';
 import { useToast } from '../toast.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
+import { PublishButton, usePublishIgnition } from '../delight/ignition.js';
 
 type Props = {
   open: boolean;
@@ -53,6 +54,9 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const [embedCopied, setEmbedCopied] = useState(false);
   const [qrCopied, setQrCopied] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  // Publish ignition (ADR-060); `ignited` makes the Live dot fire its sonar.
+  const ignite = usePublishIgnition();
+  const [ignited, setIgnited] = useState(false);
   const [lockEditing, setLockEditing] = useState(false);
   const [lockDraft, setLockDraft] = useState('');
   const [lockBusy, setLockBusy] = useState(false);
@@ -61,6 +65,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
 
   useEffect(() => {
     if (open) return;
+    setIgnited(false);
     // Never keep a typed password around after the sheet closes.
     setLockEditing(false);
     setLockDraft('');
@@ -166,17 +171,22 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   }, [qr]);
 
   const onPublish = () => {
-    setPublishing(true);
-    const next = publishForm(formId);
-    setPublishing(false);
-    if (next) {
-      toast.push({
-        title: stale ? 'Republished' : 'You’re live',
-        detail: 'Public link is serving this draft.',
-        tone: 'success',
-        sound: 'success',
-      });
-    } else {
+    if (ignite.phase !== 'idle') return;
+    const wasStale = stale;
+    // Publishes now; the toast and the Live dot's sonar wait for the check.
+    const ok = ignite.start(() => Boolean(publishForm(formId)), {
+      scope: panelRef.current,
+      onLive: () => {
+        setIgnited(true);
+        toast.push({
+          title: wasStale ? 'Republished' : 'You’re live',
+          detail: 'Public link is serving this draft.',
+          tone: 'success',
+          sound: 'success',
+        });
+      },
+    });
+    if (!ok) {
       toast.push({
         title: 'Could not publish',
         detail: 'Check your connection and try again.',
@@ -419,20 +429,20 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                       ) : null}
                     </span>
                     {cloud ? (
-                      <button
-                        type="button"
-                        className={`slate-btn slate-btn--compact${isPublished && !stale ? '' : ' slate-btn--primary'}`}
-                        onClick={isPublished && !stale ? onUnpublish : onPublish}
-                        disabled={publishing}
-                      >
-                        {publishing
-                          ? 'Working…'
-                          : isPublished
-                            ? stale
-                              ? 'Republish'
-                              : 'Unpublish'
-                            : 'Publish'}
-                      </button>
+                      ignite.phase !== 'idle' || !isPublished || stale ? (
+                        <PublishButton compact phase={ignite.phase} onClick={onPublish}>
+                          {isPublished ? 'Republish' : 'Publish'}
+                        </PublishButton>
+                      ) : (
+                        <button
+                          type="button"
+                          className="slate-btn slate-btn--compact"
+                          onClick={onUnpublish}
+                          disabled={publishing}
+                        >
+                          {publishing ? 'Working…' : 'Unpublish'}
+                        </button>
+                      )
                     ) : null}
                   </div>
                 </section>
@@ -487,8 +497,8 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                 </section>
 
                 <div className="slate-share-foot">
-                  {isPublished && !stale ? (
-                    <p className="slate-share-live">
+                  {isPublished && !stale && ignite.phase !== 'working' ? (
+                    <p className={`slate-share-live${ignited ? ' slate-share-live--ignite' : ''}`}>
                       <span className="slate-share-live-dot" aria-hidden />
                       Live
                     </p>
@@ -509,14 +519,9 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                       : 'This form is too large for a portable link. Remove questions or shorten copy and try again.'}
                   </p>
                   {cloud ? (
-                    <button
-                      type="button"
-                      className="slate-btn slate-btn--primary slate-btn--compact"
-                      onClick={onPublish}
-                      disabled={publishing}
-                    >
-                      {publishing ? 'Working…' : 'Publish'}
-                    </button>
+                    <PublishButton compact phase={ignite.phase} onClick={onPublish}>
+                      Publish
+                    </PublishButton>
                   ) : null}
                 </div>
                 {lockRow}

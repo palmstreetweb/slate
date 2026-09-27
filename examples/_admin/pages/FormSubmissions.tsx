@@ -40,6 +40,7 @@ import { isStoresHydrated } from '../neon/hydrate.js';
 import { SharePanel } from '../components/SharePanel.js';
 import { useToast } from '../toast.js';
 // Shared sheet first: the views' own sheets (imported with them) build on it.
+import { RadarPing } from '../delight/RadarPing.js';
 import '../responses/responses.css';
 import { answerQuestions, respondentName } from '../responses/model.js';
 import { markRead, markUnread, readUnread, useUnread } from '../responses/unreadStore.js';
@@ -499,8 +500,12 @@ export function FormSubmissions({ formId }: Props) {
         </div>
       );
   } else if (subs.length === 0) {
+    // Nothing has ever come in: a slow radar ping and a nudge on Share
+    // (ADR-060). "Inbox is empty" (everything trashed) stays still.
+    const waiting = trashed.length === 0;
     body = (
       <div className="slate-empty slate-empty--start">
+        {waiting ? <RadarPing /> : null}
         <p className="slate-empty-title">
           {trashed.length > 0 ? 'Inbox is empty' : 'No responses yet'}
         </p>
@@ -516,7 +521,7 @@ export function FormSubmissions({ formId }: Props) {
         <div className="slate-empty-actions">
           <button
             type="button"
-            className="slate-btn slate-btn--primary"
+            className={`slate-btn slate-btn--primary${waiting ? ' slate-nudge' : ''}`}
             onClick={() => setShareOpen(true)}
           >
             {published ? (stale ? 'Republish' : 'Share link') : 'Publish & share'}

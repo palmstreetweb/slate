@@ -43,6 +43,7 @@ import '@/styles/toggle.css';
 import './_admin/publicChrome.css';
 import './_admin/_adminTheme.css';
 import './_admin/slateMotion.css';
+import './_admin/delight/delight.css';
 
 /** The gallery lives in its own bundle (ADR-059); the entry picks it on a full load. */
 function ReloadForBundle() {

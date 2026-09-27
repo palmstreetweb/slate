@@ -539,6 +539,7 @@ Alternatives:
 - Reuse `schema.sound` presets. Rejected — those are respondent-facing and opt-in per form.
 Consequences: Studio feels more tactile. First click still unlocks AudioContext. Compact primary tabs stay silent. Mute is studio-only (form step sounds unchanged). Build with AI’s full-page PDF drop wash plays `drop` (glass taps timed to the assemble bars) once when the file is dropped, not while it is still hovering.
 Revisit when: distinct per-route themes, or a volume slider.
+Addendum (2026-09-27, ADR-060): a new `arrival` cue (two-note bell) plays when new responses are announced and for the first-response toast, in place of `refresh`. Mute gates it like every other cue.
 
 ## ADR-041 — Studio toast host + publish confidence
 Date: 2026-09-20
@@ -550,6 +551,7 @@ Alternatives:
 - Auto-republish on every save. Rejected — authors often want to stage draft edits.
 Consequences: Clearer live-vs-draft mental model. Toast stack is examples-only.
 Revisit when: real-time collaborator presence or scheduled publish.
+Addendum (2026-09-27, ADR-060): Publish/Republish now plays spinner → self-drawing check → bow-out, and the header pill flips Draft → Live on the check. The publish itself still runs on click. The "New response" toast now actually fires on cloud polls (it was swallowed by the subscription's silent ingest). Toasts gained `celebrate` (the one-time "First response!"), and `sound: 'none'` is silent.
 
 ## ADR-042 — Choice letter keys run A–Z
 Date: 2026-09-21
@@ -738,6 +740,7 @@ Alternatives:
 - A chart library. Rejected: two bar shapes don't justify the bundle weight or a new dependency.
 Consequences: Read / unread is per browser. Opening a response on a laptop does not clear it on a phone, and clearing site data makes everything "not new" again (the bell re-seeds silently on first run). The unread list is capped at 200 ids across all forms, so very old unread items drop off. The Responses page styles the studio header through `:has(.slate-rsp)` so crumbs truncate and phone gutters tighten on this page only; the rest of the studio header is unchanged. On a 320–360px phone at the larger studio sizes the header drops Refresh on this page (it already pulls new responses on open and on tab focus), so the brand, bell, Sign out and theme toggle still fit.
 Revisit when: read state should sync across devices or team members (move it to Neon), owners need saved filters or views beyond these two, or the studio gets a shared phone header (then drop the page-scoped header rules).
+Addendum (2026-09-27, ADR-060): Summary KPIs count up, the sparkline draws on and bars grow from zero by `scaleX` when their card first scrolls into view; rows that arrive while the page is open wash in with the accent. Point 6's "no new dependencies" still holds.
 
 ## ADR-056 — Security audit fixes, first pass
 Date: 2026-09-23
@@ -866,6 +869,29 @@ Alternatives:
 - `width` transitions with a pseudo-element tip. Rejected: `width` triggers layout on every frame.
 Consequences: Measured with `npm run build`: `dist/index.js` goes from 37.3 to 41.0 kB gz (unminified, as published), or 27.4 to 30.1 kB gz minified. `dist/styles.css` goes from 14.1 to 17.9 kB gz, most of it the per-theme confetti and decoration rules. The engine stays under the brief's 50 kB budget. The thanks-step progress bar reads below 100% until the submit resolves. `aria-valuenow` is honest about that, and the hold is intentional. A leaving copy briefly duplicates visible text in the DOM (aria-hidden, inert, no ids), so text queries in host tests can see it for ≤420ms. The single-choice snapshot markup is unchanged. Only the thanks snapshot changed (classes instead of inline styles).
 Revisit when: a host asks to turn the celebration off (add `schema.celebrate?: boolean`), scale/NPS want a commit beat, or riso/memphis/grid get their own draw-on.
+
+## ADR-060 — Delight passes 4 + 5: publish ignition, arrivals, a living Summary, calmer empty states
+Date: 2026-09-27
+Status: accepted
+Context: Pass 1 (ADR-059) made the respondent side feel alive; the studio still met its two biggest moments (going live, hearing back) with a toast and a number change. The owner approved passes 4 and 5 for the studio. The same limits apply: no runtime dependencies, CSS + the Web Animations API only, transform/opacity (and stroke-dash for self-drawing checks), `prefers-reduced-motion` everywhere, colours from tokens. An audit also found two loops that never stopped (the empty-state border breathe and button float in `slateMotion.css`, and the Share panel's Live dot pulse) — WCAG 2.2.2 — and that the Live dot animated `box-shadow`. The brief is silent on studio motion (the studio is an examples-only surface, ADR-018).
+Decision:
+1. **One home.** Everything lives in `examples/_admin/delight/` (helpers, small components, `delight.css`), imported by the studio and the `/motion` gallery. Nothing touches `src/` or the published package; `src/index.ts` is unchanged. `delight.css` follows ADR-059's pattern: rules outside the motion block are the static end state, keyframes run only inside `@media (prefers-reduced-motion: no-preference)` on a wrapper without `data-reduced-motion` (the gallery's Reduce switch), and JS motion checks `motionReduced()` from `src/utils/motion.ts`.
+2. **Publish ignition** (`usePublishIgnition`, `PublishButton`). The publish runs on click, synchronously, as before; only what the author sees is staged: a 420 ms spinner, then the ring closes and a check draws itself with "Live", held 1.1 s, then the button bows out (220 ms). The toast and success cue fire on the check beat and still fire if the button unmounts mid-spin, so a publish is never silent and never delayed. Calm motion goes straight to the check. The editor pill keeps its old label during the spinner, then flips (`FlipPill`, a rotateX split-flap, never on first render). The Share panel uses the same button; its Live footer appears on the check beat.
+3. **Live dot** (standing decision: a small dot, never a pill or badge). It stays a 7 px dot coloured by the new `--chrome-live` token. Its pulse is now an opacity/scale pseudo-element that runs three 1.6 s cycles, then rests. Right after a publish from the panel it pops in and fires one sonar ring first.
+4. **Arrivals.** `delight/arrivals.ts` is a per-tab, in-memory record of responses that landed while the studio was open. The bell's ingest (`StudioInbox`) is the only writer, and only once stores are hydrated, so the batch that loads with the page never animates. On an arrival the bell swings (rotate with a lagging clapper), its badge pops, the bell panel and the Responses inbox rows slide in with an accent wash that fades over 2 s, and the dashboard card count rolls like an odometer (`Odometer`: per-digit reels translated by transform, the true number in screen-reader text). A new `arrival` Web Audio cue (a two-note bell) replaces `refresh` where the studio already announced new responses, and plays for the first-response toast; mute still gates it (ADR-040).
+5. **Poll announce fix.** A poll's store update reached `ingest` through the subscription before the poll's own ingest ran, so in cloud mode the rows were marked known silently and the "New response" toast (ADR-041) never showed. The subscription now inherits the poll's `announce` flag through a ref.
+6. **First response.** When every active response of a form is new in one ingest and the form hasn't been celebrated, a one-time "First response!" toast shows a "1st" medal that bursts pass 1's confetti (same `.slate-confetti` classes and keyframes, studio colours via `--slate-cf-*` overrides). Celebrated form ids are kept per browser under the new key `slate-admin-first-response` (JSON array, capped at 500); every access is in try/catch, so blocked storage can at worst repeat it. Toasts gained `celebrate?: boolean`, and `sound: 'none'` now really is silent (it used to fall through to the tone's cue).
+7. **Summary comes alive.** KPI numbers count up over 600 ms (`CountUp`, easeOutCubic; the true value is screen-reader text, only the aria-hidden copy animates). The 14-day sparkline columns draw on left to right (scaleY). Each chart's bars grow from zero by `transform: scaleX` (their width stays the layout truth) the first time the card scrolls into view: `useReveal` sets `data-reveal` on the DOM from a shared IntersectionObserver, in a layout effect so nothing flashes, and marks the card revealed at once with calm motion or without IntersectionObserver. Filtering keeps its existing width transition.
+8. **Empty states.** The dashboard's three-bar mark assembles with the boot splash's loading-stack motion (same start scale and ease, held instead of fading). "No responses yet" (never had any) gets a radar: a dot with two rings pinging outward, and the Share button glints as each ping lands. The old infinite border breathe (a `border-color` animation) became an opacity-only glow. Every one of these loops runs three 1.6 s cycles, so each is done within about 6 s, then still. Loading spinners and skeleton shimmers keep looping while something is loading (they stop when it stops).
+9. **Gallery.** `/motion` gains three studio sections (publish + first responses, the Summary, empty states) with Replay buttons, demo data, the real studio components and CSS, and the real toast host. No stores, no sign-in; nothing is published or saved.
+Alternatives:
+- A number-animation or chart library. Rejected: runtime dependency for a few hundred lines of CSS.
+- Delaying the real publish until the spinner finishes. Rejected: navigating away mid-spin would drop the publish.
+- Animating bar `width` from 0. Rejected: layout on every frame; scaleX gives the same look on the compositor.
+- Replaying arrivals for everything new since the last visit. Rejected: fifty rows flashing at once is noise; the unread dots already say "new since you were here".
+- Storing first-response state in Neon. Deferred: per-browser is enough for a one-time moment, same as read state (ADR-055).
+Consequences: Studio-only; respondents and the engine bundle are unchanged (the respondent route loads the same code, the examples build only regrouped shared chunks). The Publish button now lingers ~1.7 s after a publish instead of vanishing. The first-response toast can repeat on another browser or after clearing site data. The bell panel and inbox wash use the accent colour, so they follow the studio palette.
+Revisit when: read state moves to Neon (move first-response with it), the Share panel gets a new layout, or a user asks to turn studio motion down separately from the OS setting.
 
 ---
 
