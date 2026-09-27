@@ -1,5 +1,5 @@
 /**
- * Motion gallery bundle (ADR-059): `/motion` only. A dev demo that replays
+ * Motion gallery bundle (ADR-059, ADR-060): `/motion` only. A dev demo that replays
  * every delight-pass animation with schemas built into the page — no studio,
  * no auth provider, no Neon, nothing submitted anywhere.
  */
@@ -8,7 +8,14 @@ import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useRoute } from './_admin/_router.js';
 import { MotionGallery } from './motion/MotionGallery.js';
+import { ToastProvider } from './_admin/toast.js';
 
+// Studio chrome for the pass 4–5 studio moments (ADR-060).
+import './_admin/slateChromeTokens.css';
+import './_admin/publicChrome.css';
+import './_admin/_adminTheme.css';
+import './_admin/slateMotion.css';
+import './_admin/delight/delight.css';
 import './motion/motionGallery.css';
 
 function MotionRoute() {
@@ -20,7 +27,12 @@ function MotionRoute() {
     if (!here) window.location.reload();
   }, [here]);
 
-  return here ? <MotionGallery /> : null;
+  // Studio moments push real studio toasts (bottom-right), as in the studio.
+  return here ? (
+    <ToastProvider>
+      <MotionGallery />
+    </ToastProvider>
+  ) : null;
 }
 
 /** Fraunces for the editorial / forest / bloom cards (Inter + JetBrains Mono load in index.html). */

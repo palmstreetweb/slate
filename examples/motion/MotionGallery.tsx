@@ -1,5 +1,5 @@
 /**
- * Motion gallery (ADR-059) — every delight-pass animation on one page, each
+ * Motion gallery (ADR-059, ADR-060) — every delight-pass animation on one page, each
  * with a Replay button. Dev demo only: it ships in the examples app, never in
  * the published package. Schemas are built in; onSubmit resolves locally
  * after a short fake delay, so nothing leaves the browser.
@@ -25,6 +25,7 @@ import { ReducedMotionOverrideContext } from '@/hooks/useReducedMotion.js';
 import { ProgressBar } from '@/components/chrome/ProgressBar.js';
 import { FooterCounter } from '@/components/chrome/FooterCounter.js';
 import { ThemeDecoration, hasStepDecorationBackdrop, resolveThemeDecoration } from '@/components/ThemeDecoration.js';
+import { StudioEmpty, StudioPass4, StudioSummary } from './StudioMoments.js';
 
 type Mode = 'light' | 'dark';
 
@@ -575,7 +576,7 @@ export function MotionGallery() {
     <div className="mg" data-mode={mode}>
       <header className="mg-head">
         <div className="mg-title">
-          <span className="mg-eyebrow">Slate · delight pass 1</span>
+          <span className="mg-eyebrow">Slate · delight passes 1–5</span>
           <h1>Motion gallery</h1>
           <p>
             Every new animation, replayable. Demo schemas live in the page — nothing is signed in
@@ -601,6 +602,9 @@ export function MotionGallery() {
           <a href="#flow">Question flow</a>
           <a href="#progress">Progress</a>
           <a href="#decorations">Decorations</a>
+          <a href="#studio-live">Studio: live</a>
+          <a href="#studio-summary">Studio: summary</a>
+          <a href="#studio-empty">Studio: empty</a>
         </nav>
 
         <section aria-labelledby="celebration">
@@ -655,9 +659,33 @@ export function MotionGallery() {
             ))}
           </div>
         </section>
+
+        <section aria-labelledby="studio-live">
+          <SectionHead id="studio-live" title="Studio: publish + first responses">
+            Pass 4. Publishing is a moment, and so is hearing back. Demo data only — nothing is
+            published and no response is real.
+          </SectionHead>
+          <StudioPass4 mode={mode} reduce={reduce} sound={sound} />
+        </section>
+
+        <section aria-labelledby="studio-summary">
+          <SectionHead id="studio-summary" title="Studio: the Summary comes alive">
+            Pass 5. The real Responses Summary with 18 demo responses.
+          </SectionHead>
+          <StudioSummary mode={mode} reduce={reduce} sound={sound} />
+        </section>
+
+        <section aria-labelledby="studio-empty">
+          <SectionHead id="studio-empty" title="Studio: empty states">
+            Pass 5. Empty is a beginning, not a dead end — and no loop runs forever.
+          </SectionHead>
+          <StudioEmpty mode={mode} reduce={reduce} sound={sound} />
+        </section>
       </ReducedMotionOverrideContext.Provider>
 
-      <footer className="mg-foot">ADR-059 · examples only — not part of @palmstreetweb/slate.</footer>
+      <footer className="mg-foot">
+        ADR-059 · ADR-060 · examples only — not part of @palmstreetweb/slate.
+      </footer>
     </div>
   );
 }

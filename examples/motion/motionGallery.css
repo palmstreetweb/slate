@@ -477,6 +477,149 @@
   border: 1px solid var(--slate-border-md);
 }
 
+/* ---------- studio moments (ADR-060) ---------- */
+
+.mg-grid--studio {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+}
+
+.mg-grid--empty {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+}
+
+/* Beats base.css's full-viewport min-height on the bare engine wrapper. */
+.mg-studio[data-slate-forms] {
+  min-height: 0;
+  overflow: visible;
+}
+
+.mg-studio--publish,
+.mg-studio--arrive,
+.mg-studio--first,
+.mg-studio--empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.mg-studio-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 60px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--chrome-hair);
+  background: color-mix(in srgb, var(--chrome-bg) 88%, transparent);
+}
+
+.mg-studio-bar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mg-studio-crumb,
+.mg-studio-brand {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--chrome-muted);
+}
+
+.mg-studio-brand {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--chrome-ink);
+}
+
+.mg-studio-share {
+  display: grid;
+  gap: 10px;
+  flex: 1;
+  align-content: center;
+  padding: 22px 18px;
+  background: var(--chrome-panel);
+}
+
+.mg-studio-share-label,
+.mg-studio-muted {
+  margin: 0;
+  font-size: 12px;
+  color: var(--chrome-muted);
+}
+
+.mg-studio-share .slate-share-foot {
+  min-height: 48px;
+}
+
+.mg-studio-pad {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: var(--chrome-bg);
+  flex: 1;
+}
+
+.mg-studio-formcard .slate-card-pad {
+  display: grid;
+  gap: 10px;
+}
+
+.mg-studio-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The bell panel, laid flat in the card instead of floating. */
+.mg-studio .slate-inbox.mg-studio-inbox {
+  position: static;
+  width: 100%;
+  max-height: none;
+  box-shadow: none;
+  animation: none;
+}
+
+.mg-studio--first {
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 250px;
+  padding: 24px 16px;
+  background: var(--chrome-bg);
+}
+
+.mg-studio--first .mg-studio-toast {
+  width: min(320px, 100%);
+}
+
+.mg-studio--summary {
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--chrome-bg);
+}
+
+.mg-studio--summary .slate-rsp {
+  padding: 16px;
+}
+
+.mg-studio--empty {
+  justify-content: center;
+  padding: 16px;
+  background: var(--chrome-bg);
+}
+
+.mg-studio--empty .slate-empty {
+  padding: 40px 20px 36px;
+}
+
+.mg-note--flush {
+  margin: 0;
+  max-width: 720px;
+}
+
 @media (max-width: 560px) {
   .mg {
     padding-top: 20px;
