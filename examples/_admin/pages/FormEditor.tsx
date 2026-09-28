@@ -391,6 +391,7 @@ function FormEditorBody({ formId }: { formId: string }) {
       Boolean(liveForm) &&
       hasUnpublishedChanges({
         ...liveForm!,
+        name,
         schema,
       });
     pinnedLabelRef.current = statusLabelRef.current;
@@ -576,6 +577,7 @@ function FormEditorBody({ formId }: { formId: string }) {
     Boolean(liveForm) &&
     hasUnpublishedChanges({
       ...liveForm!,
+      name,
       schema,
     });
   const liveLabel = !cloud

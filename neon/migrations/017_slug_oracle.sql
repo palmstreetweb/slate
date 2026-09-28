@@ -1,6 +1,7 @@
 -- 017_slug_oracle.sql (ADR-061). Apply after 016 and BEFORE redeploying submitresponse.
--- No Data API cache refresh: nothing the Data API exposes changes shape (get_form_by_slug keeps its
--- signature and grants; the new table and function are not granted to Data API roles).
+-- Then refresh the Data API schema cache: the studio reads the new forms.published_name (ADR-061 (h)).
+-- get_form_by_slug keeps its signature and grants; the new table and function are not granted to
+-- Data API roles. A studio on a stale cache still loads and saves; it just doesn't compare names.
 --
 -- What this fixes:
 --   1. slug-oracle. get_form_by_slug (012) is an anonymous, unthrottled Data API RPC, so a script can
@@ -28,8 +29,12 @@ alter table public.forms enable trigger forms_set_updated_at;
 -- Snapshot on publish, pinned otherwise. The studio publishes with an upsert that sets
 -- published_schema = schema and status = 'published' (formsRemote.publishFormRemote), and every
 -- other save re-sends the same published_schema, so "published_schema changed, or status became
--- published" is exactly "the author pressed Publish or Republish". Any client-sent published_name is
--- ignored, for every role.
+-- published" is exactly "the author pressed Publish or Republish".
+-- A rename alone leaves published_schema unchanged (the brand name can differ from the form name),
+-- so the studio shows Republish when name <> published_name, and that Republish sends
+-- published_name = name. The trigger accepts a client-sent published_name only when it equals the
+-- row's own current name on a live published row. Every other client value (a forged title, or the
+-- old title that ordinary saves re-send) is ignored, for every role.
 create or replace function public.forms_published_name()
 returns trigger
 language plpgsql
@@ -42,6 +47,10 @@ begin
   elsif new.published_schema is distinct from old.published_schema
         or (new.status = 'published' and old.status is distinct from 'published') then
     new.published_name := case when new.published_schema is not null then new.name end;
+  elsif new.status = 'published' and new.published_schema is not null
+        and new.published_name is not distinct from new.name then
+    -- Republish of a rename (the studio sends the current name). Nothing but the name is accepted.
+    new.published_name := new.name;
   else
     new.published_name := old.published_name;
   end if;

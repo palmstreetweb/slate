@@ -16,7 +16,7 @@ import {
 } from '../formQuota.js';
 import { formatNeonError, isQuotaExceededError, isRlsOrAuthError } from './neonError.js';
 import { formRecordToRow, rowToFormRecord } from './mappers.js';
-import { FORM_OWNER_COLUMNS, type DbFormRow } from './database.types.js';
+import { FORM_OPTIONAL_COLUMNS, FORM_OWNER_COLUMNS, type DbFormRow } from './database.types.js';
 
 type Listener = (forms: FormRecord[]) => void;
 
@@ -26,6 +26,11 @@ let hydrated = false;
 let writeGeneration = 0;
 /** Server-reported cap (ADR-038). `used` is always cache length, including trash. */
 let quotaMax = FORM_QUOTA_MAX;
+/**
+ * The last hydrate read `forms.published_name` (017). Until then writes never carry it,
+ * so a database without the column (or a stale Data API cache) keeps saving (ADR-061).
+ */
+let publishedNameColumn = false;
 const listeners = new Set<Listener>();
 
 function notify(): void {
@@ -45,6 +50,7 @@ export function clearFormsRemoteCache(): void {
   cache = [];
   hydrated = false;
   quotaMax = FORM_QUOTA_MAX;
+  publishedNameColumn = false;
   notify();
 }
 
@@ -71,15 +77,24 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
   const neon = getNeon();
 
   // Explicit columns, never `*` — `fill_password_hash` must not reach the browser (ADR-043).
+  let hasPublishedName = true;
   const fetchForms = async (): Promise<DbFormRow[]> => {
-    const run = (columns: string) =>
-      neon.from('forms').select(columns).order('updated_at', { ascending: false });
-    let { data, error } = await run(FORM_OWNER_COLUMNS);
-    if (error && isMissingColumnError(error)) {
-      // Migration 012 / schema cache not applied yet — library must still load.
-      ({ data, error } = await run(FORM_OWNER_COLUMNS.replace(',fill_locked', '')));
+    const run = (columns: readonly string[]) =>
+      neon.from('forms').select(columns.join(',')).order('updated_at', { ascending: false });
+    let columns = FORM_OWNER_COLUMNS.split(',');
+    let { data, error } = await run(columns);
+    // Migration 012 / 017 or the schema cache not applied yet — the library must still load.
+    // Drop the optional column the error names (else the next one) and read again.
+    while (error && isMissingColumnError(error)) {
+      const message = (error as { message?: string }).message ?? '';
+      const optional = FORM_OPTIONAL_COLUMNS.filter((c) => columns.includes(c));
+      if (optional.length === 0) break;
+      const drop = optional.find((c) => message.includes(c)) ?? optional[0]!;
+      columns = columns.filter((c) => c !== drop);
+      ({ data, error } = await run(columns));
     }
     if (error) throw error;
+    hasPublishedName = columns.includes('published_name');
     return (data ?? []) as DbFormRow[];
   };
 
@@ -114,6 +129,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
 
   if (gen !== writeGeneration) return;
 
+  publishedNameColumn = hasPublishedName;
   const next = rows.map(rowToFormRecord);
 
   // Soft refresh / race: do not replace a known library with a flaky empty read.
@@ -156,7 +172,11 @@ function isTrashed(f: FormRecord): boolean {
 
 function isMissingColumnError(err: unknown): boolean {
   const e = err as { code?: string; message?: string } | null;
-  return e?.code === '42703' || e?.code === 'PGRST204' || /fill_locked/.test(e?.message ?? '');
+  return (
+    e?.code === '42703' ||
+    e?.code === 'PGRST204' ||
+    /fill_locked|published_name/.test(e?.message ?? '')
+  );
 }
 
 /** Fixed 8-digit public slug, allocated once at create (ADR-043). */
@@ -267,7 +287,7 @@ async function insertForm(form: FormRecord): Promise<string> {
 
   const writeOnce = async () => {
     const neon = getNeon();
-    const row = formRecordToRow({ ...form, slug });
+    const row = formRecordToRow({ ...form, slug }, { publishedName: publishedNameColumn });
     const { error } = await neon.from('forms').insert({
       ...row,
       created_at: form.createdAt,
@@ -307,7 +327,7 @@ async function upsertForm(form: FormRecord): Promise<void> {
 
   const write = async () => {
     const neon = getNeon();
-    const row = formRecordToRow(form);
+    const row = formRecordToRow(form, { publishedName: publishedNameColumn });
     const { error } = await neon.from('forms').upsert(
       {
         ...row,
@@ -669,6 +689,8 @@ export async function publishFormRemote(formId: string): Promise<FormRecord | nu
   if (!form) return null;
   const [updated] = await updateFormRemote(formId, {
     publishedSchema: form.schema,
+    // The trigger honours this only because it equals `name`: Republish of a rename (017).
+    publishedName: form.name,
     status: 'published',
   });
   return updated;
@@ -679,13 +701,18 @@ export async function unpublishFormRemote(formId: string): Promise<FormRecord | 
   return updated;
 }
 
-/** Restore re-creates rows, so no password survives it — don't claim one does. */
-function withoutFillLock(forms: FormRecord[]): FormRecord[] {
-  return forms.map(({ fillLocked: _drop, ...rest }) => rest);
+/**
+ * Restore re-creates rows, so the cache mirrors what the database keeps: no password
+ * survives it, and a published row's title is its own name (017's insert trigger).
+ */
+function asRestored(forms: FormRecord[]): FormRecord[] {
+  return forms.map(({ fillLocked: _drop, publishedName: _title, ...rest }) =>
+    rest.publishedSchema ? { ...rest, publishedName: rest.name } : rest,
+  );
 }
 
 export async function replaceAllFormsRemote(input: FormRecord[]): Promise<boolean> {
-  const forms = withoutFillLock(input);
+  const forms = asRestored(input);
   try {
     const existing = read();
     for (const f of existing) {
@@ -834,6 +861,8 @@ export function publishFormRemoteSync(formId: string): FormRecord | null {
   if (!form) return null;
   const [updated] = updateFormRemoteSync(formId, {
     publishedSchema: form.schema,
+    // The trigger honours this only because it equals `name`: Republish of a rename (017).
+    publishedName: form.name,
     status: 'published',
   });
   return updated;
@@ -845,7 +874,7 @@ export function unpublishFormRemoteSync(formId: string): FormRecord | null {
 }
 
 export function replaceAllFormsRemoteSync(input: FormRecord[]): boolean {
-  const forms = withoutFillLock(input);
+  const forms = asRestored(input);
   const prev = read();
   // Never fire-and-forget a wipe — restore/backup must finish or roll back.
   cache = [...forms];

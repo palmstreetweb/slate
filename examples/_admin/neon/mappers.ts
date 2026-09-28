@@ -15,6 +15,7 @@ export function rowToFormRecord(row: DbFormRow): FormRecord {
     deletedAt: row.deleted_at ?? undefined,
     status: row.status,
     publishedSchema: row.published_schema ?? undefined,
+    ...(typeof row.published_name === 'string' ? { publishedName: row.published_name } : {}),
     ...(row.fill_locked ? { fillLocked: true } : {}),
   };
 }
@@ -36,12 +37,21 @@ export function slugRowToPublishedForm(row: {
   return { ...base, locked: false, schema: row.schema as Schema };
 }
 
+/**
+ * Record → writable row. `published_name` goes only when the record knows it and
+ * the database has the column (`opts.publishedName`, from hydrate). The trigger
+ * keeps it unless it equals `name` on a live row, so ordinary saves (which re-send
+ * the old title) never move the public title; Republish (which sets it to `name`)
+ * does (017, ADR-061).
+ */
 export function formRecordToRow(
   form: FormRecord,
+  opts: { publishedName?: boolean } = {},
 ): Pick<
   DbFormRow,
   'id' | 'name' | 'slug' | 'schema' | 'published_schema' | 'status' | 'deleted_at'
-> {
+> &
+  Partial<Pick<DbFormRow, 'published_name'>> {
   return {
     id: form.id,
     name: form.name,
@@ -50,6 +60,9 @@ export function formRecordToRow(
     published_schema: form.publishedSchema ?? null,
     status: form.status ?? 'draft',
     deleted_at: form.deletedAt ?? null,
+    ...(opts.publishedName && form.publishedName !== undefined
+      ? { published_name: form.publishedName }
+      : {}),
   };
 }
 

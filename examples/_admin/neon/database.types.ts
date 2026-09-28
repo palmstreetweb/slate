@@ -24,11 +24,20 @@ export type DbFormRow = {
    * browser never selects it.
    */
   fill_locked?: boolean;
+  /**
+   * The form name as of the last Publish (migration 017, ADR-061): the public title.
+   * Kept by a trigger; a write is honoured only when it equals `name` on a live
+   * published row (Republish of a rename). Missing before 017.
+   */
+  published_name?: string | null;
 };
 
 /** Explicit owner-hydrate column list. Never `*` — that would pull `fill_password_hash`. */
 export const FORM_OWNER_COLUMNS =
-  'id,name,slug,schema,published_schema,status,owner_id,created_at,updated_at,deleted_at,fill_locked';
+  'id,name,slug,schema,published_schema,status,owner_id,created_at,updated_at,deleted_at,fill_locked,published_name';
+
+/** Owner columns a database may not have yet (012, 017). Hydrate drops them one by one if missing. */
+export const FORM_OPTIONAL_COLUMNS = ['published_name', 'fill_locked'] as const;
 
 export type DbSubmissionRow = {
   id: string;

@@ -25,6 +25,12 @@ export type FormRecord = {
   schema: Schema;
   /** Published snapshot served on public fill links. */
   publishedSchema?: Schema;
+  /**
+   * The form name as of the last publish: the public title (ADR-061). Cloud: from
+   * `forms.published_name`. Undefined when unknown (pre-017 database, old local
+   * data), and then a rename is not compared.
+   */
+  publishedName?: string;
   status?: FormStatus;
   /** ISO timestamp when moved to trash; omitted while active. */
   deletedAt?: string;
@@ -32,9 +38,15 @@ export type FormRecord = {
   fillLocked?: boolean;
 };
 
-/** True when live link serves an older snapshot than the editor. */
+/**
+ * True when the live link serves an older snapshot than the editor: the schema
+ * differs, or the form was renamed since the last publish. A rename with a
+ * customized brand name leaves the schema unchanged, so the public title
+ * (`publishedName`) is the only place it shows (ADR-061).
+ */
 export function hasUnpublishedChanges(form: FormRecord | null | undefined): boolean {
   if (!form || form.status !== 'published' || !form.publishedSchema) return false;
+  if (form.publishedName !== undefined && form.publishedName !== form.name) return true;
   try {
     return JSON.stringify(form.publishedSchema) !== JSON.stringify(form.schema);
   } catch {
@@ -290,7 +302,11 @@ export function publishForm(formId: string): FormRecord | null {
   if (useRemote()) return remote.publishFormRemoteSync(formId);
   const form = getForm(formId);
   if (!form) return null;
-  const [updated] = updateForm(formId, { publishedSchema: form.schema, status: 'published' });
+  const [updated] = updateForm(formId, {
+    publishedSchema: form.schema,
+    publishedName: form.name,
+    status: 'published',
+  });
   return updated;
 }
 

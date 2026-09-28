@@ -38,6 +38,15 @@ describe('slug-oracle guards (ADR-061)', () => {
     expect(sql).not.toMatch(/drop function[^;]*get_form_by_slug/i);
   });
 
+  it('017: a client-sent published_name is honoured only when it equals the live name', () => {
+    const sql = read('neon/migrations/017_slug_oracle.sql');
+    const fn = sql.slice(sql.indexOf('function public.forms_published_name()'));
+    expect(fn).toMatch(
+      /new\.status = 'published' and new\.published_schema is not null\s+and new\.published_name is not distinct from new\.name then\s+(--[^\n]*\n\s+)?new\.published_name := new\.name;/,
+    );
+    expect(fn).toMatch(/else\s+new\.published_name := old\.published_name;/);
+  });
+
   it('018 revokes the old RPC from both Data API roles and says how to roll back', () => {
     const sql = read('neon/migrations/018_revoke_get_form_by_slug.sql');
     expect(sql).toMatch(

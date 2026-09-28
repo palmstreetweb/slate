@@ -239,6 +239,60 @@ async function scenarios() {
       after.name === 'LIVE SECRET RENAME' && reopened.name === 'Renamed open',
       `locked=${String(after.name)} open=${String(reopened.name)}`,
     );
+
+    // Rename with a customized brand (schema unchanged). The studio's save re-sends the old title;
+    // its Republish sends published_name = name (ADR-061 addendum).
+    const title = async () =>
+      (
+        await q<{ published_name: string }>(
+          'select published_name from public.forms where id = $1',
+          [F.other],
+        )
+      )[0]?.published_name;
+    await asRole(
+      'authenticated',
+      OWNER,
+      `update public.forms set name = 'Other renamed', published_name = 'Harness other',
+              published_schema = published_schema, status = 'published' where id = $1`,
+      [F.other],
+    );
+    const afterSave = await title();
+    const savedGet = (await (await get(SLUG.other, '10.20.0.1')).json()) as { name?: string };
+    await asRole(
+      'authenticated',
+      OWNER,
+      `update public.forms set published_name = 'Other renamed',
+              published_schema = published_schema, status = 'published' where id = $1`,
+      [F.other],
+    );
+    const afterRepublish = await title();
+    const republishedGet = (await (await get(SLUG.other, '10.20.0.1')).json()) as {
+      name?: string;
+    };
+    await asRole(
+      'authenticated',
+      OWNER,
+      `update public.forms set status = 'draft', name = 'Draft rename', published_name = 'Draft rename'
+        where id = $1`,
+      [F.other],
+    );
+    const draftTitle = await title();
+    await asRole(
+      'authenticated',
+      OWNER,
+      `update public.forms set name = 'Harness other', status = 'published' where id = $1`,
+      [F.other],
+    );
+    check(
+      'rename-only Republish: a save keeps the old title, published_name = name moves it, nothing else does',
+      afterSave === 'Harness other' &&
+        savedGet.name === 'Harness other' &&
+        afterRepublish === 'Other renamed' &&
+        republishedGet.name === 'Other renamed' &&
+        draftTitle === 'Other renamed' &&
+        (await title()) === 'Harness other',
+      `save=${afterSave}/${String(savedGet.name)} republish=${afterRepublish}/${String(republishedGet.name)} draft=${draftTitle} restored=${await title()}`,
+    );
   }
 
   // Scanner.
