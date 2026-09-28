@@ -1,118 +1,83 @@
 /**
- * Public fill's form fetch, without the Neon SDK (ADR-048).
+ * Public fill's form fetch, without the Neon SDK (ADR-048, ADR-061).
  *
- * Two plain requests: an anonymous JWT from Neon Auth, then the
- * `get_form_by_slug` RPC on the Data API. The SDK's path added a
- * `get-session` round trip first (0.6–2 s measured) and ~100 KB of code a
- * respondent never needs. The app entry calls `loadPublishedForm` before the
- * public chunk has even downloaded, so the network and the JS race in parallel.
+ * One plain GET to the submitresponse Function: `?op=form&slug=`. No custom
+ * headers, so it is a CORS "simple" request with no preflight: a first-time
+ * QR scan is one round trip. (It was an anonymous token, a preflight and the
+ * `get_form_by_slug` RPC.) The Function sees the client IP, which the Data API
+ * can't, so unknown-slug lookups are throttled there (ADR-061). The app entry
+ * calls `loadPublishedForm` before the public chunk has even downloaded, so the
+ * network and the JS race in parallel.
  */
 
 import type { PublishedFormPayload } from './database.types.js';
-import { deriveNeonServiceUrls, getNeonUrl } from './config.js';
+import { getSubmitUrl } from './config.js';
 import { slugRowToPublishedForm } from './mappers.js';
 
-const TOKEN_KEY = 'slate-anon-token';
-/** Refresh a little early so a token never expires mid-request. */
-const TOKEN_SKEW_MS = 60_000;
-
-type CachedToken = { token: string; exp: number };
-
-let memoryToken: CachedToken | null = null;
 const inflight = new Map<string, Promise<PublishedFormPayload | null>>();
 
-function urls(): { authUrl: string; dataApiUrl: string } {
-  const base = getNeonUrl();
-  if (!base) throw new Error('This form is not available right now.');
-  return deriveNeonServiceUrls(base);
-}
+const UNAVAILABLE = 'This form is not available right now.';
+const RETRY_LATER = 'Could not load this form. Please try again in a moment.';
 
-function tokenExp(token: string): number {
+function lookupUrl(slug: string): string {
+  let base: string;
   try {
-    const payload = JSON.parse(
-      atob(token.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/')),
-    ) as { exp?: number };
-    return typeof payload.exp === 'number' ? payload.exp * 1000 : 0;
+    base = getSubmitUrl();
   } catch {
-    return 0;
+    throw new Error(UNAVAILABLE);
   }
+  const u = new URL(base);
+  u.searchParams.set('op', 'form');
+  u.searchParams.set('slug', slug);
+  return u.href;
 }
 
-function readCachedToken(): string | null {
-  const now = Date.now() + TOKEN_SKEW_MS;
-  if (memoryToken && memoryToken.exp > now) return memoryToken.token;
-  try {
-    const raw = window.sessionStorage.getItem(TOKEN_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as CachedToken;
-    if (parsed?.token && parsed.exp > now) {
-      memoryToken = parsed;
-      return parsed.token;
-    }
-  } catch {
-    /* storage off */
-  }
-  return null;
+function minutes(seconds: number): string {
+  const m = Math.max(1, Math.ceil(seconds / 60));
+  return `about ${m} minute${m === 1 ? '' : 's'}`;
 }
 
-function writeCachedToken(token: string): void {
-  const entry = { token, exp: tokenExp(token) };
-  memoryToken = entry;
-  try {
-    window.sessionStorage.setItem(TOKEN_KEY, JSON.stringify(entry));
-  } catch {
-    /* storage off */
-  }
-}
+type Row = Parameters<typeof slugRowToPublishedForm>[0];
 
-function dropCachedToken(): void {
-  memoryToken = null;
-  try {
-    window.sessionStorage.removeItem(TOKEN_KEY);
-  } catch {
-    /* storage off */
-  }
-}
-
-/** Short-lived anonymous JWT (role `anonymous`). Only authorizes public RPCs. */
-async function anonymousToken(): Promise<string> {
-  const cached = readCachedToken();
-  if (cached) return cached;
-  const res = await fetch(`${urls().authUrl}/token/anonymous`, { credentials: 'omit' });
-  if (!res.ok) throw new Error('Could not load this form. Check your connection and try again.');
-  const body = (await res.json()) as { token?: string };
-  if (!body.token)
-    throw new Error('Could not load this form. Check your connection and try again.');
-  writeCachedToken(body.token);
-  return body.token;
-}
-
-async function rpc<T>(fn: string, args: Record<string, unknown>, retried = false): Promise<T> {
-  const token = await anonymousToken();
-  const res = await fetch(`${urls().dataApiUrl}/rpc/${fn}`, {
-    method: 'POST',
-    credentials: 'omit',
-    headers: {
-      'content-type': 'application/json',
-      accept: 'application/json',
-      authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (res.status === 401 && !retried) {
-    // Token expired or rotated between cache and use — fetch a fresh one once.
-    dropCachedToken();
-    return rpc<T>(fn, args, true);
-  }
-  if (!res.ok) throw new Error('Could not load this form. Please try again in a moment.');
-  return (await res.json()) as T;
+function isRow(v: unknown): v is Row {
+  const r = v as Partial<Row> | null;
+  return (
+    !!r &&
+    typeof r === 'object' &&
+    typeof r.id === 'string' &&
+    typeof r.name === 'string' &&
+    typeof r.slug === 'string'
+  );
 }
 
 async function fetchBySlug(slug: string): Promise<PublishedFormPayload | null> {
-  const rows = await rpc<unknown>('get_form_by_slug', { p_slug: slug });
-  const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
-  const row = list[0] as Parameters<typeof slugRowToPublishedForm>[0] | undefined;
-  return row ? slugRowToPublishedForm(row) : null;
+  let res: Response;
+  try {
+    // Nothing but the URL: any custom header would add a preflight. The Function
+    // answers Cache-Control: no-store, so a republish shows on the next load.
+    res = await fetch(lookupUrl(slug), { credentials: 'omit' });
+  } catch (err) {
+    if (err instanceof Error && err.message === UNAVAILABLE) throw err;
+    throw new Error('Could not load this form. Check your connection and try again.');
+  }
+  if (res.status === 404) return null;
+  if (res.status === 429) {
+    // Over this network's miss budget (ADR-061): show the server's copy, which names the wait.
+    const b = (await res.json().catch(() => ({}))) as {
+      error?: unknown;
+      retryAfterSeconds?: unknown;
+    };
+    const wait = Number(b.retryAfterSeconds) || Number(res.headers.get('Retry-After')) || 600;
+    throw new Error(
+      typeof b.error === 'string' && b.error.startsWith('Too many')
+        ? b.error
+        : `Too many form links were opened from this network just now. Please try again in ${minutes(wait)}, or switch to mobile data.`,
+    );
+  }
+  if (!res.ok) throw new Error(RETRY_LATER);
+  const body: unknown = await res.json().catch(() => null);
+  if (!isRow(body)) throw new Error(RETRY_LATER);
+  return slugRowToPublishedForm(body);
 }
 
 /**

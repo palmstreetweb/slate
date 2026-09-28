@@ -8,15 +8,16 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <!-- Public fill's critical path: auth token, then Data API. Warm both TLS handshakes now. -->
+    <!-- Public fill's critical path is one GET to the submitresponse Function (ADR-061); the
+         studio's is the auth session. Warm both TLS handshakes now. -->
     <link
       rel="preconnect"
-      href="https://ep-misty-snow-ax9wxjvf.neonauth.c-4.us-east-2.aws.neon.tech"
+      href="https://br-calm-darkness-ax6lho6c-submitresponse.compute.c-4.us-east-2.aws.neon.tech"
       crossorigin
     />
     <link
       rel="preconnect"
-      href="https://ep-misty-snow-ax9wxjvf.apirest.c-4.us-east-2.aws.neon.tech"
+      href="https://ep-misty-snow-ax9wxjvf.neonauth.c-4.us-east-2.aws.neon.tech"
       crossorigin
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />

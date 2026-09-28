@@ -1,76 +1,98 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const cfg = vi.hoisted(() => ({ submitUrl: 'https://fn.test' as string | null }));
 vi.mock('../examples/_admin/neon/config.js', () => ({
-  getNeonUrl: () => 'https://ep-test.us-east-2.aws.neon.tech/neondb',
-  deriveNeonServiceUrls: () => ({
-    authUrl: 'https://auth.test/neondb/auth',
-    dataApiUrl: 'https://data.test/neondb/rest/v1',
-  }),
+  getSubmitUrl: () => {
+    if (!cfg.submitUrl) throw new Error('VITE_SUBMIT_URL is not configured');
+    return cfg.submitUrl;
+  },
 }));
 
-const b64 = (o: object) => btoa(JSON.stringify(o)).replace(/=+$/, '');
-const token = (expSec: number) => `${b64({ alg: 'EdDSA' })}.${b64({ role: 'anonymous', exp: expSec })}.sig`;
 const row = { id: 'f_1', name: 'Test', slug: '12345678', locked: false, schema: { questions: [] } };
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.resetModules();
-  window.sessionStorage.clear();
-  fetchMock = vi.fn(async (url: string) => {
-    if (url.endsWith('/token/anonymous')) {
-      return new Response(JSON.stringify({ token: token(Math.floor(Date.now() / 1000) + 3600) }));
-    }
-    return new Response(JSON.stringify([row]));
-  });
+  cfg.submitUrl = 'https://fn.test';
+  fetchMock = vi.fn(async () => new Response(JSON.stringify(row)));
   vi.stubGlobal('fetch', fetchMock);
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe('public form fetch without the SDK (ADR-048)', () => {
-  it('token then RPC — no session call — and never the studio SDK', async () => {
+describe('public form fetch: one simple GET to the Function (ADR-048, ADR-061)', () => {
+  it('one GET with no custom headers (no preflight), no token, no Data API, no SDK', async () => {
     const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
     const form = await loadPublishedForm('12345678');
-    expect(form?.name).toBe('Test');
-    const urls = fetchMock.mock.calls.map((c) => c[0] as string);
-    expect(urls).toEqual([
-      'https://auth.test/neondb/auth/token/anonymous',
-      'https://data.test/neondb/rest/v1/rpc/get_form_by_slug',
-    ]);
-    const init = fetchMock.mock.calls[1]![1] as RequestInit;
-    expect((init.headers as Record<string, string>).authorization).toMatch(/^Bearer /);
-    expect(JSON.parse(init.body as string)).toEqual({ p_slug: '12345678' });
+    expect(form).toEqual(row);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe('https://fn.test/?op=form&slug=12345678');
+    expect(init).toEqual({ credentials: 'omit' });
+    expect(init.method ?? 'GET').toBe('GET');
+    expect(init.headers).toBeUndefined();
+  });
+
+  it('keeps a path on the Function URL and encodes the slug', async () => {
+    cfg.submitUrl = 'https://fn.test/submitresponse';
+    const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
+    await loadPublishedForm('crew night&x=1');
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'https://fn.test/submitresponse?op=form&slug=crew+night%26x%3D1',
+    );
   });
 
   it('the entry prefetch and PublicFill share one request', async () => {
     const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
-    const [a, b] = await Promise.all([loadPublishedForm('12345678'), loadPublishedForm('12345678')]);
+    const [a, b] = await Promise.all([
+      loadPublishedForm('12345678'),
+      loadPublishedForm('12345678'),
+    ]);
     expect(a).toBe(b);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('reuses the cached token on the next visit in this tab', async () => {
-    const first = await import('../examples/_admin/neon/publicForm.js');
-    await first.loadPublishedForm('12345678');
-    vi.resetModules();
-    const second = await import('../examples/_admin/neon/publicForm.js');
-    await second.loadPublishedForm('87654321');
-    const urls = fetchMock.mock.calls.map((c) => c[0] as string);
-    expect(urls.filter((u) => u.endsWith('/token/anonymous'))).toHaveLength(1);
-  });
-
-  it('refetches the token once if the Data API rejects it', async () => {
-    let rpcCalls = 0;
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.endsWith('/token/anonymous')) {
-        return new Response(JSON.stringify({ token: token(Math.floor(Date.now() / 1000) + 3600) }));
-      }
-      rpcCalls += 1;
-      return rpcCalls === 1 ? new Response('', { status: 401 }) : new Response(JSON.stringify([row]));
-    });
+  it('a locked form comes back without a schema', async () => {
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ ...row, locked: true, schema: null, name: 'Published' })),
+    );
     const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
-    expect((await loadPublishedForm('12345678'))?.id).toBe('f_1');
-    expect(rpcCalls).toBe(2);
+    expect(await loadPublishedForm('12345678')).toEqual({
+      id: 'f_1',
+      name: 'Published',
+      slug: '12345678',
+      locked: true,
+      schema: null,
+    });
+  });
+
+  it('404 resolves to null, not an error', async () => {
+    fetchMock.mockImplementation(
+      async () => new Response(JSON.stringify({ error: 'not_found' }), { status: 404 }),
+    );
+    const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
+    expect(await loadPublishedForm('00000000')).toBeNull();
+  });
+
+  it('429 shows the server’s copy; without one, a friendly line with the wait', async () => {
+    const copy =
+      'Too many links to forms that don’t exist were opened from this network, so forms are paused here for about 7 minutes. Please try again then, or switch to mobile data.';
+    fetchMock.mockImplementationOnce(
+      async () =>
+        new Response(JSON.stringify({ error: copy, reason: 'lookup', retryAfterSeconds: 420 }), {
+          status: 429,
+          headers: { 'Retry-After': '420' },
+        }),
+    );
+    const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
+    await expect(loadPublishedForm('12345678')).rejects.toThrow(copy);
+    fetchMock.mockImplementationOnce(
+      async () => new Response('busy', { status: 429, headers: { 'Retry-After': '90' } }),
+    );
+    await expect(loadPublishedForm('12345678')).rejects.toThrow(
+      /^Too many form links .* about 2 minutes, or switch to mobile data\.$/,
+    );
   });
 
   it('a failure is not memoized — the next call retries', async () => {
@@ -80,13 +102,22 @@ describe('public form fetch without the SDK (ADR-048)', () => {
     expect((await loadPublishedForm('12345678'))?.id).toBe('f_1');
   });
 
-  it('missing slug resolves to null, not an error', async () => {
-    fetchMock.mockImplementation(async (url: string) =>
-      url.endsWith('/token/anonymous')
-        ? new Response(JSON.stringify({ token: token(Math.floor(Date.now() / 1000) + 3600) }))
-        : new Response('[]'),
-    );
+  it('network error and a malformed body read as plain copy', async () => {
+    fetchMock.mockImplementationOnce(async () => {
+      throw new TypeError('Failed to fetch');
+    });
     const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
-    expect(await loadPublishedForm('00000000')).toBeNull();
+    await expect(loadPublishedForm('12345678')).rejects.toThrow(/Check your connection/);
+    fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify([row])));
+    await expect(loadPublishedForm('12345678')).rejects.toThrow(/try again in a moment/);
+  });
+
+  it('no submit URL configured: not available, and nothing is fetched', async () => {
+    cfg.submitUrl = null;
+    const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
+    await expect(loadPublishedForm('12345678')).rejects.toThrow(
+      'This form is not available right now.',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

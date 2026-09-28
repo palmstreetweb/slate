@@ -100,6 +100,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      /**
+       * Pre-8b public lookup. Not called by this app since ADR-061 (the fill page
+       * asks submitresponse `GET ?op=form`); 018 revokes Data API EXECUTE.
+       */
       get_form_by_slug: {
         Args: { p_slug: string };
         Returns: {
