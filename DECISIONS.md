@@ -587,6 +587,7 @@ Alternatives:
 Consequences: Turning the lock on, off, or changing the word never changes the URL or QR. Respondents type it once per tab. A respondent mid-fill when the password changes gets a clear "password changed, reload" on submit. Backup restore re-creates rows, so restored forms come back unlocked. The SPA tolerates a database without 012 (falls back to the column list without `fill_locked`; unlocked rows still open), so deploy order is forgiving — but the lock row will error until 012 is applied and the Data API schema cache is refreshed.
 Revisit when: per-respondent codes, expiring access, or the custom-slug / custom-domain feature lands.
 Addendum (ADR-058): (1) new or changed passwords need 6–72 characters, NFC-normalized. (6) is replaced: only misses are counted, through `try_fill_password`; token reloads and unknown slugs are free, and errors read as a wrong password.
+Addendum (ADR-061): (3) the public lookup is now `GET ?op=form` on `submitresponse` and returns the published title (`forms.published_name`), not the live name, for every form. Unlock's slug lookup charges unknown slugs to the same per-IP miss budget; an IP over budget gets a 429.
 
 ## ADR-044 — Clean pathname routes; public link is `/forms/{slug}`
 Date: 2026-09-22
@@ -624,6 +625,7 @@ Not done (needs a product answer or more time): per-owner notification email (ev
 Consequences: Owners must be signed in for Build with AI. `storagesign` needs `NEON_AUTH_URL` (it can derive it from `DATABASE_URL` but the env is pinned on deploy). Uploads of unusual types are stored as octet-stream and downloaded rather than previewed.
 Revisit when: custom domains (CSP `frame-ancestors`, cookies), per-respondent access codes, or a second app on the origin.
 Addendum (ADR-058): item 1, read ops are now charged after a valid Bearer, to the account plus an IP backstop, never before. Item 4, the body cap is 64 KiB counted in bytes.
+Addendum (ADR-061): the enumeration half of "per-owner slugs are globally unique (a squatting/enumeration oracle)" is closed by the throttled lookup; squatting was closed by ADR-057.
 
 ## ADR-047 — v1 responses live in the app only
 Date: 2026-09-22
@@ -646,6 +648,7 @@ Alternatives:
 - Route-level `lazy()` inside one app. Rejected — `AuthProvider` and the SDK sit at the root, so respondents would still pay for them.
 Consequences: Respondent JS 267 → 98 KB gzip; CSS 25 → 13 KB gzip; the token request starts ~17 ms after the HTML (tested on the production build with production headers). In-app navigation from a public route to a studio route does a full reload so the entry can pick the studio bundle. Two copies of nothing — rules were moved, not duplicated.
 Revisit when: a second public surface (embeds, custom domains) needs its own entry.
+Addendum (ADR-061): the rejected alternative is now the decision. The fetch is one `GET ?op=form&slug=` to `submitresponse` with no custom headers (no preflight, no token), and only distinct unknown slugs are charged, so viewing a form costs nothing while a network is under budget. index.html preconnects the Function host in place of the Data API host.
 
 ## ADR-049 — Responses load in slices, not all at once
 Date: 2026-09-23
@@ -845,6 +848,7 @@ Consequences / risks:
 
 Verified on a throwaway branch (2026-09-26): 016 applied twice, 28 SQL checks (all-or-nothing under 50 parallel calls, 0 deadlocks in 60 s × 32 clients, bounded prune on the index, fresh/proven unlock rules, NFC, grants) and 15 scenarios running the real Functions against it (`scripts/check-rate-limits.ts`).
 Revisit when: an edge limiter or per-device signal is available, the Function hosts get AAAA records (IPv6 grouping), step 11 (per-owner byte quotas, server-minted keys), or typo lockouts are reported.
+Addendum (ADR-061): (j) is done. `FORM_LOOKUP_MISS_MAX` (300 distinct unknown slugs per 10 min, IP) joins the table; the Neon 100-invocation risk now covers form loading too.
 
 ## ADR-059 — Delight pass 1: completion celebration, question hand-off, progress spark
 Date: 2026-09-26
@@ -892,6 +896,52 @@ Alternatives:
 - Storing first-response state in Neon. Deferred: per-browser is enough for a one-time moment, same as read state (ADR-055).
 Consequences: Studio-only; respondents and the engine bundle are unchanged (the respondent route loads the same code, the examples build only regrouped shared chunks). The Publish button now lingers ~1.7 s after a publish instead of vanishing. The first-response toast can repeat on another browser or after clearing site data. The bell panel and inbox wash use the accent colour, so they follow the studio palette.
 Revisit when: read state moves to Neon (move first-response with it), the Share panel gets a new layout, or a user asks to turn studio motion down separately from the OS setting.
+
+
+## ADR-061 — Slug lookups go through the Function, charged by distinct misses (slug-oracle)
+Date: 2026-09-28
+Status: proposed — built and branch-tested; awaiting Caleb's "ship it" (he approved the design direction and the shared-network trade-off on 2026-09-28)
+Context: Public fill loaded the form through the anonymous Data API RPC `get_form_by_slug` (012). Nothing throttled it, so a script could walk the 8-digit slug space (90,000,000 values) and list every published form, including locked ones by name. It also returned the live `forms.name`, so a rename after publishing reached every scanner, even for password-locked forms. ADR-058(j) deferred this: the Data API has no rate limit and SQL can't see a trustworthy client IP, because Neon's proxy forwards the client's own headers. ADR-048 had rejected loading through the Function because it would put a per-network limit in front of merely viewing a form.
+Decision:
+(a) **Where: `submitresponse`, `GET ?op=form&slug=`.** The Function already sees the client IP (ADR-058(i)) and has the pool and the rate core, so this adds no new public host, secret or DB path. A GET with no custom headers is a CORS simple request, so there is no preflight: a first-time QR scan is one round trip where it was three (anonymous token, preflight, RPC). The entry prefetch (ADR-048) is unchanged in shape: `main.tsx` starts `loadPublishedForm` before the public chunk downloads, still with no SDK. It has no token now either. index.html preconnects the Function host instead of the Data API host.
+(b) **Charge distinct misses only.** Migration `017_slug_oracle.sql` adds `lookup_public_form(slug, ip, miss_max, window)`, one statement for `op=form` and `op=unlock` alike:
+   - It reads the IP's miss row. If the IP already has `miss_max` distinct misses in the window, the answer is `denied` and nothing is read or written.
+   - A published, live form is a hit and writes nothing.
+   - Anything else (unknown, draft, trashed, schema-less) is a miss. It adds the slug's hash to that IP's set in `slug_miss_buckets`: one row per IP, capped at `miss_max` entries. A repeat of the same slug is free, so 300 people scanning one dead QR, or one person reloading, count once.
+   - Misses prune at most 20 rows older than 25 h, with SKIP LOCKED.
+(c) **Over budget, hits are refused too**, or the oracle would survive. 429 with `Retry-After`, `retryAfterSeconds` and `reason: 'lookup'`: "Too many links to forms that don’t exist were opened from this network, so forms are paused here for about N minutes. Please try again then, or switch to mobile data." The fill page shows it as sent. It starts with "Too many", so pre-8b bundles also show it verbatim on the unlock path.
+(d) **Unlock shares the budget.** Unlock with an unlocked form's slug returned its schema, so it was a second oracle. Its lookup is now the same statement: an unknown slug charges one miss and still answers 401 `wrong_password`, and an IP over budget gets the lookup 429 before any token check or bcrypt. Wrong passwords on a real form stay on ADR-058(f)'s own budgets. They are not slug misses, so a venue full of password typos can't pause form loading.
+(e) **Unknown and locked reveal nothing new.** Malformed slugs (015's format) are a free 404 with no DB. Unknown, draft and trashed slugs all get the same 404 `{"error":"not_found"}`. A locked form gets `{ id, name, slug, locked: true, schema: null }`, the same fields as before.
+(f) **Published title.** `published_schema` carries only `brand.name`, which the studio lets diverge from the form name (the brand shown in the top bar). So 017 adds `forms.published_name`. A trigger snapshots `name` when `published_schema` changes or `status` becomes `published`. That is exactly Publish or Republish, since every other studio save re-sends the same `published_schema`. Otherwise the trigger pins the old value, and a client-sent value is ignored for every role. The backfill copies today's name into every published row, which is what those rows already serve. The lookup, unlock and `get_form_by_slug` all return `coalesce(published_name, published brand name, 'Form')`, never the live name.
+(g) **Old bundles.** `get_form_by_slug` keeps its signature and grants through an overlap window. 017 switches it to the published title, so the name leak closes for old bundles at once. `018_revoke_get_form_by_slug.sql` revokes EXECUTE from `anonymous` and `authenticated`, applied 24 h after the new SPA with no rollback. Evidence: production keeps no per-function call stats (`track_functions = none`, no `pg_stat_statements`), so it can't be measured. In code, the RPC's only caller is `publicForm.ts`, which runs at page load; `index.html` is `no-cache` and assets are hashed, so old bundles stop calling it within minutes of the deploy. The real constraint is rollback: once 018 is applied, a Vercel instant rollback to a pre-8b build breaks every public form until 018's one-line GRANT is run. So 018 waits until a rollback is unlikely.
+Numbers: `FORM_LOOKUP_MISS_MAX` = 300 distinct unknown slugs per IP per 10 min (fixed window, integer env override like ADR-058). `noip` = 30. A scanner gets 300 probes per 10 min per IP, which is 43,200 per day. With N live 8-digit forms, one find takes about 90,000,000 / N probes: about 350 days per IP at today's 6 live forms, about 2 days per IP at 1,000 forms, and about 30 minutes for a 100-IP botnet at 1,000 forms. Before, the only limit was Data API throughput. A venue with 300 opens and 30 typos uses 30 of its 300.
+Verified:
+- Unit: `tests/submitResponse.test.ts`, `tests/publicForm.test.ts` and `tests/slugOracle.test.ts`.
+- On a throwaway branch, `scripts/check-slug-oracle.ts` ran the real Function against 017. 16/16 scenarios passed, among them:
+   - 1,000 random slugs from one IP: 301 × 404, then 699 × 429, and a real slug is 429 too.
+   - Denials and 200 hits write nothing.
+   - 300 opens, 30 typos and 300 scans of one dead slug: no 429.
+   - 400 misses on 32 connections store exactly 300.
+   - Unlock scanning is throttled the same way.
+   - A locked form returns the published title after a live rename, and a forged `published_name` is ignored.
+   - Old-bundle RPC calls work through the overlap with the published title.
+   - 018 gives both Data API roles 42501, and its rollback GRANT restores access.
+Latency: DB cost per call (1,000 calls in a DO block): `get_form_by_slug` hit 0.059 ms, lookup hit 0.029 ms, miss 0.164 ms, denied 0.018 ms. Warm network legs from a laptop to us-east-2 (p50 of 30): auth host 84 ms, Data API preflight 102 ms, Function GET 97 ms. A first scan was ~3 legs (≈290 ms here, ≈750 ms at a 250 ms cafe RTT) and is now 1 (≈100 / ≈250 ms). A reload in the same tab was already 1 leg (cached token and preflight), so it doesn't change. The in-process app adds ~4 ms over the raw statement.
+Alternatives:
+- A same-origin Vercel `api/` route. Rejected. It needs its own path to Postgres: a Data API call with a new server key held by Vercel (the ADR-051 pattern), or a DB credential in Vercel, which ADR-051 rejected. It also puts a Vercel cold start and a cross-region hop (iad1 → us-east-2) on the fill path. Its one real win, reusing the page's connection, is matched by a preconnect.
+- Charging every lookup, or hits too. Rejected. That is the lever ADR-048 refused: one crowd scanning one QR would pay for viewing.
+- Counting misses without de-duplication, or with one marker row per (IP, slug). Rejected. The first trips on one dead QR. The second writes a row per distinct miss (a 100-IP botnet ≈ 4 M rows a day); one bounded array per IP holds the same information.
+- Revoking the RPC in 017. Rejected: it breaks a SPA rollback and races the promote.
+- Using `brand.name` as the published title. Rejected: it is the brand, not the form's name, and changing the gate's heading would be a product change.
+Consequences / risks:
+- A prankster behind a shared IP can pause form loading there for up to 10 min with 300 unknown slugs (Caleb accepted this, 2026-09-28). Every other network is unaffected.
+- If Neon stops sending `X-Forwarded-For`, 30 distinct misses anywhere pause form loading for everyone who shares `noip`. This fails closed, as ADR-058 does for submits, and logs loudly.
+- Every form view is now a `submitresponse` invocation. Neon allows 100 concurrent invocations per account, shared by all three Functions. A lookup is ~20–50 ms of wall time, so that is roughly 2,000 lookups/s. A 300-person venue scanning over 2 min is ~2.5/s (≈0.1 concurrent). But a flood against any Function (already possible via submits) now also stalls form loading, which used to run on the Data API. The first view after the isolate idles pays the pg pool's TLS connect.
+- Over budget, a page load can make two requests: the prefetch fails, the memo clears and PublicFill retries (ADR-048's retry rule). Both are denied without writes.
+- The 4 legacy word slugs can be guessed from a dictionary, under the same budget.
+- A rename while the brand name is customized leaves the schema unchanged, so the studio shows the form as current and offers no Republish. The public title then stays at the last published name until the next schema publish.
+- 017 must be applied before the new `submitresponse`, or op=form answers 503 and unlock answers 503. The new SPA needs the new Function, or the fill page says "not available". Deploy: 017 → submitresponse → SPA → (24 h) 018. Rollback reverses it, and 017 carries its own rollback SQL.
+Revisit when: Neon or Vercel offer an edge limiter keyed on the client IP, invocation limits bite, owners get custom slugs (a dictionary oracle), or a typo lockout is reported.
 
 ---
 

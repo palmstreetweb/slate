@@ -16,8 +16,9 @@ https://ep-….aws.neon.tech/neondb
 
 (That is `VITE_NEON_URL` — host + database name over HTTPS, **not** the `postgresql://` connection string.)
 
-The SPA enables `allowAnonymous: true` on the Neon client so public fill links
-(`#/f/{slug}`) can call `get_form_by_slug` with an anonymous JWT (no login).
+Public fill links (`/forms/{slug}`) load the form from the `submitresponse` Function
+(`GET ?op=form&slug=`, ADR-061), which throttles unknown-slug lookups per IP. They need no login
+and no Data API access. `get_form_by_slug` stays callable anonymously only until 018 (below).
 
 ## 2. Google OAuth
 
@@ -54,6 +55,8 @@ In the Neon SQL Editor (or `psql` with the pooled connection string), run in ord
 14. `neon/migrations/014_ai_quota.sql`
 15. `neon/migrations/015_slug_lock.sql`
 16. `neon/migrations/016_crowd_rate_limits.sql`
+17. `neon/migrations/017_slug_oracle.sql`
+18. `neon/migrations/018_revoke_get_form_by_slug.sql`: **not with the others.** Apply it 24 h after the SPA that loads forms through the Function is live (ADR-061).
 
 Then **Data API → Refresh schema cache**. Do this after every migration that adds a column or
 changes a function signature — 012 does both (`forms.fill_locked`, `get_form_by_slug` gains
@@ -73,6 +76,10 @@ overall per UTC day — edit `ai_quota_limits()` to change them.
 015 locks form links (ADR-057): a slug never changes, trashed forms keep theirs, and a permanently deleted form retires its slug for good. No cache refresh or Function redeploy.
 
 016 (ADR-058) replaces the rate core: `consume_submit_rates` (all or nothing, denials write nothing), `try_fill_password`, and a 6-character fill password minimum. Apply it BEFORE redeploying `submitresponse` and `storagesign`; the new Functions answer 503 on submit and upload, and every password reads as wrong, until it exists. `consume_submit_rate` keeps its signature, so today's Functions and `authemail` keep working on it. No cache refresh.
+
+017 (ADR-061) closes the slug oracle: `lookup_public_form` (distinct unknown slugs per IP, over budget refuses hits too), `slug_miss_buckets`, and `forms.published_name` (the title as of the last publish, kept by a trigger). `get_form_by_slug` keeps its signature and grants but returns the published title. Apply it BEFORE redeploying `submitresponse`; the new Function answers 503 on form loads and unlocks until it exists. No cache refresh. Order: 017 → redeploy `submitresponse` → ship the SPA → 24 h later, 018. The file ends with its own rollback SQL.
+
+018 revokes anonymous and signed-in EXECUTE on `get_form_by_slug`. After it, a rollback of the SPA to a pre-ADR-061 build breaks public forms until you run the GRANT at the bottom of 018.
 
 Anyone can sign up (Google, magic link, or email code). Each account owns its own forms (ADR-036).
 Each account is capped at **50 forms** including Trash (ADR-038); permanent delete frees a slot.
@@ -98,7 +105,7 @@ Set function env (repeatable `--env KEY=VALUE`):
 - `RESEND_API_KEY` — **required** on `authemail` only. `submitresponse` sends no email: responses live in the app (ADR-047).
 - `authemail` and `storagesign`: `NEON_AUTH_URL` (Auth base, for JWKS — storagesign verifies owner JWTs with it, ADR-046)
 - Optional rate limits (ADR-058). Integers only; anything else keeps the default, and each Function logs its effective limits on start. Windows are fixed.
-  - `submitresponse`: `SUBMIT_RATE_IP_OWNER_MAX` (2000 units of 4 KiB per hour, IP + form owner), `SUBMIT_RATE_IP_MAX` (10000 units per hour, IP), `UNLOCK_RATE_PW_MAX` (2000 password attempts per 10 min, IP + owner), `UNLOCK_RATE_PW_IP_MAX` (10000 per 10 min, IP), `UNLOCK_RATE_FAIL_IP_MAX` (500 misses per hour, IP), `UNLOCK_RATE_FAIL_FORM_MAX` (300 misses per hour, form)
+  - `submitresponse`: `SUBMIT_RATE_IP_OWNER_MAX` (2000 units of 4 KiB per hour, IP + form owner), `SUBMIT_RATE_IP_MAX` (10000 units per hour, IP), `UNLOCK_RATE_PW_MAX` (2000 password attempts per 10 min, IP + owner), `UNLOCK_RATE_PW_IP_MAX` (10000 per 10 min, IP), `UNLOCK_RATE_FAIL_IP_MAX` (500 misses per hour, IP), `UNLOCK_RATE_FAIL_FORM_MAX` (300 misses per hour, form), `FORM_LOOKUP_MISS_MAX` (300 distinct unknown slugs per 10 min, IP; form loads and unlocks, ADR-061)
   - `storagesign`: `STORAGE_SIGN_MAX_BYTES` (32 MiB per file), `STORAGE_SIGN_IP_OWNER_MAX` (8192 units of 256 KiB per hour, public uploads, IP + owner), `STORAGE_SIGN_IP_MAX` (40960 units per hour, IP), `STORAGE_SIGN_DRAFT_USER_MAX` (8192 units per hour, draft uploads, account), `STORAGE_SIGN_READ_USER_MAX` (3000 reads per 10 min, account), `STORAGE_SIGN_READ_IP_MAX` (15000 reads per 10 min, IP), `STORAGE_SIGN_CONTENT_MAX_BYTES` (10485760, largest in-app preview)
   - Retired, no longer read: `SUBMIT_RATE_IP_FORM_MAX`, `SUBMIT_RATE_IP_FORM_WINDOW_SEC`, `SUBMIT_RATE_IP_WINDOW_SEC`, `UNLOCK_RATE_IP_SLUG_*`, `UNLOCK_RATE_IP_MAX`, `UNLOCK_RATE_IP_WINDOW_SEC`, `STORAGE_SIGN_IP_FORM_*`, `STORAGE_SIGN_IP_WINDOW_SEC`, `STORAGE_SIGN_READ_IP_WINDOW_SEC`. Remove any that are set with `--env NAME=`.
 - Object Storage credentials are injected by Neon when Storage is enabled on the branch

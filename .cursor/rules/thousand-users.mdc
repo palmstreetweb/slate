@@ -7,7 +7,7 @@ alwaysApply: true
 
 Every studio / public-fill change is held to this bar:
 
-- **Rate limits** on anything anonymous can hit (reuse `consume_submit_rates` (016: one call, all or nothing, denials write nothing)). Size them so a conference NAT still works but spraying does not.
+- **Rate limits** on anything anonymous can hit (reuse `consume_submit_rates` (016: one call, all or nothing, denials write nothing)). Size them so a conference NAT still works but spraying does not. Public slug lookups go through `submitresponse` `GET ?op=form` (017 `lookup_public_form`, ADR-061), never an anonymous Data API RPC.
 - **No secret leakage.** Hashes, tokens, keys, and other owners' data never reach the browser. No `select('*')` on tables that hold secrets.
 - **No extra friction** for respondents or authors. No new required steps, no retyping.
 - **No flyer-breaking URL changes.** A printed QR / public link keeps working through renames, setting changes, and republish.
