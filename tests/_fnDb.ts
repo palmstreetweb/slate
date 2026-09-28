@@ -1,13 +1,16 @@
 /**
  * In-memory stand-in for the Postgres the public Functions talk to (ADR-058).
  * Emulates 016's consume_submit_rates (all or nothing, longest wait, costs,
- * bad keys refused without a write) and the forms lookups, and logs every
- * statement. Tests mock `pg` with `fnDbPool(state)`.
+ * bad keys refused without a write), 017's lookup_public_form (distinct misses
+ * per IP, over budget refuses hits too, published title) and the forms
+ * lookups, and logs every statement. Tests mock `pg` with `fnDbPool(state)`.
  */
 
 export type FormRow = {
   id: string;
   name?: string;
+  /** 017: the name as of the last publish. */
+  published_name?: string | null;
   slug?: string;
   status: string;
   deleted_at: string | null;
@@ -21,6 +24,8 @@ export type TryResult = { ok: boolean | null; denied: string | null; retry_after
 export type FnDbState = {
   forms: Map<string, FormRow>;
   buckets: Map<string, { start: number; count: number }>;
+  /** 017 slug_miss_buckets: per IP key, the window start and the distinct unknown slugs. */
+  misses: Map<string, { start: number; slugs: Set<string> }>;
   log: Array<{ sql: string; params: unknown[] }>;
   submissions: Array<{ id: string; form_id: string; answers: unknown; meta: unknown }>;
   now: number | null;
@@ -32,6 +37,7 @@ export function newFnDbState(): FnDbState {
   return {
     forms: new Map(),
     buckets: new Map(),
+    misses: new Map(),
     log: [],
     submissions: [],
     now: null,
@@ -43,6 +49,7 @@ export function newFnDbState(): FnDbState {
 export function resetFnDb(s: FnDbState): void {
   s.forms.clear();
   s.buckets.clear();
+  s.misses.clear();
   s.log.length = 0;
   s.submissions.length = 0;
   s.now = null;
@@ -100,6 +107,57 @@ export function consumeRates(
   return { allowed: true, denied_index: 0, retry_after_seconds: 0 };
 }
 
+/** The same rules as 017 lookup_public_form. */
+export function lookupPublicForm(
+  s: FnDbState,
+  slug: string,
+  ip: string,
+  missMax: number,
+  windowSec: number,
+): Record<string, unknown> {
+  if (!slug || !ip || !(missMax >= 1) || !(windowSec >= 1 && windowSec <= 86400)) {
+    throw Object.assign(new Error('lookup_public_form: bad arguments'), { code: '22023' });
+  }
+  const now = s.now ?? Date.now();
+  const empty = {
+    id: null,
+    name: null,
+    slug: null,
+    owner_id: null,
+    fill_password_hash: null,
+    published_schema: null,
+  };
+  const b = s.misses.get(ip);
+  const live = !!b && b.start > now - windowSec * 1000;
+  if (live && b!.slugs.size >= missMax) {
+    return {
+      outcome: 'denied',
+      retry_after_seconds: Math.max(1, windowSec - Math.floor((now - b!.start) / 1000)),
+      ...empty,
+    };
+  }
+  const f = [...s.forms.values()].find(
+    (x) =>
+      x.slug === slug && !x.deleted_at && x.status === 'published' && x.published_schema != null,
+  );
+  if (f) {
+    const brand = (f.published_schema as { brand?: { name?: unknown } } | null)?.brand?.name;
+    return {
+      outcome: 'ok',
+      retry_after_seconds: 0,
+      id: f.id,
+      name: f.published_name ?? (typeof brand === 'string' ? brand : 'Form'),
+      slug: f.slug,
+      owner_id: f.owner_id,
+      fill_password_hash: f.fill_password_hash,
+      published_schema: f.fill_password_hash ? null : f.published_schema,
+    };
+  }
+  if (!live) s.misses.set(ip, { start: now, slugs: new Set([slug]) });
+  else if (b!.slugs.size < missMax) b!.slugs.add(slug);
+  return { outcome: 'miss', retry_after_seconds: 0, ...empty };
+}
+
 export function fnDbPool(s: FnDbState) {
   return class {
     async query(sql: string, params: unknown[] = []) {
@@ -129,28 +187,9 @@ export function fnDbPool(s: FnDbState) {
         s.submissions.push({ id, form_id, answers: JSON.parse(answers), meta: JSON.parse(meta) });
         return { rows: [] };
       }
-      if (sql.includes('where slug = $1')) {
+      if (sql.includes('lookup_public_form')) {
         if (s.fail.gate) throw new Error('lookup failed');
-        const f = [...s.forms.values()].find(
-          (x) =>
-            x.slug === params[0] &&
-            !x.deleted_at &&
-            x.status === 'published' &&
-            x.published_schema != null,
-        );
-        if (!f) return { rows: [] };
-        return {
-          rows: [
-            {
-              id: f.id,
-              name: f.name ?? 'Form',
-              slug: f.slug,
-              owner_id: f.owner_id,
-              fill_password_hash: f.fill_password_hash,
-              published_schema: f.fill_password_hash ? null : f.published_schema,
-            },
-          ],
-        };
+        return { rows: [lookupPublicForm(s, ...(params as [string, string, number, number]))] };
       }
       if (/^\s*select published_schema from public\.forms/.test(sql)) {
         if (s.fail.schema) throw new Error('schema read failed');

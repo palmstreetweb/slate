@@ -301,6 +301,7 @@ describe('submit: failures', () => {
       pwIp: 10000,
       failIp: 500,
       failForm: 300,
+      formMiss: 300,
     });
   });
 
@@ -419,15 +420,14 @@ describe('unlock (C5)', () => {
     expect(tryCalls()).toHaveLength(0);
   });
 
-  it('unlocked form: 200 with the schema from the lookup, which reads it only when unlocked', async () => {
-    setForm();
+  it('unlocked form: 200 with the schema from the throttled lookup (017), published title', async () => {
+    setForm({ name: 'Live rename', published_name: 'Crew' });
     const res = await unlock({});
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ locked: false, schema });
+    expect(await res.json()).toMatchObject({ locked: false, schema, name: 'Crew' });
     expect(db.state.log).toHaveLength(1);
-    expect(db.state.log[0]!.sql).toMatch(
-      /case when fill_password_hash is null then published_schema end/,
-    );
+    expect(db.state.log[0]!.sql).toMatch(/lookup_public_form\(\$1, \$2, \$3, \$4\)/);
+    expect(db.state.log[0]!.params).toEqual(['crew-night', IP, 300, 600]);
   });
 
   it('valid token: 200 with one extra schema query, no try; wrong token and no password: 401', async () => {
@@ -509,5 +509,182 @@ describe('unlock (C5)', () => {
     db.state.fail = { gate: true };
     expect((await unlock({ password: 'wrong1' })).status).toBe(503);
     err.mockRestore();
+  });
+});
+
+describe('form lookup: GET ?op=form (ADR-061)', () => {
+  const get = (
+    slug: string | null,
+    headers: Record<string, string> = { 'X-Forwarded-For': IP },
+    op: string | null = 'form',
+  ) => {
+    const q = new URLSearchParams();
+    if (op !== null) q.set('op', op);
+    if (slug !== null) q.set('slug', slug);
+    return app.request(`/?${q}`, { method: 'GET', headers });
+  };
+  const unlock = (
+    body: Record<string, unknown>,
+    headers: Record<string, string> = { 'X-Forwarded-For': IP },
+  ) => post({ op: 'unlock', slug: 'crew-night', ...body }, headers);
+  const lookups = () => db.state.log.filter((q) => q.sql.includes('lookup_public_form'));
+  const writes = () => db.state.log.filter((q) => !q.sql.includes('lookup_public_form'));
+
+  it('open form: 200 with the published title and schema, one statement, no-store', async () => {
+    setForm({ name: 'Live rename', published_name: 'Crew' });
+    const res = await get('crew-night');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(await res.json()).toEqual({
+      id: FORM,
+      name: 'Crew',
+      slug: 'crew-night',
+      locked: false,
+      schema,
+    });
+    expect(db.state.log).toHaveLength(1);
+    expect(lookups()[0]!.params).toEqual(['crew-night', IP, 300, 600]);
+  });
+
+  it('locked form: 200 with the published title, no schema, and never the hash or owner', async () => {
+    setForm({ name: 'Secret live name', published_name: 'Crew', fill_password_hash: HASH });
+    const res = await get('crew-night');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toEqual({
+      id: FORM,
+      name: 'Crew',
+      slug: 'crew-night',
+      locked: true,
+      schema: null,
+    });
+    expect(JSON.stringify(body)).not.toMatch(/Secret|\$2a\$|u_owner_x/);
+  });
+
+  it('no published_name (pre-017 row): the published brand name, never the live name', async () => {
+    setForm({
+      name: 'Secret live name',
+      published_schema: { ...schema, brand: { name: 'Crew brand' } },
+    });
+    expect(await (await get('crew-night')).json()).toMatchObject({ name: 'Crew brand' });
+  });
+
+  it('unknown, draft and trashed slugs are the same 404; repeats of one miss count once', async () => {
+    setForm({ status: 'draft' });
+    setForm({ deleted_at: '2026-09-01T00:00:00Z' }, OTHER);
+    for (const slug of ['crew-night', OTHER.replace(/_/g, '-'), '12345678']) {
+      const res = await get(slug);
+      expect(res.status, slug).toBe(404);
+      expect(await res.json()).toEqual({ error: 'not_found' });
+    }
+    for (let i = 0; i < 50; i++) await get('12345678');
+    expect(db.state.misses.get(IP)!.slugs.size).toBe(3);
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('malformed slug or missing op: 404 with zero queries', async () => {
+    for (const slug of ['', 'Crew', 'a--b', 'a'.repeat(65), 'crеw', '../x', null]) {
+      expect((await get(slug)).status, String(slug)).toBe(404);
+    }
+    expect((await get('crew-night', { 'X-Forwarded-For': IP }, null)).status).toBe(404);
+    expect((await get('crew-night', { 'X-Forwarded-For': IP }, 'unlock')).status).toBe(404);
+    expect(db.state.log).toHaveLength(0);
+  });
+
+  it('scanner: 300 distinct misses, then 429 for misses AND hits; other networks unaffected', async () => {
+    setForm();
+    for (let i = 0; i < 300; i++) {
+      expect((await get(String(20_000_000 + i))).status).toBe(404);
+    }
+    const next = await get('99999999');
+    expect(next.status).toBe(429);
+    expect(next.headers.get('Retry-After')).toBe('600');
+    const body = (await next.json()) as {
+      error: string;
+      reason: string;
+      retryAfterSeconds: number;
+    };
+    expect(body.error).toMatch(/^Too many links to forms .* about 10 minutes\. .*mobile data\.$/);
+    expect(body).toMatchObject({ reason: 'lookup', retryAfterSeconds: 600 });
+    expect((await get('crew-night')).status).toBe(429);
+    expect(db.state.misses.get(IP)!.slugs.size).toBe(300);
+    expect((await get('crew-night', { 'X-Forwarded-For': '198.51.100.9' })).status).toBe(200);
+  });
+
+  it('venue: 300 opens and 30 typos from one IP are never refused', async () => {
+    setForm();
+    let refused = 0;
+    for (let i = 0; i < 330; i++) {
+      const res = await get(i % 11 === 10 ? String(30_000_000 + i) : 'crew-night');
+      if (res.status === 429) refused += 1;
+    }
+    expect(refused).toBe(0);
+    expect(db.state.misses.get(IP)!.slugs.size).toBe(30);
+  });
+
+  it('the window resets after 10 minutes', async () => {
+    setForm();
+    db.state.now = Date.parse('2026-09-28T10:00:00Z');
+    for (let i = 0; i < 300; i++) await get(String(40_000_000 + i));
+    expect((await get('crew-night')).status).toBe(429);
+    db.state.now += 601_000;
+    expect((await get('crew-night')).status).toBe(200);
+  });
+
+  it('no X-Forwarded-For: the noip key at a tenth of the budget', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await get('12345678', {});
+    err.mockRestore();
+    expect(lookups()[0]!.params).toEqual(['12345678', 'noip', 30, 600]);
+  });
+
+  it('the lookup throws: 503', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    db.state.fail = { gate: true };
+    expect((await get('crew-night')).status).toBe(503);
+    err.mockRestore();
+  });
+
+  it('a GET is a CORS simple request: allowed for any origin, Retry-After readable', async () => {
+    setForm();
+    const res = await app.request('/?op=form&slug=crew-night', {
+      method: 'GET',
+      headers: { Origin: 'https://slateforms.vercel.app', 'X-Forwarded-For': IP },
+    });
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(res.headers.get('Access-Control-Expose-Headers')).toMatch(/Retry-After/);
+  });
+
+  it('unlock shares the budget: unknown slugs charge a miss, and an IP over budget gets the lookup 429', async () => {
+    setForm({ fill_password_hash: HASH });
+    expect((await unlock({ slug: '55555555', password: 'secret' })).status).toBe(401);
+    expect(db.state.misses.get(IP)!.slugs.has('55555555')).toBe(true);
+    for (let i = 0; i < 299; i++) await get(String(60_000_000 + i));
+    const token = fillUnlockToken(FORM, HASH);
+    const res = await unlock({ token });
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ reason: 'lookup' });
+    expect(db.state.log.filter((q) => q.sql.includes('try_fill_password'))).toHaveLength(0);
+    expect((await unlock({ token }, { 'X-Forwarded-For': '198.51.100.9' })).status).toBe(200);
+  });
+
+  it('unlock answers with the published title too', async () => {
+    setForm({ name: 'Secret live name', published_name: 'Crew', fill_password_hash: HASH });
+    const res = await unlock({ token: fillUnlockToken(FORM, HASH) });
+    expect(await res.json()).toMatchObject({ name: 'Crew', locked: true });
+  });
+
+  it('FORM_LOOKUP_MISS_MAX overrides the budget; bad values keep 300', async () => {
+    for (const [v, want] of [
+      ['50', 50],
+      ['abc', 300],
+      ['0', 300],
+    ] as const) {
+      vi.resetModules();
+      vi.stubEnv('FORM_LOOKUP_MISS_MAX', v);
+      const mod = await import('../neon/functions/submit-response/index.js');
+      expect(mod.LIMITS.formMiss).toBe(want);
+      vi.unstubAllEnvs();
+    }
   });
 });

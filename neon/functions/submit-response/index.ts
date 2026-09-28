@@ -1,13 +1,20 @@
 /**
  * Neon Function: public form submit (ADR-029, limits ADR-058)
- * + password-locked form unlock (ADR-043, `{ op: 'unlock' }` on the same URL).
+ * + password-locked form unlock (ADR-043, `{ op: 'unlock' }` on the same URL)
+ * + the public form lookup (ADR-061, `GET ?op=form&slug=`).
  * Deploy: neon functions deploy submitresponse --src neon/functions/submit-response
- * DATABASE_URL is injected by Neon. Needs migration 016 (consume_submit_rates, try_fill_password).
+ * DATABASE_URL is injected by Neon. Needs migrations 016 (consume_submit_rates,
+ * try_fill_password) and 017 (lookup_public_form).
  *
  * Order (ADR-058): shape checks, honeypot, form lookup and lock, then ONE rate
  * statement that charges every bucket or none and reads the schema only when
  * the charge went through. Junk ids, drafts and locked-without-token requests
  * cost one small read and write nothing.
+ *
+ * Slug lookups (ADR-061), for op=form and op=unlock alike, are one statement
+ * that charges only DISTINCT unknown slugs per IP. Hits are free until the IP
+ * is over its miss budget; after that hits are refused too, or the slug
+ * oracle would survive.
  */
 
 import { Hono, type Context } from 'hono';
@@ -39,8 +46,12 @@ export const LIMITS = {
   pwIp: intEnv('UNLOCK_RATE_PW_IP_MAX', 10000), // password attempts / 10 min, IP
   failIp: intEnv('UNLOCK_RATE_FAIL_IP_MAX', 500), // misses / h, IP, all forms
   failForm: intEnv('UNLOCK_RATE_FAIL_FORM_MAX', 300), // misses / h, form, all IPs
+  formMiss: intEnv('FORM_LOOKUP_MISS_MAX', 300), // distinct unknown slugs / 10 min, IP (ADR-061)
 };
-console.info('[submitresponse] limits (ADR-058)', LIMITS);
+console.info('[submitresponse] limits (ADR-058, ADR-061)', LIMITS);
+
+/** The slug-miss window (ADR-061). Fixed, like every ADR-058 window. */
+const LOOKUP_WINDOW_SEC = 600;
 
 const TOO_LONG =
   'Your answers are too long to send. Please shorten the longest answer and try again.';
@@ -66,7 +77,10 @@ type GateRow = {
   has_schema: boolean;
 };
 
-type UnlockRow = {
+/** 017 lookup_public_form. owner_id and the hash never leave this Function. */
+type LookupRow = {
+  outcome: 'ok' | 'miss' | 'denied';
+  retry_after_seconds: number;
   id: string;
   name: string;
   slug: string;
@@ -171,6 +185,89 @@ function noteHoneypot(formId: string): void {
 
 const wrongPassword = (c: Context) => c.json({ error: 'wrong_password' }, 401);
 
+const LOOKUP_SQL = `select l.outcome, l.retry_after_seconds, l.id, l.name, l.slug, l.owner_id,
+    l.fill_password_hash, l.published_schema
+  from public.lookup_public_form($1, $2, $3, $4) l`;
+
+/**
+ * One statement (017): refuse an IP that is over its miss budget, else read the
+ * form, else charge one distinct miss. Throws on a malformed result (callers 503).
+ */
+async function lookupForm(slug: string, ip: string): Promise<LookupRow> {
+  const r = (
+    await pool.query<LookupRow>(LOOKUP_SQL, [
+      slug,
+      ip,
+      ipMax(ip, LIMITS.formMiss),
+      LOOKUP_WINDOW_SEC,
+    ])
+  ).rows[0];
+  if (!r || !['ok', 'miss', 'denied'].includes(r.outcome)) throw new Error('lookup: bad result');
+  if (r.outcome === 'ok' && (typeof r.id !== 'string' || typeof r.slug !== 'string')) {
+    throw new Error('lookup: bad row');
+  }
+  return r;
+}
+
+/**
+ * Over the miss budget (ADR-061). Starts with "Too many" so every client,
+ * including cached pre-8b bundles on the unlock path, shows it as sent.
+ */
+function lookupDenied(c: Context, retryAfterSeconds: unknown) {
+  const wait = Math.max(1, Number(retryAfterSeconds) || 60);
+  c.header('Retry-After', String(wait));
+  c.header('Cache-Control', 'no-store');
+  return c.json(
+    {
+      error: `Too many links to forms that don’t exist were opened from this network, so forms are paused here for ${aboutMinutes(wait)}. Please try again then, or switch to mobile data.`,
+      reason: 'lookup',
+      retryAfterSeconds: wait,
+    },
+    429,
+  );
+}
+
+const notFound = (c: Context) => {
+  c.header('Cache-Control', 'no-store');
+  return c.json({ error: 'not_found' }, 404);
+};
+
+/**
+ * `GET ?op=form&slug=` (ADR-061). A GET with no custom headers is a CORS
+ * "simple" request: no preflight, so a first-time QR scan is ONE round trip
+ * (it was a token, a preflight and the RPC). Answers exactly what
+ * get_form_by_slug answered, with the published title instead of the live name.
+ */
+app.get('/', async (c) => {
+  if (c.req.query('op') !== 'form') return c.text('Not found', 404);
+  const slug = (c.req.query('slug') ?? '').trim();
+  // 015's slug format: anything else can't be a form. Free, no DB, same 404.
+  if (!slug || slug.length > 64 || !SLUG_RE.test(slug)) return notFound(c);
+  if (!process.env.DATABASE_URL) return c.text('Server misconfigured', 500);
+
+  const ip = clientIp((n) => c.req.header(n));
+  let r: LookupRow;
+  try {
+    r = await lookupForm(slug, ip);
+  } catch (err) {
+    console.error('[submitresponse] form lookup failed', err);
+    c.header('Cache-Control', 'no-store');
+    return c.text('Temporarily unavailable', 503);
+  }
+  if (r.outcome === 'denied') return lookupDenied(c, r.retry_after_seconds);
+  if (r.outcome !== 'ok') return notFound(c);
+  const locked = r.fill_password_hash != null;
+  if (!locked && !r.published_schema) return notFound(c);
+  c.header('Cache-Control', 'no-store');
+  return c.json({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    locked,
+    schema: locked ? null : r.published_schema,
+  });
+});
+
 const UNLOCK_COPY: Record<'pw' | 'fail_ip' | 'fail_form', (wait: string) => string> = {
   pw: (w) =>
     `Too many password attempts from this network right now. Please wait ${w}, or try from another network (for example mobile data).`,
@@ -181,10 +278,13 @@ const UNLOCK_COPY: Record<'pw' | 'fail_ip' | 'fail_form', (wait: string) => stri
 };
 
 /**
- * Unlock a password-locked form (ADR-043, counted per ADR-058). Unknown slugs,
- * unlocked forms and token reloads are free. A password guess is ONE statement
- * (try_fill_password): miss ceilings, CPU guard, bcrypt and the count commit
- * together, and any error answers exactly like a wrong password.
+ * Unlock a password-locked form (ADR-043, counted per ADR-058). Unlocked forms
+ * and token reloads are free. The slug lookup is the same throttled statement
+ * as op=form (ADR-061): an unknown slug charges one distinct miss, and an IP
+ * over its miss budget is refused before anything else, or unlock would be a
+ * second slug oracle. A password guess is ONE statement (try_fill_password):
+ * miss ceilings, CPU guard, bcrypt and the count commit together, and any error
+ * answers exactly like a wrong password.
  */
 async function handleUnlock(c: Context, body: Record<string, unknown>) {
   const slug = typeof body.slug === 'string' ? body.slug.trim() : '';
@@ -201,26 +301,19 @@ async function handleUnlock(c: Context, body: Record<string, unknown>) {
     return wrongPassword(c);
   }
 
-  let form: UnlockRow | undefined;
+  const ip = clientIp((n) => c.req.header(n));
+  let form: LookupRow;
   try {
-    // The schema only leaves this query for forms that are not locked.
-    form = (
-      await pool.query<UnlockRow>(
-        `select id, name, slug, owner_id, fill_password_hash,
-                case when fill_password_hash is null then published_schema end as published_schema
-           from public.forms
-          where slug = $1 and deleted_at is null and status = 'published'
-            and published_schema is not null
-          limit 1`,
-        [slug],
-      )
-    ).rows[0];
+    // The schema only leaves this statement for forms that are not locked.
+    form = await lookupForm(slug, ip);
   } catch (err) {
     console.error('[submitresponse] unlock lookup failed', err);
     return c.text('Temporarily unavailable', 503);
   }
+  if (form.outcome === 'denied') return lookupDenied(c, form.retry_after_seconds);
   // Same answer as a wrong password: no "which slugs are locked" oracle.
-  if (!form) return wrongPassword(c);
+  if (form.outcome !== 'ok') return wrongPassword(c);
+  // The published title, never the live forms.name (017).
   const base = { id: form.id, name: form.name, slug: form.slug };
 
   // Lock was removed since the gate rendered — just hand over the form.
@@ -249,7 +342,6 @@ async function handleUnlock(c: Context, body: Record<string, unknown>) {
   }
   if (!password) return wrongPassword(c);
 
-  const ip = clientIp((n) => c.req.header(n));
   let r: TryRow | undefined;
   try {
     r = (
