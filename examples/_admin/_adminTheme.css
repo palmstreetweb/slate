@@ -20,6 +20,39 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   z-index: 50;
 }
 
+/* The header must never be wider than the window (ADR-062). Its trail used to
+   be a rigid row, so on a phone it pushed past the right edge and mobile
+   browsers widened the whole layout viewport to fit it (innerWidth 506 on a
+   375px iPhone). Now the lead (brand + crumbs) takes what is left and
+   truncates; phones get their own compact bar (mobile/PhoneChrome.tsx). */
+[data-slate-forms][data-theme-name='slate'] .slate-header {
+  gap: 16px;
+  padding-left: max(var(--slate-content-pad), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--slate-content-pad), env(safe-area-inset-right, 0px));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-header-lead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-header-trail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-header-lead > .slate-crumb {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-brand {
   display: inline-flex;
   align-items: center;
@@ -1157,6 +1190,7 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   display: flex;
   flex-direction: column;
   height: calc(100vh - var(--slate-header-h));
+  height: calc(100dvh - var(--slate-header-h));
   min-height: 0;
 }
 

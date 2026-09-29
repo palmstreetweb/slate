@@ -17,7 +17,7 @@ type Props = {
 export function Header({ crumbs, rightSlot, mode, onToggle }: Props) {
   return (
     <header className="slate-header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="slate-header-lead">
         <button
           type="button"
           className="slate-brand"
@@ -34,7 +34,7 @@ export function Header({ crumbs, rightSlot, mode, onToggle }: Props) {
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="slate-header-trail">
         {/* On every studio page — a bad response must never take the page down with it. */}
         <ErrorBoundary label="notifications" fallback={null}>
           <StudioInbox />
