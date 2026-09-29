@@ -28,7 +28,15 @@ function IconFeedback() {
   );
 }
 
-export function FeedbackButton() {
+const OPEN_EVENT = 'slate-open-feedback';
+
+/** Open the feedback dialog from elsewhere (the phone ⋯ sheet, ADR-062). */
+export function openFeedback(): void {
+  window.dispatchEvent(new CustomEvent(OPEN_EVENT));
+}
+
+/** `trigger={false}` keeps the dialog without the floating button (phones). */
+export function FeedbackButton({ trigger = true }: { trigger?: boolean } = {}) {
   const { user } = useAuth();
   const toast = useToast();
   const titleId = useId();
@@ -41,6 +49,12 @@ export function FeedbackButton() {
     if (!open) return;
     return lockBodyScroll();
   }, [open]);
+
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener(OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_EVENT, onOpen);
+  }, []);
 
   const close = () => {
     if (sending) return;
@@ -85,16 +99,18 @@ export function FeedbackButton() {
 
   return (
     <>
-      <button
-        type="button"
-        className="slate-btn slate-btn--icon slate-feedback-fab"
-        aria-label="Send feedback"
-        title="Send feedback"
-        data-slate-sound="open"
-        onClick={() => setOpen(true)}
-      >
-        <IconFeedback />
-      </button>
+      {trigger ? (
+        <button
+          type="button"
+          className="slate-btn slate-btn--icon slate-feedback-fab"
+          aria-label="Send feedback"
+          title="Send feedback"
+          data-slate-sound="open"
+          onClick={() => setOpen(true)}
+        >
+          <IconFeedback />
+        </button>
+      ) : null}
       {open && typeof document !== 'undefined'
         ? createPortal(
             <div

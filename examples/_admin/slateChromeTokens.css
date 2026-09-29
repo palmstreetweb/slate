@@ -225,6 +225,8 @@
    pill and the publish check (ADR-060). Mode-only, so all palettes share it. */
 
 [data-slate-forms][data-theme-name='slate'] {
+  /* Veil behind sheets and dialogs on phones (ADR-062); same as the dialog scrim. */
+  --chrome-scrim: rgb(15 18 22 / 0.58);
   --chrome-live: #3ddc97;
   --chrome-live-rgb: 61 220 151;
   --chrome-live-ink: #1f8a57;

@@ -4,6 +4,7 @@ import { getForm, subscribe, type FormRecord } from '../_formsStore.js';
 import { addSubmission } from '../_submissionStore.js';
 import { navigate } from '../_router.js';
 import { AdminShell } from '../shell/AdminShell.js';
+import { IconChart } from '../mobile/PhoneChrome.js';
 import { hostFileUpload } from '../hostFileUpload.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
 import { setUploadContext, clearUploadContext } from '../uploadContext.js';
@@ -29,7 +30,11 @@ export function FormPreview({ formId }: Props) {
       <AdminShell crumbs={null}>
         <div className="slate-empty">
           <p style={{ margin: '0 0 12px' }}>Form not found.</p>
-          <button type="button" className="slate-btn slate-btn--primary" onClick={() => navigate('/')}>
+          <button
+            type="button"
+            className="slate-btn slate-btn--primary"
+            onClick={() => navigate('/')}
+          >
             Back to dashboard
           </button>
         </div>
@@ -39,13 +44,30 @@ export function FormPreview({ formId }: Props) {
 
   return (
     <AdminShell
+      phone={{
+        back: { label: 'editor', onClick: () => navigate(`/forms/${formId}/edit`) },
+        title: 'Test run',
+        subtitle: form.name,
+        menu: [
+          {
+            id: 'responses',
+            label: 'Responses',
+            icon: <IconChart />,
+            onSelect: () => navigate(`/forms/${formId}/submissions`),
+          },
+        ],
+      }}
       crumbs={
         <span className="slate-crumb">
           <button type="button" className="slate-link" onClick={() => navigate('/')}>
             Forms
           </button>
           {' / '}
-          <button type="button" className="slate-link" onClick={() => navigate(`/forms/${formId}/edit`)}>
+          <button
+            type="button"
+            className="slate-link"
+            onClick={() => navigate(`/forms/${formId}/edit`)}
+          >
             {form.name}
           </button>
           {' / '}
@@ -54,23 +76,35 @@ export function FormPreview({ formId }: Props) {
       }
       rightSlot={
         <>
-          <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/edit`)}>
+          <button
+            type="button"
+            className="slate-btn"
+            onClick={() => navigate(`/forms/${formId}/edit`)}
+          >
             ← Back to editor
           </button>
-          <button type="button" className="slate-btn" onClick={() => navigate(`/forms/${formId}/submissions`)}>
+          <button
+            type="button"
+            className="slate-btn"
+            onClick={() => navigate(`/forms/${formId}/submissions`)}
+          >
             Responses
           </button>
         </>
       }
     >
-      <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--slate-muted)' }}>
+      <p className="slate-preview-note">
         Live preview. Submissions you make here are saved and visible under{' '}
-        <button type="button" className="slate-link" onClick={() => navigate(`/forms/${formId}/submissions`)}>
+        <button
+          type="button"
+          className="slate-link"
+          onClick={() => navigate(`/forms/${formId}/submissions`)}
+        >
           Responses
         </button>
         .
       </p>
-      <div className="slate-preview" style={{ height: 'calc(100vh - 160px)', overflow: 'hidden' }}>
+      <div className="slate-preview slate-preview--page">
         {/* No `resume` here: the preview is a build/test surface, not a real
             respondent session. Autosaving partial test runs and offering to
             resume them on every preview open reads as a glitch. Production

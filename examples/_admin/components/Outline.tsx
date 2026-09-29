@@ -5,15 +5,17 @@
  * mode, brand) live at the top and bottom of this rail.
  */
 
-import { useState, useRef, useLayoutEffect, useEffect, type PointerEvent, type CSSProperties } from 'react';
+import {
+  useState,
+  useRef,
+  useLayoutEffect,
+  useEffect,
+  type PointerEvent,
+  type CSSProperties,
+} from 'react';
 import { createPortal } from 'react-dom';
-import type {
-  FormSound,
-  QuestionType,
-  Schema,
-  ThemeMode,
-  ThemeName,
-} from '@/index.js';
+import { lockBodyScroll } from '../lockBodyScroll.js';
+import type { FormSound, QuestionType, Schema, ThemeMode, ThemeName } from '@/index.js';
 import { FORM_SOUND_OPTIONS, resolveFormSound } from '@/utils/formSounds.js';
 import { safeLogoSrc } from '@/utils/brandLogo.js';
 import { ADDABLE_TYPES, TYPE_GLYPH } from '../questionTypeMeta.js';
@@ -61,6 +63,9 @@ type Props = {
   onThemeChange: (v: ThemeName) => void;
   onThemeModeChange: (v: ThemeMode) => void;
   onSoundChange: (v: FormSound) => void;
+  /** Phone layout (ADR-062): the add palette is a bottom sheet, and a touch
+   *  on a row scrolls the list — only the grip starts a drag. */
+  phone?: boolean;
 };
 
 export function Outline({
@@ -79,6 +84,7 @@ export function Outline({
   onThemeChange,
   onThemeModeChange,
   onSoundChange,
+  phone = false,
 }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [addPlacement, setAddPlacement] = useState<'below' | 'above'>('below');
@@ -179,6 +185,11 @@ export function Outline({
     });
   };
 
+  useEffect(() => {
+    if (!addOpen || !phone) return;
+    return lockBodyScroll();
+  }, [addOpen, phone]);
+
   useLayoutEffect(() => {
     if (!addOpen) return;
     setOpenAddGroups(new Set(['Screens', 'Inputs']));
@@ -216,72 +227,81 @@ export function Outline({
     };
   }, [addOpen]);
 
+  const addPalette = (
+    <div
+      ref={popoverRef}
+      className={
+        phone
+          ? 'slate-popover slate-popover--sheet slate-m-sheet'
+          : `slate-popover slate-popover--portal slate-popover--${addPlacement}`
+      }
+      style={phone ? undefined : popoverStyle}
+      role="dialog"
+      aria-label="Add question"
+    >
+      {phone ? <span className="slate-m-sheet-grip" aria-hidden="true" /> : null}
+      <p className="slate-label" style={{ marginBottom: 6 }}>
+        Add to Form
+      </p>
+      {addGroups.map((group) => {
+        const types = ADDABLE_TYPES.filter((t) => t.group === group);
+        const expanded = openAddGroups.has(group);
+        return (
+          <div key={group} className="slate-add-group">
+            <button
+              type="button"
+              className="slate-add-group-trigger"
+              aria-expanded={expanded}
+              onClick={() => toggleAddGroup(group)}
+            >
+              <span>{group}</span>
+              <span className="slate-add-group-meta">
+                <span className="slate-add-group-count">{types.length}</span>
+                <span
+                  className={`slate-collapsible-chevron${expanded ? ' slate-collapsible-chevron--open' : ''}`}
+                  aria-hidden
+                />
+              </span>
+            </button>
+            {expanded && (
+              <div className="slate-add-group-grid">
+                {types.map((t) => (
+                  <button
+                    key={t.type}
+                    type="button"
+                    className="slate-btn slate-add-type-btn"
+                    onClick={() => {
+                      onAddQuestion(t.type);
+                      setAddOpen(false);
+                    }}
+                  >
+                    <span className="slate-add-type-glyph" aria-hidden>
+                      {TYPE_GLYPH[t.type]}
+                    </span>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+        <button
+          type="button"
+          className="slate-btn slate-btn--ghost slate-btn--compact"
+          onClick={() => setAddOpen(false)}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+
   const addPopover =
     addOpen &&
     createPortal(
-      <div
-        ref={popoverRef}
-        className={`slate-popover slate-popover--portal slate-popover--${addPlacement}`}
-        style={popoverStyle}
-        role="dialog"
-        aria-label="Add question"
-      >
-        <p className="slate-label" style={{ marginBottom: 6 }}>
-          Add to Form
-        </p>
-        {addGroups.map((group) => {
-          const types = ADDABLE_TYPES.filter((t) => t.group === group);
-          const expanded = openAddGroups.has(group);
-          return (
-            <div key={group} className="slate-add-group">
-              <button
-                type="button"
-                className="slate-add-group-trigger"
-                aria-expanded={expanded}
-                onClick={() => toggleAddGroup(group)}
-              >
-                <span>{group}</span>
-                <span className="slate-add-group-meta">
-                  <span className="slate-add-group-count">{types.length}</span>
-                  <span
-                    className={`slate-collapsible-chevron${expanded ? ' slate-collapsible-chevron--open' : ''}`}
-                    aria-hidden
-                  />
-                </span>
-              </button>
-              {expanded && (
-                <div className="slate-add-group-grid">
-                  {types.map((t) => (
-                    <button
-                      key={t.type}
-                      type="button"
-                      className="slate-btn slate-add-type-btn"
-                      onClick={() => {
-                        onAddQuestion(t.type);
-                        setAddOpen(false);
-                      }}
-                    >
-                      <span className="slate-add-type-glyph" aria-hidden>
-                        {TYPE_GLYPH[t.type]}
-                      </span>
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-          <button
-            type="button"
-            className="slate-btn slate-btn--ghost slate-btn--compact"
-            onClick={() => setAddOpen(false)}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>,
+      phone ? <div className="slate-m-sheet-backdrop">{addPalette}</div> : addPalette,
       portalRoot,
     );
 
@@ -409,7 +429,7 @@ export function Outline({
                         style={{
                           flex: 1,
                           cursor: canDrag ? 'grab' : undefined,
-                          touchAction: canDrag ? 'none' : undefined,
+                          touchAction: canDrag && !phone ? 'none' : undefined,
                         }}
                         onClick={() => {
                           if (didDragRef.current) {
@@ -421,6 +441,8 @@ export function Outline({
                         }}
                         onPointerDown={(e) => {
                           if (!canDrag) return;
+                          // Phones scroll with a finger on the list; the grip drags.
+                          if (phone && e.pointerType !== 'mouse') return;
                           startReorder(e, e.currentTarget);
                         }}
                       >
@@ -449,17 +471,18 @@ export function Outline({
                             ↑
                           </button>
                         )}
-                        {i < schema.questions.length - 1 && schema.questions[i + 1]?.type !== 'thanks' && (
-                          <button
-                            type="button"
-                            className="slate-icon-btn"
-                            onClick={() => onReorder(q.id, 'down')}
-                            aria-label="Move down"
-                            title="Move down"
-                          >
-                            ↓
-                          </button>
-                        )}
+                        {i < schema.questions.length - 1 &&
+                          schema.questions[i + 1]?.type !== 'thanks' && (
+                            <button
+                              type="button"
+                              className="slate-icon-btn"
+                              onClick={() => onReorder(q.id, 'down')}
+                              aria-label="Move down"
+                              title="Move down"
+                            >
+                              ↓
+                            </button>
+                          )}
                         <button
                           type="button"
                           className="slate-icon-btn"

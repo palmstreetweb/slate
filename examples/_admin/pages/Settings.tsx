@@ -214,7 +214,10 @@ export function Settings() {
   }, []);
 
   return (
-    <AdminShell crumbs={<span className="slate-crumb">Settings</span>}>
+    <AdminShell
+      crumbs={<span className="slate-crumb">Settings</span>}
+      phone={{ back: { label: 'studio', onClick: closeSettings }, title: 'Settings' }}
+    >
       <SettingsContent />
     </AdminShell>
   );

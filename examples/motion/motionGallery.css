@@ -646,3 +646,17 @@
     transition: none;
   }
 }
+
+/* Phones and touch (ADR-062): a 13px select makes iOS zoom the page on
+   focus, and 36px controls are under the 44px tap size. */
+@media (max-width: 719px), (pointer: coarse) {
+  .mg-select select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .mg-btn,
+  .mg-tab {
+    min-height: 44px;
+  }
+}

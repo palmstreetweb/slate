@@ -40,6 +40,7 @@ import {
   IconResponses,
   IconShare,
 } from '../components/FormCardIcons.js';
+import { usePhone } from '../responses/hooks.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import {
   animateFormGridDuplicate,
@@ -57,16 +58,15 @@ export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
   const [trashed, setTrashed] = useState<FormRecord[]>(() => listTrashedForms());
   const [view, setView] = useState<'forms' | 'trash'>('forms');
-  const [storageIssue, setStorageIssue] = useState<'forms' | 'submissions' | 'both' | null>(
-    () => {
-      const formsBad = probeFormsStorage() === 'corrupt';
-      const subsBad = probeSubmissionsStorage() === 'corrupt';
-      if (formsBad && subsBad) return 'both';
-      if (formsBad) return 'forms';
-      if (subsBad) return 'submissions';
-      return null;
-    },
-  );
+  const phone = usePhone();
+  const [storageIssue, setStorageIssue] = useState<'forms' | 'submissions' | 'both' | null>(() => {
+    const formsBad = probeFormsStorage() === 'corrupt';
+    const subsBad = probeSubmissionsStorage() === 'corrupt';
+    if (formsBad && subsBad) return 'both';
+    if (formsBad) return 'forms';
+    if (subsBad) return 'submissions';
+    return null;
+  });
   const confirm = useConfirm();
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -242,7 +242,9 @@ export function Dashboard() {
         navigate(`/forms/${created.id}/edit`);
         return;
       }
-      throw new Error('The cloud did not save the generated draft. Check your connection and try again.');
+      throw new Error(
+        'The cloud did not save the generated draft. Check your connection and try again.',
+      );
     } catch (err) {
       if (isFormQuotaError(err)) {
         setAiOpen(false);
@@ -256,6 +258,26 @@ export function Dashboard() {
   return (
     <AdminShell
       crumbs={<span className="slate-crumb">Forms</span>}
+      phone={{
+        actions: (
+          <>
+            <button type="button" className="slate-btn" onClick={openAi} disabled={creating}>
+              <SparkleIcon /> Build with AI
+            </button>
+            <button
+              type="button"
+              className="slate-btn slate-btn--new"
+              onClick={onNew}
+              disabled={creating}
+            >
+              <span className="slate-btn-plus" aria-hidden="true">
+                +
+              </span>{' '}
+              {creating ? 'Creating…' : 'New form'}
+            </button>
+          </>
+        ),
+      }}
       rightSlot={
         <div className="slate-header-actions">
           <button
@@ -263,7 +285,9 @@ export function Dashboard() {
             className="slate-btn"
             onClick={openAi}
             disabled={creating}
-            title={quota && quota.used >= quota.max ? `Limit of ${quota.max} forms reached` : undefined}
+            title={
+              quota && quota.used >= quota.max ? `Limit of ${quota.max} forms reached` : undefined
+            }
           >
             <SparkleIcon /> Build with AI
           </button>
@@ -272,7 +296,9 @@ export function Dashboard() {
             className="slate-btn slate-btn--new"
             onClick={onNew}
             disabled={creating}
-            title={quota && quota.used >= quota.max ? `Limit of ${quota.max} forms reached` : undefined}
+            title={
+              quota && quota.used >= quota.max ? `Limit of ${quota.max} forms reached` : undefined
+            }
           >
             <span className="slate-btn-plus">+</span> {creating ? 'Creating…' : 'New form'}
           </button>
@@ -308,7 +334,8 @@ export function Dashboard() {
               onClick={async () => {
                 const ok = await confirm({
                   title: 'Reset local storage?',
-                  message: 'Deletes all forms and responses saved in this browser. There is no undo.',
+                  message:
+                    'Deletes all forms and responses saved in this browser. There is no undo.',
                   confirmLabel: 'Reset storage',
                   danger: true,
                 });
@@ -370,7 +397,9 @@ export function Dashboard() {
         trashed.length === 0 ? (
           <div className="slate-empty slate-empty--start">
             <p className="slate-empty-title">Trash is empty</p>
-            <p className="slate-empty-copy">Deleted forms show up here until you restore or remove them forever.</p>
+            <p className="slate-empty-copy">
+              Deleted forms show up here until you restore or remove them forever.
+            </p>
           </div>
         ) : (
           <>
@@ -457,8 +486,8 @@ export function Dashboard() {
           </p>
           <p className="slate-empty-copy">
             {trashed.length > 0
-              ? 'Restore a form from Trash, or start a new one from the top right.'
-              : 'Build with AI or New form live in the top right — pick whichever fits.'}
+              ? `Restore a form from Trash, or start a new one ${phone ? 'below' : 'from the top right'}.`
+              : `Build with AI or New form live ${phone ? 'at the bottom' : 'in the top right'} — pick whichever fits.`}
           </p>
         </div>
       ) : (
@@ -515,11 +544,19 @@ function TrashedFormCard({
         </div>
       </div>
       <div className="slate-card-footer">
-        <div className="slate-card-toolbar" role="toolbar" aria-label={`Trash actions for ${form.name}`}>
+        <div
+          className="slate-card-toolbar"
+          role="toolbar"
+          aria-label={`Trash actions for ${form.name}`}
+        >
           <button type="button" className="slate-btn slate-btn--compact" onClick={onRestore}>
             Restore
           </button>
-          <button type="button" className="slate-btn slate-btn--compact slate-btn--danger" onClick={onDeleteForever}>
+          <button
+            type="button"
+            className="slate-btn slate-btn--compact slate-btn--danger"
+            onClick={onDeleteForever}
+          >
             Delete forever
           </button>
         </div>
@@ -571,7 +608,10 @@ function FormCard({
         onClick={() => navigate(`/forms/${form.id}/edit`)}
         aria-label={`Open ${form.name}`}
       >
-        <div className="slate-card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div
+          className="slate-card-pad"
+          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
           <div>
             <span className="slate-card-title">{form.name}</span>
             <p className="slate-card-meta">
@@ -591,14 +631,14 @@ function FormCard({
             ) : (
               <span className="slate-badge">Draft</span>
             )}
-            <span className="slate-badge">{qCount} {qCount === 1 ? 'question' : 'questions'}</span>
+            <span className="slate-badge">
+              {qCount} {qCount === 1 ? 'question' : 'questions'}
+            </span>
             <span className={`slate-badge${subCount > 0 ? ' slate-badge--accent' : ''}`}>
               {/* Rolls up like an odometer when a response lands (ADR-060). */}
               <Odometer value={subCount} /> {subCount === 1 ? 'response' : 'responses'}
             </span>
-            {lastAt && (
-              <span className="slate-badge">last {timeAgo(new Date(lastAt))}</span>
-            )}
+            {lastAt && <span className="slate-badge">last {timeAgo(new Date(lastAt))}</span>}
           </div>
         </div>
       </button>

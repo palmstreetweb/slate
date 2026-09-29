@@ -564,6 +564,10 @@ export function FormSubmissions({ formId }: Props) {
 
   return (
     <AdminShell
+      phone={{
+        back: { label: 'Forms', onClick: () => navigate('/') },
+        title: form.name,
+      }}
       crumbs={
         crumbFit === 'none' ? null : (
           <span className="slate-crumb rsp-crumbs">

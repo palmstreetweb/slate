@@ -37,6 +37,7 @@ import { isFormsHydrated } from './_admin/neon/formsRemote.js';
 import { isNeonConfigured } from './_admin/neon/env.js';
 import { formatNeonError, isRlsOrAuthError } from './_admin/neon/neonError.js';
 import { installAdminUiSounds } from './_admin/uiSounds.js';
+import { enableSafeAreaViewport } from './_admin/mobile/viewport.js';
 
 import './_admin/slateChromeTokens.css';
 import '@/styles/toggle.css';
@@ -44,6 +45,7 @@ import './_admin/publicChrome.css';
 import './_admin/_adminTheme.css';
 import './_admin/slateMotion.css';
 import './_admin/delight/delight.css';
+import './_admin/mobile/mobile.css';
 
 /** The gallery lives in its own bundle (ADR-059); the entry picks it on a full load. */
 function ReloadForBundle() {
@@ -222,7 +224,7 @@ function AdminCloudBootstrap() {
         data-theme="dark"
         className="slate-empty"
         style={{
-          minHeight: '100vh',
+          minHeight: '100dvh',
           display: 'grid',
           placeContent: 'center',
           gap: 16,
@@ -273,7 +275,7 @@ function AuthUnreachable({ onRetry }: { onRetry: () => void }) {
       className="slate-empty"
       role="alert"
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'grid',
         placeContent: 'center',
         gap: 16,
@@ -313,6 +315,7 @@ function RootCrashFallback() {
 
 /** Studio bundle (ADR-048). Also serves public routes after in-app navigation. */
 export function mountStudio(root: HTMLElement): void {
+  enableSafeAreaViewport();
   createRoot(root).render(
     <StrictMode>
       <UiSoundsRoot>

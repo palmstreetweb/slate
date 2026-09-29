@@ -1,0 +1,826 @@
+/* ============================================================
+   Studio mobile layout (ADR-062). Loaded last by studioApp.tsx.
+
+   Two switches, one breakpoint (responses/hooks.ts PHONE_MAX_WIDTH):
+   - Structure comes from JS. AdminShell's usePhone() (≤ 719 CSS px,
+     studio-zoom aware) renders the compact bar, the ⋯ sheet, the bottom
+     action bar and the editor tabs, and marks .slate-app--phone.
+   - Portaled overlays (dialogs, the Share panel, toasts, the bell) live
+     outside the shell, so they follow @media (max-width: 719px).
+
+   Rules: no horizontal page scroll; tap targets ≥ 44px; fields ≥ 16px so
+   iOS never zooms on focus; dvh, not vh; safe areas via env(); colours
+   only from chrome tokens; motion only inside no-preference.
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='slate'] {
+  --m-tap: 44px;
+  --m-safe-t: env(safe-area-inset-top, 0px);
+  --m-safe-r: env(safe-area-inset-right, 0px);
+  --m-safe-b: env(safe-area-inset-bottom, 0px);
+  --m-safe-l: env(safe-area-inset-left, 0px);
+  --m-gutter: 16px;
+  /* Bottom action bar: 48px buttons + 10px padding above and below. */
+  --m-actionbar-h: 68px;
+  --m-tabs-h: 58px;
+  --m-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---------- every width: nothing may be wider than the window ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-content:not(.slate-content--full-bleed) {
+  padding-left: max(var(--slate-content-pad), var(--m-safe-l));
+  padding-right: max(var(--slate-content-pad), var(--m-safe-r));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-settings-fab {
+  left: max(20px, var(--m-safe-l));
+  bottom: max(20px, var(--m-safe-b));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-feedback-fab {
+  right: max(20px, var(--m-safe-r));
+  bottom: max(20px, var(--m-safe-b));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-preview-note {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-preview--page {
+  height: calc(100vh - 160px);
+  height: calc(100dvh - 160px);
+  overflow: hidden;
+}
+
+/* Tablets and small laptops: the editor header drops what it can spare
+   (autosave never needs a label to work; ⌘/ still opens the shortcuts). */
+@media (max-width: 1180px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-header .slate-save-status,
+  [data-slate-forms][data-theme-name='slate'] .slate-header .slate-shortcuts-btn {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  [data-slate-forms][data-theme-name='slate'] {
+    --slate-content-pad: 24px;
+  }
+}
+
+/* ============================================================
+   PHONE SHELL (.slate-app--phone, set by AdminShell)
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='slate'] .slate-app--phone {
+  --slate-header-h: 56px;
+  --slate-content-pad: var(--m-gutter);
+  --slate-card-pad: 20px;
+  --slate-card-icon-btn: var(--m-tap);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-app--phone
+  .slate-content:not(.slate-content--full-bleed) {
+  padding-top: 20px;
+  padding-bottom: calc(32px + var(--m-safe-b));
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-app--actionbar
+  .slate-content:not(.slate-content--full-bleed) {
+  padding-bottom: calc(var(--m-actionbar-h) + 24px + var(--m-safe-b));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-app--actionbar .slate-content--full-bleed {
+  padding-bottom: calc(var(--m-actionbar-h) + var(--m-safe-b));
+}
+
+/* ---------- compact top bar ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-header--phone {
+  height: calc(var(--slate-header-h) + var(--m-safe-t));
+  padding: var(--m-safe-t) max(6px, var(--m-safe-r)) 0 max(6px, var(--m-safe-l));
+  gap: 2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-iconbtn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--m-tap);
+  height: var(--m-tap);
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--chrome-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-iconbtn .rsp-icon {
+  width: 20px;
+  height: 20px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-iconbtn:active,
+[data-slate-forms][data-theme-name='slate'] .slate-m-iconbtn--active {
+  background: var(--chrome-panel-2);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-iconbtn:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: -2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-header--phone .slate-m-brand {
+  flex: none;
+  min-width: var(--m-tap);
+  height: var(--m-tap);
+  padding: 0 8px;
+  justify-content: center;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-header--phone .slate-m-brand:hover {
+  transform: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-heading {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-title {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 21px;
+  letter-spacing: -0.01em;
+  color: var(--chrome-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--chrome-muted);
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-subtitle > * {
+  flex: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-subtitle > :last-child {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Publish state: a small dot, never a pill (standing decision). */
+[data-slate-forms][data-theme-name='slate'] .slate-m-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-status--live {
+  color: var(--chrome-live-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-status--live::before {
+  background: var(--chrome-live);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-status--stale::before {
+  background: var(--slate-warn);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-save--err {
+  color: var(--slate-error);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-header-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+/* Refresh and the bell come from StudioInbox; give them full targets. */
+[data-slate-forms][data-theme-name='slate'] .slate-header--phone .slate-btn--icon {
+  width: var(--m-tap);
+  height: var(--m-tap);
+  min-height: var(--m-tap);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-header--phone .slate-inbox-badge {
+  top: 6px;
+  right: 6px;
+}
+
+/* The Responses page titles itself in the bar on phones. */
+[data-slate-forms][data-theme-name='slate']:has(.slate-header--phone)
+  .slate-rsp--phone
+  .rsp-form-name {
+  display: none;
+}
+
+/* The test run fills the screen under the bar; the bar says what it is. */
+[data-slate-forms][data-theme-name='slate'] .slate-app--phone .slate-preview-note {
+  display: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-app--phone .slate-preview--page {
+  height: calc(100dvh - var(--slate-header-h) - var(--m-safe-t) - 40px - var(--m-safe-b));
+  min-height: 420px;
+  border-radius: 16px;
+}
+
+/* ---------- bottom action bar ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-actionbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 55;
+  display: flex;
+  gap: 10px;
+  padding: 10px max(var(--m-gutter), var(--m-safe-r)) calc(10px + var(--m-safe-b))
+    max(var(--m-gutter), var(--m-safe-l));
+  border-top: 1px solid var(--chrome-hair);
+  background: color-mix(in srgb, var(--chrome-bg) 90%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-actionbar > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-actionbar .slate-btn {
+  height: 48px;
+  min-height: 48px;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-actionbar .slate-btn svg {
+  flex: none;
+}
+
+/* ---------- ⋯ sheet (and every other bottom sheet) ---------- */
+
+.slate-m-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-top: max(24px, var(--m-safe-t));
+  background: var(--chrome-scrim);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px max(12px, var(--m-safe-r)) calc(12px + var(--m-safe-b)) max(12px, var(--m-safe-l));
+  border: 1px solid var(--chrome-line);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--chrome-panel);
+  color: var(--chrome-ink);
+  box-shadow: 0 -12px 40px -12px var(--chrome-scrim);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-grip {
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin: 0 auto 8px;
+  border-radius: 2px;
+  background: var(--chrome-line);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-account {
+  overflow: hidden;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--chrome-ink);
+  font: inherit;
+  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-item:active,
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-item:focus-visible {
+  background: var(--chrome-panel-2);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-item:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: -2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-item:disabled {
+  opacity: 0.5;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-item--danger {
+  color: var(--slate-error);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-item--danger .slate-m-sheet-icon {
+  color: inherit;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-glyph {
+  font-size: 19px;
+  line-height: 1;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-hint {
+  flex: none;
+  font-size: 13px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-sep {
+  height: 1px;
+  margin: 6px 12px;
+  background: var(--chrome-hair);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-sheet-cancel {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  margin-top: 8px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 12px;
+  background: var(--chrome-panel-2);
+  color: var(--chrome-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ============================================================
+   EDITOR ON A PHONE: Outline · Question · Preview
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='slate'] .slate-app--phone .slate-editor-shell {
+  height: auto;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-tabs {
+  position: sticky;
+  top: calc(var(--slate-header-h) + var(--m-safe-t));
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 6px max(12px, var(--m-safe-r)) 8px max(12px, var(--m-safe-l));
+  border-bottom: 1px solid var(--chrome-hair);
+  background: var(--chrome-bg);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-tab {
+  position: relative;
+  min-width: 0;
+  height: var(--m-tap);
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--chrome-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-tab[aria-selected='true'] {
+  border-color: var(--chrome-line);
+  background: var(--chrome-panel);
+  color: var(--chrome-ink);
+  box-shadow: var(--slate-shadow-card);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-tab:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: -2px;
+}
+
+/* Panes flow with the page (the URL bar can collapse); only the preview
+   keeps a fixed frame. */
+[data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane > .slate-rail {
+  height: auto;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane .slate-rail-pad {
+  padding-left: max(var(--m-gutter), var(--m-safe-l));
+  padding-right: max(var(--m-gutter), var(--m-safe-r));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane > .slate-canvas {
+  height: calc(
+    100dvh - var(--slate-header-h) - var(--m-safe-t) - var(--m-tabs-h) - var(--m-actionbar-h) -
+      var(--m-safe-b)
+  );
+  min-height: 360px;
+  background: transparent;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane .slate-canvas-toolbar {
+  padding: 8px max(var(--m-gutter), var(--m-safe-r)) 8px max(var(--m-gutter), var(--m-safe-l));
+  gap: 8px;
+  background: transparent;
+  border-bottom: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane .slate-canvas-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane .slate-canvas-frame {
+  margin: 0 max(12px, var(--m-safe-r)) 12px max(12px, var(--m-safe-l));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-app--phone .slate-editor-alert {
+  padding: 8px var(--m-gutter);
+}
+
+/* Outline rows: taller, and the current question keeps its move/duplicate
+   actions visible (there is no hover on a phone). */
+[data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane .slate-outline-row {
+  min-height: var(--m-tap);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane .slate-outline-grip {
+  width: 32px;
+  min-height: var(--m-tap);
+  opacity: 0.55;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane .slate-outline-list {
+  --slate-outline-grip-w: 32px;
+}
+
+/* ---------- add-question palette as a sheet ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-popover--sheet {
+  max-height: 86%;
+  padding-top: 8px;
+  animation: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-popover--sheet .slate-add-group-trigger {
+  min-height: var(--m-tap);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-popover--sheet .slate-add-type-btn {
+  min-height: var(--m-tap);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-popover--sheet .slate-btn--compact {
+  min-height: var(--m-tap);
+  padding: 0 18px;
+}
+
+/* ============================================================
+   PHONE WIDTH (media query: reaches portaled overlays too)
+   ============================================================ */
+
+@media (max-width: 719px) {
+  /* --- tap targets --- */
+  [data-slate-forms][data-theme-name='slate'] .slate-btn {
+    min-height: var(--m-tap);
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-btn--icon {
+    width: var(--m-tap);
+    min-width: var(--m-tap);
+    height: var(--m-tap);
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-icon-btn {
+    width: var(--m-tap);
+    height: var(--m-tap);
+    font-size: 16px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-tab {
+    min-height: var(--m-tap);
+  }
+
+  [data-slate-forms][data-theme-name='slate'] :is(.slate-share-close, .slate-share-open) {
+    min-width: var(--m-tap);
+    min-height: var(--m-tap);
+  }
+}
+
+/* --- fields: 16px or iOS zooms the page on focus (iPads too). Studio fields
+       only; a previewed form (its own inner wrapper) keeps its theme's sizes. --- */
+@media (max-width: 719px), (pointer: coarse) {
+  [data-slate-forms][data-theme-name='slate']
+    :is(
+      input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']),
+      textarea,
+      select
+    ):not([data-slate-forms]:not([data-theme-name='slate']) *) {
+    /* !important: the studio's field rules (publicChrome.css) carry long
+       :not() chains; this floor has to win over every one of them. */
+    font-size: 16px !important;
+  }
+}
+
+@media (max-width: 719px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-input {
+    min-height: var(--m-tap);
+  }
+
+  /* --- dialogs become bottom sheets --- */
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-backdrop {
+    align-items: flex-end;
+    padding: max(24px, var(--m-safe-t)) 0 0;
+  }
+
+  [data-slate-forms][data-theme-name='slate']
+    :is(.slate-dialog, .slate-share-panel, .slate-shortcuts) {
+    width: 100%;
+    max-width: none;
+    max-height: 100%;
+    margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-bottom: 0;
+    border-radius: 20px 20px 0 0;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog {
+    padding: 22px max(20px, var(--m-safe-r)) calc(16px + var(--m-safe-b)) max(20px, var(--m-safe-l));
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-share-panel {
+    padding-bottom: var(--m-safe-b);
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-title {
+    font-size: 20px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-message {
+    font-size: 15px;
+  }
+
+  /* Primary on top, full width, thumb height. */
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-actions > .slate-btn {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+    font-size: 15px;
+  }
+
+  /* Build with AI is a whole task: full screen. */
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog-backdrop:has(> .slate-dialog--ai) {
+    padding: 0;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-dialog--ai {
+    min-height: 100%;
+    border: 0;
+    border-radius: 0;
+    padding-top: calc(20px + var(--m-safe-t));
+  }
+
+  /* --- the bell: a full-width panel under the bar --- */
+  .slate-inbox {
+    left: max(8px, var(--m-safe-l)) !important;
+    right: max(8px, var(--m-safe-r)) !important;
+    width: auto;
+    max-height: calc(100dvh - 80px - var(--m-safe-t) - var(--m-safe-b));
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-inbox-header {
+    min-height: 52px;
+    padding: 8px 16px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-inbox-header .slate-link {
+    min-height: var(--m-tap);
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-inbox-item {
+    min-height: 52px;
+  }
+
+  /* --- toasts: full width, above the action bar and the home indicator --- */
+  .slate-toast-stack {
+    left: max(12px, var(--m-safe-l));
+    right: max(12px, var(--m-safe-r));
+    bottom: calc(12px + var(--m-safe-b));
+    max-width: none;
+  }
+
+  body:has(.slate-m-actionbar) .slate-toast-stack {
+    bottom: calc(var(--m-actionbar-h) + 10px + var(--m-safe-b));
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-toast-dismiss {
+    min-width: 36px;
+    min-height: 36px;
+    margin: -8px -6px -8px 0;
+  }
+
+  /* --- hover-only affordances get a touch fallback --- */
+  [data-slate-forms][data-theme-name='slate']
+    .slate-outline-item:has(.slate-outline-row--selected)
+    .slate-outline-actions {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(-50%);
+  }
+
+  [data-slate-forms][data-theme-name='slate']
+    .slate-outline-item:has(.slate-outline-row--selected)
+    .slate-outline-title {
+    padding-right: 124px;
+  }
+
+  /* --- login --- */
+  [data-slate-forms][data-theme-name='slate'] .slate-login {
+    min-height: 100dvh;
+    padding: max(20px, var(--m-safe-t)) max(16px, var(--m-safe-r)) max(20px, var(--m-safe-b))
+      max(16px, var(--m-safe-l));
+  }
+
+  [data-slate-forms][data-theme-name='slate'] :is(.slate-login-google, .slate-login-submit) {
+    min-height: 48px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-login-back {
+    min-height: var(--m-tap);
+  }
+}
+
+/* Coarse pointers at any width (tablets): same outline fallback. */
+@media (hover: none) and (min-width: 720px) {
+  [data-slate-forms][data-theme-name='slate']
+    .slate-outline-item:has(.slate-outline-row--selected)
+    .slate-outline-actions {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(-50%);
+  }
+}
+
+/* ---------- motion (sheets rise; bars settle). Calm = static end state. ---------- */
+
+@keyframes slate-m-sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes slate-m-bar-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slate-forms][data-theme-name='slate'] .slate-m-sheet {
+    animation: slate-m-sheet-in 280ms var(--m-ease) both;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-m-actionbar {
+    animation: slate-m-bar-in 320ms var(--m-ease) both;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-m-tab {
+    transition:
+      background 160ms ease,
+      color 160ms ease,
+      border-color 160ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (max-width: 719px) {
+  [data-slate-forms][data-theme-name='slate']
+    :is(.slate-dialog, .slate-share-panel, .slate-shortcuts) {
+    animation: slate-m-sheet-in 280ms var(--m-ease) both;
+  }
+}

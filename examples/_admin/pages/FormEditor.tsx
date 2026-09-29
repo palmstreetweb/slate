@@ -42,7 +42,9 @@ import { AdminShell } from '../shell/AdminShell.js';
 import { Outline } from '../components/Outline.js';
 import { Canvas } from '../components/Canvas.js';
 import { Inspector } from '../components/Inspector.js';
-import { EditorLayoutShell } from '../components/EditorLayoutShell.js';
+import { EditorLayoutShell, type EditorPhoneTab } from '../components/EditorLayoutShell.js';
+import { usePhone } from '../responses/hooks.js';
+import { IconChart, IconLink, IconPlay } from '../mobile/PhoneChrome.js';
 import { SharePanel } from '../components/SharePanel.js';
 import { useEditorHistory } from '../useEditorHistory.js';
 import { clampOutlineDropIndex, resolveOutlineInsertIndex } from '../outlineDropIndex.js';
@@ -166,6 +168,9 @@ function FormEditorBody({ formId }: { formId: string }) {
   const toast = useToast();
   const [aiDraft, setAiDraft] = useState(() => isAiDraft(formId));
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Phones show one pane at a time behind a segmented control (ADR-062).
+  const phone = usePhone();
+  const [phoneTab, setPhoneTab] = useState<EditorPhoneTab>('outline');
   // Publish ignition (ADR-060): spinner → check → the button bows out.
   const ignite = usePublishIgnition();
   /** The header pill's label, kept on "Draft" until the check lands. */
@@ -215,7 +220,7 @@ function FormEditorBody({ formId }: { formId: string }) {
     [],
   );
 
-  const { pushHistory } = useEditorHistory({
+  const { pushHistory, undo, redo } = useEditorHistory({
     getSnapshot,
     restore: restoreSnapshot,
   });
@@ -594,9 +599,73 @@ function FormEditorBody({ formId }: { formId: string }) {
   const pillLive = statusLabel === 'Live';
   const pillStale = statusLabel === 'Unpublished changes';
 
+  const needsPublish = cloud && (!isPublished || stale || ignite.phase !== 'idle');
+  const saveText = saveError ?? (savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved');
+
   return (
     <AdminShell
       fullBleed
+      phone={{
+        back: { label: 'Forms', onClick: () => navigate('/') },
+        title: name,
+        subtitle: (
+          <>
+            {statusLabel ? (
+              <span
+                className={`slate-m-status${pillLive ? ' slate-m-status--live' : pillStale ? ' slate-m-status--stale' : ''}`}
+              >
+                {statusLabel}
+              </span>
+            ) : null}
+            <span className={saveError ? 'slate-m-save slate-m-save--err' : 'slate-m-save'}>
+              {saveText}
+            </span>
+          </>
+        ),
+        menu: [
+          {
+            id: 'preview',
+            label: 'Test the form',
+            hint: 'Full screen',
+            icon: <IconPlay />,
+            onSelect: () => navigate(`/forms/${formId}/preview`),
+          },
+          {
+            id: 'responses',
+            label: 'Responses',
+            icon: <IconChart />,
+            onSelect: () => navigate(`/forms/${formId}/submissions`),
+          },
+          {
+            id: 'undo',
+            label: 'Undo',
+            icon: <span className="slate-m-glyph">↶</span>,
+            onSelect: undo,
+          },
+          {
+            id: 'redo',
+            label: 'Redo',
+            icon: <span className="slate-m-glyph">↷</span>,
+            onSelect: redo,
+          },
+        ],
+        actions: (
+          <>
+            <button
+              type="button"
+              className={`slate-btn${needsPublish ? '' : ' slate-btn--primary'}`}
+              onClick={() => void handleShare()}
+            >
+              <IconLink /> Share
+            </button>
+            {needsPublish ? (
+              <PublishButton phase={ignite.phase} onClick={quickPublish}>
+                {isPublished ? 'Republish' : 'Publish'}
+              </PublishButton>
+            ) : null}
+          </>
+        ),
+      }}
       crumbs={
         <span className="slate-crumb">
           <button type="button" className="slate-link" onClick={() => navigate('/')}>
@@ -631,7 +700,7 @@ function FormEditorBody({ formId }: { formId: string }) {
           ) : null}
           <button
             type="button"
-            className="slate-btn slate-btn--icon"
+            className="slate-btn slate-btn--icon slate-shortcuts-btn"
             onClick={() => setShortcutsOpen(true)}
             aria-label="Keyboard shortcuts"
             title="Shortcuts (⌘/)"
@@ -649,7 +718,7 @@ function FormEditorBody({ formId }: { formId: string }) {
           <button type="button" className="slate-btn" onClick={() => void handleShare()}>
             Share
           </button>
-          {cloud && (!isPublished || stale || ignite.phase !== 'idle') ? (
+          {needsPublish ? (
             // Only while there is something to push (or the ignition is still
             // playing). Live + current → Share alone.
             <PublishButton phase={ignite.phase} onClick={quickPublish}>
@@ -768,7 +837,10 @@ function FormEditorBody({ formId }: { formId: string }) {
                 type="button"
                 className="slate-link"
                 style={{ fontSize: 13 }}
-                onClick={() => setSelectedId(issue.questionId)}
+                onClick={() => {
+                  setSelectedId(issue.questionId);
+                  if (phone) setPhoneTab('edit');
+                }}
               >
                 {issue.message}
               </button>
@@ -777,12 +849,23 @@ function FormEditorBody({ formId }: { formId: string }) {
         )}
 
         <EditorLayoutShell
+          phoneTab={phone ? phoneTab : undefined}
+          onPhoneTabChange={setPhoneTab}
+          editLabel={isWelcome ? 'Welcome' : isThanks ? 'Ending' : 'Question'}
           outline={
             <Outline
               schema={schema}
               selectedId={selectedQuestion.id}
-              onSelect={setSelectedId}
-              onAddQuestion={addQuestion}
+              phone={phone}
+              onSelect={(id) => {
+                setSelectedId(id);
+                // On a phone, picking a question opens it.
+                if (phone) setPhoneTab('edit');
+              }}
+              onAddQuestion={(type) => {
+                addQuestion(type);
+                if (phone) setPhoneTab('edit');
+              }}
               onReorder={reorder}
               onMove={moveTo}
               onDuplicate={duplicateQuestion}
