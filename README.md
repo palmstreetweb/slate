@@ -97,6 +97,8 @@ type Schema = {
   /** Opt-in step sound: `'off'` or one of ten built-in presets (ADR-023).
    *  When on, text fields also play typewriter key ticks (ADR-034). */
   sound?: FormSound | boolean;
+  /** Instant estimate settings (ADR-064): currency, base price, labels, breakdown. */
+  estimate?: EstimateSettings;
   questions: ReadonlyArray<Question>;
 };
 ```
@@ -137,10 +139,13 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `legal` | `title`, `body?`, `acceptLabel?`, `declineLabel?`, `required?` (default `true`) | required | `'accept' \| 'decline'` |
 | `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?`, `display?` (`'numbers'` \| `'stars'` \| `'emoji'` \| `'slider'`), `sliderIcon?` | range | `number` |
 | `nps` | `title`, `minLabel?`, `maxLabel?`, `required?` | 0–10 | `number` |
+| `contact_info` | `title`, `fields?` (`name` / `email` / `phone`: `'required'` \| `'optional'` \| `'off'`; default name + email required, phone optional), `defaultCountry?` | per part: required, email shape, phone parses | `{ name?, email?, phone? }` (phone as E.164) |
+| `address` | `title`, `required?`, `line2?` (default `true`), `country?`, `format?` (`'us'` \| `'international'`), `serviceArea?` (ZIP codes or prefixes) | complete once started; 5-digit ZIP (US) | `{ street, line2?, city, region?, postal, country? }` |
+| `signature` | `title`, `body?`, `required?`, `allowTyped?` (default `true`) | a real stroke, not a dot; or a typed name | `{ path }` (vector strokes, 500 × 200 box) or `{ typed }` |
 | `review` | `title`, `subtitle?`, `cta?`, `visibleIf?` | — | _not stored; lists answers with jump-to-edit_ |
-| `thanks` | `title`, `subtitle?`, `cta?`, `visibleIf?`, `redirectUrl?` | — | _not stored; fires `onSubmit`_ |
+| `thanks` | `title`, `subtitle?`, `cta?`, `visibleIf?`, `redirectUrl?`, `showEstimate?` | — | _not stored; fires `onSubmit`_ |
 
-`Option` is `{ label: string; value: string; description?: string; score?: number }`. `PictureOption` adds `{ src: string; alt?: string }`.
+`Option` is `{ label: string; value: string; description?: string; score?: number; price?: number; priceMax?: number; features?: string[]; badge?: string }` (prices and card details from ADR-064). `PictureOption` adds `{ src: string; alt?: string }`.
 
 **Options added in ADR-063** (Wave A of the question catalog expansion; BUILD_BRIEF §5 stays the canonical v1 table):
 
@@ -150,11 +155,17 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 - **Quantity stepper** — `number` with `display: 'stepper'`: big − / + buttons, hold to repeat, `prefix` / `unit` shown around the value.
 - **Date time / range** — `includeTime` (12-hour entry on month-first forms, 24-hour otherwise) and `range` (From / To).
 
-Stars, faces, the slider, the stepper, date ranges / times and the file field load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
+**Added in ADR-064** (Wave B):
+
+- **Instant estimate** — put a `price` (and `priceMax` for a range) on choice options, a `unitPrice` (and `unitPriceMax`) on number questions, and optionally `schema.estimate.base`. An ending with `showEstimate` reveals "Your estimate: $2,400 – $3,100" once the response is received (counting up; a line per priced answer with `estimate.breakdown`; `estimate.disclaimer` as small print). `{{estimate}}` pipes the same text into any copy, and `SubmitMeta.estimate` carries `{ low, high, currency, lines }`. A server that stores responses should recompute it from its own copy of the schema (the Slate submit Function does).
+- **Package cards** — `display: 'cards'` on `single_choice` draws each option as a card with its price, `features` and `badge`. Same answer as the list.
+- **Contact info**, **Address** and **Signature** — the three new types above. Addresses use the browser's autofill tokens (no lookup service). With a `serviceArea`, a condition can test `IN_AREA_VALUE` / `OUT_OF_AREA_VALUE` (exported) to route out-of-area answers to their own ending.
+
+Stars, faces, the slider, the stepper, date ranges / times, the file field, picture choice, ranking, the matrix, package cards, the contact block, the address, the signature pad and the estimate reveal load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
 
 ### Answer piping
 
-`{{field:questionId}}` in any `title`, `subtitle`, or `body` is replaced with the formatted answer; `{{score}}` resolves to the running score total. Unanswered fields resolve to `''`.
+`{{field:questionId}}` in any `title`, `subtitle`, or `body` is replaced with the formatted answer; `{{score}}` resolves to the running score total and `{{estimate}}` to the instant estimate ("$2,400 – $3,100"). A contact block pipes as the name. Unanswered fields resolve to `''`.
 
 ```ts
 title: "Nice to meet you, {{field:name}}. What's your email?"
@@ -223,6 +234,8 @@ type SubmitMeta = {
   hiddenFields: Record<string, unknown>;
   /** Total of option-level `score` values (0 when nothing is scored). */
   score: number;
+  /** The instant estimate, when the schema has prices (ADR-064). */
+  estimate?: { low: number; high: number; currency: string; lines: EstimateLine[] };
 };
 ```
 

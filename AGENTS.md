@@ -53,12 +53,12 @@ Every layer has one job. If a new file doesn't fit cleanly into one of the above
 
 First ask whether it's an **option** on an existing type (ADR-063): a new look or input style for the same stored answer (stars vs numbers, stepper vs box, date + time) is an option, not a type. Only a new answer shape is a new type.
 
-1. Add the type (or option) to `src/types/Question.ts`, and its answer to `src/types/Answers.ts`. Answers must fit the server's shapes: `string`, `number`, `string[]`, `Record<string, string | string[]>`.
+1. Add the type (or option) to `src/types/Question.ts`, and its answer to `src/types/Answers.ts`. Answers must fit the server's shapes: `string`, `number`, `string[]`, `Record<string, string | string[]>` (a group of parts — contact, address, signature — is a `Record`, ADR-064).
 2. Add a validator branch in `src/logic/validation.ts`, and a `schemaCheck.ts` rule for any new way a schema can be wrong.
 3. Build the field. A small one goes in `src/components/questions/<NewType>Field.tsx` and the `QuestionRenderer` switch. Anything heavier goes in `src/components/questions/ext/` behind the on-demand registry (`lazyFields.tsx`: a key, a loader and a line in `extFieldKey`), so it doesn't grow the engine's initial load. Run `npm run size` (budget 50 kB gzip).
-4. Keyboard (`useKeyboardNav`), piping text (`formatAnswerFor` in `logic/piping.ts`), conditions and scoring if it has options.
-5. Server: a branch in `clampForQuestion` (`neon/functions/submit-response/answerShape.ts`).
-6. Studio: `TYPE_LABEL` / `ADDABLE_TYPES` (`questionTypeMeta.ts`), an icon in `components/TypeIcon.tsx`, inspector settings, `sanitizeUntrustedSchema.ts`, Responses (`responsesFormat.ts`, Summary distribution, CSV), and Build with AI (`api/generateFormSchema.ts` + `api/mapGeneratedForm.ts`).
+4. Keyboard (`useKeyboardNav`), piping text (`formatAnswerFor` in `logic/piping.ts`), conditions and scoring if it has options. A derived yes/no a condition should test (like "outside the service area") is a sentinel value compared in `conditional.ts`, never stored (`OTHER_VALUE`, `OUT_OF_AREA_VALUE`).
+5. Server: a branch in `clampForQuestion` (`neon/functions/submit-response/answerShape.ts`). Anything the server must recompute or re-check exactly as the engine does (the estimate, signature paths) lives in a `shared with the server (keep identical)` section of the engine module, copied byte for byte into the Function folder; a test compares the two.
+6. Studio: `TYPE_LABEL` / `ADDABLE_TYPES` (`questionTypeMeta.ts`), an icon in `components/TypeIcon.tsx`, a default in `makeDefaultQuestion` (`pages/FormEditor.tsx`), inspector settings (`Inspector.tsx`, Wave B's in `InspectorWaveB.tsx`), `sanitizeUntrustedSchema.ts`, Responses (`responsesFormat.ts` incl. `csvParts` for a multi-part answer, Summary distribution in `responses/model.ts`, `ResponseAnswers.tsx` for anything that isn't text), and Build with AI (`api/generateFormSchema.ts` + `api/mapGeneratedForm.ts`; new required fields need a default in `withDraftDefaults` so an older draft can still be revised).
 7. Check it in all 12 themes, at 375 px (ADR-062), light and dark, with reduced motion (ADR-059).
 8. Update the README question-types list, and add Vitest specs. `tests/catalogCoverage.test.tsx` fails until a new type reaches every surface above; add its sample there.
 
