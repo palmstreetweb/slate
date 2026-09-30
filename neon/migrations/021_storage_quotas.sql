@@ -29,6 +29,8 @@
 --      it claims the pending, unexpired rows of the same form the answers reference.
 --   4. Deletes: submissions_doom_uploads and forms_doom_uploads mark the rows of a permanently deleted
 --      response or form 'doomed'. Trash (deleted_at) changes nothing: trashed responses keep their files.
+--      A response inserted again while its files are still there (the studio's backup restore deletes
+--      every response, then inserts them) takes them back; the global sweep waits 2 min for that.
 --   5. The sweep, run by storagesign with no new infrastructure: reserve_upload claims a gate row at most
 --      once a minute and says so (sweep_due); storage_sweep_begin then leases a bounded batch (doomed
 --      objects first, then pending uploads past 24 h, then one HEAD per upload 30 min after it was
@@ -102,6 +104,8 @@ create table if not exists public.form_uploads (
   verified_at timestamptz,
   legacy boolean not null default false,
   lease_until timestamptz,
+  -- When its response or form was permanently deleted.
+  doomed_at timestamptz,
   constraint form_uploads_key_shape check (
     key ~ '^(public|draft)/[A-Za-z0-9_-]{4,64}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[^/]{1,120}$'
   ),
@@ -263,6 +267,9 @@ $fn$;
 -- Claims the pending, unexpired uploads of the same form that a stored response references.
 -- AFTER INSERT and after a change to answers; also follows a response whose id changes. Named to fire
 -- before submissions_signup_claims (020), so every path takes upload rows before the form lock.
+-- A doomed row whose object is still there comes back too: the studio's backup restore deletes every
+-- response and inserts them again, and must not lose their files. Not while a sweep holds it (its
+-- delete may be in flight); a revived row is checked again (HEAD) in case an earlier sweep died mid-way.
 create or replace function public.submissions_claim_uploads()
 returns trigger
 language plpgsql
@@ -279,11 +286,13 @@ begin
     end if;
   end if;
   update public.form_uploads u
-     set state = 'claimed', submission_id = new.id, claimed_at = now()
+     set state = 'claimed', submission_id = new.id, claimed_at = now(),
+         verified_at = case when u.state = 'doomed' then null else u.verified_at end,
+         doomed_at = null
    where u.key in (select public.upload_keys_of(new.answers))
      and u.form_id = new.form_id
-     and u.state = 'pending'
-     and u.created_at > now() - public.storage_pending_ttl();
+     and ((u.state = 'pending' and u.created_at > now() - public.storage_pending_ttl())
+          or (u.state = 'doomed' and (u.lease_until is null or u.lease_until < now())));
   return null;
 end;
 $fn$;
@@ -304,7 +313,7 @@ set search_path = public, pg_temp
 as $fn$
 begin
   update public.form_uploads u
-     set state = 'doomed', lease_until = null
+     set state = 'doomed', lease_until = null, doomed_at = now()
    where u.submission_id = old.id and u.state = 'claimed';
   return null;
 end;
@@ -323,7 +332,7 @@ set search_path = public, pg_temp
 as $fn$
 begin
   update public.form_uploads u
-     set state = 'doomed', lease_until = null
+     set state = 'doomed', lease_until = null, doomed_at = now()
    where u.form_id = old.id and u.state <> 'doomed';
   return null;
 end;
@@ -459,8 +468,10 @@ $fn$;
 -- ---------------------------------------------------------------------------
 -- 5. The sweep.
 -- ---------------------------------------------------------------------------
--- Leases up to p_limit rows (at most 200) for storagesign: 'delete' (doomed, or pending past the TTL) or
--- 'head' (not checked yet, 30 min after signing). With p_owner: only that owner's doomed rows.
+-- Leases up to p_limit rows (at most 200) for storagesign: 'delete' (doomed at least 2 min ago, or pending
+-- past the TTL) or 'head' (not checked yet, 30 min after signing). The 2 minutes let a backup restore
+-- (delete, then insert again) take its files back first. With p_owner: only that owner's doomed rows,
+-- at once (the studio asks right after the owner deleted something for good).
 create or replace function public.storage_sweep_begin(p_limit integer, p_owner text default null)
 returns table (obj_key text, obj_action text, obj_bytes bigint)
 language plpgsql volatile security definer set search_path = public, pg_temp
@@ -473,7 +484,9 @@ declare
 begin
   select coalesce(array_agg(x.key), '{}') into v_doomed
     from (select u.key from public.form_uploads u
-           where u.state = 'doomed' and (p_owner is null or u.owner_id = p_owner)
+           where u.state = 'doomed'
+             and (u.owner_id = p_owner
+                  or (p_owner is null and coalesce(u.doomed_at, '-infinity') <= now() - interval '2 minutes'))
              and (u.lease_until is null or u.lease_until < now())
            order by u.created_at
            limit v_left
