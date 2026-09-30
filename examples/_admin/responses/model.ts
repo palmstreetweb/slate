@@ -5,6 +5,7 @@
  * plain strings for React to render as text, never markup.
  */
 
+import { WAITLIST_VALUE, signupPicks } from '@/logic/signupAnswer.js';
 import type { Question } from '@/index.js';
 import { OTHER_VALUE } from '@/index.js';
 import { allowsOther, hasOtherAnswer, otherLabelOf, splitOther } from '@/logic/other.js';
@@ -476,6 +477,11 @@ export function answerMatchesFilter(
     if (filter.value === OUT_OF_AREA_VALUE) return area === 'out';
     return area === null && !isBlankAnswer(value);
   }
+  // Sign-up slots (ADR-066): took this slot, or joined any waitlist.
+  if (question?.type === 'signup_slots') {
+    const { slots, wait } = signupPicks(value);
+    return filter.value === WAITLIST_VALUE ? wait.length > 0 : slots.includes(filter.value);
+  }
   // Photo checklist (ADR-065): this shot has a photo.
   if (question?.type === 'photo_checklist') {
     const a =
@@ -542,7 +548,8 @@ const OPTION_TYPES = new Set<Question['type']>([
   'dropdown',
   'picture_choice',
 ]);
-const COLUMN_CHOICE_TYPES = new Set<Question['type']>([...OPTION_TYPES, 'yes_no']);
+/** Sign-up slots (ADR-066) make a good column too: which slot each person took. */
+const COLUMN_CHOICE_TYPES = new Set<Question['type']>([...OPTION_TYPES, 'yes_no', 'signup_slots']);
 const TEXT_COLUMN_FALLBACK = new Set<Question['type']>(['short_text', 'url', 'phone']);
 /** More distinct values than this and a numeric chart only lists values that occur. */
 const NUMERIC_DOMAIN_MAX = 11;

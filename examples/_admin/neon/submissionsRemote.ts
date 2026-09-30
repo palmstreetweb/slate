@@ -19,6 +19,7 @@ import { getNeon } from './client.js';
 import { ensureAuthForDataApi, waitForAuthReady } from './ensureAuth.js';
 import { formatNeonError, isRlsOrAuthError } from './neonError.js';
 import { rowToSubmission, submissionToRow } from './mappers.js';
+import { moveSignupAnswer } from '@/logic/signupView.js';
 
 type Listener = (subs: StoredSubmission[]) => void;
 
@@ -558,6 +559,73 @@ export function purgeSubmissionsRemoteSync(formId: string): void {
       ),
     'Could not purge responses',
   );
+}
+
+/** What moving someone between sign-up slots came to (ADR-066). */
+export type MoveSignupResult =
+  | { ok: true }
+  | { ok: false; reason: 'full'; taken: number; capacity: number }
+  | { ok: false; reason: 'gone' | 'error'; message: string };
+
+/**
+ * The studio roster's move (ADR-066): 020's owner-checked move_signup_slot,
+ * which counts under the form's lock and refuses a full slot unless `force`.
+ * Not optimistic — the cache changes only once the database agrees.
+ */
+export async function moveSignupSlotRemote(args: {
+  submissionId: string;
+  questionId: string;
+  from: string;
+  to: string;
+  force?: boolean;
+}): Promise<MoveSignupResult> {
+  try {
+    await ensureAuthForDataApi();
+    const { data, error } = await getNeon().rpc('move_signup_slot', {
+      p_submission_id: args.submissionId,
+      p_question_id: args.questionId,
+      p_from: args.from,
+      p_to: args.to,
+      p_force: args.force === true,
+    });
+    if (error) throw error;
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { outcome?: unknown; taken?: unknown; capacity?: unknown }
+      | null
+      | undefined;
+    if (row?.outcome === 'full') {
+      return {
+        ok: false,
+        reason: 'full',
+        taken: Number(row.taken) || 0,
+        capacity: Number(row.capacity) || 0,
+      };
+    }
+    if (row?.outcome !== 'ok') {
+      return {
+        ok: false,
+        reason: 'gone',
+        message:
+          row?.outcome === 'bad_slot'
+            ? 'That slot isn’t on the published form. Publish your changes first.'
+            : 'That response changed or is gone. Refresh and try again.',
+      };
+    }
+    const sub = full.get(args.submissionId);
+    if (sub) {
+      putFull({
+        ...sub,
+        answers: {
+          ...sub.answers,
+          [args.questionId]: moveSignupAnswer(sub.answers[args.questionId], args.from, args.to),
+        } as StoredSubmission['answers'],
+      });
+      notify();
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: 'error', message: formatNeonError(err, 'Could not move them') };
+  }
 }
 
 /** Backup restore (offline-first feature; kept correct for cloud). */

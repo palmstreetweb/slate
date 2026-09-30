@@ -367,6 +367,43 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         ...vis,
       };
     }
+    // Wave D (ADR-066): options are the slots; `max` is the most per person.
+    case 'signup_slots': {
+      const used = new Set<string>();
+      const date = (d: string) => (/^\d{4}-\d{2}-\d{2}$/.test(d.trim()) ? d.trim() : undefined);
+      const time = (t: string) =>
+        /^([01]\d|2[0-3]):[0-5]\d$/.test(t.trim()) ? t.trim() : undefined;
+      const slots = q.options
+        .filter((o) => o.label.trim() && o.value.trim())
+        .slice(0, 50)
+        .map((o) => {
+          const value = slugId(o.value, used).slice(0, 64);
+          const cap = Math.round(Number(o.capacity));
+          const d = date(o.date ?? '');
+          const start = time(o.start ?? '');
+          const end = time(o.end ?? '');
+          return {
+            label: o.label.trim().slice(0, 120),
+            value,
+            capacity: cap >= 1 && cap <= 1000 ? cap : 8,
+            ...(d ? { date: d } : {}),
+            ...(start ? { start } : {}),
+            ...(end && start && end > start ? { end } : {}),
+          };
+        });
+      const maxPicks = Math.round(q.max);
+      return {
+        id,
+        type: 'signup_slots',
+        title,
+        ...(text(q.body) ? { body: text(q.body) } : {}),
+        slots,
+        ...(required ? {} : { required: false }),
+        ...(maxPicks >= 2 ? { maxPicks: Math.min(maxPicks, slots.length, 50) } : {}),
+        ...(q.waitlist ? { waitlist: true } : {}),
+        ...vis,
+      };
+    }
     case 'review':
       return {
         id,
@@ -420,6 +457,7 @@ function blankQuestion(
     days: [],
     startTime: '',
     endTime: '',
+    waitlist: false,
     showIfField: '',
     showIfEquals: '',
     ...partial,

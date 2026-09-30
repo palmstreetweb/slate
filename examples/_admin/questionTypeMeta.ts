@@ -35,6 +35,7 @@ export const TYPE_LABEL: Record<Question['type'], string> = {
   location: 'Location',
   photo_checklist: 'Photo Checklist',
   availability: 'Availability',
+  signup_slots: 'Sign-up Slots',
   review: 'Review Screen',
 };
 
@@ -58,6 +59,8 @@ export const ADDABLE_TYPES: ReadonlyArray<{ type: QuestionType; label: string; g
   { type: 'nps', label: TYPE_LABEL.nps, group: 'Choices' },
   { type: 'ranking', label: TYPE_LABEL.ranking, group: 'Choices' },
   { type: 'matrix', label: TYPE_LABEL.matrix, group: 'Choices' },
+  // Wave D (ADR-066): limited spots, taken at submit.
+  { type: 'signup_slots', label: TYPE_LABEL.signup_slots, group: 'Choices' },
   // Wave C (ADR-065): things a phone captures on the spot.
   { type: 'photo_checklist', label: TYPE_LABEL.photo_checklist, group: 'Capture' },
   { type: 'image_pin', label: TYPE_LABEL.image_pin, group: 'Capture' },

@@ -163,6 +163,14 @@ const PATHS: Record<Question['type'], ReactNode> = {
       <rect x="6.6" y="6.6" width="2.8" height="3.1" fill="currentColor" stroke="none" />
     </>
   ),
+  // Wave D (ADR-066): a ticket with its stub, spots marked.
+  signup_slots: (
+    <>
+      <path d="M2.5 4.5h11v2.2a1.3 1.3 0 0 0 0 2.6v2.2h-11V9.3a1.3 1.3 0 0 0 0-2.6z" />
+      <path d="M9.6 4.8v1.2M9.6 7.4v1.2M9.6 10v1.2" />
+      <path d="M5 7.1h2.3M5 9h1.6" />
+    </>
+  ),
 };
 
 export function TypeIcon({

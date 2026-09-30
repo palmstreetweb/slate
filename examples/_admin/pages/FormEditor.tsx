@@ -50,6 +50,7 @@ import { useEditorHistory } from '../useEditorHistory.js';
 import { clampOutlineDropIndex, resolveOutlineInsertIndex } from '../outlineDropIndex.js';
 import { uniqueQuestionId } from '../questionIds.js';
 import { withOutOfAreaEnding } from '../outOfArea.js';
+import { newSlotValue } from '../signupSlots.js';
 import { sanitizeSchemaLogic } from '../sanitizeSchema.js';
 import { slugify } from '../shareUrls.js';
 import { withBrandLogo } from '../brandLogo.js';
@@ -929,6 +930,7 @@ function FormEditorBody({ formId }: { formId: string }) {
               estimate={schema.estimate}
               onEstimateChange={(next) => patchSchema({ estimate: next })}
               onAddOutOfAreaEnding={addOutOfAreaEnding}
+              formId={formId}
               onDelete={async () => {
                 const titleText =
                   'title' in selectedQuestion && typeof selectedQuestion.title === 'string'
@@ -1157,5 +1159,24 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
         endTime: '18:00',
         slotMinutes: 60,
       };
+    // Wave D (ADR-066)
+    case 'signup_slots': {
+      const morning = newSlotValue([]);
+      return {
+        id,
+        type,
+        title: 'Pick a time that works for you',
+        slots: [
+          { label: 'Morning', value: morning, capacity: 8, start: '10:00', end: '11:00' },
+          {
+            label: 'Afternoon',
+            value: newSlotValue([morning]),
+            capacity: 8,
+            start: '14:00',
+            end: '15:00',
+          },
+        ],
+      };
+    }
   }
 }

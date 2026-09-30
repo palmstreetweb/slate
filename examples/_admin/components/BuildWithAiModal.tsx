@@ -59,6 +59,7 @@ const TYPE_LABEL: Record<string, string> = {
   location: 'Location',
   photo_checklist: 'Photos',
   availability: 'Availability',
+  signup_slots: 'Sign-up slots',
   review: 'Review',
 };
 

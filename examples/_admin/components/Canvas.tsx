@@ -11,6 +11,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { Question, Schema, ThemeMode, ResolvedThemeMode } from '@/index.js';
+import { listSubmissions, subscribe as subscribeSubmissions } from '../_submissionStore.js';
+import { localSlotsLeft } from '../signupSlots.js';
 import { QuestionRenderer } from '@/components/questions/QuestionRenderer.js';
 import { TopBar } from '@/components/chrome/TopBar.js';
 import { ProgressBar } from '@/components/chrome/ProgressBar.js';
@@ -41,7 +43,10 @@ type Props = {
 
 function defaultMode(themeMode: ThemeMode): ResolvedThemeMode {
   if (themeMode === 'light' || themeMode === 'dark') return themeMode;
-  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: light)').matches) {
+  if (
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-color-scheme: light)').matches
+  ) {
     return 'light';
   }
   return 'dark';
@@ -49,6 +54,17 @@ function defaultMode(themeMode: ThemeMode): ResolvedThemeMode {
 
 export function Canvas({ formId, schema, selectedQuestion }: Props) {
   const forced = schema.themeMode === 'light' || schema.themeMode === 'dark';
+  // Sign-up slots preview with the spots people have taken so far (ADR-066).
+  const [subsTick, setSubsTick] = useState(0);
+  useEffect(() => subscribeSubmissions(() => setSubsTick((n) => n + 1)), []);
+  const slotsLeft = useMemo(
+    () =>
+      selectedQuestion.type === 'signup_slots'
+        ? localSlotsLeft([selectedQuestion], listSubmissions(formId))[selectedQuestion.id]
+        : undefined,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recount when responses change
+    [selectedQuestion, formId, subsTick],
+  );
   const [mode, setMode] = useState<ResolvedThemeMode>(() => defaultMode(schema.themeMode));
 
   useEffect(() => {
@@ -116,7 +132,9 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
   return (
     <section className="slate-canvas">
       <div className="slate-canvas-toolbar">
-        <span className="slate-canvas-label">Live preview · {labelForQuestion(selectedQuestion)}</span>
+        <span className="slate-canvas-label">
+          Live preview · {labelForQuestion(selectedQuestion)}
+        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {forced ? (
             <span className="slate-badge" title="Schema forces this mode">
@@ -186,6 +204,7 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
                 allQuestions={schema.questions}
                 estimate={previewEstimate}
                 estimateSettings={schema.estimate}
+                slotsLeft={slotsLeft}
               />
             </div>
           </div>

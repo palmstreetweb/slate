@@ -6,8 +6,8 @@ import type { Answers, SubmitMeta } from '@/index.js';
 import type { Schema } from '@/index.js';
 import { getSubmitUrl, isNeonConfigured } from './config.js';
 import { loadPublishedForm } from './publicForm.js';
-import type { FormClosedInfo, PublishedFormPayload } from './database.types.js';
-import { closedInfoOf } from './mappers.js';
+import type { FormClosedInfo, PublishedFormPayload, SlotsLeftPayload } from './database.types.js';
+import { closedInfoOf, slotsLeftOf } from './mappers.js';
 import { clearFillUnlockToken, readFillUnlockToken } from '../fillUnlock.js';
 
 /** The form closed (410: past its closing time, 409: at its cap) — ADR-063. */
@@ -17,6 +17,48 @@ export class FormClosedError extends Error {
     super(message);
     this.name = 'FormClosedError';
     this.closed = closed;
+  }
+}
+
+/**
+ * A sign-up slot filled while the respondent was answering (ADR-066): 409 with
+ * reason 'slot_full'. Nothing was stored; `slotsLeft` is every slot's fresh
+ * count, and `full` names the slots to pick again.
+ */
+export class SlotFullError extends Error {
+  readonly full: ReadonlyArray<{ question: string; slot: string }>;
+  readonly slotsLeft: SlotsLeftPayload | undefined;
+  constructor(
+    message: string,
+    full: ReadonlyArray<{ question: string; slot: string }>,
+    slotsLeft: SlotsLeftPayload | undefined,
+  ) {
+    super(message);
+    this.name = 'SlotFullError';
+    this.full = full;
+    this.slotsLeft = slotsLeft;
+  }
+}
+
+/**
+ * Fresh spots left for a form's sign-up slots (ADR-066): the same throttled
+ * lookup as the form itself (ADR-061), with `part=slots` so the schema isn't
+ * sent again. Null when there's nothing to update (locked, closed, gone, or
+ * the network failed — the counts the page has stay).
+ */
+export async function fetchSlotsLeft(slug: string): Promise<SlotsLeftPayload | null> {
+  if (!isNeonConfigured()) return null;
+  try {
+    const u = new URL(getSubmitUrl());
+    u.searchParams.set('op', 'form');
+    u.searchParams.set('slug', slug);
+    u.searchParams.set('part', 'slots');
+    const res = await fetch(u.href, { credentials: 'omit' });
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => null)) as { slotsLeft?: unknown } | null;
+    return slotsLeftOf(body?.slotsLeft) ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -94,6 +136,7 @@ export async function unlockPublicForm(
     schema?: unknown;
     unlockToken?: string;
     closed?: unknown;
+    slotsLeft?: unknown;
   };
   const closed = closedInfoOf(body.closed);
   if (closed) {
@@ -106,6 +149,7 @@ export async function unlockPublicForm(
       message: 'Something went wrong. Please try again in a moment.',
     };
   }
+  const slotsLeft = slotsLeftOf(body.slotsLeft);
   return {
     ok: true,
     form: {
@@ -114,6 +158,7 @@ export async function unlockPublicForm(
       slug: body.slug,
       locked: false,
       schema: body.schema as Schema,
+      ...(slotsLeft ? { slotsLeft } : {}),
     },
     unlockToken: body.unlockToken ?? null,
   };
@@ -165,7 +210,27 @@ export async function submitPublicResponse(
         error?: unknown;
         reason?: unknown;
         message?: unknown;
+        full?: unknown;
+        slotsLeft?: unknown;
       };
+      // A sign-up slot filled meanwhile (ADR-066): back to that question, not closed.
+      if (res.status === 409 && b.reason === 'slot_full') {
+        const full = (Array.isArray(b.full) ? b.full : [])
+          .filter(
+            (f): f is { question: string; slot: string } =>
+              !!f &&
+              typeof (f as { question?: unknown }).question === 'string' &&
+              typeof (f as { slot?: unknown }).slot === 'string',
+          )
+          .map((f) => ({ question: f.question, slot: f.slot }));
+        throw new SlotFullError(
+          typeof b.error === 'string' && b.error
+            ? b.error
+            : 'A spot you picked just filled up. Please pick another.',
+          full,
+          slotsLeftOf(b.slotsLeft),
+        );
+      }
       const closed = closedInfoOf({
         reason: b.reason ?? (res.status === 409 ? 'full' : 'date'),
         message: b.message,

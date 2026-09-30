@@ -34,7 +34,7 @@ const DISPLAY: Record<string, readonly unknown[]> = {
   picture_choice: ['grid', 'swipe'],
   yes_no: ['buttons', 'swipe'],
 };
-const FLAGS = ['allowOther', 'includeTime', 'range', 'showEstimate'];
+const FLAGS = ['allowOther', 'includeTime', 'range', 'showEstimate', 'waitlist'];
 /** Wave B options that are real booleans either way (ADR-064). */
 const BOOLEANS = ['line2', 'country', 'allowTyped', 'notes'];
 const PRICE_MAX = 10_000_000;
@@ -176,6 +176,43 @@ function sanitizeWaveC(next: Record<string, unknown>): void {
   }
 }
 
+/**
+ * Wave D (ADR-066): sign-up slots in known shapes — a key the engine accepts,
+ * 1–1,000 spots, a real `YYYY-MM-DD` and `HH:MM` times, short text; at most
+ * 50 slots and 50 picks. A portable link has no server, so nothing counts
+ * spots there (the slots show their capacity).
+ */
+function sanitizeWaveD(next: Record<string, unknown>): void {
+  if (next.type !== 'signup_slots') return;
+  keepBounded(next, 'maxPicks', 1, 50);
+  if ('showRemaining' in next && typeof next.showRemaining !== 'boolean') delete next.showRemaining;
+  if ('body' in next) next.body = clampText(next.body);
+  next.slots = (Array.isArray(next.slots) ? (next.slots as unknown[]) : [])
+    .filter((o): o is Record<string, unknown> => Boolean(o) && typeof o === 'object')
+    .slice(0, 50)
+    .flatMap((o) => {
+      const value =
+        typeof o.value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(o.value) ? o.value : '';
+      const capacity =
+        typeof o.capacity === 'number' && Number.isInteger(o.capacity)
+          ? bounded(o.capacity, 1, 1000)
+          : undefined;
+      if (!value || capacity === undefined) return [];
+      const slot: Record<string, unknown> = {
+        label: typeof o.label === 'string' ? o.label.slice(0, 120) : '',
+        value,
+        capacity,
+      };
+      if (typeof o.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.date)) slot.date = o.date;
+      for (const key of ['start', 'end']) {
+        if (typeof o[key] === 'string' && /^\d{2}:\d{2}$/.test(o[key] as string))
+          slot[key] = o[key];
+      }
+      if (typeof o.description === 'string') slot.description = o.description.slice(0, 200);
+      return [slot];
+    });
+}
+
 function sanitizeOption(o: Record<string, unknown>): void {
   keepPrice(o, 'price');
   keepPrice(o, 'priceMax');
@@ -240,6 +277,7 @@ export function sanitizeUntrustedSchema(schema: Schema): Schema {
     sanitizeOptions(next);
     sanitizeWaveB(next);
     sanitizeWaveC(next);
+    sanitizeWaveD(next);
     if ('redirectUrl' in next) {
       const safe = httpsOnly(next.redirectUrl);
       if (safe) next.redirectUrl = safe;

@@ -7,6 +7,10 @@ import type { Answers, Estimate, SubmitMeta } from '@/index.js';
 import { isNeonConfigured } from './neon/env.js';
 import { isStoresHydrated } from './neon/hydrate.js';
 import * as remote from './neon/submissionsRemote.js';
+import { signupPicks } from '@/logic/signupAnswer.js';
+import { moveSignupAnswer } from '@/logic/signupView.js';
+
+export type MoveSignupResult = remote.MoveSignupResult;
 
 const STORAGE_KEY = 'slate-submissions';
 
@@ -241,6 +245,56 @@ export function trashSubmission(submissionId: string): void {
   if (neonNotReady()) return;
   const now = trashAt();
   write(read().map((s) => (s.id === submissionId && isActive(s) ? { ...s, deletedAt: now } : s)));
+}
+
+/**
+ * Move someone between sign-up slots from the roster (ADR-066): out of `from`
+ * (a slot they hold or wait for) and into `to`. Refused when `to` is already
+ * at `capacity`, unless `force`. Cloud: 020's move_signup_slot, which checks
+ * the published capacity under the form's lock. Local: the same rule over the
+ * responses in this browser.
+ */
+export async function moveSignupSlot(args: {
+  submissionId: string;
+  questionId: string;
+  from: string;
+  to: string;
+  capacity: number;
+  force?: boolean;
+}): Promise<MoveSignupResult> {
+  if (useRemote()) return remote.moveSignupSlotRemote(args);
+  if (neonNotReady()) {
+    return {
+      ok: false,
+      reason: 'error',
+      message: 'Cloud sync is not ready — try again in a moment.',
+    };
+  }
+  const all = read();
+  const sub = all.find((s) => s.id === args.submissionId && isActive(s));
+  const picks = signupPicks(sub?.answers[args.questionId]);
+  if (!sub || !(picks.slots.includes(args.from) || picks.wait.includes(args.from))) {
+    return { ok: false, reason: 'gone', message: 'That response changed or is gone.' };
+  }
+  const taken = all.filter(
+    (s) =>
+      s.formId === sub.formId &&
+      s.id !== sub.id &&
+      isActive(s) &&
+      signupPicks(s.answers[args.questionId]).slots.includes(args.to),
+  ).length;
+  if (taken >= args.capacity && !args.force) {
+    return { ok: false, reason: 'full', taken, capacity: args.capacity };
+  }
+  const moved = moveSignupAnswer(sub.answers[args.questionId], args.from, args.to);
+  write(
+    all.map((s) =>
+      s.id === sub.id
+        ? { ...s, answers: { ...s.answers, [args.questionId]: moved } as Answers }
+        : s,
+    ),
+  );
+  return { ok: true };
 }
 
 /** @deprecated Use trashSubmission */

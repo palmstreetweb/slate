@@ -1,5 +1,5 @@
 /**
- * Question catalog coverage (ADR-063, extended by ADR-064 and ADR-065). Every question type must be wired
+ * Question catalog coverage (ADR-063, extended by ADR-064, ADR-065 and ADR-066). Every question type must be wired
  * through every surface that knows about types. A new type added in a later
  * wave fails here (and in `SAMPLES`, at compile time) until it is: studio
  * label, palette entry and icon, validation, answer formatting, the server
@@ -123,6 +123,21 @@ const SAMPLES: Record<QuestionType, { q: Question; answer: unknown }> = {
     q: { id: 'x', type: 'availability', title: 'T', days: ['mon', 'wed'], slotMinutes: 30 },
     answer: { mon: '09:00-11:30', wed: '14:00-15:00' },
   },
+  // Wave D (ADR-066)
+  signup_slots: {
+    q: {
+      id: 'x',
+      type: 'signup_slots',
+      title: 'T',
+      maxPicks: 2,
+      waitlist: true,
+      slots: [
+        { label: 'Sat 10–11am', value: 's_sat10', capacity: 8, date: '2026-10-03', start: '10:00' },
+        { label: 'Bring drinks', value: 's_drinks', capacity: 3 },
+      ],
+    },
+    answer: { slots: ['s_sat10'], wait: ['s_drinks'] },
+  },
 };
 
 const CHROME = new Set<QuestionType>(['welcome', 'thanks']);
@@ -204,6 +219,21 @@ describe('question catalog coverage (ADR-063)', () => {
     expect(extFieldKey({ ...swipePics, multiple: false } as Question)).toBe('picture-choice');
     expect(extFieldKey({ ...SAMPLES.yes_no.q, display: 'swipe' } as Question)).toBe('swipe');
     expect(extFieldKey(SAMPLES.yes_no.q)).toBeNull();
+  });
+
+  it('sign-up slots load on demand and keep their slots in portable schemas (ADR-066)', () => {
+    expect(extFieldKey(SAMPLES.signup_slots.q)).toBe('signup-slots');
+    const out = sanitizeUntrustedSchema({
+      brand: { name: 'x' },
+      theme: 'classic',
+      themeMode: 'light',
+      questions: [{ ...SAMPLES.signup_slots.q, id: 'slots', showRemaining: false }],
+    } as never);
+    const q = out.questions[0] as unknown as Record<string, unknown>;
+    expect(q.slots).toEqual((SAMPLES.signup_slots.q as { slots: unknown }).slots);
+    expect(q.maxPicks).toBe(2);
+    expect(q.waitlist).toBe(true);
+    expect(q.showRemaining).toBe(false);
   });
 
   it('portable schemas keep Wave C options in known shapes (ADR-065)', () => {

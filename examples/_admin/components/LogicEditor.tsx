@@ -13,6 +13,8 @@ import type { Condition, LogicRule, Question } from '@/index.js';
 import { OTHER_VALUE } from '@/index.js';
 import { allowsOther, otherLabelOf } from '@/logic/other.js';
 import { IN_AREA_VALUE, OUT_OF_AREA_VALUE, checksArea, hasServiceArea } from '@/logic/address.js';
+import { WAITLIST_VALUE } from '@/logic/signupAnswer.js';
+import { offeredSlots, slotName } from '@/logic/signupView.js';
 import { SlateSelect } from './SlateSelect.js';
 
 function isCompleteJumpRule(rule: LogicRule): boolean {
@@ -46,6 +48,7 @@ const NUMERIC_OPS = new Set<LeafOp>(['gt', 'lt', 'gte', 'lte']);
 const VALUELESS_OPS = new Set<LeafOp>(['is_empty', 'is_not_empty']);
 const NUMERIC_TYPES = new Set(['number', 'scale', 'nps']);
 const CHOICE_TYPES = new Set([
+  'signup_slots',
   'single_choice',
   'multi_choice',
   'dropdown',
@@ -136,6 +139,11 @@ function optionsFor(
         { label: q.acceptLabel ?? 'I accept', value: 'accept' },
         { label: q.declineLabel ?? "I don't accept", value: 'decline' },
       ];
+    case 'signup_slots': {
+      // "Took this slot" per slot, and "joined a waitlist" when there is one (ADR-066).
+      const slots = offeredSlots(q).map((s) => ({ label: `Took: ${slotName(s)}`, value: s.value }));
+      return q.waitlist ? [...slots, { label: 'Joined a waitlist', value: WAITLIST_VALUE }] : slots;
+    }
     case 'address':
     case 'location':
       // The service-area check (ADR-064, ADR-065): the ZIP against the owner's

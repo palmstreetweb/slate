@@ -34,6 +34,7 @@ export const GENERATED_QUESTION_TYPES = [
   'location',
   'photo_checklist',
   'availability',
+  'signup_slots',
   'review',
 ] as const;
 
@@ -55,12 +56,23 @@ const optionSchema = z.object({
   alt: z.string(),
 });
 
-/** Choice options can carry prices and package-card details (ADR-064). 0 / "" / [] = none. */
+/**
+ * Choice options can carry prices and package-card details (ADR-064). A
+ * sign-up slot (ADR-066) is an option with its spots and, optionally, a day and
+ * times. 0 / "" / [] = none.
+ */
 const pricedOptionSchema = optionSchema.extend({
   price: z.number(),
   priceMax: z.number(),
   features: z.array(z.string()),
   badge: z.string(),
+  /** signup_slots: spots in this slot (1–1000). */
+  capacity: z.number(),
+  /** signup_slots: "YYYY-MM-DD", or "". */
+  date: z.string(),
+  /** signup_slots: "HH:MM" 24-hour, or "". */
+  start: z.string(),
+  end: z.string(),
 });
 
 export const generatedQuestionSchema = z.object({
@@ -116,6 +128,8 @@ export const generatedQuestionSchema = z.object({
   days: z.array(z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])),
   startTime: z.string(),
   endTime: z.string(),
+  /** signup_slots: when a slot is full, offer its waitlist (ADR-066). */
+  waitlist: z.boolean(),
   /** Earlier question id. Empty = always visible. */
   showIfField: z.string(),
   /** Stored answer to match (`yes`, `chicken`, option value — not the label). */
@@ -178,6 +192,13 @@ export const generatedFormSchema = z
           });
         }
       }
+      if (q.type === 'signup_slots' && !q.options.some((o) => o.label && o.value)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'signup_slots needs at least 1 slot',
+          path: [...path, 'options'],
+        });
+      }
       if (q.type === 'matrix') {
         if (q.rows.filter((o) => o.label && o.value).length < 2) {
           ctx.addIssue({
@@ -229,7 +250,8 @@ export const generatedFormSchema = z
 
 /**
  * A draft from before Wave B (ADR-064) lacks the price, card and estimate
- * fields, and one from before Wave C (ADR-065) the typing, radius and grid
+ * fields, one from before Wave C (ADR-065) the typing, radius and grid
+ * fields, and one from before Wave D (ADR-066) the waitlist and the slot
  * fields; a revise request can still carry one (a tab open across a deploy).
  * Fill the blanks the model would have written, so it still validates.
  */
@@ -252,10 +274,22 @@ export function withDraftDefaults(raw: unknown): unknown {
       if (next.days === undefined) next.days = [];
       if (next.startTime === undefined) next.startTime = '';
       if (next.endTime === undefined) next.endTime = '';
+      // Wave D (ADR-066)
+      if (next.waitlist === undefined) next.waitlist = false;
       if (Array.isArray(next.options)) {
         next.options = next.options.map((o: unknown) =>
           o && typeof o === 'object' && !Array.isArray(o)
-            ? { price: 0, priceMax: 0, features: [], badge: '', ...(o as Record<string, unknown>) }
+            ? {
+                price: 0,
+                priceMax: 0,
+                features: [],
+                badge: '',
+                capacity: 0,
+                date: '',
+                start: '',
+                end: '',
+                ...(o as Record<string, unknown>),
+              }
             : o,
         );
       }
@@ -315,6 +349,9 @@ On-site capture (use only when they clearly fit; never "to look complete"):
 - location — "use my location" to check the service area. radius + radiusUnit ("mi" / "km") only when the user gives a distance ("within 25 miles"); the owner sets the business location afterwards. Never invent coordinates.
 - availability — a week grid to paint free times. days (e.g. ["mon","tue","wed","thu","fri"]), startTime / endTime as "HH:MM" 24-hour, step = slot minutes (15, 30, 60 or 120; default 60).
 - display "swipe": on picture_choice with multiple true, a card stack to like / pass ("Which styles do you like?"); on yes_no, one swipe card ("this or that"). Otherwise "".
+
+Sign-ups with limited spots (use when people pick a time or a task that only so many can take: "pick a time", volunteer shifts, tours, class spots, "what will you bring"):
+- signup_slots — each option is one slot: label ("Sat 10–11am", "Bring drinks"), value (a short id), capacity = its spots (use the numbers the user gives; otherwise a sensible small number like 8). date "YYYY-MM-DD" and start / end "HH:MM" (24-hour) only when the user gives a day or times; otherwise "". max = most slots one person may take (0 or 1 = one each). waitlist true only when the user wants a waitlist. Never invent dates.
 
 Prices and the instant estimate (never invent prices — only use prices the user gave):
 - price on a choice option = its price; priceMax for a range ("$8,000–12,000" → price 8000, priceMax 12000). 0 = no price.

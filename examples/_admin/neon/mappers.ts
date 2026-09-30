@@ -2,6 +2,7 @@ import type { Schema } from '@/index.js';
 import type { FormRecord, TrackedSource } from '../_formsStore.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import type {
+  SlotsLeftPayload,
   DbFormRow,
   DbSubmissionRow,
   FormClosedInfo,
@@ -65,6 +66,24 @@ export function closedInfoOf(raw: unknown): FormClosedInfo | null {
   return { reason, message: typeof message === 'string' && message ? message.slice(0, 500) : null };
 }
 
+/**
+ * Spots left from the Function (ADR-066): `{ questionId: { slot: n } }`, whole
+ * numbers from 0 only; anything else is dropped. Undefined when there is none.
+ */
+export function slotsLeftOf(raw: unknown): SlotsLeftPayload | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const out: SlotsLeftPayload = {};
+  for (const [q, per] of Object.entries(raw as Record<string, unknown>)) {
+    if (!per || typeof per !== 'object' || Array.isArray(per)) continue;
+    const row: Record<string, number> = {};
+    for (const [slot, n] of Object.entries(per as Record<string, unknown>)) {
+      if (typeof n === 'number' && Number.isInteger(n) && n >= 0) row[slot] = n;
+    }
+    out[q] = row;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 export function slugRowToPublishedForm(row: {
   id: string;
   name: string;
@@ -72,6 +91,7 @@ export function slugRowToPublishedForm(row: {
   locked?: boolean | null;
   schema?: unknown;
   closed?: unknown;
+  slotsLeft?: unknown;
 }): PublishedFormPayload | null {
   const base = { id: row.id, name: row.name, slug: row.slug };
   // Closed wins over everything (ADR-063): no schema, no password gate.
@@ -79,7 +99,13 @@ export function slugRowToPublishedForm(row: {
   if (closed) return { ...base, locked: Boolean(row.locked), schema: null, closed };
   if (row.locked) return { ...base, locked: true, schema: null };
   if (!row.schema) return null;
-  return { ...base, locked: false, schema: row.schema as Schema };
+  const slotsLeft = slotsLeftOf(row.slotsLeft);
+  return {
+    ...base,
+    locked: false,
+    schema: row.schema as Schema,
+    ...(slotsLeft ? { slotsLeft } : {}),
+  };
 }
 
 /**

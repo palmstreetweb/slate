@@ -1,7 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Form } from '@/index.js';
+import { signupPicks } from '@/logic/signup.js';
 import { getForm, subscribe, type FormRecord } from '../_formsStore.js';
-import { addSubmission } from '../_submissionStore.js';
+import {
+  addSubmission,
+  ensureFormSubmissions,
+  listSubmissions,
+  subscribe as subscribeSubmissions,
+} from '../_submissionStore.js';
+import { localSlotsLeft, slotFullMessage } from '../signupSlots.js';
 import { navigate } from '../_router.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import { IconChart } from '../mobile/PhoneChrome.js';
@@ -13,6 +20,18 @@ type Props = { formId: string };
 
 export function FormPreview({ formId }: Props) {
   const [form, setForm] = useState<FormRecord | null>(() => getForm(formId));
+  // Sign-up slots (ADR-066): a test run counts spots from the responses this browser holds,
+  // and refuses a full slot the way the submit Function does, so the whole flow can be tried.
+  const [subsTick, setSubsTick] = useState(0);
+  useEffect(() => {
+    void ensureFormSubmissions(formId);
+    return subscribeSubmissions(() => setSubsTick((n) => n + 1));
+  }, [formId]);
+  const slotsLeft = useMemo(
+    () => (form ? localSlotsLeft(form.schema.questions, listSubmissions(formId)) : {}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recount when responses change
+    [form, formId, subsTick],
+  );
 
   // Re-fetch when the formId changes or another tab edits the schema.
   useEffect(() => {
@@ -113,7 +132,19 @@ export function FormPreview({ formId }: Props) {
           schema={form.schema}
           onFileUpload={hostFileUpload}
           resolveFileUploadMeta={resolveUploadMeta}
+          slotsLeft={slotsLeft}
           onSubmit={async (answers, meta) => {
+            const left = localSlotsLeft(form.schema.questions, listSubmissions(formId));
+            const full = Object.entries(left).flatMap(([question, per]) =>
+              signupPicks(answers[question])
+                .slots.filter((slot) => per[slot] === 0)
+                .map((slot) => ({ question, slot })),
+            );
+            if (full.length) {
+              throw Object.assign(new Error(slotFullMessage(form.schema.questions, full)), {
+                goTo: full[0]!.question,
+              });
+            }
             addSubmission(formId, answers, meta);
           }}
         />

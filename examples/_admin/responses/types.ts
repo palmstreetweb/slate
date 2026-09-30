@@ -7,6 +7,7 @@
 import type { Question } from '@/index.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import type { TrackedSource } from '../_formsStore.js';
+import type { MoveSignup } from './SummaryWaveD.js';
 
 /** Persisted choice between the two views (`slate-responses-view`). */
 export type ResponsesViewName = 'inbox' | 'summary';
@@ -26,6 +27,8 @@ export type ResponsesViewCommon = {
   onTrash(id: string): void;
   /** The form's named flyer links, for source labels (ADR-063). */
   trackedSources?: ReadonlyArray<TrackedSource>;
+  /** Move someone between sign-up slots from the Summary roster (ADR-066). */
+  onMoveSignup?: MoveSignup;
 };
 
 export type InboxProps = ResponsesViewCommon & {

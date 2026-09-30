@@ -34,6 +34,7 @@ import {
   VoiceNoteSettings,
   YesNoStyleSetting,
 } from './InspectorWaveC.js';
+import { SignupSlotsSettings } from './InspectorWaveD.js';
 
 type Props = {
   question: Question;
@@ -47,6 +48,8 @@ type Props = {
   onEstimateChange?: (next: EstimateSettings | undefined) => void;
   /** Adds an "out of area" ending for this address question, and a jump to it. */
   onAddOutOfAreaEnding?: (addressId: string) => void;
+  /** The form being edited — sign-up slots show how many signed up per slot (ADR-066). */
+  formId?: string;
 };
 
 /** Some condition in the form tests this address's service area. */
@@ -75,6 +78,7 @@ export function Inspector({
   estimate,
   onEstimateChange,
   onAddOutOfAreaEnding,
+  formId,
 }: Props) {
   const currency = estimateCurrency(estimate);
   // Question IDs are auto-generated and stable; they're not surfaced in the
@@ -462,6 +466,11 @@ export function Inspector({
 
         {question.type === 'availability' && (
           <AvailabilitySettings question={question} onChange={onChange} />
+        )}
+
+        {/* Wave D (ADR-066) */}
+        {question.type === 'signup_slots' && (
+          <SignupSlotsSettings question={question} onChange={onChange} formId={formId} />
         )}
 
         {question.type === 'photo_checklist' && (

@@ -194,8 +194,19 @@ export type Database = {
 /** Why the public page is closed (ADR-063), and the owner's message if any. */
 export type FormClosedInfo = { reason: 'date' | 'full'; message: string | null };
 
+/** Spots left per sign-up question and slot (ADR-066), as the submit Function counts them. */
+export type SlotsLeftPayload = Record<string, Record<string, number>>;
+
 export type PublishedFormPayload =
-  | { id: string; name: string; slug: string; locked: false; schema: Schema; closed?: undefined }
+  | {
+      id: string;
+      name: string;
+      slug: string;
+      locked: false;
+      schema: Schema;
+      closed?: undefined;
+      slotsLeft?: SlotsLeftPayload;
+    }
   | { id: string; name: string; slug: string; locked: true; schema: null; closed?: undefined }
   | {
       id: string;

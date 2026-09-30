@@ -4,12 +4,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Form } from '@/index.js';
 import {
   FormClosedError,
+  SlotFullError,
   fetchPublishedFormBySlug,
+  fetchSlotsLeft,
   metaToPayload,
   submitPublicResponse,
   unlockPublicForm,
 } from '../neon/publicApi.js';
-import type { FormClosedInfo, PublishedFormPayload } from '../neon/database.types.js';
+import type {
+  FormClosedInfo,
+  PublishedFormPayload,
+  SlotsLeftPayload,
+} from '../neon/database.types.js';
+import { mergeSlotsLeft, slotFullMessage } from '../signupSlots.js';
 import { isNeonConfigured } from '../neon/config.js';
 import { hostFileUpload } from '../hostFileUpload.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
@@ -27,6 +34,9 @@ type Props = { slug: string };
 
 type OpenForm = Extract<PublishedFormPayload, { locked: false }>;
 type LockedForm = Extract<PublishedFormPayload, { locked: true }>;
+
+/** Spots-left counts older than this are refreshed when someone reaches a sign-up question. */
+const SLOTS_STALE_MS = 30_000;
 
 /** `?embed=1` — we're inside a host site's iframe (ADR-054). */
 function readEmbedMode(): boolean {
@@ -81,6 +91,9 @@ export function PublicFill({ slug }: Props) {
     duringFill: boolean;
   } | null>(null);
   const [extras] = useState(readLinkExtras);
+  /** Spots left on sign-up slots (ADR-066), from the lookup, a refresh or a 409. */
+  const [slotsLeft, setSlotsLeft] = useState<SlotsLeftPayload | undefined>(undefined);
+  const slotsAt = useRef(0);
   /** Honeypot input (ADR-052). Read at submit, never rendered from state. */
   const trapRef = useRef<HTMLInputElement>(null);
   const [embed] = useState(readEmbedMode);
@@ -98,6 +111,8 @@ export function PublicFill({ slug }: Props) {
     let cancelled = false;
     const open = (payload: OpenForm) => {
       setForm(payload);
+      setSlotsLeft(payload.slotsLeft);
+      slotsAt.current = Date.now();
       setGate(null);
       setUploadContext(payload.id, { scope: 'public' });
     };
@@ -148,11 +163,32 @@ export function PublicFill({ slug }: Props) {
       if (!result.ok) return result.message;
       if (result.unlockToken) writeFillUnlockToken(result.form.id, result.unlockToken);
       setForm(result.form);
+      setSlotsLeft(result.form.slotsLeft);
+      slotsAt.current = Date.now();
       setGate(null);
       setUploadContext(result.form.id, { scope: 'public' });
       return null;
     },
     [slug, gate],
+  );
+
+  // Someone reaching a sign-up question sees fresh counts (at most every 30 s),
+  // from the same throttled lookup — a locked form re-proves with this tab's token.
+  const onQuestionChange = useCallback(
+    (questionId: string) => {
+      if (!form) return;
+      const q = form.schema.questions.find((x) => x.id === questionId);
+      if (q?.type !== 'signup_slots' || Date.now() - slotsAt.current < SLOTS_STALE_MS) return;
+      slotsAt.current = Date.now();
+      const token = readFillUnlockToken(form.id);
+      void (async () => {
+        const next = token
+          ? await unlockPublicForm(slug, { token }).then((r) => (r.ok ? r.form.slotsLeft : null))
+          : await fetchSlotsLeft(slug);
+        if (next) setSlotsLeft((cur) => mergeSlotsLeft(cur, next));
+      })();
+    },
+    [form, slug],
   );
 
   if (loading) {
@@ -225,6 +261,8 @@ export function PublicFill({ slug }: Props) {
         prefill={extras.prefill}
         onFileUpload={hostFileUpload}
         resolveFileUploadMeta={resolveUploadMeta}
+        slotsLeft={slotsLeft}
+        onQuestionChange={onQuestionChange}
         onSubmit={async (answers, meta) => {
           const payloadMeta = metaToPayload(meta);
           // Filled trap = bot. Flag it and let the Function drop it before any
@@ -243,6 +281,16 @@ export function PublicFill({ slug }: Props) {
             // instead of offering a Retry that can't work.
             if (err instanceof FormClosedError) {
               setClosed({ name: form.name, info: err.closed, duringFill: true });
+            }
+            // A slot filled while they were answering (ADR-066): fresh counts, and back to
+            // the question to pick again — every other answer stays.
+            if (err instanceof SlotFullError) {
+              setSlotsLeft((cur) => mergeSlotsLeft(cur, err.slotsLeft));
+              slotsAt.current = Date.now();
+              const first = err.full[0]?.question;
+              throw Object.assign(new Error(slotFullMessage(form.schema.questions, err.full)), {
+                goTo: first,
+              });
             }
             throw err;
           }

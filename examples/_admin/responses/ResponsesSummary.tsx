@@ -57,6 +57,7 @@ import {
 import { isOverlayOpen, useMarkAllRead, useNow, usePhone } from './hooks.js';
 import { ResponseAnswers } from './ResponseAnswers.js';
 import { AvailabilityHeatCard, PinCloudCard } from './SummaryWaveC.js';
+import { SignupRosterCard } from './SummaryWaveD.js';
 import { EstimateBreakdown, estimateLabel } from './ResponseEstimate.js';
 import { ResponseActions } from './ResponseActions.js';
 import {
@@ -1109,7 +1110,7 @@ export function ResponsesSummary(props: SummaryProps) {
       ? `${phone ? 'Tap' : 'Click'} a bar or tile above to filter`
       : `${phone ? 'Tap' : 'Click'} a tile above to filter`;
   const extraCards = questions.filter(
-    (q) => q.type === 'availability' || q.type === 'image_pin',
+    (q) => q.type === 'availability' || q.type === 'image_pin' || q.type === 'signup_slots',
   ).length;
   const chartCount = chartQs.length + extraCards + (sourceTotal ? 1 : 0) + (estimates ? 1 : 0);
   const topClass =
@@ -1160,6 +1161,16 @@ export function ResponsesSummary(props: SummaryProps) {
             />
           ) : q.type === 'image_pin' ? (
             <PinCloudCard key={q.id} question={q} number={qNumbers.get(q.id) ?? 0} subs={subs} />
+          ) : q.type === 'signup_slots' ? (
+            // Wave D (ADR-066): who took each slot, with a fill bar, and each waitlist.
+            <SignupRosterCard
+              key={q.id}
+              question={q}
+              number={qNumbers.get(q.id) ?? 0}
+              subs={subs}
+              questions={questions}
+              onMove={props.onMoveSignup}
+            />
           ) : null,
         )}
         {sourceTotal ? (

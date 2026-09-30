@@ -348,6 +348,10 @@ describe('Build with AI', () => {
     priceMax: 0,
     features: [] as string[],
     badge: '',
+    capacity: 0,
+    date: '',
+    start: '',
+    end: '',
     ...extra,
   });
   const draft = (

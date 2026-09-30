@@ -22,6 +22,7 @@ import {
   isFormSubmissionsReady,
   listSubmissions,
   listTrashedSubmissions,
+  moveSignupSlot,
   permanentlyDeleteSubmission,
   restoreSubmission,
   restoreSubmissions,
@@ -50,6 +51,7 @@ import { ResponsesInbox } from '../responses/ResponsesInbox.js';
 import { ResponsesSummary } from '../responses/ResponsesSummary.js';
 import { ResponsesSkeleton } from '../responses/ResponsesSkeleton.js';
 import type { ResponsesViewName } from '../responses/types.js';
+import type { MoveSignup } from '../responses/SummaryWaveD.js';
 import {
   IconArrowLeft,
   IconDownload,
@@ -292,6 +294,41 @@ export function FormSubmissions({ formId }: Props) {
     [describe, toast],
   );
 
+  // Sign-up slots (ADR-066): move someone from the roster. A full slot asks first,
+  // then overbooks on purpose; the database counts under the form's lock either way.
+  const onMoveSignup = useCallback<MoveSignup>(
+    ({ sub, question, from, to, toName, capacity }) => {
+      void (async () => {
+        const who = describe(sub.id, 'active') ?? 'They';
+        const args = { submissionId: sub.id, questionId: question.id, from, to, capacity };
+        let r = await moveSignupSlot(args);
+        if (!r.ok && r.reason === 'full') {
+          const ok = await confirm({
+            title: `${toName} is full`,
+            message: `All ${r.capacity} spots are taken. Add ${who} anyway? The slot will be over by one.`,
+            confirmLabel: 'Add anyway',
+          });
+          if (!ok) return;
+          r = await moveSignupSlot({ ...args, force: true });
+        }
+        if (r.ok) {
+          toast.push({
+            title: from === to ? `${who} got a spot` : `Moved to ${toName}`,
+            detail: from === to ? toName : who,
+            tone: 'success',
+          });
+        } else {
+          toast.push({
+            title: 'Couldn’t move them',
+            detail: r.reason === 'full' ? `${toName} is full.` : r.message,
+            tone: 'error',
+          });
+        }
+      })();
+    },
+    [confirm, describe, toast],
+  );
+
   const onRestore = useCallback(
     (id: string) => {
       const who = describe(id, 'trash');
@@ -455,6 +492,7 @@ export function FormSubmissions({ formId }: Props) {
     onMarkUnread,
     onTrash,
     trackedSources: form.trackedSources,
+    onMoveSignup,
   };
 
   let body: ReactNode;

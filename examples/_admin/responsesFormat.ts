@@ -21,6 +21,8 @@ import {
   formatAvailability,
 } from '@/logic/availability.js';
 import { formatVoiceNote, voiceAudioOf, voiceTypedOf } from '@/logic/media.js';
+import { signupPicks } from '@/logic/signupAnswer.js';
+import { slotName, slotWhenText } from '@/logic/signupView.js';
 import { peekLocalUploadMeta } from './localFileStore.js';
 import { safeText } from './answerShape.js';
 
@@ -218,9 +220,34 @@ function formatAnswer(question: Question, value: unknown): string {
         (typeof value === 'object' ? '—' : safeText(value))
       );
 
+    // Wave D (ADR-066): one slot per line, with when it is; waitlists marked.
+    case 'signup_slots': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return safeText(value);
+      const { slots, wait } = signupPicks(value);
+      const lines = [
+        ...slots.map((v) => slotLine(question, v)),
+        ...wait.map((v) => `Waitlist: ${slotLine(question, v)}`),
+      ];
+      return lines.length ? lines.join('\n') : '—';
+    }
+
     default:
       return safeText(value);
   }
+}
+
+/**
+ * A slot as the owner reads it: "Morning swim (Sat, Oct 3 · 10–11 AM)". A key
+ * the question no longer offers (a removed slot) reads "Removed slot (key)".
+ */
+export function slotLine(
+  question: Extract<Question, { type: 'signup_slots' }>,
+  value: string,
+): string {
+  const slot = question.slots?.find((s) => s.value === value);
+  if (!slot) return `Removed slot (${value})`;
+  const when = slot.label?.trim() ? slotWhenText(slot) : '';
+  return when ? `${slotName(slot)} (${when})` : slotName(slot);
 }
 
 /** A location in words: in / out of the area and how far, a ZIP, or a typed place (ADR-065). */
@@ -270,7 +297,8 @@ export function locationAreaOf(
  * becomes Name / Email / Phone, an address Street / Unit / City / State / ZIP
  * (/ Country, / In service area). Wave C (ADR-065): a location becomes
  * Latitude / Longitude / ZIP or place / In service area / Distance, a photo
- * checklist one column per shot, availability one column per day. Null for
+ * checklist one column per shot, availability one column per day. Wave D
+ * (ADR-066): sign-up slots become Slot (and Waitlist). Null for
  * one-column answers.
  */
 export function csvParts(
@@ -351,6 +379,30 @@ export function csvParts(
         return ref ? (describeFileUploadAnswer(ref, peekLocalUploadMeta(ref)) ?? 'Photo') : '';
       },
     }));
+  }
+  // Wave D (ADR-066): the slots taken, and — with a waitlist — the waitlists joined.
+  if (question.type === 'signup_slots') {
+    const cols = [
+      {
+        key: 'slot',
+        label: 'Slot',
+        cell: (v: unknown) =>
+          signupPicks(v)
+            .slots.map((x) => slotLine(question, x))
+            .join('; '),
+      },
+    ];
+    if (question.waitlist) {
+      cols.push({
+        key: 'wait',
+        label: 'Waitlist',
+        cell: (v: unknown) =>
+          signupPicks(v)
+            .wait.map((x) => slotLine(question, x))
+            .join('; '),
+      });
+    }
+    return cols;
   }
   if (question.type === 'availability') {
     const grid = availabilityGrid(question as unknown as Record<string, unknown>);

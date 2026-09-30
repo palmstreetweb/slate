@@ -16,6 +16,10 @@ const opt = (label: string, value: string) => ({
   priceMax: 0,
   features: [] as string[],
   badge: '',
+  capacity: 0,
+  date: '',
+  start: '',
+  end: '',
 });
 
 const validDraft = {
