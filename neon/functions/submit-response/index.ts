@@ -22,6 +22,15 @@
  * and every slot's spots left, and the page sends the respondent back to pick
  * again. The public lookup reports spots left (counts only, never who).
  *
+ * Storage quotas (ADR-067, needs migration 021): every file ref the answers
+ * keep must be an upload storagesign minted for this form and question that
+ * nobody has claimed (or, during the grace, an old page's upload under this
+ * form's own prefix); the 6-argument insert checks and claims them in one
+ * transaction, else 400 with reason 'files' naming the questions, and nothing
+ * is stored. Another form's ref in a file answer is refused the same way. A
+ * page's `submitId` (a UUID per fill) makes a retried submit return the
+ * response it already stored instead of a duplicate.
+ *
  * Closed forms (ADR-063): a form past its closing time is refused (410) right
  * after the gate read, before any charge; a form at its response cap is
  * refused (409) by the insert itself, which counts under a per-form lock so
@@ -46,6 +55,7 @@ import { Pool } from 'pg';
 import { fillUnlockToken, isValidUnlockToken } from './fillLock.js';
 import { clientIp } from './requestIp.js';
 import { clampForQuestion, clampText, isSafeKey, keepFileRefs } from './answerShape.js';
+import { fileClaimsOf, foreignRefQuestions } from './fileClaims.js';
 import { computeEstimateCore } from './estimate.js';
 import { signupSlotsOf } from './signup.js';
 import { formZipAreas } from './geo.js';
@@ -62,6 +72,8 @@ const SUBMIT_UNIT = 4096;
 const FORM_ID_RE = /^[A-Za-z0-9_-]{4,64}$/;
 /** 015 forms_slug_format. */
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+/** ADR-067: the page's retry key, from crypto.randomUUID(). */
+const SUBMIT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** ADR-058 defaults. Env overrides must be integers in range; anything else keeps the default. */
 export const LIMITS = {
@@ -112,6 +124,24 @@ export const CLOSED_COPY = {
   date: 'This form is closed and isn’t taking responses anymore.',
   full: 'This form has all the responses it can take, so it’s closed now.',
 } as const;
+
+/** A file the answers name can't be claimed (ADR-067): expired, never uploaded, taken, or not this form's. */
+export const FILES_COPY =
+  'A file you added expired or didn’t finish uploading. Please remove it and add it again — your other answers are still here.';
+
+/**
+ * 400 for files (ADR-067). A page that sent a submitId reads JSON and goes back
+ * to the first question named; an older page shows the body as sent, so it gets
+ * the sentence alone.
+ */
+function filesResponse(c: Context, questions: unknown, json: boolean) {
+  c.header('Cache-Control', 'no-store');
+  if (!json) return c.text(FILES_COPY, 400);
+  const named = (Array.isArray(questions) ? questions : [])
+    .filter((q): q is string => typeof q === 'string')
+    .slice(0, 50);
+  return c.json({ error: FILES_COPY, reason: 'files', questions: named }, 400);
+}
 
 function closedResponse(c: Context, reason: 'date' | 'full', message: string | null) {
   c.header('Cache-Control', 'no-store');
@@ -571,13 +601,14 @@ app.post(
 
     if (body.op === 'unlock') return handleUnlock(c, body);
 
-    const { formId, answers, meta, unlockToken } = body;
+    const { formId, answers, meta, unlockToken, submitId } = body;
     if (
       typeof formId !== 'string' ||
       !FORM_ID_RE.test(formId) ||
       !isObj(answers) ||
       !isObj(meta) ||
-      (unlockToken !== undefined && typeof unlockToken !== 'string')
+      (unlockToken !== undefined && typeof unlockToken !== 'string') ||
+      (submitId !== undefined && (typeof submitId !== 'string' || !SUBMIT_ID_RE.test(submitId)))
     ) {
       return c.text('Missing fields', 400);
     }
@@ -652,7 +683,12 @@ app.post(
     // Unpublished between the gate and the charge.
     if (!v.schema) return c.text('Form not available', 404);
 
+    // ADR-067: another form's file in a file answer is refused, not dropped.
+    const foreign = foreignRefQuestions(answers, v.schema, form.id);
+    if (foreign.length) return filesResponse(c, foreign, submitId !== undefined);
+
     const clean = sanitizeAnswers(answers, v.schema, form.id);
+    const files = fileClaimsOf(clean, form.id);
     const cleanMeta = sanitizeMeta(meta);
     // Instant estimate (ADR-064): the server's own figure, from the published
     // prices and the answers it kept — what the owner reads can't be forged.
@@ -661,21 +697,39 @@ app.post(
 
     const submissionId = `s_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
     let stored:
-      | { outcome?: unknown; closed_message?: unknown; full_slots?: unknown; slots_left?: unknown }
+      | {
+          outcome?: unknown;
+          closed_message?: unknown;
+          full_slots?: unknown;
+          slots_left?: unknown;
+          bad_questions?: unknown;
+          stored_id?: unknown;
+        }
       | undefined;
     try {
       // 019: refuses a closed form, and counts under a per-form lock when a cap is set.
       // 020: under the same lock, takes each sign-up spot or refuses the full ones.
+      // 021: first checks and locks every file key, and a retry key returns the stored response.
       stored = (
         await pool.query(
-          `select i.outcome, i.closed_message, i.full_slots, i.slots_left
-             from public.insert_public_submission($1, $2, $3::jsonb, $4::jsonb) i`,
-          [submissionId, form.id, JSON.stringify(clean), JSON.stringify(cleanMeta)],
+          `select i.outcome, i.closed_message, i.full_slots, i.slots_left, i.bad_questions, i.stored_id
+             from public.insert_public_submission($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6::uuid) i`,
+          [
+            submissionId,
+            form.id,
+            JSON.stringify(clean),
+            JSON.stringify(cleanMeta),
+            JSON.stringify(files),
+            submitId ?? null,
+          ],
         )
       ).rows[0] as typeof stored;
     } catch (err) {
       console.error('[submitresponse] insert failed', err);
       return c.text('Could not save your response. Please try again.', 500);
+    }
+    if (stored?.outcome === 'bad_files') {
+      return filesResponse(c, stored.bad_questions, submitId !== undefined);
     }
     const message = typeof stored?.closed_message === 'string' ? stored.closed_message : null;
     if (stored?.outcome === 'slot_full') {
@@ -690,7 +744,11 @@ app.post(
     }
 
     // Responses live in the app only (ADR-047): no email leaves this Function.
-    return c.json({ id: submissionId });
+    // A retry gets the id of the response its first attempt stored (ADR-067).
+    return c.json({
+      id:
+        typeof stored.stored_id === 'string' && stored.stored_id ? stored.stored_id : submissionId,
+    });
   },
 );
 

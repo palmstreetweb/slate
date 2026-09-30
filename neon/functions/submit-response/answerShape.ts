@@ -58,7 +58,7 @@ export function clampValue(v: unknown): unknown {
 }
 
 /** slate-file://storage:{public|draft}/{formId}/{uuid}/{name}, as uploadToNeonStorage builds it. */
-const STORAGE_REF_RE =
+export const STORAGE_REF_RE =
   /^slate-file:[/][/]storage:(?:public|draft)[/]([A-Za-z0-9_-]{4,64})[/][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[/][^/]{1,120}$/;
 
 /**

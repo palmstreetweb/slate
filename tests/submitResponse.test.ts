@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fillUnlockToken } from '../neon/functions/submit-response/fillLock.js';
 import { clampValue, keepFileRefs } from '../neon/functions/submit-response/answerShape.js';
-import { rateCalls, rateKeys, resetFnDb, type newFnDbState } from './_fnDb.js';
+import { addUpload, rateCalls, rateKeys, resetFnDb, type newFnDbState } from './_fnDb.js';
 
 // ADR-058: submitresponse checks shapes, then the honeypot, then the form and
 // its lock, then ONE all-or-nothing rate statement that also returns the schema.
@@ -381,9 +381,12 @@ describe('file answers keep only this form’s refs (C4)', () => {
   it('end to end: stored answers keep only valid refs; non-file answers are clampValue output', async () => {
     setForm();
     const good = ref('public');
+    // ADR-067: every ref must be an upload storagesign recorded for this form.
+    addUpload(db.state, { key: good.slice(21), owner_id: 'u_owner_x', question_id: 'q_file' });
+    addUpload(db.state, { key: ref('draft').slice(21), owner_id: 'u_owner_x', question_id: null });
     const answers = {
       q_name: 'x'.repeat(12_000),
-      q_file: [good, ref('public', OTHER), 'https://x.example/a.png'],
+      q_file: [good, 'https://x.example/a.png'],
       q_one: [ref('draft'), good],
     };
     expect((await submit({ answers })).status).toBe(200);
@@ -392,6 +395,15 @@ describe('file answers keep only this form’s refs (C4)', () => {
       q_file: [good],
       q_one: ref('draft'),
     });
+  });
+
+  // ADR-067: dropping another form's ref (ADR-058) became a refusal — the page never sends one.
+  it('another form’s ref in a file answer is a 400 and nothing is stored', async () => {
+    setForm();
+    const res = await submit({ answers: { q_file: [ref('public', OTHER)] } });
+    expect(res.status).toBe(400);
+    expect(db.state.submissions).toHaveLength(0);
+    expect(db.state.log.some((q) => q.sql.includes('insert_public_submission'))).toBe(false);
   });
 });
 

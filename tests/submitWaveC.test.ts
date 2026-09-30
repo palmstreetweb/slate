@@ -13,7 +13,7 @@ import {
 } from '../neon/functions/submit-response/answerShape.js';
 import { imageKey } from '@/logic/pins.js';
 import * as media from '@/logic/media.js';
-import { resetFnDb, type newFnDbState } from './_fnDb.js';
+import { addUpload, resetFnDb, type newFnDbState } from './_fnDb.js';
 
 const db = vi.hoisted(() => ({ state: null as unknown as ReturnType<typeof newFnDbState> }));
 
@@ -199,13 +199,17 @@ describe('clampForQuestion: Wave C shapes', () => {
 
 describe('submit: Wave C answers as stored', () => {
   it('stores every Wave C answer in its server shape; a forged area is replaced', async () => {
+    // ADR-067: the files are uploads storagesign recorded for these questions.
+    addUpload(db.state, { key: ref(FORM, 'voice.m4a').slice(21), question_id: 'story' });
+    addUpload(db.state, { key: ref().slice(21), question_id: 'shots' });
     const res = await submit({
       leak: { pins: ['0.5,0.5'], notes: ['leak'] },
       where: { lat: 34.0522, lng: -118.2437, area: 'in' },
       zipOnly: { zip: '90210', area: 'in' },
       when: { mon: '09:00-10:00' },
       story: { audio: ref(FORM, 'voice.m4a'), sec: '12' },
-      shots: { front: ref(), roof: ref(OTHER) },
+      // An item the question doesn't publish is dropped, not refused.
+      shots: { front: ref(), shed: ref(FORM, 'shed.jpg') },
       likes: [],
     });
     expect(res.status).toBe(200);
@@ -222,11 +226,26 @@ describe('submit: Wave C answers as stored', () => {
   });
 
   it('drops a Wave C answer that is nothing but junk, keeping the rest', async () => {
-    await submit({ leak: { pins: ['9,9'] }, when: { mon: 'soon' }, story: { audio: ref(OTHER) } });
+    await submit({ leak: { pins: ['9,9'] }, when: { mon: 'soon' }, story: { audio: 'nope' } });
     expect(stored().answers).toEqual({});
     await submit({ where: { typed: 'Goleta' } });
     expect(
       db.state.submissions.some((s) => (s as { answers: { where?: unknown } }).answers.where),
     ).toBe(true);
+  });
+
+  // ADR-067: a voice note or checklist naming another form's file used to be dropped (ADR-058);
+  // the page never sends one, so it is now refused and nothing is stored.
+  it('another form’s file in a voice note or a checklist is a 400', async () => {
+    expect((await submit({ story: { audio: ref(OTHER) } })).status).toBe(400);
+    expect((await submit({ shots: { front: ref(OTHER) } })).status).toBe(400);
+    expect(db.state.submissions).toHaveLength(0);
+  });
+
+  it('a file nobody signed (no row, grace over) is a 400 naming its question', async () => {
+    db.state.storage.legacyOpen = false;
+    const res = await submit({ story: { audio: ref(FORM, 'voice.m4a') } });
+    expect(res.status).toBe(400);
+    expect(db.state.submissions).toHaveLength(0);
   });
 });
