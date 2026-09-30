@@ -27,7 +27,11 @@ import {
   subscribe,
   hasUnpublishedChanges,
   setFormFillPassword,
+  updateForm,
 } from '../_formsStore.js';
+import { countSubmissions, subscribe as subscribeSubmissions } from '../_submissionStore.js';
+import { trackedLinkUrl } from '../trackedLinks.js';
+import { CloseRow, TrackedLinks } from './ShareExtras.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { publicFillUrl } from '../neon/publicApi.js';
 import { playUiSound } from '../uiSounds.js';
@@ -61,11 +65,14 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const [lockDraft, setLockDraft] = useState('');
   const [lockBusy, setLockBusy] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
+  /** Tracked link on show (ADR-063): its `src`, or null for the main link. */
+  const [trackSrc, setTrackSrc] = useState<string | null>(null);
   const [, setTick] = useState(0);
 
   useEffect(() => {
     if (open) return;
     setIgnited(false);
+    setTrackSrc(null);
     // Never keep a typed password around after the sheet closes.
     setLockEditing(false);
     setLockDraft('');
@@ -74,7 +81,13 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    return subscribe(() => setTick((t) => t + 1));
+    const offForms = subscribe(() => setTick((t) => t + 1));
+    // "12 of 20 responses" follows new arrivals while the panel is open.
+    const offSubs = subscribeSubmissions(() => setTick((t) => t + 1));
+    return () => {
+      offForms();
+      offSubs();
+    };
   }, [open]);
 
   useFocusTrap(panelRef, open, onClose);
@@ -91,7 +104,13 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
     !form?.fillLocked && canEncodePortableSchema(schema)
       ? buildPortableShareUrl(schema, { formId, name: formName })
       : null;
-  const shareUrl = productionUrl ?? portableUrl;
+  // Tracked links (ADR-063) build on the published public link; `?src=` is added, never answers.
+  const trackBase = isPublished ? publicFillUrl(slug) : null;
+  const trackedUrl =
+    trackSrc && trackBase && form?.trackedSources?.some((t) => t.src === trackSrc)
+      ? trackedLinkUrl(trackBase, trackSrc)
+      : null;
+  const shareUrl = trackedUrl ?? productionUrl ?? portableUrl;
 
   /**
    * The QR encodes a SHORT link so the code stays chunky and scannable.
@@ -102,7 +121,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
     typeof window !== 'undefined'
       ? `${window.location.origin}/forms/${formId}/preview`
       : `/forms/${formId}/preview`;
-  const qrUrl = productionUrl ?? shortFormUrl;
+  const qrUrl = trackedUrl ?? productionUrl ?? shortFormUrl;
 
   useEffect(() => {
     if (!open) return;
@@ -245,6 +264,34 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   };
 
   if (!open || typeof document === 'undefined') return null;
+
+  const liveResponses = countSubmissions(formId);
+
+  const closeRow = form ? (
+    <CloseRow
+      form={form}
+      liveResponses={liveResponses}
+      onSave={(patch, note) => {
+        const [, ok] = updateForm(formId, patch);
+        if (ok)
+          toast.push({ title: note.title, detail: note.detail, tone: 'success', sound: 'success' });
+        return ok;
+      }}
+    />
+  ) : null;
+
+  const trackedRow =
+    form && trackBase ? (
+      <TrackedLinks
+        sources={form.trackedSources ?? []}
+        selected={trackedUrl ? trackSrc : null}
+        onSelect={setTrackSrc}
+        onChange={(next) => {
+          const [, ok] = updateForm(formId, { trackedSources: next.length ? next : undefined });
+          return ok;
+        }}
+      />
+    ) : null;
 
   const mode = readSlateMode();
   const uiTheme = detectAdminUiTheme();
@@ -447,7 +494,11 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                   </div>
                 </section>
 
+                {trackedRow}
+
                 {lockRow}
+
+                {closeRow}
 
                 <section className="slate-share-scan" aria-label="QR code">
                   <div className="slate-share-qr-frame" aria-hidden={!qr}>
@@ -525,6 +576,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                   ) : null}
                 </div>
                 {lockRow}
+                {closeRow}
               </>
             )}
           </div>

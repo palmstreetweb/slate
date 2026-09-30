@@ -49,6 +49,11 @@ function pictureOptionsOf(q: GeneratedQuestion): PictureOption[] {
     }));
 }
 
+/** `allowOther` only when the model set it (ADR-063). */
+function otherOf(q: GeneratedQuestion): { allowOther?: true } {
+  return q.allowOther ? { allowOther: true } : {};
+}
+
 function visibilityOf(q: GeneratedQuestion, idMap: Map<string, string>): { visibleIf?: Condition } {
   const field = q.showIfField.trim();
   const equals = q.showIfEquals.trim();
@@ -99,6 +104,9 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         min: q.min,
         max: q.max,
         step: q.step || 1,
+        ...(q.display === 'stepper' ? { display: 'stepper' as const } : {}),
+        ...(text(q.unit) ? { unit: text(q.unit)!.slice(0, 24) } : {}),
+        ...(text(q.prefix) ? { prefix: text(q.prefix)!.slice(0, 12) } : {}),
         ...vis,
       };
     case 'date':
@@ -108,6 +116,8 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         title,
         required,
         format: q.format === 'DD/MM/YYYY' ? 'DD/MM/YYYY' : 'MM/DD/YYYY',
+        ...(q.includeTime ? { includeTime: true } : {}),
+        ...(q.range ? { range: true } : {}),
         ...vis,
       };
     case 'file_upload':
@@ -123,7 +133,15 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         ...vis,
       };
     case 'single_choice':
-      return { id, type: 'single_choice', title, required, options: optionsOf(q), ...vis };
+      return {
+        id,
+        type: 'single_choice',
+        title,
+        required,
+        options: optionsOf(q),
+        ...otherOf(q),
+        ...vis,
+      };
     case 'multi_choice':
       return {
         id,
@@ -132,6 +150,7 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         options: optionsOf(q),
         min: q.min,
         max: q.max || undefined,
+        ...otherOf(q),
         ...vis,
       };
     case 'dropdown':
@@ -142,6 +161,7 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         options: optionsOf(q),
         placeholder: text(q.placeholder, 'Choose one'),
         required,
+        ...otherOf(q),
         ...vis,
       };
     case 'picture_choice':
@@ -154,6 +174,7 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         required,
         min: q.min,
         max: q.max || undefined,
+        ...otherOf(q),
         ...vis,
       };
     case 'ranking':
@@ -200,6 +221,9 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         minLabel: text(q.minLabel),
         maxLabel: text(q.maxLabel),
         required,
+        ...(q.display === 'stars' || q.display === 'emoji' || q.display === 'slider'
+          ? { display: q.display }
+          : {}),
         ...vis,
       };
     case 'nps':
@@ -251,6 +275,12 @@ function blankQuestion(
     options: [],
     rows: [],
     columns: [],
+    allowOther: false,
+    display: '',
+    unit: '',
+    prefix: '',
+    includeTime: false,
+    range: false,
     showIfField: '',
     showIfEquals: '',
     ...partial,

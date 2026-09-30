@@ -10,6 +10,8 @@
 
 import { useEffect, useState } from 'react';
 import type { Condition, LogicRule, Question } from '@/index.js';
+import { OTHER_VALUE } from '@/index.js';
+import { allowsOther, otherLabelOf } from '@/logic/other.js';
 import { SlateSelect } from './SlateSelect.js';
 
 function isCompleteJumpRule(rule: LogicRule): boolean {
@@ -93,11 +95,16 @@ function optionsFor(
     case 'multi_choice':
     case 'dropdown':
     case 'ranking':
-    case 'picture_choice':
-      return (q.options as ReadonlyArray<{ label: string; value: string }>).map((o) => ({
+    case 'picture_choice': {
+      const opts = (q.options as ReadonlyArray<{ label: string; value: string }>).map((o) => ({
         label: o.label,
         value: o.value,
       }));
+      // "Picked Other" (ADR-063): matches any typed answer, never a listed option.
+      return allowsOther(q)
+        ? [...opts, { label: `${otherLabelOf(q)} (anything typed)`, value: OTHER_VALUE }]
+        : opts;
+    }
     case 'yes_no':
       return [
         { label: q.yesLabel ?? 'Yes', value: 'yes' },

@@ -52,7 +52,11 @@ describe('csvExport', () => {
     const csv = buildResponsesCsv(questions, subs);
     const lines = csv.split('\r\n');
 
-    expect(lines[0]).toBe('Submitted,Time spent,Score,Which service?,What\'s your first name?');
+    // ADR-063 added a Source column after Score ("Direct" without a tracked link).
+    expect(lines[0]).toBe(
+      "Submitted,Time spent,Score,Source,Which service?,What's your first name?",
+    );
+    expect(lines[1]).toContain(',Direct,');
     expect(lines[1]).toMatch(/Parking lot striping/);
     expect(lines[1]).toContain('1 min 30 sec');
     expect(lines[1]).not.toMatch(/,striping,/);
@@ -84,7 +88,9 @@ describe('csvExport', () => {
   });
 
   it('responsesCsvFilename includes form name and date', () => {
-    expect(responsesCsvFilename('805 Quote')).toMatch(/^805 Quote — responses \d{4}-\d{2}-\d{2}\.csv$/);
+    expect(responsesCsvFilename('805 Quote')).toMatch(
+      /^805 Quote — responses \d{4}-\d{2}-\d{2}\.csv$/,
+    );
   });
 });
 
@@ -119,5 +125,58 @@ describe('CSV formula injection (ADR-046)', () => {
     expect(csv('-42.5')).toContain('-42.5');
     expect(csv('-42.5')).not.toContain("'-42.5");
     expect(csv('hello')).not.toContain("'hello");
+  });
+
+  it('Source names tracked links, and Other / dates / units read plainly (ADR-063)', () => {
+    const questions: Question[] = [
+      {
+        id: 'how',
+        type: 'single_choice',
+        title: 'How did you hear?',
+        allowOther: true,
+        options: [{ label: 'Flyer', value: 'flyer' }],
+      },
+      { id: 'stay', type: 'date', title: 'Dates', range: true },
+      { id: 'sqft', type: 'number', title: 'Size', unit: 'sq ft' },
+    ];
+    const rows: StoredSubmission[] = [
+      {
+        id: 's_a',
+        formId: 'f',
+        receivedAt: '2026-09-29T18:00:00.000Z',
+        answers: { how: 'Yard sign', stay: '2026-10-03/2026-10-07', sqft: 1800 },
+        meta: {
+          startedAt: '',
+          completedAt: '',
+          durationMs: 1000,
+          questionsVisited: [],
+          hiddenFields: { src: 'mailbox-flyer' },
+          score: 0,
+        },
+      },
+      {
+        id: 's_b',
+        formId: 'f',
+        receivedAt: '2026-09-29T19:00:00.000Z',
+        answers: { how: 'flyer' },
+        meta: {
+          startedAt: '',
+          completedAt: '',
+          durationMs: 1000,
+          questionsVisited: [],
+          hiddenFields: { src: 'door-hanger' },
+          score: 0,
+        },
+      },
+    ];
+    const lines = buildResponsesCsv(questions, rows, [
+      { name: 'Mailbox flyer — Oak St', src: 'mailbox-flyer', createdAt: '' },
+    ]).split('\r\n');
+    expect(lines[1]).toContain(',Mailbox flyer — Oak St,');
+    expect(lines[1]).toContain(',Other: Yard sign,');
+    expect(lines[1]).toContain('10/03/2026 – 10/07/2026');
+    // Numbers stay numbers for the spreadsheet.
+    expect(lines[1]!.endsWith(',1800')).toBe(true);
+    expect(lines[2]).toContain(',Door hanger,Flyer,');
   });
 });

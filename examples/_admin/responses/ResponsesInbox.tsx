@@ -27,6 +27,7 @@ import type { Question } from '@/index.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import type { InboxProps } from './types.js';
 import {
+  DIRECT_SOURCE,
   answerPreview,
   answerValues,
   dayGroups,
@@ -40,7 +41,11 @@ import {
   relativeAge,
   respondentEmail,
   respondentName,
+  hasSources,
   responseNumbers,
+  sourceDistribution,
+  sourceText,
+  subSource,
   tableColumns,
   unreadIds,
 } from './model.js';
@@ -85,6 +90,8 @@ type RowData = {
   /** Text preview — the long answer, or wherever the search hit. */
   snip: string;
   files: boolean;
+  /** Where it came from (ADR-063); '' when no response has a tracked source. */
+  source: string;
 };
 
 /* ---------- text helpers ---------- */
@@ -189,6 +196,7 @@ function buildRow(
   nameQ: Question | null,
   terms: ReadonlyArray<string>,
   name: string,
+  source = '',
 ): RowData {
   const needText = need ? answerPreview(sub, need, 48) : '';
   const base = text ? answerPreview(sub, text, 2000) : '';
@@ -221,6 +229,7 @@ function buildRow(
     need: needText,
     snip: clip(oneLine(snip), SNIP_MAX),
     files: hasFiles(sub, questions),
+    source,
   };
 }
 
@@ -248,7 +257,7 @@ const InboxRow = memo(function InboxRow({
   terms,
   onOpen,
 }: RowProps) {
-  const { sub, name, need, snip, files } = row;
+  const { sub, name, need, snip, files, source } = row;
   return (
     <li>
       <button
@@ -295,6 +304,12 @@ const InboxRow = memo(function InboxRow({
                   <span className="rsp-sr"> Has files.</span>
                 </>
               ) : null}
+            </span>
+          ) : null}
+          {source ? (
+            <span className="rsp-ib-src" dir="auto">
+              <span className="rsp-sr">Source: </span>
+              {source}
             </span>
           ) : null}
         </span>
@@ -351,6 +366,7 @@ export function ResponsesInbox({
   subs,
   unread,
   mode,
+  trackedSources,
   onMarkRead,
   onMarkUnread,
   onTrash,
@@ -372,6 +388,8 @@ export function ResponsesInbox({
   /** Last opened response — j/k carry on from here after closing. */
   const [lastId, setLastId] = useState<string | null>(null);
   const [filter, setFilterState] = useState<Filter>('all');
+  /** Source filter (ADR-063): a source value, or null for every source. */
+  const [source, setSource] = useState<string | null>(null);
   const [query, setQueryState] = useState('');
   const deferredQuery = useDeferredValue(query);
   /** Rows kept in the Unread filter after being opened (and so read). */
@@ -421,6 +439,13 @@ export function ResponsesInbox({
   }, [subs, questions]);
 
   const unreadHere = useMemo(() => (trash ? [] : unreadIds(subs, unread)), [trash, subs, unread]);
+  const withSource = useMemo(() => !trash && hasSources(subs), [trash, subs]);
+  const sources = useMemo(
+    () =>
+      withSource ? sourceDistribution(subs, trackedSources).rows.filter((r) => r.count > 0) : [],
+    [withSource, subs, trackedSources],
+  );
+  const sourceFilter = withSource && sources.some((r) => r.value === source) ? source : null;
   const unreadFilter = !trash && filter === 'unread' ? unread : null;
   const terms = useMemo(() => searchTerms(deferredQuery), [deferredQuery]);
   const visible = useMemo(
@@ -428,9 +453,10 @@ export function ResponsesInbox({
       subs.filter(
         (s) =>
           (!unreadFilter || unreadFilter.has(s.id) || keep.has(s.id)) &&
+          (sourceFilter === null || subSource(s) === sourceFilter) &&
           matchesSearch(s, questions, deferredQuery),
       ),
-    [subs, questions, deferredQuery, unreadFilter, keep],
+    [subs, questions, deferredQuery, unreadFilter, keep, sourceFilter],
   );
   const indexOf = useMemo(() => new Map(visible.map((s, i) => [s.id, i])), [visible]);
   const groups = useMemo(() => dayGroups(visible, now), [visible, now]);
@@ -440,12 +466,21 @@ export function ResponsesInbox({
     return (s: StoredSubmission): RowData => {
       let row = cache.get(s);
       if (!row) {
-        row = buildRow(s, questions, need, columns.text, nameQ, terms, names.get(s.id) ?? '');
+        row = buildRow(
+          s,
+          questions,
+          need,
+          columns.text,
+          nameQ,
+          terms,
+          names.get(s.id) ?? '',
+          withSource ? sourceText(subSource(s), trackedSources) : '',
+        );
         cache.set(s, row);
       }
       return row;
     };
-  }, [questions, columns, nameQ, terms, names]);
+  }, [questions, columns, nameQ, terms, names, withSource, trackedSources]);
 
   /** Ages only change with the clock; formatting dates per row per keypress adds up. */
   const ageOf = useMemo(() => {
@@ -770,7 +805,18 @@ export function ResponsesInbox({
 
   const trimmedQuery = query.trim();
   let listEmpty: ReactNode = null;
-  if (visible.length === 0) {
+  if (visible.length === 0 && sourceFilter !== null && !trimmedQuery) {
+    listEmpty = (
+      <div className="rsp-empty rsp-ib-empty">
+        <p className="rsp-empty-title">
+          Nothing from {sourceText(sourceFilter, trackedSources)} here
+        </p>
+        <button type="button" className="rsp-btn" onClick={() => setSource(null)}>
+          Show every source
+        </button>
+      </div>
+    );
+  } else if (visible.length === 0) {
     listEmpty = trimmedQuery ? (
       <div className="rsp-empty rsp-ib-empty">
         <p className="rsp-empty-title">No responses match “{clip(trimmedQuery, 60)}”</p>
@@ -872,6 +918,23 @@ export function ResponsesInbox({
                   Unread <span className="rsp-seg-n">{unreadHere.length}</span>
                 </button>
               </div>
+              {withSource ? (
+                <label className="rsp-ib-source">
+                  <span className="rsp-sr">Source</span>
+                  <select
+                    className="rsp-select"
+                    value={sourceFilter ?? ''}
+                    onChange={(e) => setSource(e.target.value || null)}
+                  >
+                    <option value="">All sources</option>
+                    {sources.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label} ({r.count})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <button
                 type="button"
                 className="rsp-textbtn"
@@ -1079,6 +1142,16 @@ export function ResponsesInbox({
                 <dt>Time to complete</dt>
                 <dd>{formatDuration(openSub.meta?.durationMs)}</dd>
               </div>
+              {withSource ? (
+                <div>
+                  <dt>Source</dt>
+                  <dd>
+                    {subSource(openSub) === DIRECT_SOURCE
+                      ? 'Direct link'
+                      : sourceText(subSource(openSub), trackedSources)}
+                  </dd>
+                </div>
+              ) : null}
               {!trash && email ? (
                 <div>
                   <dt>From this person</dt>

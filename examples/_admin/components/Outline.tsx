@@ -18,7 +18,8 @@ import { lockBodyScroll } from '../lockBodyScroll.js';
 import type { FormSound, QuestionType, Schema, ThemeMode, ThemeName } from '@/index.js';
 import { FORM_SOUND_OPTIONS, resolveFormSound } from '@/utils/formSounds.js';
 import { safeLogoSrc } from '@/utils/brandLogo.js';
-import { ADDABLE_TYPES, TYPE_GLYPH } from '../questionTypeMeta.js';
+import { ADDABLE_TYPES } from '../questionTypeMeta.js';
+import { TypeIcon } from './TypeIcon.js';
 import { useOutlineDrag } from '../hooks/useOutlineDrag.js';
 import { SlateSelect } from './SlateSelect.js';
 
@@ -276,9 +277,10 @@ export function Outline({
                     }}
                   >
                     <span className="slate-add-type-glyph" aria-hidden>
-                      {TYPE_GLYPH[t.type]}
+                      <TypeIcon type={t.type} />
                     </span>
-                    {t.label}
+                    {/* A span, so a label that wraps stays left-aligned with the rest. */}
+                    <span className="slate-add-type-label">{t.label}</span>
                   </button>
                 ))}
               </div>
@@ -448,7 +450,7 @@ export function Outline({
                       >
                         <span className="slate-outline-idx">{String(i + 1).padStart(2, '0')}</span>
                         <span className="slate-outline-glyph" aria-hidden>
-                          {TYPE_GLYPH[q.type]}
+                          <TypeIcon type={q.type} size={15} />
                         </span>
                         <span className="slate-outline-title">{titleText || '(no title)'}</span>
                         {pinned && (

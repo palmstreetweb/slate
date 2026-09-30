@@ -74,6 +74,16 @@ export const generatedQuestionSchema = z.object({
   options: z.array(optionSchema),
   rows: z.array(optionSchema),
   columns: z.array(optionSchema),
+  /** Choice questions: add "Other" with a text box (ADR-063). */
+  allowOther: z.boolean(),
+  /** scale: numbers | stars | emoji | slider. number: stepper. '' = default (ADR-063). */
+  display: z.enum(['', 'numbers', 'stars', 'emoji', 'slider', 'stepper']),
+  /** number: shown after / before the value, e.g. "sq ft", "$" (display only). */
+  unit: z.string(),
+  prefix: z.string(),
+  /** date: also ask for a time of day / ask for a start and end. */
+  includeTime: z.boolean(),
+  range: z.boolean(),
   /** Earlier question id. Empty = always visible. */
   showIfField: z.string(),
   /** Stored answer to match (`yes`, `chicken`, option value — not the label). */
@@ -208,6 +218,12 @@ Use only when the prompt clearly needs them:
 - statement / review — sparingly
 
 Do not add ranking, matrix, NPS, or picture_choice to "look complete."
+
+Options (leave false / "" unless they clearly help):
+- allowOther: true on single_choice, multi_choice, dropdown or picture_choice when people may not fit the list ("How did you hear about us?", "Which service?"). Adds "Other" with a text box. Never on yes_no or legal.
+- display on scale: "stars" to rate a visit or service, "emoji" (faces) for how someone feels, "slider" for a wide range like 0–10. Otherwise "".
+- display "stepper" on number for small counts (rooms, windows, people, pets): set min and max; unit ("windows", "sq ft") and prefix ("$") are display only.
+- date: includeTime for appointments or pickups at a time of day; range for spans (a stay, event dates, "available from / to").
 
 Branching (showIfField / showIfEquals):
 - Empty strings = always visible.

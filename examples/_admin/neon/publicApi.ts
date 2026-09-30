@@ -6,8 +6,19 @@ import type { Answers, SubmitMeta } from '@/index.js';
 import type { Schema } from '@/index.js';
 import { getSubmitUrl, isNeonConfigured } from './config.js';
 import { loadPublishedForm } from './publicForm.js';
-import type { PublishedFormPayload } from './database.types.js';
+import type { FormClosedInfo, PublishedFormPayload } from './database.types.js';
+import { closedInfoOf } from './mappers.js';
 import { clearFillUnlockToken, readFillUnlockToken } from '../fillUnlock.js';
+
+/** The form closed (410: past its closing time, 409: at its cap) — ADR-063. */
+export class FormClosedError extends Error {
+  readonly closed: FormClosedInfo;
+  constructor(message: string, closed: FormClosedInfo) {
+    super(message);
+    this.name = 'FormClosedError';
+    this.closed = closed;
+  }
+}
 
 /** Published form by slug — SDK-free, shared with the app entry's prefetch (ADR-048). */
 export function fetchPublishedFormBySlug(slug: string): Promise<PublishedFormPayload | null> {
@@ -17,7 +28,8 @@ export function fetchPublishedFormBySlug(slug: string): Promise<PublishedFormPay
 
 export type UnlockResult =
   | { ok: true; form: Extract<PublishedFormPayload, { locked: false }>; unlockToken: string | null }
-  | { ok: false; reason: 'wrong_password' | 'rate_limited' | 'unavailable'; message: string };
+  | { ok: false; reason: 'wrong_password' | 'rate_limited' | 'unavailable'; message: string }
+  | { ok: false; reason: 'closed'; message: string; closed: FormClosedInfo };
 
 /**
  * Trade a password (or this tab's saved token) for the schema (ADR-043).
@@ -81,7 +93,12 @@ export async function unlockPublicForm(
     slug?: string;
     schema?: unknown;
     unlockToken?: string;
+    closed?: unknown;
   };
+  const closed = closedInfoOf(body.closed);
+  if (closed) {
+    return { ok: false, reason: 'closed', message: 'This form is closed.', closed };
+  }
   if (!body.id || !body.name || !body.slug || !body.schema) {
     return {
       ok: false,
@@ -141,6 +158,22 @@ export async function submitPublicResponse(
       // Password was changed or removed mid-fill; the old token is dead.
       clearFillUnlockToken(payload.formId);
       throw new Error('This form’s password changed. Reload the page and enter the new one.');
+    }
+    if (res.status === 410 || res.status === 409) {
+      // Closed since the page loaded (ADR-063): the page swaps to the closed screen.
+      const b = (await res.json().catch(() => ({}))) as {
+        error?: unknown;
+        reason?: unknown;
+        message?: unknown;
+      };
+      const closed = closedInfoOf({
+        reason: b.reason ?? (res.status === 409 ? 'full' : 'date'),
+        message: b.message,
+      });
+      throw new FormClosedError(
+        typeof b.error === 'string' && b.error ? b.error : 'This form is closed.',
+        closed ?? { reason: res.status === 409 ? 'full' : 'date', message: null },
+      );
     }
     if (res.status === 429) {
       let retryAfter = Number(res.headers.get('Retry-After') || 60);

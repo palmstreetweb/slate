@@ -30,14 +30,34 @@ export type DbFormRow = {
    * published row (Republish of a rename). Missing before 017.
    */
   published_name?: string | null;
+  /** Close settings + tracked links (migration 019, ADR-063). Missing before 019. */
+  closes_at?: string | null;
+  max_responses?: number | null;
+  closed_message?: string | null;
+  tracked_sources?: Array<{ name: string; src: string; createdAt: string }> | null;
 };
 
 /** Explicit owner-hydrate column list. Never `*` — that would pull `fill_password_hash`. */
 export const FORM_OWNER_COLUMNS =
-  'id,name,slug,schema,published_schema,status,owner_id,created_at,updated_at,deleted_at,fill_locked,published_name';
+  'id,name,slug,schema,published_schema,status,owner_id,created_at,updated_at,deleted_at,fill_locked,published_name,closes_at,max_responses,closed_message,tracked_sources';
 
-/** Owner columns a database may not have yet (012, 017). Hydrate drops them one by one if missing. */
-export const FORM_OPTIONAL_COLUMNS = ['published_name', 'fill_locked'] as const;
+/** 019's columns: written only when a hydrate has read all four (ADR-063). */
+export const FORM_CLOSE_COLUMNS = [
+  'closes_at',
+  'max_responses',
+  'closed_message',
+  'tracked_sources',
+] as const;
+
+/** Owner columns a database may not have yet (012, 017, 019). Hydrate drops them one by one if missing. */
+export const FORM_OPTIONAL_COLUMNS = [
+  'tracked_sources',
+  'closed_message',
+  'max_responses',
+  'closes_at',
+  'published_name',
+  'fill_locked',
+] as const;
 
 export type DbSubmissionRow = {
   id: string;
@@ -171,6 +191,17 @@ export type Database = {
 };
 
 /** `schema` is null exactly when `locked` — the gate unlocks it (ADR-043). */
+/** Why the public page is closed (ADR-063), and the owner's message if any. */
+export type FormClosedInfo = { reason: 'date' | 'full'; message: string | null };
+
 export type PublishedFormPayload =
-  | { id: string; name: string; slug: string; locked: false; schema: Schema }
-  | { id: string; name: string; slug: string; locked: true; schema: null };
+  | { id: string; name: string; slug: string; locked: false; schema: Schema; closed?: undefined }
+  | { id: string; name: string; slug: string; locked: true; schema: null; closed?: undefined }
+  | {
+      id: string;
+      name: string;
+      slug: string;
+      locked: boolean;
+      schema: null;
+      closed: FormClosedInfo;
+    };

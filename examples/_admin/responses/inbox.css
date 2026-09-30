@@ -1012,3 +1012,50 @@
 [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib--trash .rsp-ib-filterbar {
   min-height: 32px;
 }
+
+/* ---------- ADR-063: where a response came from ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-src {
+  display: inline-block;
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: 4px;
+  padding: 0 7px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 99px;
+  font-size: 11px;
+  line-height: 17px;
+  color: var(--chrome-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-source {
+  display: inline-flex;
+  align-items: center;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-select {
+  height: 30px;
+  max-width: 180px;
+  padding: 0 26px 0 10px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 8px;
+  background: var(--chrome-panel-2);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--chrome-ink);
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-select:focus-visible {
+  outline: 2px solid var(--chrome-red, var(--slate-accent));
+  outline-offset: 1px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp--phone .rsp-select {
+  height: 44px;
+  font-size: 16px;
+}

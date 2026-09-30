@@ -9,7 +9,8 @@ import { useMemo, useState, type PointerEvent } from 'react';
 import { hrefFor } from '../_router.js';
 import { DROP_PRESETS, type DropPresetId } from '../dropPresets.js';
 import { useDropLabDrag } from '../hooks/useDropLabDrag.js';
-import { TYPE_GLYPH } from '../questionTypeMeta.js';
+import type { QuestionType } from '@/index.js';
+import { TypeIcon } from '../components/TypeIcon.js';
 
 type LabQuestion = {
   id: string;
@@ -179,9 +180,11 @@ export function DropLab() {
                           }}
                           onPointerDown={(e) => startDrag(e, e.currentTarget)}
                         >
-                          <span className="slate-outline-idx">{String(i + 1).padStart(2, '0')}</span>
+                          <span className="slate-outline-idx">
+                            {String(i + 1).padStart(2, '0')}
+                          </span>
                           <span className="slate-outline-glyph" aria-hidden>
-                            {TYPE_GLYPH[q.type as keyof typeof TYPE_GLYPH] ?? 'T'}
+                            <TypeIcon type={q.type as QuestionType} size={15} />
                           </span>
                           <span className="slate-outline-title">{q.title}</span>
                         </button>

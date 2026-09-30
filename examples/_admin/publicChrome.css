@@ -440,3 +440,58 @@ html:has(.slate-embed) body {
   height: 1px;
   overflow: hidden;
 }
+
+/* ---------- public fill: closed form (ADR-063) ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-closed-card {
+  justify-items: start;
+  gap: 10px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-closed-mark {
+  display: inline-flex;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: var(--chrome-panel-2, var(--slate-bg-2));
+  border: 1px solid var(--chrome-line, var(--slate-border));
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-closed-mark svg {
+  width: 32px;
+  height: 32px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-closed-kicker {
+  margin: 0;
+  font-family: var(--slate-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--slate-muted);
+  overflow-wrap: anywhere;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-closed-message {
+  margin: 6px 0 0;
+  padding: 12px 14px;
+  width: 100%;
+  box-sizing: border-box;
+  border-left: 3px solid var(--slate-accent);
+  border-radius: 0 var(--slate-radius-sm, 8px) var(--slate-radius-sm, 8px) 0;
+  background: var(--chrome-panel-2, var(--slate-bg-2));
+  font-size: var(--slate-fs-md, 15px);
+  line-height: 1.5;
+  color: var(--slate-text);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}

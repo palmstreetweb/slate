@@ -23,10 +23,12 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import type { Question } from '@/index.js';
+import { OTHER_VALUE } from '@/index.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import { titleOf } from '../responsesFormat.js';
 import type { AnswerFilter, Distribution, Kpis, SummaryProps, TableColumns } from './types.js';
 import {
+  SOURCE_FILTER_ID,
   answerMatchesFilter,
   answerPreview,
   answerText,
@@ -40,9 +42,13 @@ import {
   kpis,
   namedRespondent,
   questionDistribution,
+  hasSources,
   relativeAge,
   respondentName,
   responseNumbers,
+  sourceDistribution,
+  sourceText,
+  subSource,
   tableColumns,
   unreadIds,
 } from './model.js';
@@ -92,9 +98,12 @@ function matches(
   f: Filters,
   weekStartMs: number,
   skipQuestion?: string,
+  byId?: ReadonlyMap<string, Question>,
 ): boolean {
   for (const a of f.answers) {
-    if (a.questionId !== skipQuestion && !answerMatchesFilter(sub, a)) return false;
+    if (a.questionId !== skipQuestion && !answerMatchesFilter(sub, a, byId?.get(a.questionId))) {
+      return false;
+    }
   }
   if (f.newIds && !f.newIds.has(sub.id)) return false;
   if (f.week && !(Date.parse(sub.receivedAt) >= weekStartMs)) return false;
@@ -107,7 +116,7 @@ function matches(
  * is the prototype's; `mid` shares the space out below ~900px.
  */
 function columnTemplates(cols: TableColumns): { wide: string; mid: string } {
-  const n = cols.choices.length;
+  const n = cols.choices.length + (cols.source ? 1 : 0);
   const wideChoices = ['minmax(96px, 136px)', 'minmax(104px, 152px)'].slice(0, n);
   const midChoices = Array.from({ length: n }, () => 'minmax(72px, 1fr)');
   const hasText = cols.text !== null;
@@ -281,6 +290,8 @@ const KpiTiles = memo(function KpiTiles({ k, newOn, weekOn, onToggleNew, onToggl
 type ChartProps = {
   question: Question;
   number: number;
+  /** Shown instead of "Q{number}" (the Source chart, ADR-063). */
+  badge?: string;
   total: Distribution;
   /** Counts under the other active filters, or null when none apply. */
   crossed: Distribution | null;
@@ -299,6 +310,7 @@ function formatAverage(n: number): string {
 const ChartCard = memo(function ChartCard({
   question,
   number,
+  badge,
   total,
   crossed,
   selected,
@@ -337,7 +349,7 @@ const ChartCard = memo(function ChartCard({
     >
       <header className="rsp-sum-chart-head">
         <h3 className="rsp-sum-chart-title" id={titleId}>
-          <span className="rsp-sum-qnum">Q{number}</span>
+          <span className="rsp-sum-qnum">{badge ?? `Q${number}`}</span>
           <span className="rsp-sum-chart-text" title={title} dir="auto">
             {title}
           </span>
@@ -412,9 +424,41 @@ const ChartCard = memo(function ChartCard({
           {showAll ? 'Show less' : `Show ${hidden} more`}
         </button>
       ) : null}
+      {total.others && total.others.length > 0 ? <TypedOthers others={total.others} /> : null}
     </article>
   );
 });
+
+/** What people typed under "Other" (ADR-063), most common first. */
+function TypedOthers({ others }: { others: ReadonlyArray<{ text: string; count: number }> }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? others : others.slice(0, 6);
+  return (
+    <div className="rsp-sum-others">
+      <p className="rsp-sum-others-head">Typed under “Other”</p>
+      <ul className="rsp-sum-others-list">
+        {shown.map((o) => (
+          <li key={o.text} dir="auto">
+            <span className="rsp-sum-others-text">{o.text}</span>
+            {o.count > 1 ? <span className="rsp-sum-others-n">×{o.count}</span> : null}
+          </li>
+        ))}
+      </ul>
+      {others.length > shown.length || all ? (
+        others.length > 6 ? (
+          <button
+            type="button"
+            className="rsp-textbtn rsp-sum-chart-more"
+            aria-expanded={all}
+            onClick={() => setAll((v) => !v)}
+          >
+            {all ? 'Show fewer' : `Show all ${others.length}`}
+          </button>
+        ) : null
+      ) : null}
+    </div>
+  );
+}
 
 /* ---------- responses table ---------- */
 
@@ -426,6 +470,8 @@ type RowProps = {
   cols: TableColumns;
   /** Question ids with an active answer filter (their cells read stronger). */
   activeQs: ReadonlySet<string>;
+  /** The source label for this response when the table has a Source column. */
+  sourceLabelOf: (sub: StoredSubmission) => string;
   isUnread: boolean;
   isOpen: boolean;
   phone: boolean;
@@ -446,6 +492,7 @@ const SummaryRow = memo(function SummaryRow({
   questions,
   cols,
   activeQs,
+  sourceLabelOf,
   isUnread,
   isOpen,
   phone,
@@ -460,6 +507,7 @@ const SummaryRow = memo(function SummaryRow({
 }: RowProps) {
   const cells = useMemo(
     () => ({
+      source: cols.source ? sourceLabelOf(sub) : '',
       name: respondentName(questions, sub.answers, number),
       anonymous: namedRespondent(questions, sub.answers) === null,
       choices: cols.choices.map((q) => ({
@@ -469,7 +517,7 @@ const SummaryRow = memo(function SummaryRow({
       text: cols.text ? answerPreview(sub, cols.text) : '',
       files: hasFiles(sub, questions),
     }),
-    [sub, questions, cols, number],
+    [sub, questions, cols, number, sourceLabelOf],
   );
   const age = relativeAge(sub.receivedAt, now);
   const when = fullDate(sub.receivedAt, now);
@@ -523,7 +571,7 @@ const SummaryRow = memo(function SummaryRow({
               {time}
               {chev}
             </span>
-            {cells.choices.some((c) => c.text) ? (
+            {cells.choices.some((c) => c.text) || cells.source ? (
               <span className="rsp-sum-chips">
                 {cells.choices.map((c) =>
                   c.text ? (
@@ -536,6 +584,15 @@ const SummaryRow = memo(function SummaryRow({
                     </span>
                   ) : null,
                 )}
+                {cells.source ? (
+                  <span
+                    className={`rsp-sum-chip rsp-sum-chip--source${activeQs.has(SOURCE_FILTER_ID) ? ' is-on' : ''}`}
+                    dir="auto"
+                  >
+                    <span className="rsp-sr">Source: </span>
+                    {cells.source}
+                  </span>
+                ) : null}
               </span>
             ) : null}
             {cells.text ? (
@@ -559,6 +616,14 @@ const SummaryRow = memo(function SummaryRow({
                 {c.text || <span aria-hidden="true">—</span>}
               </span>
             ))}
+            {cols.source ? (
+              <span
+                className={`rsp-sum-c-choice rsp-sum-c-source${activeQs.has(SOURCE_FILTER_ID) ? ' is-on' : ''}`}
+                dir="auto"
+              >
+                {cells.source}
+              </span>
+            ) : null}
             <span className="rsp-sum-c-text" dir="auto">
               {cells.text || (cols.text ? <span aria-hidden="true">—</span> : null)}
             </span>
@@ -597,6 +662,12 @@ const SummaryRow = memo(function SummaryRow({
                   #{number} of {total}
                 </dd>
               </div>
+              {cols.source ? (
+                <div>
+                  <dt>Source</dt>
+                  <dd>{cells.source}</dd>
+                </div>
+              ) : null}
             </dl>
             <ResponseActions
               sub={sub}
@@ -618,8 +689,16 @@ const SummaryRow = memo(function SummaryRow({
 
 /* ---------- the view ---------- */
 
+/** The Source chart's stand-in question (ADR-063): only its id and title are read. */
+const SOURCE_QUESTION = {
+  id: SOURCE_FILTER_ID,
+  type: 'single_choice',
+  title: 'Where they came from',
+  options: [],
+} as unknown as Question;
+
 export function ResponsesSummary(props: SummaryProps) {
-  const { subs, questions, unread, formName, onMarkRead } = props;
+  const { subs, questions, unread, formName, onMarkRead, trackedSources } = props;
   const onMarkUnreadProp = props.onMarkUnread;
   const onTrashProp = props.onTrash;
   const now = useNow();
@@ -646,30 +725,48 @@ export function ResponsesSummary(props: SummaryProps) {
   const k = useMemo(() => kpis(subs, unread, now), [subs, unread, now]);
   const weekStartMs = k.weekStart.getTime();
   const chartQs = useMemo(() => chartableQuestions(questions), [questions]);
+  const qById = useMemo(() => new Map(questions.map((q) => [q.id, q] as const)), [questions]);
+  // Where responses came from (ADR-063): a chart and a column once any came from a tracked link.
+  const withSource = useMemo(() => hasSources(subs), [subs]);
+  const sourceLabelOf = useCallback(
+    (sub: StoredSubmission) => sourceText(subSource(sub), trackedSources),
+    [trackedSources],
+  );
   const qNumbers = useMemo(
     () => new Map(questions.map((q, i) => [q.id, i + 1] as const)),
     [questions],
   );
-  const cols = useMemo(() => tableColumns(questions), [questions]);
+  const cols = useMemo(
+    () => tableColumns(questions, { source: withSource }),
+    [questions, withSource],
+  );
   const templates = useMemo(() => columnTemplates(cols), [cols]);
   const totals = useMemo(
     () => new Map(chartQs.map((q) => [q.id, questionDistribution(q, subs)] as const)),
     [chartQs, subs],
   );
+  const sourceTotal = useMemo(
+    () => (withSource ? sourceDistribution(subs, trackedSources) : null),
+    [withSource, subs, trackedSources],
+  );
   const crossed = useMemo(() => {
     const out = new Map<string, Distribution>();
     for (const q of chartQs) {
       if (filterCount(filters, q.id) === 0) continue;
-      const subset = subs.filter((s) => matches(s, filters, weekStartMs, q.id));
+      const subset = subs.filter((s) => matches(s, filters, weekStartMs, q.id, qById));
       out.set(q.id, questionDistribution(q, subset));
     }
+    if (withSource && filterCount(filters, SOURCE_FILTER_ID) > 0) {
+      const subset = subs.filter((s) => matches(s, filters, weekStartMs, SOURCE_FILTER_ID, qById));
+      out.set(SOURCE_FILTER_ID, sourceDistribution(subset, trackedSources));
+    }
     return out;
-  }, [chartQs, subs, filters, weekStartMs]);
+  }, [chartQs, subs, filters, weekStartMs, qById, withSource, trackedSources]);
 
   const active = filterCount(filters);
   const filtered = useMemo(
-    () => (active ? subs.filter((s) => matches(s, filters, weekStartMs)) : subs),
-    [active, subs, filters, weekStartMs],
+    () => (active ? subs.filter((s) => matches(s, filters, weekStartMs, undefined, qById)) : subs),
+    [active, subs, filters, weekStartMs, qById],
   );
   const visible = useMemo(() => filtered.slice(0, limit), [filtered, limit]);
   const groups = useMemo(() => dayGroups(visible, now), [visible, now]);
@@ -921,13 +1018,15 @@ export function ResponsesSummary(props: SummaryProps) {
     }
   };
 
-  const hint = chartQs.length
-    ? `${phone ? 'Tap' : 'Click'} a bar or tile above to filter`
-    : `${phone ? 'Tap' : 'Click'} a tile above to filter`;
+  const hint =
+    chartQs.length || sourceTotal
+      ? `${phone ? 'Tap' : 'Click'} a bar or tile above to filter`
+      : `${phone ? 'Tap' : 'Click'} a tile above to filter`;
+  const chartCount = chartQs.length + (sourceTotal ? 1 : 0);
   const topClass =
-    chartQs.length === 0
+    chartCount === 0
       ? ' rsp-sum-top--c0'
-      : chartQs.length === 1
+      : chartCount === 1
         ? ' rsp-sum-top--c1'
         : ' rsp-sum-top--cn';
   const colsStyle = {
@@ -960,6 +1059,18 @@ export function ResponsesSummary(props: SummaryProps) {
             onToggle={toggleAnswer}
           />
         ))}
+        {sourceTotal ? (
+          <ChartCard
+            key={SOURCE_FILTER_ID}
+            question={SOURCE_QUESTION}
+            number={0}
+            badge="Source"
+            total={sourceTotal}
+            crossed={crossed.get(SOURCE_FILTER_ID) ?? null}
+            selected={selectedByQ.get(SOURCE_FILTER_ID) ?? null}
+            onToggle={toggleAnswer}
+          />
+        ) : null}
       </section>
 
       <section
@@ -987,11 +1098,13 @@ export function ResponsesSummary(props: SummaryProps) {
               ) : (
                 <>
                   {filters.answers.map((a) => {
+                    const isSource = a.questionId === SOURCE_FILTER_ID;
                     const q = questions.find((x) => x.id === a.questionId);
-                    const qTitle = q ? titleOf(q) : a.questionId;
+                    const qTitle = isSource ? 'Source' : q ? titleOf(q) : a.questionId;
                     const label =
-                      totals.get(a.questionId)?.rows.find((r) => r.value === a.value)?.label ??
-                      a.value;
+                      (isSource ? sourceTotal : totals.get(a.questionId))?.rows.find(
+                        (r) => r.value === a.value,
+                      )?.label ?? (a.value === OTHER_VALUE ? 'Other' : a.value);
                     const key = `pill-q-${a.questionId}`;
                     return (
                       <button
@@ -1091,6 +1204,9 @@ export function ResponsesSummary(props: SummaryProps) {
                   {titleOf(q)}
                 </span>
               ))}
+              {cols.source ? (
+                <span className={activeQs.has(SOURCE_FILTER_ID) ? 'is-on' : undefined}>Source</span>
+              ) : null}
               <span title={cols.text ? titleOf(cols.text) : undefined}>
                 {cols.text ? titleOf(cols.text) : ''}
               </span>
@@ -1132,6 +1248,7 @@ export function ResponsesSummary(props: SummaryProps) {
                         questions={questions}
                         cols={cols}
                         activeQs={activeQs}
+                        sourceLabelOf={sourceLabelOf}
                         isUnread={unread.has(s.id)}
                         isOpen={open === s.id}
                         phone={phone}

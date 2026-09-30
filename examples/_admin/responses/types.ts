@@ -6,6 +6,7 @@
 
 import type { Question } from '@/index.js';
 import type { StoredSubmission } from '../_submissionStore.js';
+import type { TrackedSource } from '../_formsStore.js';
 
 /** Persisted choice between the two views (`slate-responses-view`). */
 export type ResponsesViewName = 'inbox' | 'summary';
@@ -23,6 +24,8 @@ export type ResponsesViewCommon = {
   onMarkUnread(id: string): void;
   /** Page trashes immediately and shows a "Moved to trash" toast with Undo. */
   onTrash(id: string): void;
+  /** The form's named flyer links, for source labels (ADR-063). */
+  trackedSources?: ReadonlyArray<TrackedSource>;
 };
 
 export type InboxProps = ResponsesViewCommon & {
@@ -39,7 +42,11 @@ export type InboxProps = ResponsesViewCommon & {
 
 export type SummaryProps = ResponsesViewCommon;
 
-/** One answer-value filter (Summary bars, Inbox chips). */
+/**
+ * One answer-value filter (Summary bars, Inbox chips). `questionId` may be
+ * `SOURCE_FILTER_ID` (where the response came from), and `value` may be
+ * `OTHER_VALUE` ("typed its own answer") — ADR-063.
+ */
 export type AnswerFilter = { questionId: string; value: string };
 
 export type DayGroup<T> = {
@@ -70,6 +77,11 @@ export type Distribution = {
   max: number;
   /** Numeric questions only; null when nobody answered. */
   average: number | null;
+  /**
+   * Choice questions with Other (ADR-063): what people typed, most common
+   * first. They are counted together in one "Other" row.
+   */
+  others?: Array<{ text: string; count: number }>;
 };
 
 export type Kpis = {
@@ -90,8 +102,10 @@ export type Kpis = {
 };
 
 export type TableColumns = {
-  /** Up to two choice questions (single/multi/dropdown/picture/yes-no). */
+  /** Up to two choice questions (single/multi/dropdown/picture/yes-no); one when `source` is on. */
   choices: Question[];
+  /** A Source column: some response came from a tracked link (ADR-063). */
+  source: boolean;
   /** First long_text, else another text question that isn't the name or email. */
   text: Question | null;
   /** `choices` then `text`, for header rows. */

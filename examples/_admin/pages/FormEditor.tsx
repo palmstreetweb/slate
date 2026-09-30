@@ -56,6 +56,8 @@ import { isNeonConfigured } from '../neon/env.js';
 import { useToast } from '../toast.js';
 import { playUiSound } from '../uiSounds.js';
 import { FlipPill, PublishButton, usePublishIgnition } from '../delight/ignition.js';
+import { closedReason } from '../formClose.js';
+import { countSubmissions } from '../_submissionStore.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
 
 type Props = {
@@ -585,19 +587,24 @@ function FormEditorBody({ formId }: { formId: string }) {
       name,
       schema,
     });
-  const liveLabel = !cloud
-    ? null
-    : isPublished
-      ? stale
-        ? 'Unpublished changes'
-        : 'Live'
-      : 'Draft';
+  // Closed (ADR-063) outranks the rest: nobody can fill it in right now.
+  const closedNow = isPublished && closedReason(liveForm, countSubmissions(formId)) !== null;
+  const liveLabel = closedNow
+    ? 'Closed'
+    : !cloud
+      ? null
+      : isPublished
+        ? stale
+          ? 'Unpublished changes'
+          : 'Live'
+        : 'Draft';
   statusLabelRef.current = liveLabel;
   // While the spinner runs the pill still reads what it said before the click.
   const statusLabel =
     ignite.phase === 'working' && pinnedLabelRef.current ? pinnedLabelRef.current : liveLabel;
   const pillLive = statusLabel === 'Live';
   const pillStale = statusLabel === 'Unpublished changes';
+  const pillClosed = statusLabel === 'Closed';
 
   const needsPublish = cloud && (!isPublished || stale || ignite.phase !== 'idle');
   const saveText = saveError ?? (savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved');
@@ -612,7 +619,7 @@ function FormEditorBody({ formId }: { formId: string }) {
           <>
             {statusLabel ? (
               <span
-                className={`slate-m-status${pillLive ? ' slate-m-status--live' : pillStale ? ' slate-m-status--stale' : ''}`}
+                className={`slate-m-status${pillLive ? ' slate-m-status--live' : pillStale ? ' slate-m-status--stale' : pillClosed ? ' slate-m-status--closed' : ''}`}
               >
                 {statusLabel}
               </span>
@@ -687,14 +694,22 @@ function FormEditorBody({ formId }: { formId: string }) {
             <FlipPill
               label={statusLabel}
               className={`slate-pub-pill${
-                pillLive ? ' slate-pub-pill--live' : pillStale ? ' slate-pub-pill--stale' : ''
+                pillLive
+                  ? ' slate-pub-pill--live'
+                  : pillStale
+                    ? ' slate-pub-pill--stale'
+                    : pillClosed
+                      ? ' slate-pub-pill--closed'
+                      : ''
               }`}
               title={
-                pillStale
-                  ? 'Public link is serving an older snapshot'
-                  : pillLive
-                    ? 'Public fill link is live'
-                    : 'Not published yet'
+                pillClosed
+                  ? 'Not taking responses — change it in Share'
+                  : pillStale
+                    ? 'Public link is serving an older snapshot'
+                    : pillLive
+                      ? 'Public fill link is live'
+                      : 'Not published yet'
               }
             />
           ) : null}

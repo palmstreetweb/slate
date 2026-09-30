@@ -15,6 +15,15 @@ const STORAGE_KEY = 'slate-forms';
 
 export type FormStatus = 'draft' | 'published';
 
+/** A named flyer link: `/forms/{slug}?src={src}` (ADR-063). */
+export type TrackedSource = {
+  /** What the owner called it, e.g. "Mailbox flyer — Oak St". */
+  name: string;
+  /** The `src` value in the link: lowercase letters, digits and dashes. */
+  src: string;
+  createdAt: string;
+};
+
 export type FormRecord = {
   id: string;
   name: string;
@@ -36,6 +45,17 @@ export type FormRecord = {
   deletedAt?: string;
   /** Public fill asks for a password first (ADR-043). Cloud only; never the hash. */
   fillLocked?: boolean;
+  /**
+   * Close settings (ADR-063, migration 019). Live as soon as they're saved — no
+   * Republish — because the public lookup and the submit Function read them.
+   * `closesAt` is an ISO instant; `maxResponses` counts live (not trashed) responses.
+   */
+  closesAt?: string;
+  maxResponses?: number;
+  /** Shown to people who arrive after the form closes (≤ 500 characters). */
+  closedMessage?: string;
+  /** Share → Tracked links (ADR-063). Studio-only; never served to respondents. */
+  trackedSources?: TrackedSource[];
 };
 
 /**

@@ -108,9 +108,9 @@ describe('Build with AI schema', () => {
     const parsed = generatedFormSchema.parse(draft);
     const { schema } = mapGeneratedForm(parsed);
     expect(schema.questions[0]).toMatchObject({ type: 'welcome', title: 'Welcome.' });
-    expect(schema.questions[0] && 'subtitle' in schema.questions[0] ? schema.questions[0].subtitle : '').toBe(
-      'Your feedback helps us serve you better.',
-    );
+    expect(
+      schema.questions[0] && 'subtitle' in schema.questions[0] ? schema.questions[0].subtitle : '',
+    ).toBe('Your feedback helps us serve you better.');
     const opener = schema.questions[1];
     expect(opener).toMatchObject({ type: 'long_text', title: 'How was your visit?' });
     expect(checkSchema(schema.questions)).toEqual([]);
@@ -153,7 +153,10 @@ describe('Build with AI schema', () => {
       );
     const atCap = {
       ...validDraft,
-      questions: [...validDraft.questions, ...pad(GENERATED_QUESTION_MAX - validDraft.questions.length)],
+      questions: [
+        ...validDraft.questions,
+        ...pad(GENERATED_QUESTION_MAX - validDraft.questions.length),
+      ],
     };
     expect(atCap.questions).toHaveLength(GENERATED_QUESTION_MAX);
     expect(generatedFormSchema.safeParse(atCap).success).toBe(true);
@@ -239,5 +242,68 @@ describe('generate rate limit', () => {
     for (let i = 0; i < 10; i += 1) expect(takeRateLimit('1.1.1.1', 1_000 + i)).toBe(true);
     expect(takeRateLimit('1.1.1.1', 1_020)).toBe(false);
     expect(takeRateLimit('9.9.9.9', 1_020)).toBe(true);
+  });
+});
+
+describe('Build with AI — Wave A options (ADR-063)', () => {
+  it('maps Other, scale and number styles, units, and date time / range', () => {
+    const draft = {
+      ...validDraft,
+      questions: [
+        blankGeneratedQuestion({
+          id: 'heard',
+          type: 'single_choice',
+          title: 'How did you hear about us?',
+          options: [opt('Flyer', 'flyer'), opt('Google', 'google')],
+          allowOther: true,
+        }),
+        blankGeneratedQuestion({
+          id: 'rate',
+          type: 'scale',
+          title: 'Rate the crew',
+          min: 1,
+          max: 5,
+          display: 'stars',
+        }),
+        blankGeneratedQuestion({
+          id: 'windows',
+          type: 'number',
+          title: 'How many windows?',
+          min: 1,
+          max: 40,
+          display: 'stepper',
+          unit: 'windows',
+        }),
+        blankGeneratedQuestion({
+          id: 'visit',
+          type: 'date',
+          title: 'When can we come?',
+          includeTime: true,
+        }),
+        blankGeneratedQuestion({ id: 'stay', type: 'date', title: 'Dates?', range: true }),
+      ],
+    };
+    const { schema } = mapGeneratedForm(generatedFormSchema.parse(draft));
+    const byId = Object.fromEntries(schema.questions.map((q) => [q.id, q])) as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(byId.heard!.allowOther).toBe(true);
+    expect(byId.rate!.display).toBe('stars');
+    expect(byId.windows).toMatchObject({ display: 'stepper', unit: 'windows', min: 1, max: 40 });
+    expect(byId.windows).not.toHaveProperty('prefix');
+    expect(byId.visit!.includeTime).toBe(true);
+    expect(byId.visit).not.toHaveProperty('range');
+    expect(byId.stay!.range).toBe(true);
+    expect(checkSchema(schema.questions)).toEqual([]);
+  });
+
+  it('leaves every option off when the model leaves them blank', () => {
+    const { schema } = mapGeneratedForm(generatedFormSchema.parse(validDraft));
+    for (const q of schema.questions) {
+      for (const key of ['allowOther', 'display', 'unit', 'prefix', 'includeTime', 'range']) {
+        expect(q).not.toHaveProperty(key);
+      }
+    }
   });
 });

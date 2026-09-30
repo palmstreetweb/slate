@@ -4,6 +4,8 @@
 
 import type { Question } from '@/index.js';
 import type { StoredSubmission } from './_submissionStore.js';
+import type { TrackedSource } from './_formsStore.js';
+import { sourceLabel, sourceOf } from './trackedLinks.js';
 import {
   formatAnswerForCsv,
   formatAnswerForQuestion,
@@ -77,15 +79,21 @@ function formatCell(column: CsvColumn, value: unknown): string {
   return formatAnswerForQuestion(stub, value).replace(/\n/g, '; ');
 }
 
-export function buildResponsesCsv(questions: Question[], subs: StoredSubmission[]): string {
+export function buildResponsesCsv(
+  questions: Question[],
+  subs: StoredSubmission[],
+  trackedSources?: ReadonlyArray<TrackedSource>,
+): string {
   const columns = buildCsvColumns(questions, subs);
   const questionHeaders = uniqueColumnTitles(columns.map((c) => c.title));
-  const headers = ['Submitted', 'Time spent', 'Score', ...questionHeaders];
+  // Where each response came from (ADR-063): the tracked link's name, "Direct" otherwise.
+  const headers = ['Submitted', 'Time spent', 'Score', 'Source', ...questionHeaders];
 
   const rows = subs.map((s) => [
     formatSubmittedAt(s.receivedAt),
     formatDurationMs(s.meta.durationMs),
     s.meta.score != null ? String(s.meta.score) : '',
+    sourceLabel(sourceOf(s.meta?.hiddenFields), trackedSources),
     ...columns.map((c) => formatCell(c, s.answers[c.id])),
   ]);
 
@@ -102,8 +110,9 @@ export function downloadResponsesCsv(
   formName: string,
   questions: Question[],
   subs: StoredSubmission[],
+  trackedSources?: ReadonlyArray<TrackedSource>,
 ): void {
-  const csv = buildResponsesCsv(questions, subs);
+  const csv = buildResponsesCsv(questions, subs, trackedSources);
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

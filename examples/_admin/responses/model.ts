@@ -6,8 +6,12 @@
  */
 
 import type { Question } from '@/index.js';
+import { OTHER_VALUE } from '@/index.js';
+import { allowsOther, hasOtherAnswer, otherLabelOf, splitOther } from '@/logic/other.js';
 import type { StoredSubmission } from '../_submissionStore.js';
+import type { TrackedSource } from '../_formsStore.js';
 import { formatAnswerForQuestion, formatRelativeAge, titleOf } from '../responsesFormat.js';
+import { sourceLabel, sourceOf } from '../trackedLinks.js';
 import type {
   AnswerFilter,
   DayGroup,
@@ -331,8 +335,83 @@ export function hasFiles(sub: StoredSubmission, questions: ReadonlyArray<Questio
   return questions.some((q) => q.type === 'file_upload' && !isBlankAnswer(sub.answers[q.id]));
 }
 
-export function answerMatchesFilter(sub: StoredSubmission, filter: AnswerFilter): boolean {
-  return answerValues(sub.answers[filter.questionId]).includes(filter.value);
+/* ---------- source (ADR-063) ---------- */
+
+/** Filter id for "where the response came from" — never a question id (they can't hold `@`). */
+export const SOURCE_FILTER_ID = '@source';
+/** Source value for responses from the plain link. */
+export const DIRECT_SOURCE = '@direct';
+
+/** The response's source value: its `src` / `utm_source`, else `DIRECT_SOURCE`. */
+export function subSource(sub: StoredSubmission): string {
+  return sourceOf(sub.meta?.hiddenFields) ?? DIRECT_SOURCE;
+}
+
+/** Some response came in through a tracked link. */
+export function hasSources(subs: ReadonlyArray<StoredSubmission>): boolean {
+  return subs.some((s) => subSource(s) !== DIRECT_SOURCE);
+}
+
+/** "Mailbox flyer", "Direct", … */
+export function sourceText(value: string, tracked?: ReadonlyArray<TrackedSource>): string {
+  return sourceLabel(value === DIRECT_SOURCE ? null : value, tracked);
+}
+
+/**
+ * Responses per source, most first: every tracked link (so a flyer that got
+ * nothing shows 0), every source seen, and Direct.
+ */
+export function sourceDistribution(
+  subs: ReadonlyArray<StoredSubmission>,
+  tracked: ReadonlyArray<TrackedSource> = [],
+): Distribution {
+  const counts = new Map<string, number>();
+  for (const t of tracked) counts.set(t.src, 0);
+  for (const s of subs) {
+    const src = subSource(s);
+    counts.set(src, (counts.get(src) ?? 0) + 1);
+  }
+  if (!counts.has(DIRECT_SOURCE)) counts.set(DIRECT_SOURCE, 0);
+  const answered = subs.length;
+  const order = [...counts.keys()];
+  const rows = order
+    .map((value, i) => ({
+      row: {
+        value,
+        label: sourceText(value, tracked),
+        count: counts.get(value) ?? 0,
+        pct: answered ? Math.round(((counts.get(value) ?? 0) / answered) * 100) : 0,
+      },
+      // Direct sorts last among equals.
+      i: value === DIRECT_SOURCE ? order.length : i,
+    }))
+    .sort((a, b) => b.row.count - a.row.count || a.i - b.i)
+    .map((x) => x.row);
+  return {
+    questionId: SOURCE_FILTER_ID,
+    kind: 'choice',
+    answered,
+    rows,
+    max: Math.max(1, ...rows.map((r) => r.count)),
+    average: null,
+  };
+}
+
+/**
+ * Does this response match the filter? A source filter reads the response's
+ * source; `OTHER_VALUE` on a question with Other matches any typed answer.
+ */
+export function answerMatchesFilter(
+  sub: StoredSubmission,
+  filter: AnswerFilter,
+  question?: Question,
+): boolean {
+  if (filter.questionId === SOURCE_FILTER_ID) return subSource(sub) === filter.value;
+  const value = sub.answers[filter.questionId];
+  if (filter.value === OTHER_VALUE && question && allowsOther(question)) {
+    return hasOtherAnswer(value, new Set(question.options.map((o) => o.value)));
+  }
+  return answerValues(value).includes(filter.value);
 }
 
 /* ---------- search ---------- */
@@ -498,11 +577,27 @@ export function questionDistribution(
   const order = new Map(options.map((o, i) => [o.value, i]));
   const counts = new Map<string, number>();
   const extra: string[] = [];
+  // Other (ADR-063): typed answers count together in one row; the texts are listed.
+  const withOther = allowsOther(question);
+  const typed = new Map<string, { text: string; count: number }>();
   let answered = 0;
   for (const s of subs) {
-    const vals = answerValues(s.answers[question.id]);
+    const raw = s.answers[question.id];
+    const vals = answerValues(raw);
     if (vals.length === 0) continue;
     answered++;
+    if (withOther) {
+      const { picked, other } = splitOther(options, raw);
+      for (const v of picked) counts.set(v, (counts.get(v) ?? 0) + 1);
+      if (other) {
+        counts.set(OTHER_VALUE, (counts.get(OTHER_VALUE) ?? 0) + 1);
+        const key = other.trim().toLowerCase();
+        const hit = typed.get(key);
+        if (hit) hit.count++;
+        else typed.set(key, { text: other.trim(), count: 1 });
+      }
+      continue;
+    }
     for (const v of vals) {
       if (!order.has(v) && !counts.has(v)) extra.push(v);
       counts.set(v, (counts.get(v) ?? 0) + 1);
@@ -511,6 +606,9 @@ export function questionDistribution(
   const all: Array<ChoiceOption & { i: number }> = [
     ...options.map((o, i) => ({ ...o, i })),
     ...extra.map((v, j) => ({ value: v, label: v, i: options.length + j })),
+    ...(withOther
+      ? [{ value: OTHER_VALUE, label: otherLabelOf(question), i: options.length + extra.length }]
+      : []),
   ];
   const rows = all
     .map((o) => {
@@ -534,6 +632,13 @@ export function questionDistribution(
     rows,
     max: Math.max(1, ...rows.map((r) => r.count)),
     average: null,
+    ...(withOther
+      ? {
+          others: [...typed.values()].sort(
+            (a, b) => b.count - a.count || a.text.localeCompare(b.text),
+          ),
+        }
+      : {}),
   };
 }
 
@@ -595,13 +700,18 @@ export function kpis(
  * text — or, without one, the first other text question that isn't the
  * respondent's name or email.
  */
-export function tableColumns(questions: ReadonlyArray<Question>): TableColumns {
-  const choices = questions.filter((q) => COLUMN_CHOICE_TYPES.has(q.type)).slice(0, 2);
+export function tableColumns(
+  questions: ReadonlyArray<Question>,
+  opts: { source?: boolean } = {},
+): TableColumns {
+  const source = opts.source === true;
+  // A Source column (ADR-063) takes the second choice column's place.
+  const choices = questions.filter((q) => COLUMN_CHOICE_TYPES.has(q.type)).slice(0, source ? 1 : 2);
   const name = nameQuestion(questions);
   const email = emailQuestion(questions);
   const text =
     questions.find((q) => q.type === 'long_text') ??
     questions.find((q) => TEXT_COLUMN_FALLBACK.has(q.type) && q !== name && q !== email) ??
     null;
-  return { choices, text, all: text ? [...choices, text] : choices };
+  return { choices, source, text, all: text ? [...choices, text] : choices };
 }

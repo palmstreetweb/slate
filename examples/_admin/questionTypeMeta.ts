@@ -1,6 +1,6 @@
 /**
- * Shared question-type labels + outline/add-picker glyphs for Slate.
- * Keep in sync across the outline list, Add popover, and Inspector.
+ * Shared question-type labels for Slate — the outline list, Add popover and
+ * Inspector. The icons are line SVGs in components/TypeIcon.tsx (ADR-063).
  */
 
 import type { Question, QuestionType } from '@/index.js';
@@ -28,31 +28,6 @@ export const TYPE_LABEL: Record<Question['type'], string> = {
   scale: 'Scale',
   nps: 'NPS (0–10)',
   review: 'Review Screen',
-};
-
-export const TYPE_GLYPH: Record<Question['type'], string> = {
-  welcome: '◐',
-  statement: '▤',
-  thanks: '◑',
-  short_text: 'T',
-  long_text: '¶',
-  email: '@',
-  phone: '☏',
-  url: '⌘',
-  number: '#',
-  date: '▦',
-  file_upload: '⇪',
-  single_choice: '◉',
-  multi_choice: '☑',
-  dropdown: '▼',
-  picture_choice: '▣',
-  ranking: '≡',
-  matrix: '⊞',
-  yes_no: '⊘',
-  legal: '§',
-  scale: '◇',
-  nps: '◈',
-  review: '☰',
 };
 
 export const ADDABLE_TYPES: ReadonlyArray<{ type: QuestionType; label: string; group: string }> = [

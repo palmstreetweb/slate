@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Form } from '@/index.js';
 import {
+  FormClosedError,
   fetchPublishedFormBySlug,
   metaToPayload,
   submitPublicResponse,
   unlockPublicForm,
 } from '../neon/publicApi.js';
-import type { PublishedFormPayload } from '../neon/database.types.js';
+import type { FormClosedInfo, PublishedFormPayload } from '../neon/database.types.js';
 import { isNeonConfigured } from '../neon/config.js';
 import { hostFileUpload } from '../hostFileUpload.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
@@ -17,6 +18,8 @@ import { readSlateMode } from '../slateMode.js';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { LoadingScreen } from '../shell/LoadingScreen.js';
 import { FillGate } from '../components/FillGate.js';
+import { FormClosedScreen } from '../components/FormClosedScreen.js';
+import { prefillFromSearch, trackingFromSearch } from '../trackedLinks.js';
 import { clearFillUnlockToken, readFillUnlockToken, writeFillUnlockToken } from '../fillUnlock.js';
 import { routeSearchParams } from '../_router.js';
 
@@ -28,6 +31,16 @@ type LockedForm = Extract<PublishedFormPayload, { locked: true }>;
 /** `?embed=1` — we're inside a host site's iframe (ADR-054). */
 function readEmbedMode(): boolean {
   return routeSearchParams().get('embed') === '1';
+}
+
+/**
+ * The link's extras (ADR-063), read once: `src` / `utm_*` ride along as hidden
+ * fields on the response; other parameters may prefill questions whose owner
+ * allowed it. The base link `/forms/{slug}` works exactly as before.
+ */
+function readLinkExtras(): { tracking: Record<string, string>; prefill: Record<string, string> } {
+  const params = routeSearchParams();
+  return { tracking: trackingFromSearch(params), prefill: prefillFromSearch(params) };
 }
 
 /**
@@ -61,6 +74,13 @@ export function PublicFill({ slug }: Props) {
   const [form, setForm] = useState<OpenForm | null>(null);
   /** Locked and not yet unlocked in this tab (ADR-043). */
   const [gate, setGate] = useState<LockedForm | null>(null);
+  /** Closed (ADR-063): past its closing time or at its cap. */
+  const [closed, setClosed] = useState<{
+    name: string;
+    info: FormClosedInfo;
+    duringFill: boolean;
+  } | null>(null);
+  const [extras] = useState(readLinkExtras);
   /** Honeypot input (ADR-052). Read at submit, never rendered from state. */
   const trapRef = useRef<HTMLInputElement>(null);
   const [embed] = useState(readEmbedMode);
@@ -87,6 +107,8 @@ export function PublicFill({ slug }: Props) {
         if (cancelled) return;
         if (!payload) {
           setError('This form is not available. It may have been closed.');
+        } else if (payload.closed) {
+          setClosed({ name: payload.name, info: payload.closed, duringFill: false });
         } else if (!payload.locked) {
           open(payload);
         } else {
@@ -96,6 +118,8 @@ export function PublicFill({ slug }: Props) {
           if (cancelled) return;
           if (resumed?.ok) {
             open(resumed.form);
+          } else if (resumed?.reason === 'closed') {
+            setClosed({ name: payload.name, info: resumed.closed, duringFill: false });
           } else {
             if (resumed?.reason === 'wrong_password') clearFillUnlockToken(payload.id);
             setGate(payload);
@@ -116,6 +140,11 @@ export function PublicFill({ slug }: Props) {
   const onUnlock = useCallback(
     async (password: string): Promise<string | null> => {
       const result = await unlockPublicForm(slug, { password });
+      if (!result.ok && result.reason === 'closed') {
+        setClosed({ name: gate?.name ?? '', info: result.closed, duringFill: false });
+        setGate(null);
+        return null;
+      }
       if (!result.ok) return result.message;
       if (result.unlockToken) writeFillUnlockToken(result.form.id, result.unlockToken);
       setForm(result.form);
@@ -123,11 +152,30 @@ export function PublicFill({ slug }: Props) {
       setUploadContext(result.form.id, { scope: 'public' });
       return null;
     },
-    [slug],
+    [slug, gate],
   );
 
   if (loading) {
     return <LoadingScreen label="Loading form" />;
+  }
+
+  if (closed) {
+    return (
+      <div
+        ref={embedRef}
+        data-slate-forms=""
+        data-theme-name="slate"
+        data-admin-ui={uiTheme}
+        data-theme={mode}
+        className={`slate-app${embedClass}`}
+      >
+        <FormClosedScreen
+          formName={closed.name}
+          closed={closed.info}
+          duringFill={closed.duringFill}
+        />
+      </div>
+    );
   }
 
   if (gate && !form) {
@@ -173,6 +221,8 @@ export function PublicFill({ slug }: Props) {
     >
       <Form
         schema={form.schema}
+        hiddenFields={extras.tracking}
+        prefill={extras.prefill}
         onFileUpload={hostFileUpload}
         resolveFileUploadMeta={resolveUploadMeta}
         onSubmit={async (answers, meta) => {
@@ -180,13 +230,22 @@ export function PublicFill({ slug }: Props) {
           // Filled trap = bot. Flag it and let the Function drop it before any
           // DB work (ADR-058); the respondent sees the same thanks screen either way.
           const trapped = Boolean(trapRef.current?.value.trim());
-          await submitPublicResponse({
-            formId: form.id,
-            answers,
-            meta: trapped
-              ? { ...payloadMeta, hiddenFields: { ...payloadMeta.hiddenFields, _hp: '1' } }
-              : payloadMeta,
-          });
+          try {
+            await submitPublicResponse({
+              formId: form.id,
+              answers,
+              meta: trapped
+                ? { ...payloadMeta, hiddenFields: { ...payloadMeta.hiddenFields, _hp: '1' } }
+                : payloadMeta,
+            });
+          } catch (err) {
+            // Closed while they were filling it in (ADR-063): say so plainly
+            // instead of offering a Retry that can't work.
+            if (err instanceof FormClosedError) {
+              setClosed({ name: form.name, info: err.closed, duringFill: true });
+            }
+            throw err;
+          }
         }}
       />
       {/* Off-screen, outside the engine: people and screen readers never reach

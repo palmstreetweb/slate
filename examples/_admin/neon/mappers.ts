@@ -1,7 +1,12 @@
 import type { Schema } from '@/index.js';
-import type { FormRecord } from '../_formsStore.js';
+import type { FormRecord, TrackedSource } from '../_formsStore.js';
 import type { StoredSubmission } from '../_submissionStore.js';
-import type { DbFormRow, DbSubmissionRow, PublishedFormPayload } from './database.types.js';
+import type {
+  DbFormRow,
+  DbSubmissionRow,
+  FormClosedInfo,
+  PublishedFormPayload,
+} from './database.types.js';
 import { normalizeAnswers, normalizeMeta } from '../answerShape.js';
 
 export function rowToFormRecord(row: DbFormRow): FormRecord {
@@ -17,21 +22,59 @@ export function rowToFormRecord(row: DbFormRow): FormRecord {
     publishedSchema: row.published_schema ?? undefined,
     ...(typeof row.published_name === 'string' ? { publishedName: row.published_name } : {}),
     ...(row.fill_locked ? { fillLocked: true } : {}),
+    ...(typeof row.closes_at === 'string' ? { closesAt: row.closes_at } : {}),
+    ...(typeof row.max_responses === 'number' ? { maxResponses: row.max_responses } : {}),
+    ...(typeof row.closed_message === 'string' && row.closed_message
+      ? { closedMessage: row.closed_message }
+      : {}),
+    ...(Array.isArray(row.tracked_sources)
+      ? { trackedSources: cleanTrackedSources(row.tracked_sources) }
+      : {}),
   };
+}
+
+/** Stored tracked links → well-formed entries only (owner-written, but still checked). */
+export function cleanTrackedSources(raw: unknown): TrackedSource[] {
+  if (!Array.isArray(raw)) return [];
+  const out: TrackedSource[] = [];
+  for (const item of raw.slice(0, 50)) {
+    if (!item || typeof item !== 'object') continue;
+    const { name, src, createdAt } = item as Record<string, unknown>;
+    if (typeof name !== 'string' || typeof src !== 'string') continue;
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(src) || src.length > 60) continue;
+    out.push({
+      name: name.slice(0, 80),
+      src,
+      createdAt: typeof createdAt === 'string' ? createdAt : '',
+    });
+  }
+  return out;
 }
 
 /**
  * `get_form_by_slug` row → public payload (ADR-043). Fails closed: a locked
  * row never carries a schema, and an unlocked row without one is unavailable.
  */
+/** A lookup's `closed` field (ADR-063), or null when absent or malformed. */
+export function closedInfoOf(raw: unknown): FormClosedInfo | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const { reason, message } = raw as { reason?: unknown; message?: unknown };
+  if (reason !== 'date' && reason !== 'full') return null;
+  return { reason, message: typeof message === 'string' && message ? message.slice(0, 500) : null };
+}
+
 export function slugRowToPublishedForm(row: {
   id: string;
   name: string;
   slug: string;
   locked?: boolean | null;
   schema?: unknown;
+  closed?: unknown;
 }): PublishedFormPayload | null {
   const base = { id: row.id, name: row.name, slug: row.slug };
+  // Closed wins over everything (ADR-063): no schema, no password gate.
+  const closed = closedInfoOf(row.closed);
+  if (closed) return { ...base, locked: Boolean(row.locked), schema: null, closed };
   if (row.locked) return { ...base, locked: true, schema: null };
   if (!row.schema) return null;
   return { ...base, locked: false, schema: row.schema as Schema };
@@ -46,12 +89,17 @@ export function slugRowToPublishedForm(row: {
  */
 export function formRecordToRow(
   form: FormRecord,
-  opts: { publishedName?: boolean } = {},
+  opts: { publishedName?: boolean; closeColumns?: boolean } = {},
 ): Pick<
   DbFormRow,
   'id' | 'name' | 'slug' | 'schema' | 'published_schema' | 'status' | 'deleted_at'
 > &
-  Partial<Pick<DbFormRow, 'published_name'>> {
+  Partial<
+    Pick<
+      DbFormRow,
+      'published_name' | 'closes_at' | 'max_responses' | 'closed_message' | 'tracked_sources'
+    >
+  > {
   return {
     id: form.id,
     name: form.name,
@@ -62,6 +110,16 @@ export function formRecordToRow(
     deleted_at: form.deletedAt ?? null,
     ...(opts.publishedName && form.publishedName !== undefined
       ? { published_name: form.publishedName }
+      : {}),
+    // 019 (ADR-063): only once a hydrate has read the columns, so a database without
+    // them (or a stale Data API cache) keeps saving. Undefined clears.
+    ...(opts.closeColumns
+      ? {
+          closes_at: form.closesAt ?? null,
+          max_responses: form.maxResponses ?? null,
+          closed_message: form.closedMessage ?? null,
+          tracked_sources: form.trackedSources?.length ? form.trackedSources : null,
+        }
       : {}),
   };
 }

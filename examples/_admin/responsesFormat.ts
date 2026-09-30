@@ -5,6 +5,8 @@
 
 import type { Question } from '@/index.js';
 import { describeFileUploadAnswer, isFileUploadRef } from '@/index.js';
+import { allowsOther, otherLabelOf } from '@/logic/other.js';
+import { formatDateAnswer } from '@/logic/dateValue.js';
 import { peekLocalUploadMeta } from './localFileStore.js';
 import { safeText } from './answerShape.js';
 
@@ -17,6 +19,16 @@ function titleOf(q: Question): string {
 function optionLabel(q: Question, value: string): string | null {
   if (!('options' in q) || !Array.isArray(q.options)) return null;
   return q.options.find((o) => o.value === value)?.label ?? null;
+}
+
+/**
+ * A choice value as the owner reads it: the option's label, or — on a question
+ * that allows Other (ADR-063) — "Other: what they typed".
+ */
+function choiceText(q: Question, value: string): string {
+  const label = optionLabel(q, value);
+  if (label !== null) return label;
+  return allowsOther(q) ? `${otherLabelOf(q)}: ${value}` : value;
 }
 
 /**
@@ -39,14 +51,28 @@ function formatAnswer(question: Question, value: unknown): string {
     case 'single_choice':
     case 'dropdown':
     case 'picture_choice':
-      if (typeof value === 'string') return optionLabel(question, value) ?? value;
-      return safeText(value);
-
     case 'multi_choice':
+      if (typeof value === 'string') return choiceText(question, value);
       if (Array.isArray(value)) {
         return value
-          .map((v) => (typeof v === 'string' ? (optionLabel(question, v) ?? v) : safeText(v)))
+          .map((v) => (typeof v === 'string' ? choiceText(question, v) : safeText(v)))
           .join(', ');
+      }
+      return safeText(value);
+
+    case 'date':
+      // Plain dates stay ISO, as they always were; a time or a range reads in the form's format.
+      if (
+        typeof value === 'string' &&
+        (question.includeTime || question.range || value.length > 10)
+      ) {
+        return formatDateAnswer(value, question.format);
+      }
+      return safeText(value);
+
+    case 'number':
+      if (typeof value === 'number' && (question.prefix || question.unit)) {
+        return `${question.prefix ?? ''}${value}${question.unit ? ` ${question.unit}` : ''}`;
       }
       return safeText(value);
 
@@ -195,6 +221,8 @@ export function formatDurationMs(ms: number): string {
 
 /** Spreadsheet-friendly answer text — labels, no em dashes, single-line cells. */
 export function formatAnswerForCsv(question: Question, value: unknown): string {
+  // Numbers stay numbers in a spreadsheet: no prefix or unit (ADR-063).
+  if (question.type === 'number' && typeof value === 'number') return String(value);
   const formatted = formatAnswerForQuestion(question, value);
   if (formatted === '—') return '';
   return formatted.replace(/\n/g, '; ');

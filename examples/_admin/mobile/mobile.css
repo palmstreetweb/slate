@@ -221,6 +221,10 @@
   background: var(--slate-warn);
 }
 
+[data-slate-forms][data-theme-name='slate'] .slate-m-status--closed::before {
+  background: var(--slate-error);
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-m-save--err {
   color: var(--slate-error);
 }

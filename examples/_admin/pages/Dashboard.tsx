@@ -52,6 +52,7 @@ import { refreshFormsRemote } from '../neon/formsRemote.js';
 import { FORM_QUOTA_MAX, formQuotaUserMessage, isFormQuotaError } from '../formQuota.js';
 import { BuildWithAiModal, SparkleIcon } from '../components/BuildWithAiModal.js';
 import { markAiDraft, type GeneratedDraft } from '../ai/client.js';
+import { closedReason, formatCloseTime } from '../formClose.js';
 import { Odometer } from '../delight/Odometer.js';
 
 export function Dashboard() {
@@ -620,7 +621,10 @@ function FormCard({
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {form.status === 'published' ? (
+            {form.status === 'published' && closedReason(form, subCount) ? (
+              // Closed (ADR-063): past its closing time or at its cap.
+              <span className="slate-badge slate-badge--closed">Closed</span>
+            ) : form.status === 'published' ? (
               <span
                 className={`slate-badge${
                   hasUnpublishedChanges(form) ? ' slate-badge--stale' : ' slate-badge--live'
@@ -631,6 +635,9 @@ function FormCard({
             ) : (
               <span className="slate-badge">Draft</span>
             )}
+            {form.status === 'published' && !closedReason(form, subCount) && form.closesAt ? (
+              <span className="slate-badge">closes {formatCloseTime(form.closesAt)}</span>
+            ) : null}
             <span className="slate-badge">
               {qCount} {qCount === 1 ? 'question' : 'questions'}
             </span>

@@ -16,7 +16,12 @@ import {
 } from '../formQuota.js';
 import { formatNeonError, isQuotaExceededError, isRlsOrAuthError } from './neonError.js';
 import { formRecordToRow, rowToFormRecord } from './mappers.js';
-import { FORM_OPTIONAL_COLUMNS, FORM_OWNER_COLUMNS, type DbFormRow } from './database.types.js';
+import {
+  FORM_CLOSE_COLUMNS,
+  FORM_OPTIONAL_COLUMNS,
+  FORM_OWNER_COLUMNS,
+  type DbFormRow,
+} from './database.types.js';
 
 type Listener = (forms: FormRecord[]) => void;
 
@@ -31,6 +36,8 @@ let quotaMax = FORM_QUOTA_MAX;
  * so a database without the column (or a stale Data API cache) keeps saving (ADR-061).
  */
 let publishedNameColumn = false;
+/** The last hydrate read 019's close columns (ADR-063); until then writes never carry them. */
+let closeColumns = false;
 const listeners = new Set<Listener>();
 
 function notify(): void {
@@ -51,6 +58,7 @@ export function clearFormsRemoteCache(): void {
   hydrated = false;
   quotaMax = FORM_QUOTA_MAX;
   publishedNameColumn = false;
+  closeColumns = false;
   notify();
 }
 
@@ -78,6 +86,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
 
   // Explicit columns, never `*` — `fill_password_hash` must not reach the browser (ADR-043).
   let hasPublishedName = true;
+  let hasCloseColumns = true;
   const fetchForms = async (): Promise<DbFormRow[]> => {
     const run = (columns: readonly string[]) =>
       neon.from('forms').select(columns.join(',')).order('updated_at', { ascending: false });
@@ -95,6 +104,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
     }
     if (error) throw error;
     hasPublishedName = columns.includes('published_name');
+    hasCloseColumns = FORM_CLOSE_COLUMNS.every((c) => columns.includes(c));
     return (data ?? []) as DbFormRow[];
   };
 
@@ -130,6 +140,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
   if (gen !== writeGeneration) return;
 
   publishedNameColumn = hasPublishedName;
+  closeColumns = hasCloseColumns;
   const next = rows.map(rowToFormRecord);
 
   // Soft refresh / race: do not replace a known library with a flaky empty read.
@@ -175,7 +186,9 @@ function isMissingColumnError(err: unknown): boolean {
   return (
     e?.code === '42703' ||
     e?.code === 'PGRST204' ||
-    /fill_locked|published_name/.test(e?.message ?? '')
+    /fill_locked|published_name|closes_at|max_responses|closed_message|tracked_sources/.test(
+      e?.message ?? '',
+    )
   );
 }
 
@@ -287,7 +300,10 @@ async function insertForm(form: FormRecord): Promise<string> {
 
   const writeOnce = async () => {
     const neon = getNeon();
-    const row = formRecordToRow({ ...form, slug }, { publishedName: publishedNameColumn });
+    const row = formRecordToRow(
+      { ...form, slug },
+      { publishedName: publishedNameColumn, closeColumns },
+    );
     const { error } = await neon.from('forms').insert({
       ...row,
       created_at: form.createdAt,
@@ -327,7 +343,7 @@ async function upsertForm(form: FormRecord): Promise<void> {
 
   const write = async () => {
     const neon = getNeon();
-    const row = formRecordToRow(form, { publishedName: publishedNameColumn });
+    const row = formRecordToRow(form, { publishedName: publishedNameColumn, closeColumns });
     const { error } = await neon.from('forms').upsert(
       {
         ...row,

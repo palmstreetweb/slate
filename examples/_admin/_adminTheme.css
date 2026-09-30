@@ -1596,12 +1596,13 @@ body.slate-editor-resizing * {
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-outline-glyph {
-  font-family: var(--slate-font-mono);
-  font-size: var(--slate-fs-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--slate-muted);
-  text-align: center;
   flex-shrink: 0;
-  width: 1.1em;
+  width: 16px;
+  height: 16px;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-type-chip {
@@ -1790,13 +1791,37 @@ body.slate-editor-resizing * {
   padding: 6px 8px;
   font-size: 13px;
   justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
   min-height: 30px;
+  text-align: left;
 }
 
+/* Every tile reads the same: icon in a fixed slot, label left-aligned even when it wraps. */
 [data-slate-forms][data-theme-name='slate'] .slate-add-type-glyph {
-  font-family: var(--slate-font-mono);
-  opacity: 0.6;
-  margin-right: 4px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-add-type-btn:hover .slate-add-type-glyph {
+  color: var(--slate-accent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-add-type-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.25;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-type-icon {
+  display: block;
+  flex: none;
 }
 
 /* ----- canvas ----- */
@@ -4302,6 +4327,14 @@ body.slate-editor-resizing * {
   background: color-mix(in srgb, #e3a008 12%, var(--chrome-panel, var(--slate-bg)));
 }
 
+/* Closed (ADR-063): past its closing time or at its response cap. */
+[data-slate-forms][data-theme-name='slate'] .slate-pub-pill--closed,
+[data-slate-forms][data-theme-name='slate'] .slate-badge--closed {
+  color: var(--slate-error);
+  border-color: color-mix(in srgb, var(--slate-error) 38%, var(--slate-border));
+  background: color-mix(in srgb, var(--slate-error) 10%, var(--chrome-panel, var(--slate-bg)));
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-share-stale {
   margin: 0 0 10px;
   font-size: 12px;
@@ -4657,6 +4690,163 @@ body.slate-editor-resizing * {
   color: var(--slate-error);
 }
 
+/* ---------- share: closing + tracked links (ADR-063) — one line each until opened ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close {
+  display: grid;
+  gap: 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-label--closed {
+  color: var(--slate-error);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close--editing {
+  padding: 10px 12px;
+  border: 1px solid var(--slate-border);
+  border-radius: var(--slate-radius-md);
+  background: var(--slate-bg-3);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: var(--slate-fs-xs);
+  font-weight: 500;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-field .slate-input,
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-field .slate-textarea {
+  width: 100%;
+  min-width: 0;
+  font-size: var(--slate-fs-sm);
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-field .slate-input {
+  height: 34px;
+  padding-block: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-cap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-cap .slate-input {
+  width: 5.5em;
+  flex: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-chips::-webkit-scrollbar {
+  display: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-chip,
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-add {
+  flex: none;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 99px;
+  border: 1px solid var(--slate-border);
+  background: transparent;
+  font: inherit;
+  font-size: var(--slate-fs-xs);
+  font-weight: 500;
+  color: var(--slate-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-chip:hover,
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-add:hover {
+  color: var(--slate-text);
+  border-color: var(--slate-border-md);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-chip--on {
+  color: var(--slate-text);
+  border-color: var(--slate-accent);
+  background: color-mix(in srgb, var(--slate-accent) 12%, transparent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-add {
+  border-style: dashed;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-remove {
+  width: 24px;
+  height: 24px;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--slate-muted);
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-remove:hover {
+  color: var(--slate-error);
+}
+
+@media (max-width: 719px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-share-close-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-share-track-chip,
+  [data-slate-forms][data-theme-name='slate'] .slate-share-track-add {
+    height: 36px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-share-track-remove {
+    width: 36px;
+    height: 36px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-share-close-field .slate-input,
+  [data-slate-forms][data-theme-name='slate'] .slate-share-close-field .slate-textarea {
+    font-size: 16px;
+  }
+}
+
 /* ---------- Studio size (ADR-045): three steps, default is the floor ---------- */
 
 /* Studio roots only: the app mount and portaled studio chrome. Public fill
@@ -4687,4 +4877,11 @@ body[data-slate-scale='3'] > [data-slate-forms][data-theme-name='slate'] {
 
 [data-slate-forms][data-theme-name='slate'] .slate-scale-tab--3 {
   font-size: 18px;
+}
+
+/* Inspector: number prefix + unit side by side (ADR-063). */
+[data-slate-forms][data-theme-name='slate'] .slate-inspector-affixes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px;
 }

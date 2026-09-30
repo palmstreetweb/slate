@@ -378,7 +378,7 @@ export function FormSubmissions({ formId }: Props) {
   const editorPath = `/forms/${formId}/edit`;
 
   const exportCsv = () => {
-    downloadResponsesCsv(form.name, questions, subs);
+    downloadResponsesCsv(form.name, questions, subs, form.trackedSources);
     toast.push({
       title: 'CSV downloaded',
       detail: plural(subs.length, 'response', 'responses'),
@@ -454,6 +454,7 @@ export function FormSubmissions({ formId }: Props) {
     onMarkRead,
     onMarkUnread,
     onTrash,
+    trackedSources: form.trackedSources,
   };
 
   let body: ReactNode;

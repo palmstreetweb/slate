@@ -6,8 +6,10 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Condition, Option, PictureOption, Question } from '@/index.js';
-import { TYPE_GLYPH, TYPE_LABEL } from '../questionTypeMeta.js';
+import { TYPE_LABEL } from '../questionTypeMeta.js';
+import { TypeIcon } from './TypeIcon.js';
 import { ConditionBuilder, JumpRulesEditor } from './LogicEditor.js';
+import { canPrefill, isValidPrefillKey, RESERVED_LINK_PARAMS } from '@/logic/prefill.js';
 import { SlateNumberInput } from './SlateNumberInput.js';
 import { SlateSelect } from './SlateSelect.js';
 
@@ -32,7 +34,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         </p>
         <div className="slate-type-chip">
           <span className="slate-outline-glyph" aria-hidden>
-            {TYPE_GLYPH[question.type]}
+            <TypeIcon type={question.type} size={15} />
           </span>
           <span>{TYPE_LABEL[question.type]}</span>
         </div>
@@ -144,6 +146,21 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
               }
               onChange={(v) => onChange({ required: v } as Partial<Question>)}
               label="Required"
+            />
+          </>
+        )}
+
+        {question.type === 'date' && (
+          <>
+            <Checkbox
+              checked={Boolean(question.includeTime)}
+              onChange={(v) => onChange({ includeTime: v || undefined } as Partial<Question>)}
+              label="Ask for a Time Too"
+            />
+            <Checkbox
+              checked={Boolean(question.range)}
+              onChange={(v) => onChange({ range: v || undefined } as Partial<Question>)}
+              label="Start and End (Date Range)"
             />
           </>
         )}
@@ -274,20 +291,77 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         )}
 
         {question.type === 'number' && (
-          <Row>
-            <Field label="Min">
-              <SlateNumberInput
-                value={question.min}
-                onChange={(n) => onChange({ min: n } as Partial<Question>)}
+          <>
+            <Field label="Style">
+              <SlateSelect
+                value={question.display ?? 'input'}
+                options={[
+                  { value: 'input', label: 'Type a number' },
+                  { value: 'stepper', label: 'Quantity stepper (− / +)' },
+                ]}
+                aria-label="Number style"
+                onChange={(display) =>
+                  onChange({
+                    display: display === 'stepper' ? 'stepper' : undefined,
+                  } as Partial<Question>)
+                }
               />
             </Field>
-            <Field label="Max">
-              <SlateNumberInput
-                value={question.max}
-                onChange={(n) => onChange({ max: n } as Partial<Question>)}
-              />
-            </Field>
-          </Row>
+            <Row>
+              <Field label="Min">
+                <SlateNumberInput
+                  value={question.min}
+                  onChange={(n) => onChange({ min: n } as Partial<Question>)}
+                />
+              </Field>
+              <Field label="Max">
+                <SlateNumberInput
+                  value={question.max}
+                  onChange={(n) => onChange({ max: n } as Partial<Question>)}
+                />
+              </Field>
+            </Row>
+            <Row>
+              <Field
+                label="Step"
+                hint={question.display === 'stepper' ? 'Each − / + tap' : undefined}
+              >
+                <SlateNumberInput
+                  value={question.step}
+                  placeholder="1"
+                  onChange={(n) =>
+                    onChange({
+                      step: n !== undefined && n > 0 ? n : undefined,
+                    } as Partial<Question>)
+                  }
+                />
+              </Field>
+              <Field label="Before / After" hint="e.g. $ … or … sq ft">
+                <span className="slate-inspector-affixes">
+                  <input
+                    className="slate-input"
+                    value={question.prefix ?? ''}
+                    placeholder="$"
+                    maxLength={12}
+                    aria-label="Shown before the number"
+                    onChange={(e) =>
+                      onChange({ prefix: e.target.value || undefined } as Partial<Question>)
+                    }
+                  />
+                  <input
+                    className="slate-input"
+                    value={question.unit ?? ''}
+                    placeholder="units"
+                    maxLength={24}
+                    aria-label="Shown after the number"
+                    onChange={(e) =>
+                      onChange({ unit: e.target.value || undefined } as Partial<Question>)
+                    }
+                  />
+                </span>
+              </Field>
+            </Row>
+          </>
         )}
 
         {question.type === 'scale' && (
@@ -334,6 +408,52 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                 />
               </Field>
             </Row>
+            <Field
+              label="Style"
+              hint={
+                (question.display === 'stars' || question.display === 'emoji') &&
+                scalePoints(question) > 7
+                  ? `${scalePoints(question)} points is a lot of ${question.display === 'stars' ? 'stars' : 'faces'} on a phone — 5 reads best.`
+                  : question.display === 'slider'
+                    ? 'They drag, then press OK.'
+                    : undefined
+              }
+            >
+              <SlateSelect
+                value={question.display ?? 'numbers'}
+                options={[
+                  { value: 'numbers', label: 'Numbers' },
+                  { value: 'stars', label: 'Stars' },
+                  { value: 'emoji', label: 'Faces' },
+                  { value: 'slider', label: 'Slider' },
+                ]}
+                aria-label="Scale style"
+                onChange={(display) =>
+                  onChange({
+                    display: display === 'numbers' ? undefined : display,
+                    sliderIcon: display === 'slider' ? question.sliderIcon : undefined,
+                  } as Partial<Question>)
+                }
+              />
+            </Field>
+            {question.display === 'slider' && (
+              <Field label="Above the Slider">
+                <SlateSelect
+                  value={question.sliderIcon ?? 'emoji'}
+                  options={[
+                    { value: 'emoji', label: 'A face that reacts' },
+                    { value: 'stars', label: 'Stars that fill' },
+                    { value: 'none', label: 'Just the number' },
+                  ]}
+                  aria-label="Above the slider"
+                  onChange={(sliderIcon) =>
+                    onChange({
+                      sliderIcon: sliderIcon === 'emoji' ? undefined : sliderIcon,
+                    } as Partial<Question>)
+                  }
+                />
+              </Field>
+            )}
           </>
         )}
 
@@ -394,6 +514,10 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
           </Field>
         )}
 
+        {(question.type === 'single_choice' ||
+          question.type === 'multi_choice' ||
+          question.type === 'dropdown') && <OtherSetting question={question} onChange={onChange} />}
+
         {question.type === 'picture_choice' && (
           <>
             <Checkbox
@@ -407,6 +531,7 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                 onChange={(opts) => onChange({ options: opts } as Partial<Question>)}
               />
             </Field>
+            <OtherSetting question={question} onChange={onChange} />
             {question.multiple && (
               <Row>
                 <Field label="Min Selections">
@@ -481,6 +606,10 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
           </Field>
         )}
 
+        {canPrefill(question) && (
+          <PrefillSetting question={question} allQuestions={allQuestions} onChange={onChange} />
+        )}
+
         {question.type !== 'welcome' && (
           <>
             <div style={{ height: 1, background: 'var(--slate-border)', margin: '8px 0' }} />
@@ -535,6 +664,132 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
         )}
       </div>
     </aside>
+  );
+}
+
+/** How many points a scale has (min to max by step). */
+function scalePoints(q: { min: number; max: number; step?: number }): number {
+  const step = q.step && q.step > 0 ? q.step : 1;
+  return q.max >= q.min ? Math.floor((q.max - q.min) / step + 1e-9) + 1 : 0;
+}
+
+/** "Other: ___" (ADR-063): the respondent types their own answer. */
+function OtherSetting({
+  question,
+  onChange,
+}: {
+  question: Question & { allowOther?: boolean; otherLabel?: string };
+  onChange: (patch: Partial<Question>) => void;
+}) {
+  return (
+    <>
+      <Checkbox
+        checked={Boolean(question.allowOther)}
+        onChange={(v) =>
+          onChange({
+            allowOther: v || undefined,
+            otherLabel: v ? question.otherLabel : undefined,
+          } as Partial<Question>)
+        }
+        label="Allow “Other” (They Type Their Own)"
+      />
+      {question.allowOther && (
+        <Field label="Other Label" hint="What the extra choice says.">
+          <input
+            className="slate-input"
+            value={question.otherLabel ?? ''}
+            placeholder="Other"
+            maxLength={40}
+            onChange={(e) =>
+              onChange({ otherLabel: e.target.value || undefined } as Partial<Question>)
+            }
+          />
+        </Field>
+      )}
+    </>
+  );
+}
+
+/** Link parameter name from a title: "First name?" → "first_name". */
+function suggestPrefillKey(question: Question, taken: ReadonlySet<string>): string {
+  const title = 'title' in question && typeof question.title === 'string' ? question.title : '';
+  const base =
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .split('_')
+      .filter((w) => !['what', 'whats', 'is', 'your', 'the', 'a', 'an', 's'].includes(w))
+      .slice(0, 3)
+      .join('_')
+      .slice(0, 30) || question.type;
+  let key = RESERVED_LINK_PARAMS.has(base) ? `${base}_answer` : base;
+  let n = 2;
+  while (taken.has(key.toLowerCase())) key = `${base}_${n++}`;
+  return key;
+}
+
+/** Prefill from the link (ADR-063): owner opts in per question and names the parameter. */
+function PrefillSetting({
+  question,
+  allQuestions,
+  onChange,
+}: {
+  question: Question;
+  allQuestions: ReadonlyArray<Question>;
+  onChange: (patch: Partial<Question>) => void;
+}) {
+  const key = (question as { prefillKey?: string }).prefillKey;
+  const on = key !== undefined;
+  const taken = new Set(
+    allQuestions
+      .filter((q) => q.id !== question.id)
+      .map((q) => (q as { prefillKey?: string }).prefillKey?.toLowerCase())
+      .filter((k): k is string => Boolean(k)),
+  );
+  const trimmed = key?.trim() ?? '';
+  const problem = !on
+    ? null
+    : !trimmed
+      ? 'Give the link a name for this answer.'
+      : !isValidPrefillKey(trimmed)
+        ? 'Letters, numbers, - and _ only (and not src, embed or utm_…).'
+        : taken.has(trimmed.toLowerCase())
+          ? 'Another question already uses this name.'
+          : null;
+  return (
+    <CollapsibleSection
+      label="Fill from link"
+      hint="Let a link fill this answer in, e.g. from your own site or an email. They can still change it."
+      summary={on && trimmed ? `?${trimmed}=` : 'Off'}
+      defaultOpen={on}
+      questionId={question.id}
+    >
+      <Checkbox
+        checked={on}
+        onChange={(v) =>
+          onChange({
+            prefillKey: v ? suggestPrefillKey(question, taken) : undefined,
+          } as Partial<Question>)
+        }
+        label="Can Be Prefilled From the Link"
+      />
+      {on && (
+        <Field label="Link Name" hint={problem ?? `Add ?${trimmed}=… to the form link.`}>
+          <input
+            className={`slate-input${problem ? ' slate-input--error' : ''}`}
+            value={key ?? ''}
+            maxLength={40}
+            spellCheck={false}
+            autoCapitalize="none"
+            aria-invalid={problem ? true : undefined}
+            onChange={(e) =>
+              onChange({ prefillKey: e.target.value.replace(/\s+/g, '_') } as Partial<Question>)
+            }
+          />
+        </Field>
+      )}
+    </CollapsibleSection>
   );
 }
 

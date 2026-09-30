@@ -1399,3 +1399,60 @@
     transform: none;
   }
 }
+
+/* ---------- ADR-063: what people typed under "Other", and the Source chip ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-others {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--chrome-hair);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-others-head {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-others-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-others-list li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 9px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 6px;
+  background: var(--chrome-panel-2);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--rsp-ink-86);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-others-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-others-n {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-source {
+  color: var(--chrome-muted);
+}
