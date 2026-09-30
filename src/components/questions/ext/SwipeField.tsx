@@ -25,6 +25,7 @@ import { focusAfter } from '@/utils/focus.js';
 import { motionReduced, shakeInvalid } from '@/utils/motion.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import '@/styles/extensions.css';
 import '@/styles/extensions-c.css';
 
 type Dir = 'like' | 'nope';

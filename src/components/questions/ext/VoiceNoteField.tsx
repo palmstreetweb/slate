@@ -32,37 +32,14 @@ import { focusAfter } from '@/utils/focus.js';
 import { motionReduced, shakeInvalid } from '@/utils/motion.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import type { ExtFieldProps } from '../lazyFields.js';
+import { failedMimes, pickVoiceMime } from './voiceFormat.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import '@/styles/extensions.css';
 import '@/styles/extensions-c.css';
 
 type Phase = 'idle' | 'asking' | 'recording' | 'review' | 'typed' | 'blocked';
 type Save = 'idle' | 'saving' | 'saved' | 'error';
 type Clip = { url: string; blob: Blob; seconds: number; peaks: number[] };
-
-/**
- * Recording formats in order of preference: Opus in WebM where the browser
- * records it (Chrome, Edge, Firefox, Android — and it is what they encode
- * reliably), else AAC in MP4 (Safari and iOS). Newer Chrome also *claims*
- * AAC in MP4, but its encoder can fail at runtime ("EncodingError"), so WebM
- * comes first; a format that fails is skipped on the next try.
- */
-export const VOICE_MIME_PREFERENCE = [
-  'audio/webm;codecs=opus',
-  'audio/webm',
-  'audio/mp4;codecs=mp4a.40.2',
-  'audio/mp4',
-] as const;
-
-/** Formats that failed on this page (an encoder error or an empty file); skipped next time. */
-const failedMimes = new Set<string>();
-
-/** The first format this browser records (and hasn't failed here), or '' to let it choose. */
-export function pickVoiceMime(): string {
-  const MR = (globalThis as { MediaRecorder?: { isTypeSupported?: (t: string) => boolean } })
-    .MediaRecorder;
-  if (!MR || typeof MR.isTypeSupported !== 'function') return '';
-  return VOICE_MIME_PREFERENCE.find((t) => !failedMimes.has(t) && MR.isTypeSupported!(t)) ?? '';
-}
 
 /** A file name ending for a recorded type. */
 function extensionFor(type: string): string {

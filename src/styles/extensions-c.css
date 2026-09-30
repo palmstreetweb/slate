@@ -52,9 +52,30 @@
   min-height: 280px;
 }
 
+/* Room for the two cards peeking out underneath. */
+[data-slate-forms] .slate-swipe-deck:not(.slate-swipe-deck--single) {
+  margin-bottom: 38px;
+}
+
 [data-slate-forms] .slate-swipe-deck--single {
   height: auto;
   min-height: 0;
+}
+
+/* Phones: keep ✕ / ♥ in reach under the card. */
+@media (max-width: 480px) {
+  [data-slate-forms] .slate-swipe-deck:not(.slate-swipe-deck--single) {
+    height: min(40vh, 340px);
+    min-height: 240px;
+  }
+
+  [data-slate-forms] .slate-swipe {
+    margin-top: 16px;
+  }
+
+  [data-slate-forms] .slate-swipe-actions {
+    margin-top: 16px;
+  }
 }
 
 [data-slate-forms] .slate-swipe-card {
@@ -663,6 +684,7 @@
 
 [data-slate-forms] .slate-voice--recording .slate-voice-ring circle {
   opacity: 1;
+  stroke: var(--slate-error);
 }
 
 [data-slate-forms] .slate-voice--recording .slate-voice-record {
@@ -1005,6 +1027,17 @@
   font-weight: 600;
 }
 
+/* Once located, asking again is a quiet, secondary action. */
+[data-slate-forms] .slate-loc-btn.slate-loc-btn--again {
+  min-height: 44px;
+  padding: 0 16px;
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  background: transparent;
+  color: var(--slate-text);
+  font-size: 15px;
+  font-weight: 500;
+}
+
 [data-slate-forms] .slate-loc-btn:disabled {
   opacity: 0.7;
   cursor: progress;
@@ -1149,12 +1182,13 @@
   padding: 10px;
   border: var(--slate-border-width) solid var(--slate-border-md);
   border-radius: calc(var(--slate-radius) + 2px);
-  background: transparent;
+  /* Opaque, so a theme's backdrop (stars, shapes) never runs through the buttons. */
+  background: var(--slate-bg);
 }
 
 [data-slate-forms] .slate-shot--done {
   border-color: rgb(var(--slate-accent-rgb) / 0.6);
-  background: var(--slate-accent-lo);
+  background: linear-gradient(var(--slate-accent-lo), var(--slate-accent-lo)), var(--slate-bg);
 }
 
 [data-slate-forms] .slate-shot--error {

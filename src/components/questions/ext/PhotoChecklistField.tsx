@@ -22,6 +22,7 @@ import { focusAfter } from '@/utils/focus.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import '@/styles/extensions.css';
 import '@/styles/extensions-c.css';
 
 type Shot = { state: 'uploading' | 'done' | 'error'; thumb?: string; error?: string; ref?: string };
@@ -126,6 +127,7 @@ export default function PhotoChecklistField({
         answerRef.current = { ...answerRef.current, [item]: ref };
         onAnswer({ ...answerRef.current });
         ping?.();
+        setError(null);
         setShots((s) => ({ ...s, [item]: { state: 'done', thumb, ref } }));
         setSaid(`${label}: added.`);
       } catch (err) {

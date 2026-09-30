@@ -31,6 +31,7 @@ import { focusAfter } from '@/utils/focus.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import '@/styles/extensions.css';
 import '@/styles/extensions-c.css';
 
 /** Hold this long on touch before a drag paints instead of scrolling. */
@@ -69,6 +70,8 @@ export default function AvailabilityField({
     y0: number;
     timer: number;
     start: string | null;
+    /** The last painted cell: a fast drag skips cells, so the line between is filled. */
+    last: string | null;
   } | null>(null);
 
   useEffect(
@@ -132,6 +135,7 @@ export default function AvailabilityField({
       y0: e.clientY,
       timer: 0,
       start: k,
+      last: k,
     } as NonNullable<typeof paint.current>;
     paint.current = p;
     if (!touch) {
@@ -173,7 +177,28 @@ export default function AvailabilityField({
       }
     }
     const k = cellAt(e.clientX, e.clientY);
-    if (k) setCells([k], p.mode);
+    if (!k || k === p.last) return;
+    setCells(p.last ? cellsBetween(p.last, k) : [k], p.mode);
+    p.last = k;
+  };
+
+  /** Every cell on the straight line from `a` to `b` (grid steps), both ends included. */
+  const cellsBetween = (a: string, b: string): string[] => {
+    const at = (k: string) => {
+      const [day, slot] = k.split(':');
+      return [grid.days.indexOf(day!), Number(slot)] as const;
+    };
+    const [d0, s0] = at(a);
+    const [d1, s1] = at(b);
+    if (d0 < 0 || d1 < 0) return [b];
+    const n = Math.max(Math.abs(d1 - d0), Math.abs(s1 - s0));
+    const out: string[] = [];
+    for (let i = 0; i <= n; i++) {
+      const d = Math.round(d0 + ((d1 - d0) * i) / (n || 1));
+      const sl = Math.round(s0 + ((s1 - s0) * i) / (n || 1));
+      out.push(cellKey(grid.days[d]!, sl));
+    }
+    return out;
   };
 
   const end = (e: React.PointerEvent<HTMLDivElement>) => {

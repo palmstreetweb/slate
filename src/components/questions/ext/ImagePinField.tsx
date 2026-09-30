@@ -23,6 +23,7 @@ import { shakeInvalid } from '@/utils/motion.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import '@/styles/extensions.css';
 import '@/styles/extensions-c.css';
 
 type Pin = { x: number; y: number; note: string; key: number };
@@ -224,7 +225,8 @@ export default function ImagePinField({
         {resolveTitle(question.title, answers)}
       </h1>
       <p className="slate-subtitle slate-pin-lede">
-        {limit === 1 ? 'Tap the photo to mark the spot.' : `Tap the photo to mark up to ${limit} spots.`}
+        {limit === 1 ? 'Mark one spot' : `Mark up to ${limit} spots`}
+        {withNotes ? ', with a short note on each.' : '.'}
       </p>
 
       <div className="slate-pin">

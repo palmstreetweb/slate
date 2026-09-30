@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { LocationQuestion } from '@/types/Question.js';
 import { validate } from '@/logic/validation.js';
+import { OUT_OF_AREA_VALUE } from '@/logic/address.js';
 import {
   PLACE_TYPED_MAX,
   formZipAreas,
@@ -30,6 +31,7 @@ import { shakeInvalid } from '@/utils/motion.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import '@/styles/extensions.css';
 import '@/styles/extensions-c.css';
 
 type Phase = 'idle' | 'locating' | 'done' | 'off' | 'manual';
@@ -59,8 +61,9 @@ function radarSpot(
   const d = Math.hypot(kmX, kmY);
   if (d === 0) return { x: 0, y: 0 };
   const r = d / radiusKm;
-  // Inside: to scale. Outside: squeezed toward the edge so it stays on the radar.
-  const scaled = r <= 1 ? r * 0.62 : 0.62 + 0.3 * (1 - 1 / r);
+  // Inside: clear of the business mark, then to scale. Outside: squeezed toward
+  // the edge so it stays on the radar.
+  const scaled = r <= 1 ? 0.2 + r * 0.42 : 0.62 + 0.3 * (1 - 1 / r);
   return { x: (kmX / d) * scaled, y: (-kmY / d) * scaled };
 }
 
@@ -200,6 +203,8 @@ export default function LocationField({
   const distance = locationDistance(rec, answer);
   const area = answer?.area;
   const typing = phase === 'manual' || phase === 'off';
+  // When the owner routes people outside the area to their own ending, don't promise "continue".
+  const routesOut = (question.logic ?? []).some((r) => JSON.stringify(r.if).includes(OUT_OF_AREA_VALUE));
 
   return (
     <div ref={rootRef}>
@@ -237,9 +242,8 @@ export default function LocationField({
               ) : area === 'out' ? (
                 <>
                   <strong>You’re outside our usual area.</strong>
-                  {distance !== null
-                    ? ` About ${formatDistance(distance, question.radiusUnit)} away — you can still continue.`
-                    : ' You can still continue.'}
+                  {distance !== null ? ` About ${formatDistance(distance, question.radiusUnit)} away.` : ''}
+                  {routesOut ? '' : ' You can still continue.'}
                 </>
               ) : (
                 <strong>Got your location.</strong>
@@ -262,7 +266,7 @@ export default function LocationField({
             <button
               ref={buttonRef}
               type="button"
-              className="slate-loc-btn"
+              className={`slate-loc-btn${phase === 'done' ? ' slate-loc-btn--again' : ''}`}
               onClick={locate}
               disabled={phase === 'locating'}
             >
