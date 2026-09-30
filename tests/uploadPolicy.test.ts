@@ -156,6 +156,44 @@ vi.mock('../neon/functions/storage-sign/authJwt.js', () => ({
   }),
 }));
 
+describe('Wave C file questions (ADR-065)', () => {
+  it('a voice note is a file question, capped by its recording length', () => {
+    expect(fileUploadLimitBytes({ questions: [{ type: 'voice_note' }] }, CAP)).toBe(
+      60 * 40_000 + 64 * 1024,
+    );
+    expect(fileUploadLimitBytes({ questions: [{ type: 'voice_note', maxSeconds: 300 }] }, CAP)).toBe(
+      300 * 40_000 + 64 * 1024,
+    );
+    // Nonsense lengths fall back to the question's own bounds, never the global cap.
+    expect(fileUploadLimitBytes({ questions: [{ type: 'voice_note', maxSeconds: 1e9 }] }, CAP)).toBe(
+      300 * 40_000 + 64 * 1024,
+    );
+    expect(fileUploadLimitBytes({ questions: [{ type: 'voice_note', maxSeconds: 1 }] }, CAP)).toBe(MB);
+  });
+
+  it('a photo checklist is a file question, 12 MB per photo', () => {
+    expect(fileUploadLimitBytes({ questions: [{ type: 'photo_checklist', items: [] }] }, CAP)).toBe(
+      12 * MB,
+    );
+  });
+
+  it('the roomiest file question still wins, and the cap still bounds it', () => {
+    expect(
+      fileUploadLimitBytes(
+        { questions: [{ type: 'voice_note' }, fileQ({ maxSizeMb: 20 }), { type: 'photo_checklist' }] },
+        CAP,
+      ),
+    ).toBe(20 * MB);
+    expect(fileUploadLimitBytes({ questions: [{ type: 'photo_checklist' }] }, 5 * MB)).toBe(5 * MB);
+  });
+
+  it('other Wave C questions lend no storage', () => {
+    for (const type of ['image_pin', 'location', 'availability']) {
+      expect(fileUploadLimitBytes({ questions: [{ type }] }, CAP)).toBeNull();
+    }
+  });
+});
+
 describe('storage-sign upload gate (ADR-050, ADR-058)', () => {
   const FORM_ID = 'f_test1';
   const HASH = '$2a$08$abcdefghijklmnopqrstuuJ7gq0l1m9cQ4n3o8c5w2y1z0x9v8u7t';
@@ -539,5 +577,28 @@ describe('storage-sign upload gate (ADR-050, ADR-058)', () => {
       throw Object.assign(new Error('boom'), { name: 'InternalError' });
     };
     expect((await read('content', 'owner-jwt')).status).toBe(503);
+  });
+
+  it('voice notes sign audio/webm and audio/mp4 as themselves, within the recording cap (ADR-065)', async () => {
+    setForm({ questions: [textQ, { id: 'v', type: 'voice_note', maxSeconds: 60 }] });
+    const voice = (contentType: string, contentLength: number) =>
+      post({
+        op: 'upload',
+        path: `public/${FORM_ID}/${UUID}/voice-note.webm`,
+        contentType,
+        contentLength,
+      });
+    const webm = await voice('audio/webm;codecs=opus', 900_000);
+    expect(webm.status).toBe(200);
+    expect(await webm.json()).toMatchObject({ contentType: 'audio/webm', maxBytes: 60 * 40_000 + 64 * 1024 });
+    const mp4 = await voice('audio/mp4', 900_000);
+    expect(await mp4.json()).toMatchObject({ contentType: 'audio/mp4' });
+    expect((await voice('audio/webm', 3 * MB)).status).toBe(413);
+  });
+
+  it('a photo checklist opens public uploads up to 12 MB a photo (ADR-065)', async () => {
+    setForm({ questions: [{ id: 'c', type: 'photo_checklist', items: [{ label: 'Front', value: 'front' }] }] });
+    expect((await sign('public', 2 * MB)).status).toBe(200);
+    expect((await sign('public', 13 * MB)).status).toBe(413);
   });
 });

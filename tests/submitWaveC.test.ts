@@ -1,0 +1,215 @@
+/** @vitest-environment node */
+/**
+ * The submit Function and Wave C (ADR-065): per-type clamps for pins,
+ * locations, availability, voice notes and photo checklists, and the real
+ * Hono app storing them — a location's in / out of the area is always the
+ * server's own verdict, from the published center and radius.
+ */
+
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clampForQuestion, VOICE_TYPED_MAX } from '../neon/functions/submit-response/answerShape.js';
+import { imageKey } from '@/logic/pins.js';
+import * as media from '@/logic/media.js';
+import { resetFnDb, type newFnDbState } from './_fnDb.js';
+
+const db = vi.hoisted(() => ({ state: null as unknown as ReturnType<typeof newFnDbState> }));
+
+vi.mock('pg', async () => {
+  const m = await import('./_fnDb.js');
+  db.state = m.newFnDbState();
+  return { Pool: m.fnDbPool(db.state) };
+});
+
+const FORM = 'f_wavecform001';
+const OTHER = 'f_otherform001';
+const IP = '203.0.113.65';
+const UUID = '0b8e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5b';
+const ref = (form = FORM, name = 'front.jpg') => `slate-file://storage:public/${form}/${UUID}/${name}`;
+const PHOTO = 'https://example.com/roof.jpg';
+
+const schema = {
+  brand: { name: 'Roofing' },
+  questions: [
+    { id: 'leak', type: 'image_pin', title: 'Where?', image: PHOTO, maxPins: 2 },
+    {
+      id: 'where',
+      type: 'location',
+      title: 'Where’s the job?',
+      center: { lat: 34.4208, lng: -119.6982 },
+      radius: 25,
+      radiusUnit: 'mi',
+    },
+    { id: 'zipOnly', type: 'location', title: 'ZIP?' },
+    { id: 'addr', type: 'address', title: 'Address', serviceArea: ['931'] },
+    { id: 'when', type: 'availability', title: 'When?', days: ['mon', 'tue'], slotMinutes: 30 },
+    { id: 'story', type: 'voice_note', title: 'Tell us', maxSeconds: 30 },
+    { id: 'quiet', type: 'voice_note', title: 'Audio only', allowTyped: false },
+    {
+      id: 'shots',
+      type: 'photo_checklist',
+      title: 'Photos',
+      items: [
+        { label: 'Front', value: 'front' },
+        { label: 'Roof', value: 'roof' },
+      ],
+    },
+    { id: 'likes', type: 'picture_choice', title: 'Like?', display: 'swipe', multiple: true, options: [{ label: 'A', value: 'a', src: PHOTO }] },
+    { id: 'done', type: 'thanks', title: 'Thanks' },
+  ],
+};
+
+let app: { request: (path: string, init: RequestInit) => Response | Promise<Response> };
+const savedDb = process.env.DATABASE_URL;
+
+beforeAll(async () => {
+  process.env.DATABASE_URL = 'postgres://test@localhost/test';
+  app = (await import('../neon/functions/submit-response/index.js')).default;
+});
+
+afterAll(() => {
+  if (savedDb === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = savedDb;
+});
+
+beforeEach(() => {
+  resetFnDb(db.state);
+  db.state.forms.set(FORM, {
+    id: FORM,
+    name: 'Roof quote',
+    slug: '12345679',
+    status: 'published',
+    deleted_at: null,
+    owner_id: 'u_owner_c',
+    fill_password_hash: null,
+    published_schema: schema,
+  });
+});
+
+const submit = (answers: Record<string, unknown>) =>
+  app.request('/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': IP },
+    body: JSON.stringify({
+      formId: FORM,
+      answers,
+      meta: {
+        startedAt: '2026-09-30T10:00:00.000Z',
+        completedAt: '2026-09-30T10:02:00.000Z',
+        durationMs: 120000,
+        questionsVisited: [],
+        hiddenFields: {},
+        score: 0,
+      },
+    }),
+  });
+
+const stored = () => db.state.submissions[0] as { answers: Record<string, unknown> };
+
+describe('clampForQuestion: Wave C shapes', () => {
+  const byId = Object.fromEntries(schema.questions.map((q) => [q.id, q])) as Record<
+    string,
+    Record<string, unknown>
+  >;
+
+  it('pins: in range, under the limit, notes aligned, the published photo’s key', () => {
+    expect(
+      clampForQuestion(byId.leak!, {
+        pins: ['0.5,0.5', '9,9', '0.25,0.75', '0.1,0.1'],
+        notes: ['leak', 'x', ' seal ', 'extra'],
+        img: 'forged',
+      }),
+    ).toEqual({ pins: ['0.5,0.5', '0.25,0.75'], notes: ['leak', 'seal'], img: imageKey(PHOTO) });
+    expect(clampForQuestion(byId.leak!, { pins: ['<script>'] })).toBeUndefined();
+    expect(clampForQuestion(byId.leak!, '0.5,0.5')).toBeUndefined();
+  });
+
+  it('location: rounded, and in / out recomputed from the published radius', () => {
+    expect(
+      clampForQuestion(byId.where!, { lat: 34.0522, lng: -118.2437, area: 'in' }, { zipAreas: [] }),
+    ).toEqual({ lat: '34.052', lng: '-118.244', area: 'out' });
+    expect(
+      clampForQuestion(byId.where!, { lat: '34.44123456', lng: '-119.81', area: 'out' }),
+    ).toEqual({ lat: '34.441', lng: '-119.810', area: 'in' });
+    expect(clampForQuestion(byId.zipOnly!, { zip: '93105' }, { zipAreas: ['931'] })).toEqual({
+      zip: '93105',
+      area: 'in',
+    });
+    expect(clampForQuestion(byId.zipOnly!, { typed: 'Goleta', area: 'in' })).toEqual({
+      typed: 'Goleta',
+    });
+    expect(clampForQuestion(byId.where!, { lat: 'north', lng: 1 })).toBeUndefined();
+  });
+
+  it('availability: re-encoded on the published grid', () => {
+    expect(
+      clampForQuestion(byId.when!, {
+        mon: '09:00-09:30,09:30-10:00,09:15-10:00',
+        tue: '23:00-23:30',
+        sun: '09:00-10:00',
+      }),
+    ).toEqual({ mon: '09:00-10:00' });
+    expect(clampForQuestion(byId.when!, { mon: 'all day' })).toBeUndefined();
+  });
+
+  it('voice: this form’s own recording and a capped length, or typed text when allowed', () => {
+    const ctx = { formId: FORM };
+    expect(clampForQuestion(byId.story!, { audio: ref(FORM, 'voice.webm'), sec: '42' }, ctx)).toEqual({
+      audio: ref(FORM, 'voice.webm'),
+      sec: '30',
+    });
+    expect(clampForQuestion(byId.story!, { audio: ref(OTHER, 'voice.webm') }, ctx)).toBeUndefined();
+    expect(clampForQuestion(byId.story!, { audio: 'https://evil.example/a.mp3' }, ctx)).toBeUndefined();
+    expect(clampForQuestion(byId.story!, { audio: ref(FORM, 'v.m4a'), sec: 'x' }, ctx)).toEqual({
+      audio: ref(FORM, 'v.m4a'),
+    });
+    expect(
+      (clampForQuestion(byId.story!, { typed: 'y'.repeat(5000) }, ctx) as { typed: string }).typed,
+    ).toHaveLength(VOICE_TYPED_MAX);
+    expect(clampForQuestion(byId.quiet!, { typed: 'hi' }, ctx)).toBeUndefined();
+    expect(VOICE_TYPED_MAX).toBe(media.VOICE_TYPED_MAX);
+  });
+
+  it('photo checklist: published items only, each this form’s own ref', () => {
+    const ctx = { formId: FORM };
+    expect(
+      clampForQuestion(
+        byId.shots!,
+        { front: ref(), roof: ref(OTHER), panel: ref(FORM, 'p.jpg'), toString: ref() },
+        ctx,
+      ),
+    ).toEqual({ front: ref() });
+    expect(clampForQuestion(byId.shots!, { front: ref() })).toBeUndefined();
+  });
+});
+
+describe('submit: Wave C answers as stored', () => {
+  it('stores every Wave C answer in its server shape; a forged area is replaced', async () => {
+    const res = await submit({
+      leak: { pins: ['0.5,0.5'], notes: ['leak'] },
+      where: { lat: 34.0522, lng: -118.2437, area: 'in' },
+      zipOnly: { zip: '90210', area: 'in' },
+      when: { mon: '09:00-10:00' },
+      story: { audio: ref(FORM, 'voice.m4a'), sec: '12' },
+      shots: { front: ref(), roof: ref(OTHER) },
+      likes: [],
+    });
+    expect(res.status).toBe(200);
+    expect(stored().answers).toEqual({
+      leak: { pins: ['0.5,0.5'], notes: ['leak'], img: imageKey(PHOTO) },
+      where: { lat: '34.052', lng: '-118.244', area: 'out' },
+      // Checked against the published address's ZIP list.
+      zipOnly: { zip: '90210', area: 'out' },
+      when: { mon: '09:00-10:00' },
+      story: { audio: ref(FORM, 'voice.m4a'), sec: '12' },
+      shots: { front: ref() },
+      likes: [],
+    });
+  });
+
+  it('drops a Wave C answer that is nothing but junk, keeping the rest', async () => {
+    await submit({ leak: { pins: ['9,9'] }, when: { mon: 'soon' }, story: { audio: ref(OTHER) } });
+    expect(stored().answers).toEqual({});
+    await submit({ where: { typed: 'Goleta' } });
+    expect(db.state.submissions.some((s) => (s as { answers: { where?: unknown } }).answers.where)).toBe(true);
+  });
+});
