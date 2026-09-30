@@ -9,6 +9,7 @@
 import type { StorageQuota } from '../storageQuota.js';
 import { getNeon } from './client.js';
 import { getStorageSignUrl, hasStorageSignUrl, isNeonConfigured } from './config.js';
+import { authHeader } from '../storageUpload.js';
 
 type Listener = () => void;
 
@@ -79,7 +80,6 @@ export function refreshStorageQuota(): Promise<void> {
  */
 async function purgeDeletedFiles(): Promise<void> {
   if (!isNeonConfigured() || !hasStorageSignUrl()) return;
-  const { authHeader } = await import('../storageUpload.js');
   for (let round = 0; round < 3; round++) {
     try {
       const res = await fetch(getStorageSignUrl(), {
