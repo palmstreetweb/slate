@@ -534,11 +534,13 @@ export type VoiceNoteQuestion<TId extends string = string> = IdField<TId> &
 export type DistanceUnit = 'mi' | 'km';
 
 /**
- * "Use my location" and a service-area radius. Stored as
+ * "Use my location" and a service-area radius. The engine's answer is
  * `{ lat, lng, area? }` rounded to 3 decimals (about 100 m), or `{ zip, area? }`
- * / `{ typed }` when location is off. `area` ('in' | 'out') is recomputed by
- * the server from the published center and radius. Conditions test it with
- * `IN_AREA_VALUE` / `OUT_OF_AREA_VALUE`, like an address.
+ * / `{ typed }` when location is off, so a server can re-check it. `area`
+ * ('in' | 'out') is recomputed by the server from the published center and
+ * radius. Conditions test it with `IN_AREA_VALUE` / `OUT_OF_AREA_VALUE`, like
+ * an address. What is stored is only `{ area?, via }` unless `keepLocation`
+ * is on (ADR-068).
  */
 export type LocationQuestion<TId extends string = string> = IdField<TId> &
   Visibility & {
@@ -551,8 +553,18 @@ export type LocationQuestion<TId extends string = string> = IdField<TId> &
     radius?: number;
     /** Default 'mi'. */
     radiusUnit?: DistanceUnit;
-    /** The privacy line under the button; a clear default is used when unset. */
+    /**
+     * The owner's own words under the button (what the location is for). The
+     * field always adds what is saved: only in / out of the area, or — with
+     * `keepLocation` — the approximate location.
+     */
     privacyNote?: string;
+    /**
+     * Keep the approximate location (ADR-068): store the rounded coordinates
+     * (about 110 m), or the ZIP or place typed, as well as the verdict. Off by
+     * default: only `{ area?, via }` is stored, and the respondent is told so.
+     */
+    keepLocation?: boolean;
   };
 
 /**

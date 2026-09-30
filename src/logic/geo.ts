@@ -1,12 +1,16 @@
 /**
  * "Use my location" and the service-area radius (ADR-065) — pure, no React.
  *
- * The respondent's position is stored rounded to 3 decimals (about 110 m, a
- * city block), never finer. Whether it is inside the owner's radius is
- * decided by `locationAnswerCore`, which the engine uses to build the answer
- * and the submit Function re-runs on what it receives, against the published
- * center and radius — so a forged `area: 'in'` never survives (the same trust
- * rule as the Wave B estimate, ADR-064).
+ * The page sends the respondent's position rounded to 3 decimals (about
+ * 110 m, a city block), never finer. Whether it is inside the owner's radius
+ * is decided by `locationAnswerCore`, which the engine uses to build the
+ * answer and the submit Function re-runs on what it receives, against the
+ * published center and radius — so a forged `area: 'in'` never survives (the
+ * same trust rule as the Wave B estimate, ADR-064).
+ *
+ * What is stored is `locationStoredCore` (ADR-068): by default only the
+ * verdict and how it was given (`{ area, via }`); the rounded position, the
+ * ZIP or the place typed only when the owner turned on `keepLocation`.
  *
  * When location is off, a ZIP code typed instead is checked against the
  * form's address service areas (ADR-064), or a typed place is kept as text.
@@ -134,6 +138,27 @@ export function locationAnswerCore(
     return t ? { typed: t } : undefined;
   }
   return undefined;
+}
+
+/**
+ * The location answer to STORE (ADR-068). The page still sends what it found
+ * (rounded coordinates, a ZIP or a place) so the verdict can be re-checked
+ * here; then, unless the owner turned on `keepLocation` (only `true` counts;
+ * a schema without it is verdict-only), only the verdict and how it was
+ * given are kept: `{ area?, via: 'gps' | 'zip' | 'typed' }`. No coordinates,
+ * no distance (a distance to the one published center draws a circle), no
+ * ZIP and no typed place. A verdict sent without the position it came from
+ * is nothing (`locationAnswerCore` never reads a client `area`).
+ */
+export function locationStoredCore(
+  q: GeoRecord,
+  v: unknown,
+  zipAreas: ReadonlyArray<string>,
+): Record<string, string> | undefined {
+  const a = locationAnswerCore(q, v, zipAreas);
+  if (!a || q.keepLocation === true) return a;
+  const via = a.lat ? 'gps' : a.zip ? 'zip' : 'typed';
+  return a.area ? { area: a.area, via } : { via };
 }
 
 /* ---------- engine-only helpers ---------- */

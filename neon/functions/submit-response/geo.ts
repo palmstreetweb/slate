@@ -5,6 +5,10 @@
  * so a stored `area` is always the server's own — a client can't claim to be
  * inside the service area. Coordinates are re-rounded to 3 decimals.
  *
+ * Then `locationStoredCore` (ADR-068) keeps only `{ area?, via }` unless the
+ * published question has `keepLocation: true`: by default the coordinates,
+ * the ZIP and the typed place are used for the check and never stored.
+ *
  * The section below is a byte-for-byte copy of the shared section of
  * src/logic/geo.ts. tests/geo.test.ts fails if the two drift.
  */
@@ -127,4 +131,25 @@ export function locationAnswerCore(
     return t ? { typed: t } : undefined;
   }
   return undefined;
+}
+
+/**
+ * The location answer to STORE (ADR-068). The page still sends what it found
+ * (rounded coordinates, a ZIP or a place) so the verdict can be re-checked
+ * here; then, unless the owner turned on `keepLocation` (only `true` counts;
+ * a schema without it is verdict-only), only the verdict and how it was
+ * given are kept: `{ area?, via: 'gps' | 'zip' | 'typed' }`. No coordinates,
+ * no distance (a distance to the one published center draws a circle), no
+ * ZIP and no typed place. A verdict sent without the position it came from
+ * is nothing (`locationAnswerCore` never reads a client `area`).
+ */
+export function locationStoredCore(
+  q: GeoRecord,
+  v: unknown,
+  zipAreas: ReadonlyArray<string>,
+): Record<string, string> | undefined {
+  const a = locationAnswerCore(q, v, zipAreas);
+  if (!a || q.keepLocation === true) return a;
+  const via = a.lat ? 'gps' : a.zip ? 'zip' : 'typed';
+  return a.area ? { area: a.area, via } : { via };
 }

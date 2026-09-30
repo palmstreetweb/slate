@@ -62,7 +62,8 @@ import type {
  *   - signature → { path } (vector strokes) or { typed } (ADR-064)
  *   - image_pin → { pins: ['x,y', …], notes?, img? } (ADR-065)
  *   - voice_note → { audio, sec } (a stored file) or { typed } (ADR-065)
- *   - location → { lat, lng, area? } / { zip, area? } / { typed } (ADR-065)
+ *   - location → { lat, lng, area? } / { zip, area? } / { typed } (ADR-065);
+ *     stored as { area?, via } unless the question keeps the location (ADR-068)
  *   - photo_checklist → { [itemValue]: fileRef } (ADR-065)
  *   - availability → { [day]: 'HH:MM-HH:MM,…' } (ADR-065)
  *   - signup_slots → { slots: [slotValue, …], wait?: [slotValue, …] } (ADR-066)
@@ -111,11 +112,15 @@ export type VoiceNoteAnswer = { audio: string; sec?: string } | { typed: string 
 /**
  * A `location` answer (ADR-065): coordinates rounded to 3 decimals, a ZIP code
  * typed instead, or a typed place; `area` is 'in' or 'out' when checkable.
+ * That is what the engine hands `onSubmit`, so a server can re-check it. A
+ * stored answer is only the verdict and how it was given, `{ area?, via }`,
+ * unless the question has `keepLocation` (ADR-068).
  */
 export type LocationAnswer =
   | { lat: string; lng: string; area?: 'in' | 'out' }
   | { zip: string; area?: 'in' | 'out' }
-  | { typed: string };
+  | { typed: string }
+  | { area?: 'in' | 'out'; via: 'gps' | 'zip' | 'typed' };
 
 /** A `photo_checklist` answer (ADR-065): item value → stored photo ref. */
 export type PhotoChecklistAnswer = Record<string, string>;
