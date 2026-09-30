@@ -4975,3 +4975,73 @@ body[data-slate-scale='3'] > [data-slate-forms][data-theme-name='slate'] {
     font-size: 16px;
   }
 }
+
+/* ============================================================
+   Wave C inspector (ADR-065): the pin photo and the day chips
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='slate'] .slate-insp-photo {
+  display: grid;
+  gap: 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-insp-photo-img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border: 1px solid var(--slate-border);
+  border-radius: 8px;
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-insp-photo-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+  padding: 12px;
+  border: 1px dashed var(--slate-border-md);
+  border-radius: 8px;
+  color: var(--slate-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-insp-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-insp-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-insp-day {
+  min-width: 40px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--slate-border-md);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--slate-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-insp-day.is-on {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+}
+
+@media (max-width: 719px), (pointer: coarse) {
+  [data-slate-forms][data-theme-name='slate'] .slate-insp-day {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

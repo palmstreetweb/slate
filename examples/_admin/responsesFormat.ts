@@ -10,6 +10,17 @@ import { formatDateAnswer } from '@/logic/dateValue.js';
 import { areaStatus, formatAddress, serviceAreaPrefixes } from '@/logic/address.js';
 import { CONTACT_FIELDS } from '@/logic/contact.js';
 import { signaturePathOf, signatureTypedOf } from '@/logic/signature.js';
+import { pinsOf } from '@/logic/pins.js';
+import { formZipAreas, locationAnswerCore as locationAnswer } from '@/logic/geo.js';
+import { formatDistance, locationDistance } from '@/logic/geoText.js';
+import {
+  WEEKDAY_SHORT,
+  availabilityGrid,
+  clockLabel,
+  decodeAvailability,
+  formatAvailability,
+} from '@/logic/availability.js';
+import { formatVoiceNote, voiceAudioOf, voiceTypedOf } from '@/logic/media.js';
 import { peekLocalUploadMeta } from './localFileStore.js';
 import { safeText } from './answerShape.js';
 
@@ -175,15 +186,89 @@ function formatAnswer(question: Question, value: unknown): string {
       return safeText(value) || '—';
     }
 
+    // Wave C (ADR-065)
+    case 'image_pin': {
+      const pins = pinsOf(value);
+      if (!pins.length) return typeof value === 'object' ? '—' : safeText(value);
+      return pins
+        .map((p, i) => `Pin ${i + 1}${p.note.trim() ? `: ${p.note.trim()}` : ''}`)
+        .join('\n');
+    }
+
+    case 'voice_note':
+      return formatVoiceNote(value) || (typeof value === 'object' ? '—' : safeText(value));
+
+    case 'location':
+      return locationText(question, value);
+
+    case 'photo_checklist': {
+      if (typeof value !== 'object' || Array.isArray(value)) return safeText(value);
+      const a = value as Record<string, unknown>;
+      const lines = question.items
+        .filter((i) => typeof a[i.value] === 'string' && a[i.value] !== '')
+        .map((i) => `${i.label}: photo`);
+      return lines.length ? `${lines.length} of ${question.items.length} photos\n${lines.join('\n')}` : '—';
+    }
+
+    case 'availability':
+      return (
+        formatAvailability(question as unknown as Record<string, unknown>, value) ||
+        (typeof value === 'object' ? '—' : safeText(value))
+      );
+
     default:
       return safeText(value);
   }
 }
 
+/** A location in words: in / out of the area and how far, a ZIP, or a typed place (ADR-065). */
+export function locationText(
+  question: Extract<Question, { type: 'location' }>,
+  value: unknown,
+  form: ReadonlyArray<Question> = [],
+): string {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return safeText(value) || '—';
+  const v = value as Record<string, unknown>;
+  const area = locationAreaOf(question, value, form);
+  const areaText = area === 'in' ? 'Inside the service area' : area === 'out' ? 'Outside the service area' : '';
+  if (typeof v.lat === 'string' && typeof v.lng === 'string') {
+    const d = locationDistance(question as unknown as Record<string, unknown>, value);
+    const far = d !== null ? `${formatDistance(d, question.radiusUnit)} away` : '';
+    return [areaText, far, `${v.lat}, ${v.lng}`].filter(Boolean).join(' · ');
+  }
+  if (typeof v.zip === 'string') return [`ZIP ${v.zip}`, areaText].filter(Boolean).join(' · ');
+  if (typeof v.typed === 'string') return `Typed: ${v.typed}`;
+  return '—';
+}
+
+/**
+ * In / out of the area for a stored location: the server's verdict as stored
+ * (it recomputed it from the published form, ADR-065), else recomputed here
+ * from today's settings for rows the engine stored itself (test runs, local).
+ */
+export function locationAreaOf(
+  question: Extract<Question, { type: 'location' }>,
+  value: unknown,
+  form: ReadonlyArray<Question> = [],
+): 'in' | 'out' | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const stored = (value as Record<string, unknown>).area;
+  if (stored === 'in' || stored === 'out') return stored;
+  const area = locationAnswer(
+    question as unknown as Record<string, unknown>,
+    value,
+    formZipAreas(form),
+  )?.area;
+  return area === 'in' || area === 'out' ? area : null;
+}
+
 /**
  * Spreadsheet columns for an answer made of parts (ADR-064): a contact block
  * becomes Name / Email / Phone, an address Street / Unit / City / State / ZIP
- * (/ Country, / In service area). Null for one-column answers.
+ * (/ Country, / In service area). Wave C (ADR-065): a location becomes
+ * Latitude / Longitude / ZIP or place / In service area / Distance, a photo
+ * checklist one column per shot, availability one column per day. Null for
+ * one-column answers.
  */
 export function csvParts(
   question: Question,
@@ -223,6 +308,70 @@ export function csvParts(
       });
     }
     return cols;
+  }
+  // Wave C (ADR-065)
+  if (question.type === 'location') {
+    const coord = (v: unknown, k: 'lat' | 'lng') => part(v, k);
+    const unit = question.radiusUnit === 'km' ? 'km' : 'mi';
+    return [
+      { key: 'lat', label: 'Latitude', cell: (v) => coord(v, 'lat') },
+      { key: 'lng', label: 'Longitude', cell: (v) => coord(v, 'lng') },
+      {
+        key: 'place',
+        label: 'ZIP or place',
+        cell: (v) => part(v, 'zip') || part(v, 'typed'),
+      },
+      {
+        key: 'area',
+        label: 'In service area',
+        cell: (v) => {
+          const a = locationAreaOf(question, v);
+          return a === 'in' ? 'Yes' : a === 'out' ? 'No' : '';
+        },
+      },
+      {
+        key: 'distance',
+        label: `Distance (${unit})`,
+        cell: (v) => {
+          const d = locationDistance(question as unknown as Record<string, unknown>, v);
+          return d === null ? '' : String(Math.round(d * 10) / 10);
+        },
+      },
+    ];
+  }
+  if (question.type === 'photo_checklist') {
+    return question.items.map((item) => ({
+      key: `photo:${item.value}`,
+      label: item.label,
+      cell: (v: unknown) => {
+        const ref = part(v, item.value);
+        return ref ? (describeFileUploadAnswer(ref, peekLocalUploadMeta(ref)) ?? 'Photo') : '';
+      },
+    }));
+  }
+  if (question.type === 'availability') {
+    const grid = availabilityGrid(question as unknown as Record<string, unknown>);
+    return grid.days.map((day) => ({
+      key: `day:${day}`,
+      label: WEEKDAY_SHORT[day] ?? day,
+      cell: (v: unknown) => {
+        const set = decodeAvailability(grid, v).get(day);
+        if (!set) return '';
+        const out: string[] = [];
+        let i = 0;
+        while (i < grid.count) {
+          if (!set.has(i)) {
+            i += 1;
+            continue;
+          }
+          let j = i;
+          while (j < grid.count && set.has(j)) j += 1;
+          out.push(`${clockLabel(grid.start + i * grid.slot)}–${clockLabel(grid.start + j * grid.slot)}`);
+          i = j;
+        }
+        return out.join(', ');
+      },
+    }));
   }
   return null;
 }
@@ -301,6 +450,26 @@ export function formatAnswerForCsv(question: Question, value: unknown): string {
   if (question.type === 'signature') {
     const typed = signatureTypedOf(value);
     return typed ? `Typed: ${typed}` : signaturePathOf(value) ? 'Signed (drawn)' : '';
+  }
+  // Pins with where they are, so a sheet can be read without the photo (ADR-065).
+  if (question.type === 'image_pin') {
+    return pinsOf(value)
+      .map(
+        (p, i) =>
+          `Pin ${i + 1} at ${Math.round(p.x * 100)}% across, ${Math.round(p.y * 100)}% down${
+            p.note.trim() ? `: ${p.note.trim()}` : ''
+          }`,
+      )
+      .join('; ');
+  }
+  // The recording stays in the app; the sheet names it (ADR-065).
+  if (question.type === 'voice_note') {
+    const typed = voiceTypedOf(value);
+    if (typed) return `Typed: ${typed}`;
+    const ref = voiceAudioOf(value);
+    if (!ref) return '';
+    const name = describeFileUploadAnswer(ref, peekLocalUploadMeta(ref));
+    return `${formatVoiceNote(value)}${name ? `: ${name}` : ''}`;
   }
   const formatted = formatAnswerForQuestion(question, value);
   if (formatted === '—') return '';

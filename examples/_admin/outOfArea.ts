@@ -4,6 +4,7 @@
  * area, placed before the other endings (the first visible ending wins,
  * ADR-016), and a jump to it from the address so the rest of the form is
  * skipped. Everything uses existing logic — nothing new in the engine.
+ * A location question (ADR-065) gets the same ending, keyed on its radius.
  */
 
 import type { Question } from '@/index.js';
@@ -25,7 +26,7 @@ export function withOutOfAreaEnding(
     visibleIf: outside,
   };
   const next = questions.map((q) =>
-    q.id === addressId && q.type === 'address'
+    q.id === addressId && (q.type === 'address' || q.type === 'location')
       ? ({ ...q, logic: [...(q.logic ?? []), { if: outside, goTo: endingId }] } as Question)
       : q,
   );

@@ -56,6 +56,7 @@ import {
 } from './model.js';
 import { isOverlayOpen, useMarkAllRead, useNow, usePhone } from './hooks.js';
 import { ResponseAnswers } from './ResponseAnswers.js';
+import { AvailabilityHeatCard, PinCloudCard } from './SummaryWaveC.js';
 import { EstimateBreakdown, estimateLabel } from './ResponseEstimate.js';
 import { ResponseActions } from './ResponseActions.js';
 import {
@@ -362,6 +363,7 @@ const ChartCard = memo(function ChartCard({
           {current.average !== null ? (
             <span className="rsp-sum-avg">avg {formatAverage(current.average)}</span>
           ) : null}
+          {total.likes ? <span className="rsp-sum-likes">like rate</span> : null}
           {crossed ? (
             <span>
               <b>{crossed.answered}</b> of {total.answered} match
@@ -1106,7 +1108,8 @@ export function ResponsesSummary(props: SummaryProps) {
     chartQs.length || sourceTotal
       ? `${phone ? 'Tap' : 'Click'} a bar or tile above to filter`
       : `${phone ? 'Tap' : 'Click'} a tile above to filter`;
-  const chartCount = chartQs.length + (sourceTotal ? 1 : 0) + (estimates ? 1 : 0);
+  const extraCards = questions.filter((q) => q.type === 'availability' || q.type === 'image_pin').length;
+  const chartCount = chartQs.length + extraCards + (sourceTotal ? 1 : 0) + (estimates ? 1 : 0);
   const topClass =
     chartCount === 0
       ? ' rsp-sum-top--c0'
@@ -1144,6 +1147,14 @@ export function ResponsesSummary(props: SummaryProps) {
             onToggle={toggleAnswer}
           />
         ))}
+        {/* Wave C (ADR-065): when people are free, and where they pinned. */}
+        {questions.map((q) =>
+          q.type === 'availability' ? (
+            <AvailabilityHeatCard key={q.id} question={q} number={qNumbers.get(q.id) ?? 0} subs={subs} />
+          ) : q.type === 'image_pin' ? (
+            <PinCloudCard key={q.id} question={q} number={qNumbers.get(q.id) ?? 0} subs={subs} />
+          ) : null,
+        )}
         {sourceTotal ? (
           <ChartCard
             key={SOURCE_FILTER_ID}

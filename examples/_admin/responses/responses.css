@@ -1239,3 +1239,245 @@ body[data-slate-scale='3'] [data-slate-forms][data-theme-name='slate']:has(.slat
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
+
+/* ============================================================
+   Wave C answers (ADR-065): pins, voice, location, photos, week
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-pins {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-pins-photo {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  line-height: 0;
+  border: 1px solid var(--chrome-line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--chrome-panel-2);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-pins-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-pins-blank {
+  display: block;
+  aspect-ratio: 4 / 3;
+  background-image:
+    linear-gradient(var(--chrome-hair) 1px, transparent 1px),
+    linear-gradient(90deg, var(--chrome-hair) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-pin {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border: 2px solid var(--chrome-panel);
+  border-radius: 50%;
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgb(var(--slate-accent-rgb) / 0.35);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-pins-notes {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-pins-notes li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-pins-n {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-pins-moved {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-voice {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-voice-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 13px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-voice-audio {
+  width: min(100%, 340px);
+  height: 40px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-voice-len {
+  font-variant-numeric: tabular-nums;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-loc {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-loc-map {
+  flex: none;
+  width: 72px;
+  height: 72px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-loc-outer {
+  fill: var(--chrome-panel-2);
+  stroke: var(--chrome-line);
+  stroke-dasharray: 3 3;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-loc-area {
+  fill: rgb(var(--slate-accent-rgb) / 0.08);
+  stroke: rgb(var(--slate-accent-rgb) / 0.5);
+  stroke-width: 1.5;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-loc-home {
+  fill: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-loc-dot {
+  fill: var(--slate-accent);
+  stroke: var(--chrome-panel);
+  stroke-width: 2;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-loc-map--out .rsp-loc-dot {
+  fill: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-loc-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-shots {
+  display: grid;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-shots-count {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-shots-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-shot {
+  display: grid;
+  gap: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-shot-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-shot--missing .rsp-shot-label {
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-week {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-week-grid {
+  display: grid;
+  grid-template-columns: 44px repeat(var(--rsp-days), 22px);
+  gap: 2px;
+  font-size: 10px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-week-row {
+  display: contents;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-week-day {
+  text-align: center;
+  font-weight: 600;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-week-time {
+  text-align: right;
+  padding-right: 4px;
+  white-space: nowrap;
+  line-height: 12px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-week-cell {
+  height: 12px;
+  border-radius: 2px;
+  background: var(--chrome-panel-2);
+  border: 1px solid var(--chrome-hair);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-week-cell.is-on {
+  background: var(--slate-accent);
+  border-color: var(--slate-accent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-week-text {
+  white-space: pre-line;
+  min-width: 160px;
+}

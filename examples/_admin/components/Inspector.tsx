@@ -26,6 +26,14 @@ import {
   usePricing,
   withoutPrices,
 } from './InspectorWaveB.js';
+import {
+  AvailabilitySettings,
+  ImagePinSettings,
+  LocationSettings,
+  PictureStyleSetting,
+  VoiceNoteSettings,
+  YesNoStyleSetting,
+} from './InspectorWaveC.js';
 
 type Props = {
   question: Question;
@@ -225,6 +233,10 @@ export function Inspector({
               }
             />
           </Field>
+        )}
+
+        {question.type === 'yes_no' && (
+          <YesNoStyleSetting question={question} onChange={onChange} />
         )}
 
         {question.type === 'yes_no' && (
@@ -430,6 +442,48 @@ export function Inspector({
           <SignatureSettings question={question} onChange={onChange} />
         )}
 
+        {/* Wave C (ADR-065) */}
+        {question.type === 'image_pin' && <ImagePinSettings question={question} onChange={onChange} />}
+
+        {question.type === 'voice_note' && (
+          <VoiceNoteSettings question={question} onChange={onChange} />
+        )}
+
+        {question.type === 'location' && (
+          <LocationSettings
+            question={question}
+            onChange={onChange}
+            hasOutOfAreaRoute={routesOutOfArea(allQuestions, question.id)}
+            onAddOutOfAreaEnding={
+              onAddOutOfAreaEnding ? () => onAddOutOfAreaEnding(question.id) : undefined
+            }
+          />
+        )}
+
+        {question.type === 'availability' && (
+          <AvailabilitySettings question={question} onChange={onChange} />
+        )}
+
+        {question.type === 'photo_checklist' && (
+          <>
+            <Field
+              label="Photos to Take"
+              hint="One line per shot, in the order they should take them. Each opens the phone's camera."
+            >
+              <OptionsEditor
+                key={question.id}
+                options={question.items as Option[]}
+                onChange={(items) => onChange({ items } as Partial<Question>)}
+              />
+            </Field>
+            <Checkbox
+              checked={question.required !== false}
+              onChange={(v) => onChange({ required: v ? undefined : false } as Partial<Question>)}
+              label="Every Photo Is Required"
+            />
+          </>
+        )}
+
         {question.type === 'scale' && (
           <>
             <Row>
@@ -612,11 +666,14 @@ export function Inspector({
 
         {question.type === 'picture_choice' && (
           <>
-            <Checkbox
-              checked={Boolean(question.multiple)}
-              onChange={(v) => onChange({ multiple: v } as Partial<Question>)}
-              label="Allow Multiple Selections"
-            />
+            <PictureStyleSetting question={question} onChange={onChange} />
+            {question.display === 'swipe' ? null : (
+              <Checkbox
+                checked={Boolean(question.multiple)}
+                onChange={(v) => onChange({ multiple: v } as Partial<Question>)}
+                label="Allow Multiple Selections"
+              />
+            )}
             <Field label="Options (Label / Image URL)">
               <PictureOptionsEditor
                 key={question.id}
@@ -625,16 +682,18 @@ export function Inspector({
                 currency={currency}
               />
             </Field>
-            <OtherSetting question={question} onChange={onChange} />
+            {question.display === 'swipe' ? null : (
+              <OtherSetting question={question} onChange={onChange} />
+            )}
             {question.multiple && (
               <Row>
-                <Field label="Min Selections">
+                <Field label={question.display === 'swipe' ? 'Min Likes' : 'Min Selections'}>
                   <SlateNumberInput
                     value={question.min}
                     onChange={(n) => onChange({ min: n } as Partial<Question>)}
                   />
                 </Field>
-                <Field label="Max Selections">
+                <Field label={question.display === 'swipe' ? 'Max Likes' : 'Max Selections'}>
                   <SlateNumberInput
                     value={question.max}
                     onChange={(n) => onChange({ max: n } as Partial<Question>)}

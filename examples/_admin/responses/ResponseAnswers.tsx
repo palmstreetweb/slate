@@ -14,6 +14,13 @@ import { ResponseFileAnswer } from '../components/ResponseFileAnswer.js';
 import { signaturePathOf } from '@/logic/signature.js';
 import { answerText, isBlankAnswer } from './model.js';
 import { SignatureImage } from './SignatureImage.js';
+import {
+  AvailabilityAnswer,
+  LocationAnswer,
+  PhotoChecklistAnswer,
+  PinnedImage,
+  VoiceNoteAnswer,
+} from './WaveCAnswers.js';
 
 type Props = {
   /** Answer questions in schema order; numbering follows this array. */
@@ -31,6 +38,11 @@ const WIDE_TYPES = new Set<Question['type']>([
   'ranking',
   'address',
   'signature',
+  'image_pin',
+  'voice_note',
+  'location',
+  'photo_checklist',
+  'availability',
 ]);
 const WIDE_TEXT = 64;
 
@@ -72,6 +84,16 @@ export const ResponseAnswers = memo(function ResponseAnswers({
                 <div className="rsp-answer-v rsp-answer-v--signature">
                   <SignatureImage path={drawn} label={`Signature for “${titleOf(q)}”`} />
                 </div>
+              ) : q.type === 'image_pin' ? (
+                <PinnedImage question={q} value={value} />
+              ) : q.type === 'voice_note' ? (
+                <VoiceNoteAnswer value={value} />
+              ) : q.type === 'location' ? (
+                <LocationAnswer question={q} value={value} form={questions} />
+              ) : q.type === 'photo_checklist' ? (
+                <PhotoChecklistAnswer question={q} value={value} />
+              ) : q.type === 'availability' ? (
+                <AvailabilityAnswer question={q} value={value} text={text} />
               ) : (
                 <p className="rsp-answer-v slate-selectable">{text}</p>
               )}

@@ -1503,3 +1503,122 @@
 [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-estimate-range > span {
   white-space: nowrap;
 }
+
+/* ============================================================
+   Wave C (ADR-065): like rates, the availability heatmap, the pin map
+   ============================================================ */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-likes {
+  color: var(--chrome-red);
+  font-weight: 600;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heat-grid {
+  display: grid;
+  grid-template-columns: 48px repeat(var(--rsp-days), minmax(0, 1fr));
+  gap: 2px;
+  margin-top: 10px;
+  font-size: 10.5px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heat-row {
+  display: contents;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heat-day {
+  text-align: center;
+  font-weight: 600;
+  color: var(--chrome-ink);
+  padding-bottom: 2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heat-time {
+  text-align: right;
+  padding-right: 6px;
+  white-space: nowrap;
+  line-height: 16px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heat-cell {
+  height: 16px;
+  border-radius: 3px;
+  background: rgb(var(--slate-accent-rgb) / calc(0.1 + 0.9 * var(--h, 0)));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heat-cell.is-zero {
+  background: var(--chrome-panel-2);
+  box-shadow: inset 0 0 0 1px var(--chrome-hair);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heat-best {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heat-best li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heat-n {
+  color: var(--chrome-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-heat-empty {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pins-photo {
+  position: relative;
+  margin-top: 10px;
+  line-height: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--chrome-line);
+  background: var(--chrome-panel-2);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pins-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pins-blank {
+  display: block;
+  aspect-ratio: 4 / 3;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-pin {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: rgb(var(--slate-accent-rgb) / 0.55);
+  box-shadow: 0 0 0 1.5px var(--chrome-panel);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slate-forms]:not([data-reduced-motion])
+    .rsp-sum-chart[data-reveal='pending']
+    :is(.rsp-sum-heat-cell, .rsp-sum-pin) {
+    opacity: 0;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion])
+    .rsp-sum-chart[data-reveal='in']
+    :is(.rsp-sum-heat-cell, .rsp-sum-pin) {
+    animation: slate-fade-in-num 520ms ease-out calc(40ms + var(--rsp-i, 0) * 18ms) both;
+  }
+}

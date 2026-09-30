@@ -173,13 +173,15 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   /** Only the published cloud link embeds — a portable link isn't framable (ADR-054). */
   const doCopyEmbed = useCallback(async () => {
     if (!productionUrl) return;
-    const ok = await copyText(buildEmbedSnippet(productionUrl, formName));
+    const ok = await copyText(
+      buildEmbedSnippet(productionUrl, formName, (form?.publishedSchema ?? schema).questions),
+    );
     if (ok) {
       playUiSound('copy');
       setEmbedCopied(true);
       window.setTimeout(() => setEmbedCopied(false), 2000);
     }
-  }, [productionUrl, formName]);
+  }, [productionUrl, formName, form?.publishedSchema, schema]);
 
   const onCopyQr = useCallback(async () => {
     if (!qr) return;

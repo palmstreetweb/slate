@@ -4,6 +4,7 @@
  * current origin — localStorage-backed, same-browser only.
  */
 
+import type { Question } from '@/index.js';
 import { hrefFor } from './_router.js';
 
 /** Turn a form name into a URL-safe slug segment. */
@@ -89,10 +90,22 @@ function escapeHtmlAttr(raw: string): string {
  * page's footer line and posts `{ type: 'slate:height', height }` to the host
  * page so its own script can size the frame. The form name is only a title.
  */
-export function buildEmbedSnippet(publicUrl: string, formName: string): string {
+export function buildEmbedSnippet(
+  publicUrl: string,
+  formName: string,
+  questions: ReadonlyArray<Question> = [],
+): string {
   const src = escapeHtmlAttr(`${publicUrl}${publicUrl.includes('?') ? '&' : '?'}embed=1`);
   const title = escapeHtmlAttr(formName.trim() || 'Form');
-  return `<iframe src="${src}" title="${title}" style="width:100%;min-height:560px;border:0" loading="lazy"></iframe>`;
+  // A voice note needs the microphone and "Use my location" geolocation (ADR-065).
+  // A cross-origin frame only gets them when the host delegates them, and the
+  // browser still asks the respondent. Forms without either ask for nothing.
+  const allow = [
+    ...(questions.some((q) => q.type === 'voice_note') ? ['microphone'] : []),
+    ...(questions.some((q) => q.type === 'location') ? ['geolocation'] : []),
+  ];
+  const allowAttr = allow.length ? ` allow="${allow.join('; ')}"` : '';
+  return `<iframe src="${src}" title="${title}"${allowAttr} style="width:100%;min-height:560px;border:0" loading="lazy"></iframe>`;
 }
 
 /** Hash-route preview — schema from localStorage on this device only. */

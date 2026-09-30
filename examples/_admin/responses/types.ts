@@ -82,6 +82,8 @@ export type Distribution = {
    * first. They are counted together in one "Other" row.
    */
   others?: Array<{ text: string; count: number }>;
+  /** Swipe cards (ADR-065): rows are like rates — `pct` is the share who liked that card. */
+  likes?: boolean;
 };
 
 export type Kpis = {

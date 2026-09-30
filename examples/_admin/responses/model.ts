@@ -16,9 +16,17 @@ import {
   postalOf,
   serviceAreaPrefixes,
 } from '@/logic/address.js';
+import { pinsOf } from '@/logic/pins.js';
+import { voiceAudioOf } from '@/logic/media.js';
+import { availabilityGrid, decodeAvailability, type AvailabilityGrid } from '@/logic/availability.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import type { TrackedSource } from '../_formsStore.js';
-import { formatAnswerForQuestion, formatRelativeAge, titleOf } from '../responsesFormat.js';
+import {
+  formatAnswerForQuestion,
+  formatRelativeAge,
+  locationAreaOf,
+  titleOf,
+} from '../responsesFormat.js';
 import { sourceLabel, sourceOf } from '../trackedLinks.js';
 import type {
   AnswerFilter,
@@ -362,7 +370,26 @@ export function answerValues(value: unknown): string[] {
 }
 
 export function hasFiles(sub: StoredSubmission, questions: ReadonlyArray<Question>): boolean {
-  return questions.some((q) => q.type === 'file_upload' && !isBlankAnswer(sub.answers[q.id]));
+  return questions.some((q) => fileRefsOf(q, sub.answers[q.id]).length > 0);
+}
+
+/**
+ * Stored files in one answer: a file upload's items, a voice note's
+ * recording, a photo checklist's photos (ADR-065).
+ */
+export function fileRefsOf(q: Question, value: unknown): string[] {
+  if (q.type === 'file_upload') return answerValues(value);
+  if (q.type === 'voice_note') {
+    const ref = voiceAudioOf(value);
+    return ref ? [ref] : [];
+  }
+  if (q.type === 'photo_checklist' && value && typeof value === 'object' && !Array.isArray(value)) {
+    const a = value as Record<string, unknown>;
+    return q.items
+      .map((i) => a[i.value])
+      .filter((r): r is string => typeof r === 'string' && r !== '');
+  }
+  return [];
 }
 
 /* ---------- source (ADR-063) ---------- */
@@ -438,6 +465,18 @@ export function answerMatchesFilter(
 ): boolean {
   if (filter.questionId === SOURCE_FILTER_ID) return subSource(sub) === filter.value;
   const value = sub.answers[filter.questionId];
+  // Location (ADR-065): in / out of the service area, or no verdict.
+  if (question?.type === 'location') {
+    const area = locationAreaOf(question, value);
+    if (filter.value === IN_AREA_VALUE) return area === 'in';
+    if (filter.value === OUT_OF_AREA_VALUE) return area === 'out';
+    return area === null && !isBlankAnswer(value);
+  }
+  // Photo checklist (ADR-065): this shot has a photo.
+  if (question?.type === 'photo_checklist') {
+    const a = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+    return typeof a[filter.value] === 'string' && a[filter.value] !== '';
+  }
   // Address (ADR-064): in / out of the service area, or one ZIP code.
   if (question?.type === 'address') {
     if (filter.value === IN_AREA_VALUE || filter.value === OUT_OF_AREA_VALUE) {
@@ -554,6 +593,9 @@ export function chartableQuestions(questions: ReadonlyArray<Question>): Question
   return questions.filter((q) => {
     // Addresses chart by ZIP, or in / out of the service area (ADR-064).
     if (q.type === 'address') return true;
+    // Locations chart in / out of the area; checklists by shot (ADR-065).
+    if (q.type === 'location') return true;
+    if (q.type === 'photo_checklist') return q.items.length > 0;
     if (OPTION_TYPES.has(q.type)) return (choiceOptions(q)?.length ?? 0) > 0;
     if (q.type === 'yes_no' || q.type === 'scale' || q.type === 'nps') return true;
     if (q.type === 'number') return numericDomain(q) !== null;
@@ -579,6 +621,11 @@ export function questionDistribution(
   subs: ReadonlyArray<StoredSubmission>,
 ): Distribution {
   if (question.type === 'address') return addressDistribution(question, subs);
+  if (question.type === 'location') return locationDistribution(question, subs);
+  if (question.type === 'photo_checklist') return checklistDistribution(question, subs);
+  if (question.type === 'picture_choice' && question.display === 'swipe') {
+    return likeDistribution(question, subs);
+  }
   if (isNumericQuestion(question)) {
     const counts = new Map<number, number>();
     let answered = 0;
@@ -728,6 +775,177 @@ function addressDistribution(
     average: null,
     ...(area.length ? { others: byCount.map(([, z]) => z) } : {}),
   };
+}
+
+/* ---------- Wave C (ADR-065) ---------- */
+
+/** "Unknown" location rows: a typed place, or a position the form can't check. */
+export const LOCATION_UNKNOWN = '@unknown';
+
+/** Locations: inside / outside the service area, and no verdict (typed, or no radius). */
+function locationDistribution(
+  question: Extract<Question, { type: 'location' }>,
+  subs: ReadonlyArray<StoredSubmission>,
+): Distribution {
+  let inside = 0;
+  let outside = 0;
+  let unknown = 0;
+  for (const s of subs) {
+    const value = s.answers[question.id];
+    if (isBlankAnswer(value)) continue;
+    const area = locationAreaOf(question, value);
+    if (area === 'in') inside++;
+    else if (area === 'out') outside++;
+    else unknown++;
+  }
+  const answered = inside + outside + unknown;
+  const pct = (n: number) => (answered ? Math.round((n / answered) * 100) : 0);
+  const rows: DistributionRow[] = [
+    { value: IN_AREA_VALUE, label: 'In area', count: inside, pct: pct(inside) },
+    { value: OUT_OF_AREA_VALUE, label: 'Out of area', count: outside, pct: pct(outside) },
+    ...(unknown
+      ? [{ value: LOCATION_UNKNOWN, label: 'Not checked', count: unknown, pct: pct(unknown) }]
+      : []),
+  ];
+  return {
+    questionId: question.id,
+    kind: 'choice',
+    answered,
+    rows,
+    max: Math.max(1, ...rows.map((r) => r.count)),
+    average: null,
+  };
+}
+
+/** Photo checklists: how many responses have each shot, in the owner's order. */
+function checklistDistribution(
+  question: Extract<Question, { type: 'photo_checklist' }>,
+  subs: ReadonlyArray<StoredSubmission>,
+): Distribution {
+  const counts = new Map<string, number>();
+  let answered = 0;
+  for (const s of subs) {
+    const refs = fileRefsOf(question, s.answers[question.id]);
+    if (!refs.length) continue;
+    answered++;
+    const a = s.answers[question.id] as Record<string, unknown>;
+    for (const i of question.items) {
+      if (typeof a[i.value] === 'string' && a[i.value] !== '') {
+        counts.set(i.value, (counts.get(i.value) ?? 0) + 1);
+      }
+    }
+  }
+  const rows = question.items.map((i) => {
+    const count = counts.get(i.value) ?? 0;
+    return { value: i.value, label: i.label, count, pct: answered ? Math.round((count / answered) * 100) : 0 };
+  });
+  return {
+    questionId: question.id,
+    kind: 'choice',
+    answered,
+    rows,
+    max: Math.max(1, ...rows.map((r) => r.count)),
+    average: null,
+  };
+}
+
+/**
+ * Swipe cards: the like rate per card. Everyone who finished the deck saw
+ * every card, so an empty list (liked nothing) still counts as answered.
+ */
+function likeDistribution(
+  question: Extract<Question, { type: 'picture_choice' }>,
+  subs: ReadonlyArray<StoredSubmission>,
+): Distribution {
+  const counts = new Map<string, number>();
+  let answered = 0;
+  for (const s of subs) {
+    const raw = s.answers[question.id];
+    if (!Array.isArray(raw)) continue;
+    answered++;
+    const liked = new Set<string>();
+    for (const x of raw as unknown[]) if (typeof x === 'string') liked.add(x);
+    liked.forEach((v) => counts.set(v, (counts.get(v) ?? 0) + 1));
+  }
+  const rows = question.options
+    .map((o, i) => {
+      const count = counts.get(o.value) ?? 0;
+      return {
+        row: { value: o.value, label: o.label, count, pct: answered ? Math.round((count / answered) * 100) : 0 },
+        i,
+      };
+    })
+    .sort((a, b) => b.row.count - a.row.count || a.i - b.i)
+    .map((x) => x.row);
+  return {
+    questionId: question.id,
+    kind: 'choice',
+    answered,
+    rows,
+    max: Math.max(1, answered),
+    average: null,
+    likes: true,
+  };
+}
+
+/** Availability across responses: how many are free in each slot, and the best times. */
+export type AvailabilityHeat = {
+  grid: AvailabilityGrid;
+  /** Responses that painted anything. */
+  answered: number;
+  /** day → count per slot. */
+  counts: Map<string, number[]>;
+  max: number;
+  /** Up to three slots most people share, most first. */
+  best: Array<{ day: string; slot: number; count: number }>;
+};
+
+export function availabilityHeat(
+  question: Extract<Question, { type: 'availability' }>,
+  subs: ReadonlyArray<StoredSubmission>,
+): AvailabilityHeat {
+  const grid = availabilityGrid(question as unknown as Record<string, unknown>);
+  const counts = new Map(grid.days.map((d) => [d, Array.from({ length: grid.count }, () => 0)]));
+  let answered = 0;
+  for (const s of subs) {
+    const picked = decodeAvailability(grid, s.answers[question.id]);
+    if (picked.size === 0) continue;
+    answered++;
+    picked.forEach((slots, day) => {
+      const row = counts.get(day);
+      if (row) slots.forEach((i) => (row[i] = (row[i] ?? 0) + 1));
+    });
+  }
+  let max = 0;
+  const all: Array<{ day: string; slot: number; count: number }> = [];
+  counts.forEach((row, day) =>
+    row.forEach((count, slot) => {
+      max = Math.max(max, count);
+      if (count > 0) all.push({ day, slot, count });
+    }),
+  );
+  const dayOrder = new Map(grid.days.map((d, i) => [d, i]));
+  all.sort(
+    (a, b) => b.count - a.count || dayOrder.get(a.day)! - dayOrder.get(b.day)! || a.slot - b.slot,
+  );
+  return { grid, answered, counts, max, best: all.slice(0, 3) };
+}
+
+/** Every pin from every response, for the Summary's "where people pinned" map. */
+export function pinCloud(
+  question: Extract<Question, { type: 'image_pin' }>,
+  subs: ReadonlyArray<StoredSubmission>,
+  limit = 600,
+): { answered: number; pins: Array<{ x: number; y: number }> } {
+  const pins: Array<{ x: number; y: number }> = [];
+  let answered = 0;
+  for (const s of subs) {
+    const list = pinsOf(s.answers[question.id]);
+    if (!list.length) continue;
+    answered++;
+    for (const p of list) if (pins.length < limit) pins.push({ x: p.x, y: p.y });
+  }
+  return { answered, pins };
 }
 
 /** Estimates across responses (ADR-064), for the Summary's estimate card. */

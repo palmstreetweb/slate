@@ -39,12 +39,31 @@ function decodeUtf8(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes);
 }
 
+/**
+ * A pin-the-spot photo uploaded in the studio rides in the schema as a
+ * `data:` image (ADR-065). The portable reader drops those anyway (only https
+ * images survive `sanitizeUntrustedSchema`), so leave them out of the link.
+ */
+function withoutUploadedImages(schema: Schema): Schema {
+  if (!schema.questions.some((q) => q.type === 'image_pin' && q.image?.startsWith('data:'))) {
+    return schema;
+  }
+  return {
+    ...schema,
+    questions: schema.questions.map((q) => {
+      if (q.type !== 'image_pin' || !q.image?.startsWith('data:')) return q;
+      const { image: _dropped, ...rest } = q;
+      return rest;
+    }),
+  };
+}
+
 /** Serialize schema (+ optional metadata) to a URL-safe token. */
 export function encodePortableSchema(
   schema: Schema,
   meta?: { formId?: string; name?: string },
 ): string {
-  const payload: PortablePayload = { v: 1, schema, ...meta };
+  const payload: PortablePayload = { v: 1, schema: withoutUploadedImages(schema), ...meta };
   const json = JSON.stringify(payload);
   return toBase64Url(encodeUtf8(json));
 }

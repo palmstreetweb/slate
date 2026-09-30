@@ -29,7 +29,7 @@ import type { InboxProps } from './types.js';
 import {
   DIRECT_SOURCE,
   answerPreview,
-  answerValues,
+  fileRefsOf,
   dayGroups,
   firstName,
   formatDuration,
@@ -183,9 +183,7 @@ function ordinal(n: number): string {
 
 function fileCount(sub: StoredSubmission, questions: ReadonlyArray<Question>): number {
   let n = 0;
-  for (const q of questions) {
-    if (q.type === 'file_upload') n += answerValues(sub.answers[q.id]).length;
-  }
+  for (const q of questions) n += fileRefsOf(q, sub.answers[q.id]).length;
   return n;
 }
 

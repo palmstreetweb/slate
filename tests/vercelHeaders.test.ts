@@ -328,8 +328,11 @@ describe('vercel.json framing (ADR-054)', () => {
       const h = headersFor(path);
       expect(h.get('x-content-type-options')).toEqual(['nosniff']);
       expect(h.get('referrer-policy')).toEqual(['strict-origin-when-cross-origin']);
+      // Wave C (ADR-065): voice notes need the microphone and "Use my location"
+      // the geolocation API, on our own origin only; the browser still asks the
+      // respondent, and only after a tap.
       expect(h.get('permissions-policy')).toEqual([
-        'camera=(self), microphone=(), geolocation=(), payment=()',
+        'camera=(self), microphone=(self), geolocation=(self), payment=()',
       ]);
       expect(h.get('strict-transport-security')).toEqual(['max-age=31536000; includeSubDomains']);
     },

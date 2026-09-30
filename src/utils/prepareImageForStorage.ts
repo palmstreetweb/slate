@@ -23,6 +23,16 @@ const PROFILES = {
     outName: 'photo.jpg' as const,
     qualityStart: 0.75,
   },
+  /**
+   * The photo on a pin-the-spot question (ADR-065). It travels inside the
+   * published schema, so it is small: 1,200 px on the long edge, ~110 KB.
+   */
+  pin: {
+    maxEdge: 1200,
+    maxBytes: 110_000,
+    outName: 'pin.jpg' as const,
+    qualityStart: 0.72,
+  },
 } as const;
 
 export type ImageStorageProfile = keyof typeof PROFILES;
