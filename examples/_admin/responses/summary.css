@@ -1456,3 +1456,50 @@
 [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-c-source {
   color: var(--chrome-muted);
 }
+
+/* ---------- Instant estimates card (ADR-064) ---------- */
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-estimate-body {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
+  padding: 10px 0 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-estimate-stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-estimate-value {
+  font-size: 24px;
+  line-height: 30px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-estimate-range {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--chrome-ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 719px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-estimate-body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-slate-forms][data-theme-name='slate']
+    .slate-rsp
+    .rsp-sum
+    .rsp-sum-estimate-stat:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-sum-estimate-range > span {
+  white-space: nowrap;
+}

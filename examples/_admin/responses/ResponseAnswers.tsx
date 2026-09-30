@@ -11,7 +11,9 @@ import { memo } from 'react';
 import type { Question } from '@/index.js';
 import { titleOf } from '../responsesFormat.js';
 import { ResponseFileAnswer } from '../components/ResponseFileAnswer.js';
+import { signaturePathOf } from '@/logic/signature.js';
 import { answerText, isBlankAnswer } from './model.js';
+import { SignatureImage } from './SignatureImage.js';
 
 type Props = {
   /** Answer questions in schema order; numbering follows this array. */
@@ -22,7 +24,14 @@ type Props = {
 };
 
 /** Always full width in the grid layout. */
-const WIDE_TYPES = new Set<Question['type']>(['long_text', 'file_upload', 'matrix', 'ranking']);
+const WIDE_TYPES = new Set<Question['type']>([
+  'long_text',
+  'file_upload',
+  'matrix',
+  'ranking',
+  'address',
+  'signature',
+]);
 const WIDE_TEXT = 64;
 
 export const ResponseAnswers = memo(function ResponseAnswers({
@@ -36,6 +45,8 @@ export const ResponseAnswers = memo(function ResponseAnswers({
       {questions.map((q, i) => {
         const value = answers[q.id];
         const isFile = q.type === 'file_upload';
+        // A drawn signature shows the drawing itself (ADR-064).
+        const drawn = q.type === 'signature' ? signaturePathOf(value) : null;
         const text = isFile ? '' : answerText(q, value);
         const empty = isFile ? isBlankAnswer(value) : text === '';
         const wide =
@@ -56,6 +67,10 @@ export const ResponseAnswers = memo(function ResponseAnswers({
               ) : isFile ? (
                 <div className="rsp-answer-v rsp-answer-v--files">
                   <ResponseFileAnswer value={value} />
+                </div>
+              ) : drawn ? (
+                <div className="rsp-answer-v rsp-answer-v--signature">
+                  <SignatureImage path={drawn} label={`Signature for “${titleOf(q)}”`} />
                 </div>
               ) : (
                 <p className="rsp-answer-v slate-selectable">{text}</p>

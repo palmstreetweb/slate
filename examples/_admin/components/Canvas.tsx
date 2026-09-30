@@ -25,6 +25,7 @@ import { hostFileUpload } from '../hostFileUpload.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
 import { clearUploadContext, setUploadContext } from '../uploadContext.js';
 import { TYPE_LABEL } from '../questionTypeMeta.js';
+import { sampleEstimate } from '../estimatePreview.js';
 
 import '@/styles/tokens.css';
 import '@/styles/toggle.css';
@@ -67,6 +68,12 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
     const idx = visible.findIndex((q) => q.id === selectedQuestion.id);
     return idx >= 0 ? idx : 0;
   }, [visible, selectedQuestion.id]);
+
+  // An ending that shows the estimate previews it with sample answers (ADR-064).
+  const previewEstimate = useMemo(
+    () => (selectedQuestion.type === 'thanks' ? sampleEstimate(schema) : null),
+    [schema, selectedQuestion.type],
+  );
 
   const decoration = resolveThemeDecoration(schema.theme);
   const progressPct = progressFn(visible, stepIndex);
@@ -176,6 +183,9 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
                 onRestart={noop}
                 onFileUpload={hostFileUpload}
                 resolveFileUploadMeta={resolveUploadMeta}
+                allQuestions={schema.questions}
+                estimate={previewEstimate}
+                estimateSettings={schema.estimate}
               />
             </div>
           </div>

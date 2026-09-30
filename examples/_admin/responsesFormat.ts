@@ -7,6 +7,9 @@ import type { Question } from '@/index.js';
 import { describeFileUploadAnswer, isFileUploadRef } from '@/index.js';
 import { allowsOther, otherLabelOf } from '@/logic/other.js';
 import { formatDateAnswer } from '@/logic/dateValue.js';
+import { areaStatus, formatAddress, serviceAreaPrefixes } from '@/logic/address.js';
+import { CONTACT_FIELDS } from '@/logic/contact.js';
+import { signaturePathOf, signatureTypedOf } from '@/logic/signature.js';
 import { peekLocalUploadMeta } from './localFileStore.js';
 import { safeText } from './answerShape.js';
 
@@ -149,9 +152,79 @@ function formatAnswer(question: Question, value: unknown): string {
       }
       return safeText(value);
 
+    case 'contact_info': {
+      // One part per line: "Ada Lovelace\nada@example.com\n+18055550100".
+      if (typeof value !== 'object' || Array.isArray(value)) return safeText(value);
+      const parts = CONTACT_FIELDS.map((f) => (value as Record<string, unknown>)[f])
+        .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+        .map((v) => v.trim());
+      return parts.length ? parts.join('\n') : '—';
+    }
+
+    case 'address': {
+      const line = formatAddress(value);
+      if (!line) return typeof value === 'object' ? '—' : safeText(value);
+      const status = areaStatus(value, serviceAreaPrefixes(question.serviceArea));
+      return status === 'out' ? `${line} (outside service area)` : line;
+    }
+
+    case 'signature': {
+      const typed = signatureTypedOf(value);
+      if (typed) return `Typed: ${typed}`;
+      if (signaturePathOf(value)) return 'Signed';
+      return safeText(value) || '—';
+    }
+
     default:
       return safeText(value);
   }
+}
+
+/**
+ * Spreadsheet columns for an answer made of parts (ADR-064): a contact block
+ * becomes Name / Email / Phone, an address Street / Unit / City / State / ZIP
+ * (/ Country, / In service area). Null for one-column answers.
+ */
+export function csvParts(
+  question: Question,
+): Array<{ key: string; label: string; cell: (value: unknown) => string }> | null {
+  const part = (value: unknown, key: string): string => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+    const v = (value as Record<string, unknown>)[key];
+    return typeof v === 'string' ? v.trim() : '';
+  };
+  if (question.type === 'contact_info') {
+    return [
+      { key: 'name', label: 'Name', cell: (v) => part(v, 'name') },
+      { key: 'email', label: 'Email', cell: (v) => part(v, 'email') },
+      { key: 'phone', label: 'Phone', cell: (v) => part(v, 'phone') },
+    ];
+  }
+  if (question.type === 'address') {
+    const us = (question.format ?? 'us') === 'us';
+    const cols: Array<{ key: string; label: string; cell: (value: unknown) => string }> = [
+      { key: 'street', label: 'Street', cell: (v) => part(v, 'street') },
+      { key: 'line2', label: 'Unit', cell: (v) => part(v, 'line2') },
+      { key: 'city', label: 'City', cell: (v) => part(v, 'city') },
+      { key: 'region', label: us ? 'State' : 'Region', cell: (v) => part(v, 'region') },
+      { key: 'postal', label: us ? 'ZIP' : 'Postal code', cell: (v) => part(v, 'postal') },
+    ];
+    if (question.country)
+      cols.push({ key: 'country', label: 'Country', cell: (v) => part(v, 'country') });
+    const area = serviceAreaPrefixes(question.serviceArea);
+    if (area.length) {
+      cols.push({
+        key: 'area',
+        label: 'In service area',
+        cell: (v) => {
+          const status = areaStatus(v, area);
+          return status === 'in' ? 'Yes' : status === 'out' ? 'No' : '';
+        },
+      });
+    }
+    return cols;
+  }
+  return null;
 }
 
 type LeadPreview = { primary: string; secondary: string };
@@ -167,6 +240,7 @@ export function leadPreview(
   });
 
   const score = (q: Question): number => {
+    if (q.type === 'contact_info') return 11;
     if (q.type === 'short_text') return 10;
     if (q.type === 'email') return 9;
     if (q.type === 'phone') return 8;
@@ -223,6 +297,11 @@ export function formatDurationMs(ms: number): string {
 export function formatAnswerForCsv(question: Question, value: unknown): string {
   // Numbers stay numbers in a spreadsheet: no prefix or unit (ADR-063).
   if (question.type === 'number' && typeof value === 'number') return String(value);
+  // The drawing itself stays in the app; the sheet says it was signed (ADR-064).
+  if (question.type === 'signature') {
+    const typed = signatureTypedOf(value);
+    return typed ? `Typed: ${typed}` : signaturePathOf(value) ? 'Signed (drawn)' : '';
+  }
   const formatted = formatAnswerForQuestion(question, value);
   if (formatted === '—') return '';
   return formatted.replace(/\n/g, '; ');

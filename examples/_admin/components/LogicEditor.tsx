@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import type { Condition, LogicRule, Question } from '@/index.js';
 import { OTHER_VALUE } from '@/index.js';
 import { allowsOther, otherLabelOf } from '@/logic/other.js';
+import { IN_AREA_VALUE, OUT_OF_AREA_VALUE, hasServiceArea } from '@/logic/address.js';
 import { SlateSelect } from './SlateSelect.js';
 
 function isCompleteJumpRule(rule: LogicRule): boolean {
@@ -54,8 +55,16 @@ const CHOICE_TYPES = new Set([
   'ranking',
 ]);
 
+/** Answers that are a group of parts (ADR-064): only "blank" / "has an answer" apply. */
+const PART_TYPES = new Set(['contact_info', 'address', 'signature']);
+
 function opsForQuestion(q: Question | undefined): LeafOp[] {
   if (!q) return ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
+  // An address with a service area can also be tested in / out of the area.
+  if (q.type === 'address' && hasServiceArea(q)) {
+    return ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
+  }
+  if (PART_TYPES.has(q.type)) return ['is_empty', 'is_not_empty'];
   if (NUMERIC_TYPES.has(q.type)) {
     return ['equals', 'not_equals', 'gt', 'lt', 'gte', 'lte', 'is_empty', 'is_not_empty'];
   }
@@ -115,6 +124,14 @@ function optionsFor(
         { label: q.acceptLabel ?? 'I accept', value: 'accept' },
         { label: q.declineLabel ?? "I don't accept", value: 'decline' },
       ];
+    case 'address':
+      // The service-area check (ADR-064): matches the ZIP against the owner's list.
+      return hasServiceArea(q)
+        ? [
+            { label: 'Outside the service area', value: OUT_OF_AREA_VALUE },
+            { label: 'Inside the service area', value: IN_AREA_VALUE },
+          ]
+        : null;
     default:
       return null;
   }

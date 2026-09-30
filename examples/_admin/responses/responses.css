@@ -1182,3 +1182,60 @@ body[data-slate-scale='3'] [data-slate-forms][data-theme-name='slate']:has(.slat
     transition: none !important;
   }
 }
+
+/* ---------- Wave B (ADR-064): signatures and estimate breakdowns ---------- */
+
+/* A drawn signature: the stored strokes in ink, on a quiet card with its baseline. */
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-answer-v--signature {
+  white-space: normal;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-signature {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  aspect-ratio: 5 / 2;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 10px;
+  background: var(--chrome-panel-2);
+  color: var(--chrome-ink);
+  box-sizing: border-box;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-estimate-lines {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-estimate-lines li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-estimate-line-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-estimate-qty {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-estimate-line-amount {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}

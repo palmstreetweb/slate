@@ -7,6 +7,7 @@ import type { StoredSubmission } from './_submissionStore.js';
 import type { TrackedSource } from './_formsStore.js';
 import { sourceLabel, sourceOf } from './trackedLinks.js';
 import {
+  csvParts,
   formatAnswerForCsv,
   formatAnswerForQuestion,
   formatDurationMs,
@@ -46,6 +47,8 @@ type CsvColumn = {
   id: string;
   title: string;
   question: Question | null;
+  /** One part of a multi-part answer (contact, address — ADR-064). */
+  cell?: (value: unknown) => string;
 };
 
 /** Schema questions plus any answer keys that no longer exist on the form. */
@@ -58,7 +61,17 @@ export function buildCsvColumns(questions: Question[], subs: StoredSubmission[])
     }
   }
   return [
-    ...questions.map((q) => ({ id: q.id, title: titleOf(q), question: q })),
+    ...questions.flatMap((q): CsvColumn[] => {
+      // A contact block or an address gets a column per part (ADR-064).
+      const parts = csvParts(q);
+      if (!parts) return [{ id: q.id, title: titleOf(q), question: q }];
+      return parts.map((p) => ({
+        id: q.id,
+        title: `${titleOf(q)} — ${p.label}`,
+        question: q,
+        cell: p.cell,
+      }));
+    }),
     ...extraIds.map((id) => ({
       id,
       title: `(removed) ${id}`,
@@ -68,6 +81,7 @@ export function buildCsvColumns(questions: Question[], subs: StoredSubmission[])
 }
 
 function formatCell(column: CsvColumn, value: unknown): string {
+  if (column.cell) return column.cell(value);
   if (column.question) return formatAnswerForCsv(column.question, value);
   if (value === undefined || value === null || value === '') return '';
   // Best-effort for removed questions (may still be a file ref).
@@ -86,13 +100,30 @@ export function buildResponsesCsv(
 ): string {
   const columns = buildCsvColumns(questions, subs);
   const questionHeaders = uniqueColumnTitles(columns.map((c) => c.title));
+  // Instant estimate (ADR-064): plain numbers, low and high, when any response has one.
+  const estimated = subs.find((s) => s.meta?.estimate)?.meta.estimate;
+  const estimateHeaders = estimated
+    ? [`Estimate low (${estimated.currency})`, `Estimate high (${estimated.currency})`]
+    : [];
   // Where each response came from (ADR-063): the tracked link's name, "Direct" otherwise.
-  const headers = ['Submitted', 'Time spent', 'Score', 'Source', ...questionHeaders];
+  const headers = [
+    'Submitted',
+    'Time spent',
+    'Score',
+    ...estimateHeaders,
+    'Source',
+    ...questionHeaders,
+  ];
 
   const rows = subs.map((s) => [
     formatSubmittedAt(s.receivedAt),
     formatDurationMs(s.meta.durationMs),
     s.meta.score != null ? String(s.meta.score) : '',
+    ...(estimated
+      ? s.meta?.estimate
+        ? [String(s.meta.estimate.low), String(s.meta.estimate.high)]
+        : ['', '']
+      : []),
     sourceLabel(sourceOf(s.meta?.hiddenFields), trackedSources),
     ...columns.map((c) => formatCell(c, s.answers[c.id])),
   ]);

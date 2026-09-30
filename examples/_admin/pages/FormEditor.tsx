@@ -49,6 +49,7 @@ import { SharePanel } from '../components/SharePanel.js';
 import { useEditorHistory } from '../useEditorHistory.js';
 import { clampOutlineDropIndex, resolveOutlineInsertIndex } from '../outlineDropIndex.js';
 import { uniqueQuestionId } from '../questionIds.js';
+import { withOutOfAreaEnding } from '../outOfArea.js';
 import { sanitizeSchemaLogic } from '../sanitizeSchema.js';
 import { slugify } from '../shareUrls.js';
 import { withBrandLogo } from '../brandLogo.js';
@@ -352,7 +353,9 @@ function FormEditorBody({ formId }: { formId: string }) {
 
   const isWelcome = selectedQuestion.type === 'welcome';
   const isThanks = selectedQuestion.type === 'thanks';
-  const canDelete = !isWelcome && !isThanks;
+  // An extra ending (e.g. "out of area", ADR-064) can go; the last one stays.
+  const endingCount = schema.questions.filter((q) => q.type === 'thanks').length;
+  const canDelete = !isWelcome && (!isThanks || endingCount > 1);
 
   /* ---------- mutations ---------- */
 
@@ -443,12 +446,32 @@ function FormEditorBody({ formId }: { formId: string }) {
     });
   };
 
+  /**
+   * An "out of area" ending for an address with a service area (ADR-064): a
+   * Thank You screen shown only outside the area, placed before the other
+   * endings, and a jump to it from the address so the rest is skipped.
+   */
+  const addOutOfAreaEnding = (addressId: string) => {
+    const { questions, endingId } = withOutOfAreaEnding(schema.questions, addressId);
+    pushHistory();
+    setSchema((s) => (s ? { ...s, questions } : s));
+    setSelectedId(endingId);
+    toast.push({
+      title: 'Out-of-area ending added',
+      detail: 'Addresses outside your list skip to it.',
+      tone: 'success',
+    });
+  };
+
   const removeQuestion = (id: string) => {
     pushHistory();
     setSchema((s) => {
       if (!s) return s;
       const q = s.questions.find((item) => item.id === id);
-      if (!q || q.type === 'welcome' || q.type === 'thanks') return s;
+      if (!q || q.type === 'welcome') return s;
+      if (q.type === 'thanks' && s.questions.filter((item) => item.type === 'thanks').length < 2) {
+        return s;
+      }
       return { ...s, questions: s.questions.filter((item) => item.id !== id) };
     });
   };
@@ -903,6 +926,9 @@ function FormEditorBody({ formId }: { formId: string }) {
               question={selectedQuestion}
               allQuestions={schema.questions}
               onChange={(patch) => updateQuestion(selectedQuestion.id, patch)}
+              estimate={schema.estimate}
+              onEstimateChange={(next) => patchSchema({ estimate: next })}
+              onAddOutOfAreaEnding={addOutOfAreaEnding}
               onDelete={async () => {
                 const titleText =
                   'title' in selectedQuestion && typeof selectedQuestion.title === 'string'

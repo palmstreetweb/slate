@@ -12,7 +12,7 @@
  * Anything else is dropped. Never throws.
  */
 
-import type { Answers } from '@/index.js';
+import type { Answers, Estimate, EstimateLine } from '@/index.js';
 import type { StoredSubmission } from './_submissionStore.js';
 
 const MAX_KEYS = 200;
@@ -85,6 +85,44 @@ function finiteNumber(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
 
+const MONEY_MAX = 1_000_000_000;
+
+function money(v: unknown): number | undefined {
+  const n = finiteNumber(v);
+  return n === undefined ? undefined : Math.max(-MONEY_MAX, Math.min(MONEY_MAX, n));
+}
+
+/**
+ * A stored estimate (ADR-064), or undefined for anything that isn't one. The
+ * submit Function writes it, but rows are still untrusted text on load.
+ */
+export function normalizeEstimate(raw: unknown): Estimate | undefined {
+  if (!isPlainObject(raw)) return undefined;
+  const low = money(raw.low);
+  const high = money(raw.high);
+  if (low === undefined || high === undefined) return undefined;
+  const currency =
+    typeof raw.currency === 'string' && /^[A-Z]{3}$/.test(raw.currency) ? raw.currency : 'USD';
+  const lines: EstimateLine[] = [];
+  if (Array.isArray(raw.lines)) {
+    for (const item of raw.lines.slice(0, 40)) {
+      if (!isPlainObject(item)) continue;
+      const lo = money(item.low);
+      const hi = money(item.high);
+      if (lo === undefined || hi === undefined || typeof item.label !== 'string') continue;
+      const qty = finiteNumber(item.qty);
+      lines.push({
+        id: typeof item.id === 'string' ? item.id.slice(0, 64) : '',
+        label: item.label.slice(0, 120),
+        ...(qty !== undefined ? { qty } : {}),
+        low: lo,
+        high: Math.max(lo, hi),
+      });
+    }
+  }
+  return { low, high: Math.max(low, high), currency, lines };
+}
+
 export function normalizeMeta(raw: unknown): StoredSubmission['meta'] {
   const m = isPlainObject(raw) ? raw : {};
   const hidden: Record<string, unknown> = {};
@@ -103,6 +141,7 @@ export function normalizeMeta(raw: unknown): StoredSubmission['meta'] {
       : [],
     hiddenFields: hidden,
     score: finiteNumber(m.score) ?? 0,
+    ...(normalizeEstimate(m.estimate) ? { estimate: normalizeEstimate(m.estimate) } : {}),
   };
 }
 

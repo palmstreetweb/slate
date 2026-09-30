@@ -235,6 +235,72 @@ function CelebrationCard({
   );
 }
 
+/* ---------- 1b. instant estimate reveal (ADR-064) ---------- */
+
+const ESTIMATE_THEMES = ['classic', 'swiss', 'constellation', 'terminal', 'bloom', 'riso'];
+
+function EstimateCard({
+  theme,
+  mode,
+  allRun,
+  index,
+}: {
+  theme: string;
+  mode: Mode;
+  allRun: number;
+  index: number;
+}) {
+  const [runs, setRuns] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const runKey = `${allRun}-${runs}`;
+  const solo = runs > 0;
+
+  const schema = useMemo<Schema>(
+    () => ({
+      brand: { name: label(theme) },
+      theme,
+      themeMode: mode,
+      estimate: {
+        base: 150,
+        baseLabel: 'Inspection visit',
+        breakdown: true,
+        disclaimer: 'Final price after inspection.',
+      },
+      questions: [
+        {
+          id: 'plan',
+          type: 'single_choice',
+          title: 'Which package?',
+          options: [{ label: 'Restore', value: 'restore', price: 3200, priceMax: 4100 }],
+        },
+        { id: 'done', type: 'thanks', title: 'Thanks!', showEstimate: true },
+      ],
+    }),
+    [theme, mode],
+  );
+
+  useScript(rootRef, runKey, [
+    { at: (solo ? 0 : index * 140) + 650, run: (root) => clickIn(root, '.slate-choice') },
+  ]);
+
+  return (
+    <article className="mg-card">
+      <div className="mg-frame" ref={rootRef}>
+        <Form key={runKey} schema={schema} onSubmit={fakeSubmit} />
+      </div>
+      <footer className="mg-card-foot">
+        <div>
+          <strong>{label(theme)}</strong>
+          <span>count-up, lines, small print</span>
+        </div>
+        <button type="button" className="mg-btn" onClick={() => setRuns((n) => n + 1)}>
+          Replay
+        </button>
+      </footer>
+    </article>
+  );
+}
+
 /* ---------- 2. question flow (one live form at a time: keys are global) ---------- */
 
 type FlowDemo = 'commit' | 'handoff' | 'invalid';
@@ -599,6 +665,7 @@ export function MotionGallery() {
       <ReducedMotionOverrideContext.Provider value={reduce ? true : null}>
         <nav className="mg-jump" aria-label="Sections">
           <a href="#celebration">Celebration</a>
+          <a href="#estimate">Estimate</a>
           <a href="#flow">Question flow</a>
           <a href="#progress">Progress</a>
           <a href="#decorations">Decorations</a>
@@ -628,6 +695,25 @@ export function MotionGallery() {
                 theme={name}
                 mode={mode}
                 sound={sound}
+                allRun={allRun}
+                index={i}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="estimate">
+          <SectionHead id="estimate" title="Instant estimate reveal">
+            ADR-064. With the confirmation: the card rises in, the range counts up, the lines
+            follow one by one and the small print fades in last. Calm motion shows the numbers at
+            once.
+          </SectionHead>
+          <div className="mg-grid">
+            {ESTIMATE_THEMES.map((name, i) => (
+              <EstimateCard
+                key={`${name}-${allRun}`}
+                theme={name}
+                mode={mode}
                 allRun={allRun}
                 index={i}
               />

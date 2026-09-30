@@ -4,14 +4,28 @@
  * `question.type`. Logic sections collapse by default and open when needed.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Condition, Option, PictureOption, Question } from '@/index.js';
+import { useLayoutEffect, useRef } from 'react';
+import type { Condition, EstimateSettings, Option, PictureOption, Question } from '@/index.js';
+import { OUT_OF_AREA_VALUE, IN_AREA_VALUE } from '@/logic/address.js';
+import { estimateCurrency } from '@/logic/estimate.js';
 import { TYPE_LABEL } from '../questionTypeMeta.js';
 import { TypeIcon } from './TypeIcon.js';
 import { ConditionBuilder, JumpRulesEditor } from './LogicEditor.js';
 import { canPrefill, isValidPrefillKey, RESERVED_LINK_PARAMS } from '@/logic/prefill.js';
 import { SlateNumberInput } from './SlateNumberInput.js';
 import { SlateSelect } from './SlateSelect.js';
+import { Checkbox, CollapsibleSection, Field, Row } from './inspectorParts.js';
+import {
+  AddressSettings,
+  CardDetails,
+  ContactSettings,
+  EstimateSection,
+  PriceInputs,
+  SignatureSettings,
+  UnitPriceSetting,
+  usePricing,
+  withoutPrices,
+} from './InspectorWaveB.js';
 
 type Props = {
   question: Question;
@@ -20,9 +34,41 @@ type Props = {
   onChange: (patch: Partial<Question>) => void;
   onDelete: () => void;
   canDelete: boolean;
+  /** `schema.estimate` (ADR-064) — edited from an ending's Instant estimate section. */
+  estimate?: EstimateSettings;
+  onEstimateChange?: (next: EstimateSettings | undefined) => void;
+  /** Adds an "out of area" ending for this address question, and a jump to it. */
+  onAddOutOfAreaEnding?: (addressId: string) => void;
 };
 
-export function Inspector({ question, allQuestions, onChange, onDelete, canDelete }: Props) {
+/** Some condition in the form tests this address's service area. */
+function routesOutOfArea(allQuestions: ReadonlyArray<Question>, addressId: string): boolean {
+  const tests = (c: Condition | undefined): boolean => {
+    if (!c) return false;
+    if ('all' in c) return c.all.some(tests);
+    if ('any' in c) return c.any.some(tests);
+    if (c.field !== addressId || !('value' in c)) return false;
+    const values = Array.isArray(c.value) ? c.value : [c.value];
+    return values.includes(OUT_OF_AREA_VALUE) || values.includes(IN_AREA_VALUE);
+  };
+  return allQuestions.some(
+    (q) =>
+      ('visibleIf' in q && tests(q.visibleIf)) ||
+      ('logic' in q && (q.logic ?? []).some((r) => tests(r.if))),
+  );
+}
+
+export function Inspector({
+  question,
+  allQuestions,
+  onChange,
+  onDelete,
+  canDelete,
+  estimate,
+  onEstimateChange,
+  onAddOutOfAreaEnding,
+}: Props) {
+  const currency = estimateCurrency(estimate);
   // Question IDs are auto-generated and stable; they're not surfaced in the
   // Inspector (kept clean per product direction). They remain the answers
   // key in onSubmit and the reference target for logic/piping under the hood.
@@ -361,7 +407,27 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
                 </span>
               </Field>
             </Row>
+            <UnitPriceSetting question={question} onChange={onChange} currency={currency} />
           </>
+        )}
+
+        {question.type === 'contact_info' && (
+          <ContactSettings question={question} onChange={onChange} />
+        )}
+
+        {question.type === 'address' && (
+          <AddressSettings
+            question={question}
+            onChange={onChange}
+            hasOutOfAreaRoute={routesOutOfArea(allQuestions, question.id)}
+            onAddOutOfAreaEnding={
+              onAddOutOfAreaEnding ? () => onAddOutOfAreaEnding(question.id) : undefined
+            }
+          />
+        )}
+
+        {question.type === 'signature' && (
+          <SignatureSettings question={question} onChange={onChange} />
         )}
 
         {question.type === 'scale' && (
@@ -501,15 +567,41 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
           </>
         )}
 
+        {question.type === 'single_choice' && (
+          <Field
+            label="Style"
+            hint={
+              question.display === 'cards'
+                ? 'Each option is a card with its price, a few features and a badge. Phones stack them.'
+                : undefined
+            }
+          >
+            <SlateSelect
+              value={question.display === 'cards' ? 'cards' : 'list'}
+              options={[
+                { value: 'list', label: 'List' },
+                { value: 'cards', label: 'Package cards' },
+              ]}
+              aria-label="Choice style"
+              onChange={(display) =>
+                onChange({ display: display === 'cards' ? 'cards' : undefined } as Partial<Question>)
+              }
+            />
+          </Field>
+        )}
+
         {(question.type === 'single_choice' ||
           question.type === 'multi_choice' ||
           question.type === 'dropdown' ||
           question.type === 'ranking') && (
           <Field label="Options">
             <OptionsEditor
+              key={question.id}
               options={question.options as Option[]}
               onChange={(opts) => onChange({ options: opts } as Partial<Question>)}
               withScore={question.type !== 'ranking'}
+              currency={question.type !== 'ranking' ? currency : undefined}
+              cards={question.type === 'single_choice' && question.display === 'cards'}
             />
           </Field>
         )}
@@ -527,8 +619,10 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
             />
             <Field label="Options (Label / Image URL)">
               <PictureOptionsEditor
+                key={question.id}
                 options={question.options as PictureOption[]}
                 onChange={(opts) => onChange({ options: opts } as Partial<Question>)}
+                currency={currency}
               />
             </Field>
             <OtherSetting question={question} onChange={onChange} />
@@ -604,6 +698,16 @@ export function Inspector({ question, allQuestions, onChange, onDelete, canDelet
               }
             />
           </Field>
+        )}
+
+        {question.type === 'thanks' && onEstimateChange && (
+          <EstimateSection
+            question={question}
+            onChange={onChange}
+            allQuestions={allQuestions}
+            settings={estimate}
+            onSettingsChange={onEstimateChange}
+          />
         )}
 
         {canPrefill(question) && (
@@ -805,75 +909,6 @@ function skipRuleCount(question: Question): number {
   return question.logic.length;
 }
 
-function CollapsibleSection({
-  label,
-  hint,
-  summary,
-  defaultOpen,
-  questionId,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  summary: string;
-  defaultOpen: boolean;
-  questionId: string;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  useEffect(() => {
-    setOpen(defaultOpen);
-  }, [questionId, defaultOpen]);
-
-  return (
-    <div className="slate-collapsible">
-      <button
-        type="button"
-        className="slate-collapsible-trigger"
-        aria-expanded={open}
-        onClick={() => setOpen((cur) => !cur)}
-      >
-        <span className="slate-collapsible-label">{label}</span>
-        <span className="slate-collapsible-meta">
-          {!open && <span className="slate-collapsible-summary">{summary}</span>}
-          <span className={`slate-collapsible-chevron${open ? ' slate-collapsible-chevron--open' : ''}`} aria-hidden />
-        </span>
-      </button>
-      {open && (
-        <div className="slate-collapsible-body">
-          {hint && <p className="slate-help" style={{ marginTop: 0 }}>{hint}</p>}
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Row({ children }: { children: React.ReactNode }) {
-  // Subgrid: label / control / hint share row tracks so inputs stay level
-  // even when one label wraps or only one side has a hint.
-  return <div className="slate-inspector-row">{children}</div>;
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="slate-inspector-field">
-      <span className="slate-label">{label}</span>
-      <span className="slate-inspector-field-control">{children}</span>
-      {hint ? <p className="slate-help">{hint}</p> : <span className="slate-help slate-help--empty" aria-hidden />}
-    </label>
-  );
-}
-
 const AUTO_GROW_MIN_ROWS = 2;
 
 function contentBoxHeight(el: HTMLTextAreaElement): number {
@@ -937,37 +972,28 @@ function AutoGrowTextarea({
   );
 }
 
-function Checkbox({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="slate-checkbox" style={{ marginBottom: 6 }}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      {label}
-    </label>
-  );
-}
-
 function OptionsEditor({
   options,
   onChange,
   withScore = false,
+  currency,
+  cards = false,
 }: {
   options: Option[];
   onChange: (opts: Option[]) => void;
   /** Whether scoring is applicable for this question type (feeds {{score}}, ADR-016). */
   withScore?: boolean;
+  /** Prices for the instant estimate (ADR-064); omit where prices don't apply. */
+  currency?: string;
+  /** Package cards: per-option badge, description and features. */
+  cards?: boolean;
 }) {
   // Scoring is opt-in: the points column only appears once the form actually
   // uses it (any option has a numeric score). Derived from data — no local
   // state — so it stays correct when switching between questions.
   const scoring = withScore && options.some((o) => typeof o.score === 'number');
+  const pricing = usePricing(options);
+  const showPrices = currency !== undefined && (pricing.show || cards);
 
   const update = (i: number, patch: Partial<Option>) => {
     onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
@@ -1053,9 +1079,29 @@ function OptionsEditor({
               ×
             </button>
           </div>
+          {showPrices && currency !== undefined ? (
+            <span className="slate-option-extra" style={{ gridColumn: '1 / -1' }}>
+              <PriceInputs
+                low={opt.price}
+                high={opt.priceMax}
+                currency={currency}
+                label={`Price for ${opt.label}`}
+                onChange={(price, priceMax) => update(i, { price, priceMax })}
+              />
+            </span>
+          ) : null}
+          {cards ? (
+            <span className="slate-option-extra" style={{ gridColumn: '1 / -1' }}>
+              <CardDetails
+                key={`${i}-${opt.value}`}
+                option={opt}
+                onChange={(patch) => update(i, patch)}
+              />
+            </span>
+          ) : null}
         </div>
       ))}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
         <button
           type="button"
           className="slate-btn slate-btn--ghost slate-btn--compact"
@@ -1073,6 +1119,21 @@ function OptionsEditor({
             {scoring ? 'Remove Scoring' : 'Add Scoring'}
           </button>
         )}
+        {currency !== undefined && !cards && (
+          <button
+            type="button"
+            className="slate-link"
+            style={{ fontSize: 12 }}
+            onClick={() => {
+              if (showPrices) {
+                pricing.close();
+                onChange(withoutPrices(options));
+              } else pricing.open();
+            }}
+          >
+            {showPrices ? 'Remove Prices' : 'Add Prices'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1081,12 +1142,16 @@ function OptionsEditor({
 function PictureOptionsEditor({
   options,
   onChange,
+  currency,
 }: {
   options: PictureOption[];
   onChange: (opts: PictureOption[]) => void;
+  /** Prices for the instant estimate (ADR-064). */
+  currency: string;
 }) {
   // Scoring is opt-in here too — points only appear once used (ADR-016).
   const scoring = options.some((o) => typeof o.score === 'number');
+  const pricing = usePricing(options);
 
   const update = (i: number, patch: Partial<PictureOption>) => {
     onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
@@ -1165,9 +1230,18 @@ function PictureOptionsEditor({
             style={{ padding: '6px 8px', fontFamily: 'var(--slate-font-mono)', fontSize: 12 }}
             onChange={(e) => update(i, { src: e.target.value })}
           />
+          {pricing.show ? (
+            <PriceInputs
+              low={opt.price}
+              high={opt.priceMax}
+              currency={currency}
+              label={`Price for ${opt.label}`}
+              onChange={(price, priceMax) => update(i, { price, priceMax })}
+            />
+          ) : null}
         </div>
       ))}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <button
           type="button"
           className="slate-btn slate-btn--ghost slate-btn--compact"
@@ -1182,6 +1256,19 @@ function PictureOptionsEditor({
           onClick={scoring ? disableScoring : enableScoring}
         >
           {scoring ? 'Remove Scoring' : 'Add Scoring'}
+        </button>
+        <button
+          type="button"
+          className="slate-link"
+          style={{ fontSize: 12 }}
+          onClick={() => {
+            if (pricing.show) {
+              pricing.close();
+              onChange(withoutPrices(options));
+            } else pricing.open();
+          }}
+        >
+          {pricing.show ? 'Remove Prices' : 'Add Prices'}
         </button>
       </div>
     </div>

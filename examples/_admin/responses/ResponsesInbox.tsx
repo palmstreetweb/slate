@@ -51,6 +51,7 @@ import {
 } from './model.js';
 import { shouldIgnoreShortcut, useFinePointer, useMarkAllRead, useNow, usePhone } from './hooks.js';
 import { ResponseAnswers } from './ResponseAnswers.js';
+import { EstimateBreakdown, estimateLabel } from './ResponseEstimate.js';
 import { ResponseActions } from './ResponseActions.js';
 import {
   IconArrowLeft,
@@ -1154,6 +1155,12 @@ export function ResponsesInbox({
                   </dd>
                 </div>
               ) : null}
+              {openSub.meta?.estimate ? (
+                <div className="rsp-fact-estimate">
+                  <dt>Estimate</dt>
+                  <dd>{estimateLabel(openSub.meta.estimate)}</dd>
+                </div>
+              ) : null}
               {!trash && email ? (
                 <div>
                   <dt>From this person</dt>
@@ -1172,6 +1179,7 @@ export function ResponsesInbox({
                 </div>
               ) : null}
             </dl>
+            {openSub.meta?.estimate ? <EstimateBreakdown estimate={openSub.meta.estimate} /> : null}
             {phone ? actions : null}
             <ResponseAnswers
               questions={questions}

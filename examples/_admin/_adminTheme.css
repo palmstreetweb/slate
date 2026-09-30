@@ -4910,3 +4910,68 @@ body[data-slate-scale='3'] > [data-slate-forms][data-theme-name='slate'] {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 4px;
 }
+
+/* ---------- Inspector: Wave B (ADR-064) ---------- */
+
+/* "$ [low] to [high]" on one line under an option (or a unit / the base). */
+[data-slate-forms][data-theme-name='slate'] .slate-price-inputs {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-price-symbol,
+[data-slate-forms][data-theme-name='slate'] .slate-price-to {
+  font-size: 12px;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-option-extra {
+  display: block;
+  padding: 2px 0 6px 10px;
+  border-left: 2px solid var(--slate-border);
+  margin-left: 2px;
+}
+
+/* Card details: badge, one-liner, features — compact, under the option. */
+[data-slate-forms][data-theme-name='slate'] .slate-card-details {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-option-sub {
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+[data-slate-forms][data-theme-name='slate'] textarea.slate-option-sub {
+  min-height: 0;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+/* Contact block: Name / Email / Phone, each with Required · Optional · Off. */
+[data-slate-forms][data-theme-name='slate'] .slate-contact-modes {
+  display: grid;
+  gap: 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-contact-mode {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-contact-mode .slate-label {
+  margin: 0;
+}
+
+@media (max-width: 719px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-option-sub {
+    font-size: 16px;
+  }
+}

@@ -8,6 +8,14 @@
 import type { Question } from '@/index.js';
 import { OTHER_VALUE } from '@/index.js';
 import { allowsOther, hasOtherAnswer, otherLabelOf, splitOther } from '@/logic/other.js';
+import {
+  IN_AREA_VALUE,
+  OUT_OF_AREA_VALUE,
+  areaStatus,
+  normalizePostal,
+  postalOf,
+  serviceAreaPrefixes,
+} from '@/logic/address.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import type { TrackedSource } from '../_formsStore.js';
 import { formatAnswerForQuestion, formatRelativeAge, titleOf } from '../responsesFormat.js';
@@ -75,13 +83,17 @@ function looksLikeNameQuestion(q: Question): boolean {
 /** The question most likely to hold the respondent's name, if any. */
 export function nameQuestion(questions: ReadonlyArray<Question>): Question | null {
   return (
-    questions.find(looksLikeNameQuestion) ?? questions.find((q) => q.type === 'short_text') ?? null
+    questions.find((q) => q.type === 'contact_info') ??
+    questions.find(looksLikeNameQuestion) ??
+    questions.find((q) => q.type === 'short_text') ??
+    null
   );
 }
 
 /** The question most likely to hold the respondent's email, if any. */
 export function emailQuestion(questions: ReadonlyArray<Question>): Question | null {
   return (
+    questions.find((q) => q.type === 'contact_info') ??
     questions.find((q) => q.type === 'email') ??
     questions.find((q) => q.type === 'short_text' && EMAIL_TITLE.test(titleOf(q))) ??
     null
@@ -91,6 +103,15 @@ export function emailQuestion(questions: ReadonlyArray<Question>): Question | nu
 function textAnswer(answers: AnswerMap, q: Question): string {
   const v = answers[q.id];
   return typeof v === 'string' ? oneLine(v) : '';
+}
+
+/** One part of a contact block answer (ADR-064), one line, or ''. */
+function contactPart(answers: AnswerMap, q: Question, part: 'name' | 'email' | 'phone'): string {
+  if (q.type !== 'contact_info') return '';
+  const v = answers[q.id];
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return '';
+  const p = (v as Record<string, unknown>)[part];
+  return typeof p === 'string' ? oneLine(p) : '';
 }
 
 /**
@@ -103,6 +124,11 @@ export function namedRespondent(
   questions: ReadonlyArray<Question>,
   answers: AnswerMap,
 ): string | null {
+  // A contact block says who it is outright (ADR-064).
+  for (const q of questions) {
+    const name = contactPart(answers, q, 'name');
+    if (name) return clip(name, NAME_MAX);
+  }
   const named = questions.filter(looksLikeNameQuestion);
   const first = named.find((q) => textAnswer(answers, q));
   if (first) {
@@ -155,6 +181,10 @@ export function respondentEmail(
   questions: ReadonlyArray<Question>,
   answers: AnswerMap,
 ): string | null {
+  for (const q of questions) {
+    const email = contactPart(answers, q, 'email');
+    if (email && isSafeEmail(email)) return email;
+  }
   const candidates = [
     ...questions.filter((q) => q.type === 'email'),
     ...questions.filter((q) => q.type === 'short_text' && EMAIL_TITLE.test(titleOf(q))),
@@ -408,6 +438,14 @@ export function answerMatchesFilter(
 ): boolean {
   if (filter.questionId === SOURCE_FILTER_ID) return subSource(sub) === filter.value;
   const value = sub.answers[filter.questionId];
+  // Address (ADR-064): in / out of the service area, or one ZIP code.
+  if (question?.type === 'address') {
+    if (filter.value === IN_AREA_VALUE || filter.value === OUT_OF_AREA_VALUE) {
+      const status = areaStatus(value, serviceAreaPrefixes(question.serviceArea));
+      return status === (filter.value === IN_AREA_VALUE ? 'in' : 'out');
+    }
+    return normalizePostal(postalOf(value)) === filter.value;
+  }
   if (filter.value === OTHER_VALUE && question && allowsOther(question)) {
     return hasOtherAnswer(value, new Set(question.options.map((o) => o.value)));
   }
@@ -514,6 +552,8 @@ function isNumericQuestion(q: Question): boolean {
  */
 export function chartableQuestions(questions: ReadonlyArray<Question>): Question[] {
   return questions.filter((q) => {
+    // Addresses chart by ZIP, or in / out of the service area (ADR-064).
+    if (q.type === 'address') return true;
     if (OPTION_TYPES.has(q.type)) return (choiceOptions(q)?.length ?? 0) > 0;
     if (q.type === 'yes_no' || q.type === 'scale' || q.type === 'nps') return true;
     if (q.type === 'number') return numericDomain(q) !== null;
@@ -538,6 +578,7 @@ export function questionDistribution(
   question: Question,
   subs: ReadonlyArray<StoredSubmission>,
 ): Distribution {
+  if (question.type === 'address') return addressDistribution(question, subs);
   if (isNumericQuestion(question)) {
     const counts = new Map<number, number>();
     let answered = 0;
@@ -640,6 +681,91 @@ export function questionDistribution(
         }
       : {}),
   };
+}
+
+/**
+ * Address answers (ADR-064). With a service area: two rows, inside and
+ * outside, with the ZIP codes listed under them (`others`). Without one: a
+ * row per ZIP code, most first.
+ */
+function addressDistribution(
+  question: Extract<Question, { type: 'address' }>,
+  subs: ReadonlyArray<StoredSubmission>,
+): Distribution {
+  const area = serviceAreaPrefixes(question.serviceArea);
+  const zips = new Map<string, { text: string; count: number }>();
+  let inside = 0;
+  let outside = 0;
+  let answered = 0;
+  for (const s of subs) {
+    const value = s.answers[question.id];
+    const zip = normalizePostal(postalOf(value));
+    if (!zip) continue;
+    answered++;
+    const hit = zips.get(zip);
+    if (hit) hit.count++;
+    else zips.set(zip, { text: postalOf(value).toUpperCase(), count: 1 });
+    const status = areaStatus(value, area);
+    if (status === 'in') inside++;
+    else if (status === 'out') outside++;
+  }
+  const byCount = [...zips.entries()].sort(
+    (a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]),
+  );
+  const pct = (n: number) => (answered ? Math.round((n / answered) * 100) : 0);
+  const rows: DistributionRow[] = area.length
+    ? [
+        { value: IN_AREA_VALUE, label: 'In area', count: inside, pct: pct(inside) },
+        { value: OUT_OF_AREA_VALUE, label: 'Out of area', count: outside, pct: pct(outside) },
+      ]
+    : byCount.map(([zip, z]) => ({ value: zip, label: z.text, count: z.count, pct: pct(z.count) }));
+  return {
+    questionId: question.id,
+    kind: 'choice',
+    answered,
+    rows,
+    max: Math.max(1, ...rows.map((r) => r.count)),
+    average: null,
+    ...(area.length ? { others: byCount.map(([, z]) => z) } : {}),
+  };
+}
+
+/** Estimates across responses (ADR-064), for the Summary's estimate card. */
+export type EstimateStats = {
+  /** Responses with an estimate (in `currency`). */
+  count: number;
+  currency: string;
+  /** Mean of each estimate's midpoint. */
+  average: number;
+  /** Lowest low and highest high. */
+  low: number;
+  high: number;
+  /** Sum of midpoints: the pipeline, roughly. */
+  total: number;
+};
+
+/**
+ * Average, range and total of the estimates in `subs`, in the newest
+ * response's currency (an owner who switched currency sees the current one).
+ * Null when no response has an estimate.
+ */
+export function estimateStats(subs: ReadonlyArray<StoredSubmission>): EstimateStats | null {
+  const currency = subs.find((s) => s.meta?.estimate)?.meta.estimate?.currency;
+  if (!currency) return null;
+  let count = 0;
+  let sum = 0;
+  let low = Infinity;
+  let high = -Infinity;
+  for (const s of subs) {
+    const e = s.meta?.estimate;
+    if (!e || e.currency !== currency) continue;
+    count++;
+    sum += (e.low + e.high) / 2;
+    low = Math.min(low, e.low);
+    high = Math.max(high, e.high);
+  }
+  if (count === 0) return null;
+  return { count, currency, average: sum / count, low, high, total: sum };
 }
 
 /**

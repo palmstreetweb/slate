@@ -3,7 +3,7 @@
  * are scoped per formId. Deleted responses are soft-deleted (`deletedAt`).
  */
 
-import type { Answers, SubmitMeta } from '@/index.js';
+import type { Answers, Estimate, SubmitMeta } from '@/index.js';
 import { isNeonConfigured } from './neon/env.js';
 import { isStoresHydrated } from './neon/hydrate.js';
 import * as remote from './neon/submissionsRemote.js';
@@ -18,6 +18,11 @@ export type StoredSubmission = {
   meta: Pick<SubmitMeta, 'durationMs' | 'questionsVisited' | 'hiddenFields' | 'score'> & {
     startedAt: string;
     completedAt: string;
+    /**
+     * The instant estimate (ADR-064). Public responses carry the submit
+     * Function's own figure; the studio's own test runs carry the engine's.
+     */
+    estimate?: Estimate;
   };
   /** ISO timestamp when moved to trash; omitted while active. */
   deletedAt?: string;
@@ -132,6 +137,7 @@ export function addSubmission(
       questionsVisited: meta.questionsVisited,
       hiddenFields: meta.hiddenFields,
       score: meta.score,
+      ...(meta.estimate ? { estimate: meta.estimate } : {}),
     },
   };
   write([sub, ...read()]);

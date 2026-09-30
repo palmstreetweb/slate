@@ -428,6 +428,7 @@ function makeSubmission(formId: string, answers: Answers, meta: SubmitMeta): Sto
       questionsVisited: meta.questionsVisited,
       hiddenFields: meta.hiddenFields,
       score: meta.score,
+      ...(meta.estimate ? { estimate: meta.estimate } : {}),
     },
   };
 }

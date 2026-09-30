@@ -34,6 +34,8 @@ import {
   answerText,
   chartableQuestions,
   dayGroupOf,
+  estimateStats,
+  type EstimateStats,
   dayGroups,
   durationParts,
   formatDuration,
@@ -54,6 +56,7 @@ import {
 } from './model.js';
 import { isOverlayOpen, useMarkAllRead, useNow, usePhone } from './hooks.js';
 import { ResponseAnswers } from './ResponseAnswers.js';
+import { EstimateBreakdown, estimateLabel } from './ResponseEstimate.js';
 import { ResponseActions } from './ResponseActions.js';
 import {
   IconArrowDown,
@@ -66,6 +69,7 @@ import {
 } from './icons.js';
 import { CountUp } from '../delight/CountUp.js';
 import { useReveal } from '../delight/useReveal.js';
+import { formatMoney } from '@/logic/estimate.js';
 import './responses.css';
 import './summary.css';
 
@@ -428,6 +432,13 @@ const ChartCard = memo(function ChartCard({
         <TypedOthers
           others={total.others}
           label={total.rows.find((r) => r.value === OTHER_VALUE)?.label ?? 'Other'}
+          heading={
+            question.type === 'address'
+              ? (question.format ?? 'us') === 'us'
+                ? 'ZIP codes'
+                : 'Postal codes'
+              : undefined
+          }
         />
       ) : null}
     </article>
@@ -438,15 +449,18 @@ const ChartCard = memo(function ChartCard({
 function TypedOthers({
   others,
   label,
+  heading,
 }: {
   others: ReadonlyArray<{ text: string; count: number }>;
   label: string;
+  /** Replaces "Typed under “Other”" (addresses list their ZIP codes, ADR-064). */
+  heading?: string;
 }) {
   const [all, setAll] = useState(false);
   const shown = all ? others : others.slice(0, 6);
   return (
     <div className="rsp-sum-others">
-      <p className="rsp-sum-others-head">Typed under “{label}”</p>
+      <p className="rsp-sum-others-head">{heading ?? `Typed under “${label}”`}</p>
       <ul className="rsp-sum-others-list">
         {shown.map((o) => (
           <li key={o.text} dir="auto">
@@ -470,6 +484,56 @@ function TypedOthers({
     </div>
   );
 }
+
+/* ---------- estimates (ADR-064) ---------- */
+
+/** Average and range of the instant estimates, with the pipeline total. */
+const EstimateCard = memo(function EstimateCard({ stats }: { stats: EstimateStats }) {
+  const titleId = useId();
+  const revealRef = useReveal<HTMLElement>();
+  const whole = Math.round(stats.average);
+  return (
+    <article ref={revealRef} className="rsp-sum-chart rsp-sum-estimate" aria-labelledby={titleId}>
+      <header className="rsp-sum-chart-head">
+        <h3 className="rsp-sum-chart-title" id={titleId}>
+          <span className="rsp-sum-qnum">Quote</span>
+          <span className="rsp-sum-chart-text">Instant estimates</span>
+        </h3>
+        <span className="rsp-sum-chart-meta">
+          <span>{plural(stats.count, 'estimate', 'estimates')}</span>
+        </span>
+      </header>
+      <div className="rsp-sum-estimate-body">
+        <div className="rsp-sum-estimate-stat">
+          <span className="rsp-sum-kpi-label">Average</span>
+          <CountUp
+            className="rsp-sum-kpi-value rsp-sum-estimate-value"
+            srClassName="rsp-sr"
+            value={whole}
+            format={(n) => formatMoney(n, stats.currency)}
+          />
+        </div>
+        <div className="rsp-sum-estimate-stat">
+          <span className="rsp-sum-kpi-label">Range</span>
+          <span className="rsp-sum-estimate-range">
+            {/* Each end stays whole; the range breaks after the dash. */}
+            <span>{formatMoney(stats.low, stats.currency)}</span>
+            {stats.high > stats.low ? (
+              <>
+                {' – '}
+                <span>{formatMoney(stats.high, stats.currency)}</span>
+              </>
+            ) : null}
+          </span>
+        </div>
+        <div className="rsp-sum-estimate-stat">
+          <span className="rsp-sum-kpi-label">All together</span>
+          <span className="rsp-sum-estimate-range">{formatMoney(stats.total, stats.currency)}</span>
+        </div>
+      </div>
+    </article>
+  );
+});
 
 /* ---------- responses table ---------- */
 
@@ -680,7 +744,14 @@ const SummaryRow = memo(function SummaryRow({
                   <dd>{cells.source}</dd>
                 </div>
               ) : null}
+              {sub.meta?.estimate ? (
+                <div>
+                  <dt>Estimate</dt>
+                  <dd>{estimateLabel(sub.meta.estimate)}</dd>
+                </div>
+              ) : null}
             </dl>
+            {sub.meta?.estimate ? <EstimateBreakdown estimate={sub.meta.estimate} /> : null}
             <ResponseActions
               sub={sub}
               questions={questions}
@@ -737,6 +808,7 @@ export function ResponsesSummary(props: SummaryProps) {
   const k = useMemo(() => kpis(subs, unread, now), [subs, unread, now]);
   const weekStartMs = k.weekStart.getTime();
   const chartQs = useMemo(() => chartableQuestions(questions), [questions]);
+  const estimates = useMemo(() => estimateStats(subs), [subs]);
   const qById = useMemo(() => new Map(questions.map((q) => [q.id, q] as const)), [questions]);
   // Where responses came from (ADR-063): a chart and a column once any came from a tracked link.
   const withSource = useMemo(() => hasSources(subs), [subs]);
@@ -1034,7 +1106,7 @@ export function ResponsesSummary(props: SummaryProps) {
     chartQs.length || sourceTotal
       ? `${phone ? 'Tap' : 'Click'} a bar or tile above to filter`
       : `${phone ? 'Tap' : 'Click'} a tile above to filter`;
-  const chartCount = chartQs.length + (sourceTotal ? 1 : 0);
+  const chartCount = chartQs.length + (sourceTotal ? 1 : 0) + (estimates ? 1 : 0);
   const topClass =
     chartCount === 0
       ? ' rsp-sum-top--c0'
@@ -1060,6 +1132,7 @@ export function ResponsesSummary(props: SummaryProps) {
           onToggleNew={toggleNew}
           onToggleWeek={toggleWeek}
         />
+        {estimates ? <EstimateCard stats={estimates} /> : null}
         {chartQs.map((q) => (
           <ChartCard
             key={q.id}

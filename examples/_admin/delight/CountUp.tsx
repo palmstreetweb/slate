@@ -38,6 +38,8 @@ type Props = {
   className?: string;
   /** Screen-reader class; the studio's responses page uses `rsp-sr`. */
   srClassName?: string;
+  /** Text for a number (e.g. money, ADR-064); plain digits by default. */
+  format?: (n: number) => string;
 };
 
 export function CountUp({
@@ -45,6 +47,7 @@ export function CountUp({
   durationMs = COUNT_UP_MS,
   className,
   srClassName = 'slate-sr',
+  format,
 }: Props) {
   const ref = useRef<HTMLSpanElement>(null);
   const shownRef = useRef(0);
@@ -77,8 +80,8 @@ export function CountUp({
 
   return (
     <span ref={ref} className={className}>
-      <span className={srClassName}>{value}</span>
-      <span aria-hidden="true">{shown}</span>
+      <span className={srClassName}>{format ? format(value) : value}</span>
+      <span aria-hidden="true">{format ? format(shown) : shown}</span>
     </span>
   );
 }
