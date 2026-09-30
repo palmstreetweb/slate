@@ -4,6 +4,9 @@
  */
 
 import { SIG_TYPED_MAX, parseSignaturePathCore } from './signature.js';
+import { locationAnswerCore } from './geo.js';
+import { pinAnswerCore } from './pins.js';
+import { availabilityAnswerCore } from './availability.js';
 
 const MAX_STRING_CHARS = 10_000;
 const MAX_ARRAY_ITEMS = 100;
@@ -142,6 +145,75 @@ function clampSignature(
   return undefined;
 }
 
+/** Voice notes (ADR-065). Mirrors src/logic/media.ts. */
+export const VOICE_TYPED_MAX = 1000;
+const VOICE_SECONDS_MAX = 300;
+
+/** This form's own storage ref, or undefined (the file-answer rule, ADR-058). */
+function ownRef(v: unknown, formId: string | undefined): string | undefined {
+  if (typeof v !== 'string' || !formId) return undefined;
+  return STORAGE_REF_RE.exec(v)?.[1] === formId ? v : undefined;
+}
+
+/**
+ * A voice note (ADR-065): `{ audio, sec? }` with this form's own storage ref
+ * and a whole number of seconds up to the question's cap, or `{ typed }`
+ * unless the owner turned typing off.
+ */
+function clampVoice(
+  q: Record<string, unknown>,
+  v: unknown,
+  formId: string | undefined,
+): Record<string, string> | undefined {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const a = v as Record<string, unknown>;
+  const audio = ownRef(a.audio, formId);
+  if (audio) {
+    const cap =
+      typeof q.maxSeconds === 'number' && Number.isFinite(q.maxSeconds)
+        ? Math.min(VOICE_SECONDS_MAX, Math.max(5, Math.round(q.maxSeconds)))
+        : 60;
+    const sec = typeof a.sec === 'string' && /^\d{1,4}$/.test(a.sec) ? Number(a.sec) : NaN;
+    return Number.isFinite(sec) && sec >= 1
+      ? { audio, sec: String(Math.min(sec, cap)) }
+      : { audio };
+  }
+  if (typeof a.typed === 'string' && q.allowTyped !== false) {
+    const t = a.typed.trim();
+    return t ? { typed: t.slice(0, VOICE_TYPED_MAX) } : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * A photo checklist (ADR-065): only the published items, each with this
+ * form's own storage ref (one photo per item).
+ */
+function clampPhotos(
+  q: Record<string, unknown>,
+  v: unknown,
+  formId: string | undefined,
+): Record<string, string> | undefined {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const items = (Array.isArray(q.items) ? q.items : [])
+    .map((o) => (o && typeof o === 'object' ? (o as { value?: unknown }).value : undefined))
+    .filter((x): x is string => typeof x === 'string' && isSafeKey(x));
+  const out: Record<string, string> = {};
+  for (const item of items.slice(0, 50)) {
+    const ref = ownRef((v as Record<string, unknown>)[item], formId);
+    if (ref) out[item.slice(0, 64)] = ref;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** What `clampForQuestion` needs to know about the form beyond the question itself. */
+export type ClampContext = {
+  /** The form's id: file-like answers keep only its own storage refs. */
+  formId?: string;
+  /** Every ZIP prefix the published address questions serve (a ZIP typed on a location). */
+  zipAreas?: ReadonlyArray<string>;
+};
+
 /**
  * Per-type shapes for the question kinds whose answer shape ADR-063 widened
  * or pinned down. Lenient on purpose — a respondent whose page has an older
@@ -152,10 +224,19 @@ function clampSignature(
  *   - choices with `allowOther`: typed text (anything that isn't an option
  *     value) is capped at 500 characters, and a list keeps one typed entry;
  *   - contact_info / address (ADR-064): known parts only, trimmed and capped;
- *   - signature (ADR-064): a path the engine could have written, or a typed name.
+ *   - signature (ADR-064): a path the engine could have written, or a typed name;
+ *   - image_pin / location / availability (ADR-065): re-derived from the
+ *     published question by the engine's own shared code (pins in range and
+ *     under the limit; coordinates re-rounded and in / out recomputed; slots
+ *     re-encoded on the grid);
+ *   - voice_note / photo_checklist (ADR-065): this form's own storage refs only.
  * Everything else goes through `clampValue` as before.
  */
-export function clampForQuestion(q: Record<string, unknown>, v: unknown): unknown {
+export function clampForQuestion(
+  q: Record<string, unknown>,
+  v: unknown,
+  ctx: ClampContext = {},
+): unknown {
   switch (q.type) {
     case 'number':
     case 'scale':
@@ -194,6 +275,16 @@ export function clampForQuestion(q: Record<string, unknown>, v: unknown): unknow
       return clampParts(v, ADDRESS_PART_MAX);
     case 'signature':
       return clampSignature(q, v);
+    case 'image_pin':
+      return pinAnswerCore(q, v);
+    case 'location':
+      return locationAnswerCore(q, v, ctx.zipAreas ?? []);
+    case 'availability':
+      return availabilityAnswerCore(q, v);
+    case 'voice_note':
+      return clampVoice(q, v, ctx.formId);
+    case 'photo_checklist':
+      return clampPhotos(q, v, ctx.formId);
     default:
       return clampValue(v);
   }

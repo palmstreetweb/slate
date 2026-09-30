@@ -11,12 +11,10 @@
 import type { Condition, Question } from '@/types/Question.js';
 import { OTHER_VALUE, allowsOther } from './other.js';
 import { canPrefill, isValidPrefillKey } from './prefill.js';
-import {
-  IN_AREA_VALUE,
-  OUT_OF_AREA_VALUE,
-  hasServiceArea,
-  serviceAreaPrefixes,
-} from './address.js';
+import { IN_AREA_VALUE, OUT_OF_AREA_VALUE, checksArea, serviceAreaPrefixes } from './address.js';
+import { geoCenter, geoRadiusKm } from './geo.js';
+import { SLOT_MINUTES, WEEKDAY_KEYS, clockMinutes } from './availability.js';
+import { safeImageSrc, PIN_IMAGE_DATA_MAX } from '@/utils/brandLogo.js';
 import { contactShown } from './contact.js';
 import { PRICE_MAX } from './estimate.js';
 
@@ -41,7 +39,15 @@ export type SchemaIssue = {
     /** A service-area entry isn't a ZIP code or prefix (ADR-064). */
     | 'bad_service_area'
     /** A contact block with every part turned off (ADR-064). */
-    | 'no_fields';
+    | 'no_fields'
+    /** A pin question without a photo the engine will show (ADR-065). */
+    | 'no_image'
+    /** A photo checklist without any shots listed (ADR-065). */
+    | 'no_items'
+    /** An availability grid with days, times or a slot length it can't use (ADR-065). */
+    | 'bad_grid'
+    /** Swipe cards on a picture choice that isn't multi-select (ADR-065). */
+    | 'swipe_single';
   message: string;
 };
 
@@ -114,11 +120,14 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
   const checkArea = (q: Question, c: Condition) => {
     for (const field of areaFields(c)) {
       const target = byId.get(field);
-      if (target && !hasServiceArea(target)) {
+      if (target && !checksArea(target, questions)) {
         issues.push({
           questionId: q.id,
           kind: 'area_off',
-          message: `"${q.id}" checks the service area of "${field}", which doesn't list any ZIP codes`,
+          message:
+            target.type === 'location'
+              ? `"${q.id}" checks the service area of "${field}", which has no center and radius`
+              : `"${q.id}" checks the service area of "${field}", which doesn't list any ZIP codes`,
         });
       }
     }
@@ -156,6 +165,56 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
           message: `"${q.id}" lists a service area entry that isn't a ZIP code or prefix`,
         });
       }
+    }
+    if (q.type === 'image_pin' && safeImageSrc(q.image, PIN_IMAGE_DATA_MAX) === null) {
+      issues.push({
+        questionId: q.id,
+        kind: 'no_image',
+        message: `"${q.id}" has no photo to mark — add one (an upload or an https image link)`,
+      });
+    }
+    if (q.type === 'photo_checklist' && !(q.items ?? []).some((i) => i.label?.trim())) {
+      issues.push({
+        questionId: q.id,
+        kind: 'no_items',
+        message: `"${q.id}" lists no photos to take`,
+      });
+    }
+    if (q.type === 'availability') {
+      const days = q.days ?? [];
+      const start = q.startTime === undefined ? 480 : clockMinutes(q.startTime);
+      const end = q.endTime === undefined ? 1080 : clockMinutes(q.endTime);
+      const slot = q.slotMinutes ?? 60;
+      if (
+        days.some((d) => !(WEEKDAY_KEYS as readonly string[]).includes(d)) ||
+        start === null ||
+        end === null ||
+        !(SLOT_MINUTES as readonly number[]).includes(slot) ||
+        end - start < slot
+      ) {
+        issues.push({
+          questionId: q.id,
+          kind: 'bad_grid',
+          message: `"${q.id}" has days, times or a slot length the grid can't use`,
+        });
+      }
+    }
+    if (q.type === 'location' && (q.center !== undefined || q.radius !== undefined)) {
+      const rec = q as unknown as Record<string, unknown>;
+      if (geoCenter(rec) === null || geoRadiusKm(rec) === null) {
+        issues.push({
+          questionId: q.id,
+          kind: 'bad_service_area',
+          message: `"${q.id}" needs both a center (latitude, longitude) and a radius to check the service area`,
+        });
+      }
+    }
+    if (q.type === 'picture_choice' && q.display === 'swipe' && !q.multiple) {
+      issues.push({
+        questionId: q.id,
+        kind: 'swipe_single',
+        message: `"${q.id}" uses swipe cards, which need "Allow multiple selections" on`,
+      });
     }
     if (q.type === 'contact_info' && contactShown(q).length === 0) {
       issues.push({

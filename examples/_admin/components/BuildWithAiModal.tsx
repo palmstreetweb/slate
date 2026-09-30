@@ -51,6 +51,14 @@ const TYPE_LABEL: Record<string, string> = {
   legal: 'Legal',
   scale: 'Scale',
   nps: 'NPS',
+  contact_info: 'Contact',
+  address: 'Address',
+  signature: 'Signature',
+  image_pin: 'Pin the spot',
+  voice_note: 'Voice note',
+  location: 'Location',
+  photo_checklist: 'Photos',
+  availability: 'Availability',
   review: 'Review',
 };
 

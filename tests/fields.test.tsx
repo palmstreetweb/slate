@@ -206,7 +206,8 @@ describe('question types render', () => {
     expect(container).toMatchSnapshot();
   });
 
-  it('dropdown', () => {
+  // The dropdown loads on demand (ADR-065): wait for the field.
+  it('dropdown', async () => {
     const { container } = renderQuestion({
       id: 'state',
       type: 'dropdown',
@@ -216,7 +217,7 @@ describe('question types render', () => {
         { label: 'Texas', value: 'tx' },
       ],
     });
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(await screen.findByRole('combobox')).toBeInTheDocument();
     expect(container).toMatchSnapshot();
   });
 
@@ -375,7 +376,7 @@ describe('field interactions', () => {
         { label: 'Texas', value: 'tx' },
       ],
     });
-    await user.type(screen.getByRole('combobox'), 'col');
+    await user.type(await screen.findByRole('combobox'), 'col');
     const options = screen.getAllByRole('option');
     expect(options).toHaveLength(1);
     expect(options[0]).toHaveTextContent('Colorado');
@@ -391,6 +392,7 @@ describe('field interactions', () => {
       title: 'State?',
       options: [{ label: 'California', value: 'ca' }],
     });
+    await screen.findByRole('combobox');
     await user.click(screen.getByRole('button', { name: /ok/i }));
     expect(await screen.findByText(/pick one/i)).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();

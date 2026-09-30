@@ -17,6 +17,16 @@ import {
   parseSignaturePath,
   signaturePathOf,
 } from './signature.js';
+import { PIN_NOTE_MAX, parsePin, pinLimit } from './pins.js';
+import { locationAnswerCore } from './geo.js';
+import { availabilityGrid, decodeAvailability } from './availability.js';
+import {
+  VOICE_TYPED_MAX,
+  photosTaken,
+  voiceAudioOf,
+  voiceMaxSeconds,
+  voiceSecondsOf,
+} from './media.js';
 
 export { isValidIsoDate };
 
@@ -369,6 +379,105 @@ export function validate(question: Question, answer: unknown): ValidationResult 
         return null;
       }
       return { code: 'shape', message: 'Please sign here' };
+    }
+
+    case 'image_pin': {
+      const pins = isRecord(answer) && Array.isArray(answer.pins) ? answer.pins : null;
+      if (answer === undefined || answer === null || (pins !== null && pins.length === 0)) {
+        return question.required ? { code: 'required', message: 'Tap the photo to mark a spot' } : null;
+      }
+      if (pins === null || pins.some((p) => !parsePin(p))) {
+        return { code: 'shape', message: 'Those pins didn’t come through. Clear them and try again.' };
+      }
+      const limit = pinLimit(question as unknown as Record<string, unknown>);
+      if (pins.length > limit) {
+        return { code: 'max_pins', message: `Mark at most ${limit} ${limit === 1 ? 'spot' : 'spots'}` };
+      }
+      const notes = isRecord(answer) && Array.isArray(answer.notes) ? answer.notes : [];
+      if (notes.some((n) => typeof n !== 'string' || n.length > PIN_NOTE_MAX)) {
+        return { code: 'too_long', message: `Keep each note under ${PIN_NOTE_MAX} characters` };
+      }
+      return null;
+    }
+
+    case 'voice_note': {
+      const blank =
+        answer === undefined ||
+        answer === null ||
+        (isRecord(answer) && Object.keys(answer).length === 0);
+      if (blank) {
+        if (!question.required) return null;
+        return {
+          code: 'required',
+          message:
+            question.allowTyped === false ? 'Please record a voice note' : 'Please record or type an answer',
+        };
+      }
+      if (!isRecord(answer)) return { code: 'shape', message: 'Please record a voice note' };
+      if (voiceAudioOf(answer)) {
+        const sec = voiceSecondsOf(answer);
+        if (answer.sec !== undefined && (sec === null || sec > voiceMaxSeconds(question) + 2)) {
+          return { code: 'shape', message: 'That recording didn’t come through. Record it again.' };
+        }
+        return null;
+      }
+      if (typeof answer.typed === 'string' && question.allowTyped !== false) {
+        const typed = answer.typed.trim();
+        if (typed.length === 0) {
+          return question.required ? { code: 'required', message: 'Please type your answer' } : null;
+        }
+        if (typed.length > VOICE_TYPED_MAX) {
+          return { code: 'too_long', message: `Max ${VOICE_TYPED_MAX} characters` };
+        }
+        return null;
+      }
+      return { code: 'shape', message: 'Please record a voice note' };
+    }
+
+    case 'location': {
+      const blank =
+        answer === undefined ||
+        answer === null ||
+        (isRecord(answer) && Object.values(answer).every((v) => isBlankString(v)));
+      if (blank) {
+        return question.required
+          ? { code: 'required', message: 'Please share your location, or enter it below' }
+          : null;
+      }
+      if (!locationAnswerCore(question as unknown as Record<string, unknown>, answer, [])) {
+        return { code: 'shape', message: 'That location didn’t come through. Try again.' };
+      }
+      return null;
+    }
+
+    case 'photo_checklist': {
+      if (answer !== undefined && answer !== null && !isRecord(answer)) {
+        return { code: 'shape', message: 'Please add the photos' };
+      }
+      const required = question.required ?? true;
+      const missing = (question.items ?? []).length - photosTaken(question, answer).length;
+      if (required && missing > 0) {
+        return {
+          code: 'required',
+          message: missing === 1 ? 'One more photo to go' : `${missing} more photos to go`,
+        };
+      }
+      return null;
+    }
+
+    case 'availability': {
+      const blank =
+        answer === undefined ||
+        answer === null ||
+        (isRecord(answer) && Object.keys(answer).length === 0);
+      const picked = blank ? 0 : decodeAvailability(availabilityGrid(question), answer).size;
+      if (blank || picked === 0) {
+        if (!blank && isRecord(answer) && Object.values(answer).some((v) => !isBlankString(v))) {
+          return { code: 'shape', message: 'Those times didn’t come through. Paint them again.' };
+        }
+        return question.required ? { code: 'required', message: 'Paint at least one time you’re free' } : null;
+      }
+      return null;
     }
 
     case 'multi_choice': {

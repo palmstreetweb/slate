@@ -1,0 +1,1715 @@
+/* Wave C on-demand field UIs (ADR-065): swipe cards, pin the spot, the voice
+   note, location, the photo checklist and the availability grid. The
+   components that use these rules load on demand; the published stylesheet
+   includes them after extensions.css (scripts/bundle-css.mjs).
+
+   Wrapper-scoped. Colours come from tokens only (no literals — a test checks).
+   Tap targets are at least 44 px and inputs at least 16 px (iOS zoom). Motion
+   follows the ADR-059 pattern: rules outside the motion block are the static
+   end state; keyframes and transitions that are decoration run only under
+   `prefers-reduced-motion: no-preference` on a wrapper without
+   `data-reduced-motion`. Direct manipulation (a card under the finger, a pin
+   being dragged) always follows the pointer. */
+
+[data-slate-forms] {
+  --slate-lift: color-mix(in srgb, var(--slate-text) 16%, transparent);
+  --slate-lift-soft: color-mix(in srgb, var(--slate-text) 8%, transparent);
+}
+
+/* ============================================================
+   Swipe cards
+   ============================================================ */
+
+[data-slate-forms] .slate-swipe {
+  margin-top: 24px;
+  outline: none;
+}
+
+[data-slate-forms] .slate-swipe-count {
+  margin: 0 0 10px;
+  text-align: center;
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms] .slate-swipe-deck {
+  position: relative;
+  width: min(100%, 360px);
+  height: min(52vh, 440px);
+  min-height: 300px;
+  margin: 0 auto;
+}
+
+[data-slate-forms] .slate-swipe-deck--single {
+  height: auto;
+  min-height: 0;
+  width: min(100%, 420px);
+}
+
+[data-slate-forms] .slate-swipe-card {
+  --slate-swipe-like: 0;
+  --slate-swipe-nope: 0;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--slate-bg-2);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: calc(var(--slate-radius) + 8px);
+  box-shadow: 0 14px 34px var(--slate-lift);
+  transform: translate3d(0, calc(var(--slate-swipe-depth, 0) * 12px), 0)
+    scale(calc(1 - var(--slate-swipe-depth, 0) * 0.05));
+  transform-origin: 50% 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms] .slate-swipe-card:not(.slate-swipe-card--top) {
+  opacity: calc(1 - var(--slate-swipe-depth, 0) * 0.25);
+  box-shadow: 0 6px 16px var(--slate-lift-soft);
+}
+
+[data-slate-forms] .slate-swipe-card--top {
+  z-index: 3;
+  cursor: grab;
+  /* Sideways drags are ours; a vertical swipe still scrolls the page. */
+  touch-action: pan-y;
+}
+
+[data-slate-forms] .slate-swipe-card--top:active {
+  cursor: grabbing;
+}
+
+[data-slate-forms] .slate-swipe-img {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  object-fit: cover;
+  background: var(--slate-bg-3);
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+[data-slate-forms] .slate-swipe-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px 16px;
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
+}
+
+[data-slate-forms] .slate-swipe-label {
+  font-family: var(--slate-font-display);
+  font-weight: var(--slate-title-weight);
+  font-size: clamp(1.15rem, 3vw, 1.35rem);
+  line-height: 1.2;
+  text-transform: var(--slate-transform);
+}
+
+[data-slate-forms] .slate-swipe-desc {
+  font-size: 14px;
+  color: var(--slate-muted);
+}
+
+/* The "this or that" card holds the question itself. */
+[data-slate-forms] .slate-swipe-card--text {
+  position: relative;
+  inset: auto;
+  min-height: 220px;
+  padding: 36px 26px 26px;
+  justify-content: center;
+  gap: 20px;
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms] .slate-swipe-question {
+  margin: 0;
+  text-align: center;
+}
+
+[data-slate-forms] .slate-swipe-sides {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms] .slate-swipe-was {
+  align-self: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--slate-accent-lo);
+  color: var(--slate-text);
+  font-size: 13px;
+}
+
+/* LIKE / NOPE stamps fade in with the drag. */
+[data-slate-forms] .slate-swipe-stamp {
+  position: absolute;
+  top: 20px;
+  z-index: 2;
+  padding: 4px 12px;
+  border: 3px solid currentColor;
+  border-radius: 8px;
+  font-family: var(--slate-font-display);
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: 0.08em;
+  background: var(--slate-bg);
+  pointer-events: none;
+}
+
+[data-slate-forms] .slate-swipe-stamp--like {
+  left: 18px;
+  color: var(--slate-accent);
+  opacity: var(--slate-swipe-like);
+  transform: rotate(-14deg);
+}
+
+[data-slate-forms] .slate-swipe-stamp--nope {
+  right: 18px;
+  color: var(--slate-error);
+  opacity: var(--slate-swipe-nope);
+  transform: rotate(14deg);
+}
+
+[data-slate-forms] .slate-swipe-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+[data-slate-forms] .slate-swipe-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 60px;
+  height: 60px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  background: var(--slate-bg);
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 16px var(--slate-lift-soft);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms] .slate-swipe-btn svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-slate-forms] .slate-swipe-btn--nope {
+  color: var(--slate-error);
+}
+
+[data-slate-forms] .slate-swipe-btn--like {
+  color: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-swipe-btn--like svg path {
+  fill: currentColor;
+  fill-opacity: 0.18;
+}
+
+[data-slate-forms] .slate-swipe-btn[aria-pressed='true'] {
+  border-color: currentColor;
+  background: var(--slate-accent-lo);
+}
+
+[data-slate-forms] .slate-swipe-btn-text {
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-swipe-btn:focus-visible,
+[data-slate-forms] .slate-swipe-undo:focus-visible,
+[data-slate-forms] .slate-swipe-again:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 3px;
+}
+
+[data-slate-forms] .slate-swipe-undo,
+[data-slate-forms] .slate-swipe-again {
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--slate-muted);
+  font-family: var(--slate-font-body);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+[data-slate-forms] .slate-swipe-undo:disabled {
+  visibility: hidden;
+}
+
+[data-slate-forms] .slate-swipe-hint {
+  margin-top: 10px;
+  text-align: center;
+}
+
+[data-slate-forms] .slate-swipe-done {
+  margin-top: 24px;
+}
+
+[data-slate-forms] .slate-swipe-done-title {
+  margin: 0 0 14px;
+  font-family: var(--slate-font-display);
+  font-size: clamp(1.1rem, 3vw, 1.3rem);
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-swipe-liked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+[data-slate-forms] .slate-swipe-liked-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 84px;
+  font-size: 12px;
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-swipe-liked-item img {
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: var(--slate-radius);
+  border: var(--slate-border-width) solid var(--slate-accent);
+  background: var(--slate-bg-3);
+}
+
+[data-slate-forms] .slate-swipe-again {
+  padding-left: 0;
+}
+
+/* ============================================================
+   Pin the spot
+   ============================================================ */
+
+[data-slate-forms] .slate-pin-lede {
+  margin-top: 10px;
+}
+
+[data-slate-forms] .slate-pin {
+  margin-top: 20px;
+}
+
+[data-slate-forms] .slate-pin-area {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  max-height: 62vh;
+  aspect-ratio: var(--slate-pin-ratio, 1.333);
+  overflow: hidden;
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: calc(var(--slate-radius) + 4px);
+  background: var(--slate-bg-2);
+  cursor: crosshair;
+  outline: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+[data-slate-forms] .slate-pin-area:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 3px;
+}
+
+[data-slate-forms] .slate-pin-area--error {
+  border-color: var(--slate-error);
+}
+
+[data-slate-forms] .slate-pin-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
+}
+
+[data-slate-forms] .slate-pin-blank {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  color: var(--slate-muted);
+  font-size: 14px;
+  background-image:
+    linear-gradient(var(--slate-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--slate-border) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+[data-slate-forms] .slate-pin-cursor {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 2px solid var(--slate-accent);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 0 3px var(--slate-bg);
+}
+
+[data-slate-forms] .slate-pin-cursor::before,
+[data-slate-forms] .slate-pin-cursor::after {
+  content: '';
+  position: absolute;
+  background: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-pin-cursor::before {
+  left: 50%;
+  top: -8px;
+  bottom: -8px;
+  width: 2px;
+  margin-left: -1px;
+}
+
+[data-slate-forms] .slate-pin-cursor::after {
+  top: 50%;
+  left: -8px;
+  right: -8px;
+  height: 2px;
+  margin-top: -1px;
+}
+
+/* A numbered teardrop whose point is the spot. */
+[data-slate-forms] .slate-pin-dot {
+  position: absolute;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  margin: -44px 0 0 -22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms] .slate-pin-dot::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  background: var(--slate-accent);
+  border: 2px solid var(--slate-bg);
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 3px 8px var(--slate-lift);
+}
+
+[data-slate-forms] .slate-pin-num {
+  position: relative;
+  display: block;
+  margin-top: -10px;
+  color: var(--slate-on-accent);
+  font-family: var(--slate-font-body);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+[data-slate-forms] .slate-pin-dot:focus-visible {
+  outline: none;
+}
+
+[data-slate-forms] .slate-pin-dot:focus-visible::before {
+  box-shadow:
+    0 0 0 3px var(--slate-bg),
+    0 0 0 5px var(--slate-accent);
+}
+
+[data-slate-forms] .slate-pin-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 640px;
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms] .slate-pin-count {
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+[data-slate-forms] .slate-pin-clear,
+[data-slate-forms] .slate-avail-clear {
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--slate-muted);
+  font-family: var(--slate-font-body);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+[data-slate-forms] .slate-pin-list {
+  display: grid;
+  gap: 8px;
+  max-width: 640px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-slate-forms] .slate-pin-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+[data-slate-forms] .slate-pin-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+[data-slate-forms] .slate-pin-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 16px;
+}
+
+[data-slate-forms] .slate-pin-row-text {
+  flex: 1 1 auto;
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-pin-remove,
+[data-slate-forms] .slate-shot-remove {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--slate-radius);
+  background: transparent;
+  color: var(--slate-muted);
+  cursor: pointer;
+}
+
+[data-slate-forms] .slate-pin-remove svg,
+[data-slate-forms] .slate-shot-remove svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+[data-slate-forms] .slate-pin-remove:hover,
+[data-slate-forms] .slate-shot-remove:hover {
+  color: var(--slate-error);
+}
+
+/* ============================================================
+   Voice note
+   ============================================================ */
+
+[data-slate-forms] .slate-voice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 26px;
+}
+
+[data-slate-forms] .slate-voice-stage {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+[data-slate-forms] .slate-voice-record {
+  --slate-level: 0;
+  --slate-progress: 0;
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  border: none;
+  border-radius: 50%;
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgb(var(--slate-accent-rgb) / 0.3);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms] .slate-voice-record:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+[data-slate-forms] .slate-voice-record:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 4px;
+}
+
+[data-slate-forms] .slate-voice-record > svg:not(.slate-voice-ring) {
+  width: 34px;
+  height: 34px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The ring fills as the time runs out. */
+[data-slate-forms] .slate-voice-ring {
+  position: absolute;
+  inset: -8px;
+  width: calc(100% + 16px);
+  height: calc(100% + 16px);
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+
+[data-slate-forms] .slate-voice-ring circle {
+  fill: none;
+  stroke: var(--slate-accent);
+  stroke-width: 3;
+  stroke-dasharray: 100;
+  stroke-dashoffset: calc(100 - var(--slate-progress) * 100);
+  opacity: 0;
+}
+
+[data-slate-forms] .slate-voice--recording .slate-voice-ring circle {
+  opacity: 1;
+}
+
+[data-slate-forms] .slate-voice--recording .slate-voice-record {
+  background: var(--slate-error);
+  box-shadow: 0 0 0 calc(4px + var(--slate-level) * 16px) color-mix(in srgb, var(--slate-error) 22%, transparent);
+}
+
+[data-slate-forms] .slate-voice-stop {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  background: var(--slate-bg);
+}
+
+[data-slate-forms] .slate-voice-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
+}
+
+[data-slate-forms] .slate-voice-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: clamp(1.05rem, 2.6vw, 1.2rem);
+  font-weight: 600;
+}
+
+[data-slate-forms] .slate-voice-sub {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms] .slate-voice-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--slate-error);
+}
+
+[data-slate-forms] .slate-voice-rec::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+[data-slate-forms] .slate-voice-time {
+  font-family: var(--slate-font-mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--slate-text);
+}
+
+/* Live meter and the recorded waveform share one bar shape. */
+[data-slate-forms] .slate-voice-meter,
+[data-slate-forms] .slate-voice-wave {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 44px;
+}
+
+[data-slate-forms] .slate-voice-meter {
+  width: min(100%, 320px);
+}
+
+[data-slate-forms] .slate-voice-wave {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+[data-slate-forms] .slate-voice-bar {
+  flex: 1 1 0;
+  min-width: 2px;
+  height: calc(6% + var(--slate-level, 0) * 94%);
+  border-radius: 2px;
+  background: var(--slate-dim);
+}
+
+[data-slate-forms] .slate-voice-meter .slate-voice-bar {
+  background: var(--slate-error);
+}
+
+[data-slate-forms] .slate-voice-bar.is-played {
+  background: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-voice-player {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(100%, 460px);
+  padding: 10px 16px 10px 10px;
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: 999px;
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms] .slate-voice-play {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+  cursor: pointer;
+}
+
+[data-slate-forms] .slate-voice-play svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-slate-forms] .slate-voice-play--done svg {
+  fill: none;
+}
+
+[data-slate-forms] .slate-voice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+[data-slate-forms] .slate-voice-btn,
+[data-slate-forms] .slate-shot-btn,
+[data-slate-forms] .slate-loc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
+  background: transparent;
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+[data-slate-forms] .slate-voice-btn:hover,
+[data-slate-forms] .slate-shot-btn:hover:not(:disabled),
+[data-slate-forms] .slate-loc-btn:hover:not(:disabled) {
+  border-color: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-voice-link,
+[data-slate-forms] .slate-loc-link {
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--slate-muted);
+  font-family: var(--slate-font-body);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+[data-slate-forms] .slate-voice-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms] .slate-voice-save--saved {
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-voice-save--error {
+  color: var(--slate-error);
+}
+
+[data-slate-forms] .slate-voice-check,
+[data-slate-forms] .slate-shot-check {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--slate-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 22;
+  stroke-dashoffset: 0;
+}
+
+[data-slate-forms] .slate-voice-note {
+  margin: 0;
+  max-width: 520px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--slate-accent);
+  background: var(--slate-bg-2);
+  color: var(--slate-text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+[data-slate-forms] .slate-voice-typed {
+  width: min(100%, 560px);
+  font-size: 16px;
+}
+
+/* ============================================================
+   Location
+   ============================================================ */
+
+[data-slate-forms] .slate-loc {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  margin-top: 26px;
+}
+
+[data-slate-forms] .slate-loc-radar {
+  position: relative;
+  flex: none;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--slate-bg-2);
+  border: var(--slate-border-width) solid var(--slate-border);
+}
+
+[data-slate-forms] .slate-loc-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+[data-slate-forms] .slate-loc-ring--outer {
+  width: 92%;
+  height: 92%;
+  border: 1px dashed var(--slate-border-md);
+}
+
+/* The service area: 62% of the radar's half-width (LocationField's scale). */
+[data-slate-forms] .slate-loc-ring--area {
+  width: 62%;
+  height: 62%;
+  border: 2px solid rgb(var(--slate-accent-rgb) / 0.5);
+  background: rgb(var(--slate-accent-rgb) / 0.08);
+}
+
+[data-slate-forms] .slate-loc--in .slate-loc-ring--area {
+  border-color: var(--slate-accent);
+  background: rgb(var(--slate-accent-rgb) / 0.2);
+}
+
+[data-slate-forms] .slate-loc-home {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 2px;
+  background: var(--slate-text);
+  transform: rotate(45deg);
+}
+
+[data-slate-forms] .slate-loc-dot {
+  position: absolute;
+  left: calc(50% + var(--slate-dx, 0) * 50%);
+  top: calc(50% + var(--slate-dy, 0) * 50%);
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: var(--slate-accent);
+  border: 3px solid var(--slate-bg);
+  box-shadow: 0 0 0 2px var(--slate-accent);
+}
+
+[data-slate-forms] .slate-loc--out .slate-loc-dot {
+  background: var(--slate-error);
+  box-shadow: 0 0 0 2px var(--slate-error);
+}
+
+[data-slate-forms] .slate-loc-sweep {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: conic-gradient(from 0deg, rgb(var(--slate-accent-rgb) / 0.35), transparent 28%);
+}
+
+[data-slate-forms] .slate-loc--locating .slate-loc-sweep {
+  opacity: 1;
+}
+
+[data-slate-forms] .slate-loc-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+[data-slate-forms] .slate-loc-result {
+  margin: 0;
+  color: var(--slate-text);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+[data-slate-forms] .slate-loc-btn {
+  min-height: 52px;
+  padding: 0 22px;
+  border: none;
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+[data-slate-forms] .slate-loc-btn:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+[data-slate-forms] .slate-loc-btn svg,
+[data-slate-forms] .slate-shot-btn svg,
+[data-slate-forms] .slate-shot-lib svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-slate-forms] .slate-loc-btn:focus-visible,
+[data-slate-forms] .slate-voice-btn:focus-visible,
+[data-slate-forms] .slate-shot-btn:focus-visible,
+[data-slate-forms] .slate-shot-lib:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 3px;
+}
+
+[data-slate-forms] .slate-loc-manual {
+  width: min(100%, 320px);
+}
+
+[data-slate-forms] .slate-loc-manual .slate-input {
+  font-size: 16px;
+}
+
+[data-slate-forms] .slate-loc-zip {
+  font-size: 14px;
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-loc-zip--out {
+  color: var(--slate-error);
+}
+
+[data-slate-forms] .slate-loc-privacy {
+  display: flex;
+  gap: 8px;
+  margin: 2px 0 0;
+  max-width: 440px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms] .slate-loc-privacy::before {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px 3px 7px 7px;
+}
+
+@media (max-width: 560px) {
+  [data-slate-forms] .slate-loc {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  [data-slate-forms] .slate-loc-radar {
+    width: 112px;
+    height: 112px;
+  }
+}
+
+/* ============================================================
+   Photo checklist
+   ============================================================ */
+
+[data-slate-forms] .slate-shots {
+  margin-top: 22px;
+}
+
+[data-slate-forms] .slate-shots-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-shots-ring {
+  width: 34px;
+  height: 34px;
+  transform: rotate(-90deg);
+}
+
+[data-slate-forms] .slate-shots-ring circle {
+  fill: none;
+  stroke-width: 4;
+}
+
+[data-slate-forms] .slate-shots-ring-track {
+  stroke: var(--slate-border-md);
+}
+
+[data-slate-forms] .slate-shots-ring-fill {
+  stroke: var(--slate-accent);
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: calc(100 - var(--slate-progress, 0) * 100);
+}
+
+[data-slate-forms] .slate-shots-count {
+  font-family: var(--slate-font-body);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms] .slate-shots-done {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+[data-slate-forms] .slate-shots-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 620px;
+}
+
+[data-slate-forms] .slate-shot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: calc(var(--slate-radius) + 2px);
+  background: transparent;
+}
+
+[data-slate-forms] .slate-shot--done {
+  border-color: rgb(var(--slate-accent-rgb) / 0.6);
+  background: var(--slate-accent-lo);
+}
+
+[data-slate-forms] .slate-shot--error {
+  border-color: var(--slate-error);
+}
+
+[data-slate-forms] .slate-shot-thumb {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: var(--slate-radius);
+  background: var(--slate-bg-2);
+  color: var(--slate-dim);
+}
+
+[data-slate-forms] .slate-shot-thumb > svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-slate-forms] .slate-shot-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+[data-slate-forms] .slate-shot-thumb .slate-shot-check {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--slate-accent);
+  stroke: var(--slate-on-accent);
+}
+
+[data-slate-forms] .slate-shot-spin {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--slate-bg) 55%, transparent);
+}
+
+[data-slate-forms] .slate-shot-spin::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 2.5px solid var(--slate-border-md);
+  border-top-color: var(--slate-accent);
+  border-radius: 50%;
+}
+
+[data-slate-forms] .slate-shot-text {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+[data-slate-forms] .slate-shot-label {
+  color: var(--slate-text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+[data-slate-forms] .slate-shot-desc {
+  color: var(--slate-muted);
+  font-size: 13px;
+}
+
+[data-slate-forms] .slate-shot-err {
+  color: var(--slate-error);
+  font-size: 13px;
+}
+
+[data-slate-forms] .slate-shot-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+[data-slate-forms] .slate-shot-btn:disabled,
+[data-slate-forms] .slate-shot-lib:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+[data-slate-forms] .slate-shot--done .slate-shot-btn {
+  border-color: transparent;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms] .slate-shot-lib {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--slate-radius);
+  background: transparent;
+  color: var(--slate-muted);
+  cursor: pointer;
+}
+
+[data-slate-forms] .slate-shots-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  [data-slate-forms] .slate-shot {
+    flex-wrap: wrap;
+  }
+
+  [data-slate-forms] .slate-shot-text {
+    flex-basis: calc(100% - 80px);
+  }
+
+  [data-slate-forms] .slate-shot-actions {
+    width: 100%;
+    padding-left: 78px;
+  }
+
+  [data-slate-forms] .slate-shot-btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* ============================================================
+   Availability grid
+   ============================================================ */
+
+[data-slate-forms] .slate-avail-lede {
+  margin-top: 10px;
+}
+
+[data-slate-forms] .slate-avail {
+  margin-top: 18px;
+}
+
+[data-slate-forms] .slate-avail-grid {
+  --slate-days: 5;
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  max-width: 640px;
+  outline: none;
+  /* Vertical swipes scroll; painting stops the scroll itself (touchmove). */
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms] .slate-avail-row {
+  display: grid;
+  grid-template-columns: 58px repeat(var(--slate-days), minmax(0, 1fr));
+  gap: 3px;
+}
+
+[data-slate-forms] .slate-avail-row--head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--slate-bg);
+  padding-bottom: 3px;
+}
+
+[data-slate-forms] .slate-avail-day,
+[data-slate-forms] .slate-avail-time {
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--slate-muted);
+  font-family: var(--slate-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+[data-slate-forms] .slate-avail-day {
+  min-height: 40px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--slate-text);
+  border-radius: var(--slate-radius);
+}
+
+[data-slate-forms] .slate-avail-day:hover,
+[data-slate-forms] .slate-avail-time:hover {
+  color: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-avail-time {
+  text-align: right;
+  padding-right: 6px;
+  white-space: nowrap;
+}
+
+[data-slate-forms] .slate-avail-cell {
+  display: block;
+  min-height: 34px;
+  border-radius: calc(var(--slate-radius) / 2);
+  background: var(--slate-bg-2);
+  border: 1px solid var(--slate-border);
+  cursor: pointer;
+  outline: none;
+}
+
+[data-slate-forms] .slate-avail-row--hour .slate-avail-cell {
+  border-top-color: var(--slate-border-md);
+}
+
+[data-slate-forms] .slate-avail-cell.is-on {
+  background: var(--slate-accent);
+  border-color: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-avail-cell:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--slate-bg),
+    0 0 0 4px var(--slate-accent);
+}
+
+[data-slate-forms] .slate-avail-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 640px;
+  margin-top: 10px;
+}
+
+[data-slate-forms] .slate-avail-sum {
+  font-size: 14px;
+  color: var(--slate-text);
+}
+
+@media (hover: hover) {
+  [data-slate-forms] .slate-avail-cell:not(.is-on):hover {
+    background: var(--slate-accent-lo);
+  }
+}
+
+@media (max-width: 480px) {
+  [data-slate-forms] .slate-avail-row {
+    grid-template-columns: 46px repeat(var(--slate-days), minmax(0, 1fr));
+    gap: 2px;
+  }
+
+  [data-slate-forms] .slate-avail-grid {
+    gap: 2px;
+  }
+
+  [data-slate-forms] .slate-avail-time {
+    font-size: 10px;
+    padding-right: 4px;
+  }
+
+  [data-slate-forms] .slate-avail-cell {
+    min-height: 32px;
+  }
+}
+
+/* ============================================================
+   Motion (ADR-059 pattern) — decoration only
+   ============================================================ */
+
+@keyframes slate-c-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes slate-pin-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-26px) scale(0.6);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.06);
+  }
+  75% {
+    transform: translateY(-3px) scale(0.98);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes slate-pin-ripple {
+  from {
+    opacity: 0.55;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+@keyframes slate-c-flash {
+  from {
+    background: var(--slate-accent-lo);
+  }
+}
+
+@keyframes slate-voice-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes slate-voice-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes slate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slate-loc-dot-in {
+  0% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.85);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes slate-loc-ping {
+  from {
+    box-shadow:
+      0 0 0 2px var(--slate-accent),
+      0 0 0 0 rgb(var(--slate-accent-rgb) / 0.45);
+  }
+  to {
+    box-shadow:
+      0 0 0 2px var(--slate-accent),
+      0 0 0 22px rgb(var(--slate-accent-rgb) / 0);
+  }
+}
+
+@keyframes slate-c-check {
+  from {
+    stroke-dashoffset: 22;
+  }
+}
+
+@keyframes slate-c-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes slate-avail-paint {
+  from {
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-swipe-deck,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-pin,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-voice,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-loc,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-avail {
+    animation: slate-c-rise 460ms cubic-bezier(0.16, 1, 0.3, 1) 140ms both;
+  }
+
+  /* The next card steps up when the top one leaves. */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-swipe-card:not(.slate-swipe-card--top) {
+    transition:
+      transform 320ms cubic-bezier(0.2, 1.3, 0.4, 1),
+      opacity 240ms ease-out;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-swipe-card--top {
+    transition: opacity 200ms ease-out;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-swipe-btn {
+    transition:
+      transform 160ms ease-out,
+      box-shadow 160ms ease-out;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-swipe-btn:active {
+    transform: scale(0.9);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-swipe-liked-item {
+    animation: slate-c-pop 380ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+    animation-delay: calc(var(--slate-i, 0) * 60ms);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-pin-dot--fresh::before,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-pin-dot--fresh .slate-pin-num {
+    animation: slate-pin-drop 520ms cubic-bezier(0.2, 1, 0.3, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-pin-dot--fresh::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -14px;
+    width: 30px;
+    height: 30px;
+    margin-left: -15px;
+    border: 2px solid var(--slate-accent);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: slate-pin-ripple 620ms ease-out 200ms both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-pin-row--fresh {
+    animation: slate-c-flash 900ms ease-out both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-pin-cursor {
+    transition:
+      left 90ms ease-out,
+      top 90ms ease-out;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-voice-record {
+    transition:
+      box-shadow 90ms linear,
+      background 200ms ease-out,
+      transform 160ms ease-out;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-voice-record:active:not(:disabled) {
+    transform: scale(0.94);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-voice:not(.slate-voice--recording) .slate-voice-record:not(:disabled) {
+    animation: slate-voice-pulse 1.6s ease-in-out 3;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-voice-ring circle {
+    transition: stroke-dashoffset 120ms linear;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-voice-rec::before {
+    animation: slate-voice-blink 1.2s steps(1) infinite;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-voice-meter .slate-voice-bar {
+    transition: height 90ms linear;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-voice-bar {
+    transition: background 120ms linear;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-voice--review .slate-voice-player {
+    animation: slate-c-rise 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-voice-save--saved .slate-voice-check,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-shot--done .slate-shot-check {
+    animation: slate-c-check 420ms ease-out 80ms both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-loc--locating .slate-loc-sweep {
+    animation: slate-spin 1.4s linear infinite;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-loc-dot {
+    animation:
+      slate-loc-dot-in 520ms cubic-bezier(0.2, 1.2, 0.4, 1) both,
+      slate-loc-ping 1.2s ease-out 520ms 2;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-loc--out .slate-loc-dot {
+    animation: slate-loc-dot-in 520ms cubic-bezier(0.2, 1.2, 0.4, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-loc-ring--area {
+    transition:
+      background 400ms ease-out,
+      border-color 400ms ease-out;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-loc-result {
+    animation: slate-c-rise 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-shot {
+    animation: slate-c-rise 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(140ms + var(--slate-i, 0) * 50ms);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-shot {
+    transition:
+      border-color 240ms ease-out,
+      background 240ms ease-out;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-shot--done .slate-shot-thumb img {
+    animation: slate-c-pop 360ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-shot-spin::after {
+    animation: slate-spin 0.8s linear infinite;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-shots-ring-fill {
+    transition: stroke-dashoffset 480ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-shots--complete .slate-shots-ring,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-shots-done {
+    animation: slate-c-pop 440ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-avail-cell.is-on {
+    animation: slate-avail-paint 160ms cubic-bezier(0.2, 1.3, 0.4, 1);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-avail-cell {
+    transition:
+      background 120ms ease-out,
+      border-color 120ms ease-out;
+  }
+}

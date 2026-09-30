@@ -1,5 +1,5 @@
 /**
- * Question catalog coverage (ADR-063, extended by ADR-064). Every question type must be wired
+ * Question catalog coverage (ADR-063, extended by ADR-064 and ADR-065). Every question type must be wired
  * through every surface that knows about types. A new type added in a later
  * wave fails here (and in `SAMPLES`, at compile time) until it is: studio
  * label, palette entry and icon, validation, answer formatting, the server
@@ -23,6 +23,9 @@ const opts = [
   { label: 'A', value: 'a' },
   { label: 'B', value: 'b' },
 ];
+/** File-like answers (voice, photos) keep only the form's own storage refs (ADR-058). */
+const FORM = 'f_coverage01';
+const UUID = '0b8e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5b';
 
 /** One minimal question and one plausible answer per type. Missing a type is a compile error. */
 const SAMPLES: Record<QuestionType, { q: Question; answer: unknown }> = {
@@ -84,6 +87,36 @@ const SAMPLES: Record<QuestionType, { q: Question; answer: unknown }> = {
     q: { id: 'x', type: 'signature', title: 'T', required: true },
     answer: { path: 'M10 150l40 -60 40 60 40 -60 40 60' },
   },
+  // Wave C (ADR-065)
+  image_pin: {
+    q: { id: 'x', type: 'image_pin', title: 'T', image: 'https://example.com/roof.jpg', maxPins: 2 },
+    answer: { pins: ['0.25,0.5', '0.7,0.1'], notes: ['leak here', ''] },
+  },
+  voice_note: {
+    q: { id: 'x', type: 'voice_note', title: 'T', maxSeconds: 90 },
+    answer: { audio: `slate-file://storage:public/${FORM}/${UUID}/voice-note.m4a`, sec: '42' },
+  },
+  location: {
+    q: {
+      id: 'x',
+      type: 'location',
+      title: 'T',
+      center: { lat: 34.42, lng: -119.7 },
+      radius: 25,
+    },
+    answer: { lat: '34.441', lng: '-119.812', area: 'in' },
+  },
+  photo_checklist: {
+    q: { id: 'x', type: 'photo_checklist', title: 'T', items: opts },
+    answer: {
+      a: `slate-file://storage:public/${FORM}/${UUID}/front.jpg`,
+      b: `slate-file://storage:public/${FORM}/${UUID}/roof.jpg`,
+    },
+  },
+  availability: {
+    q: { id: 'x', type: 'availability', title: 'T', days: ['mon', 'wed'], slotMinutes: 30 },
+    answer: { mon: '09:00-11:30', wed: '14:00-15:00' },
+  },
 };
 
 const CHROME = new Set<QuestionType>(['welcome', 'thanks']);
@@ -105,7 +138,10 @@ describe('question catalog coverage (ADR-063)', () => {
     expect(typeof formatAnswerFor(q, answer)).toBe('string');
     expect(typeof formatAnswerForQuestion(q, answer)).toBe('string');
     if (answer !== undefined && type !== 'file_upload') {
-      expect(clampForQuestion(q as unknown as Record<string, unknown>, answer)).not.toBeUndefined();
+      const clamped = clampForQuestion(q as unknown as Record<string, unknown>, answer, {
+        formId: FORM,
+      });
+      expect(clamped).not.toBeUndefined();
     }
     // An on-demand UI is optional; when there is one, its key is a string.
     const key = extFieldKey(q);
@@ -147,5 +183,54 @@ describe('question catalog coverage (ADR-063)', () => {
     expect(extFieldKey(SAMPLES.contact_info.q)).toBe('contact-info');
     expect(extFieldKey(SAMPLES.address.q)).toBe('address');
     expect(extFieldKey(SAMPLES.signature.q)).toBe('signature');
+  });
+
+  it('Wave C types, swipe cards and the dropdown load their UI on demand (ADR-065)', () => {
+    expect(extFieldKey(SAMPLES.image_pin.q)).toBe('image-pin');
+    expect(extFieldKey(SAMPLES.voice_note.q)).toBe('voice-note');
+    expect(extFieldKey(SAMPLES.location.q)).toBe('location');
+    expect(extFieldKey(SAMPLES.photo_checklist.q)).toBe('photo-checklist');
+    expect(extFieldKey(SAMPLES.availability.q)).toBe('availability');
+    expect(extFieldKey(SAMPLES.dropdown.q)).toBe('dropdown');
+    const swipePics = { ...SAMPLES.picture_choice.q, display: 'swipe', multiple: true } as Question;
+    expect(extFieldKey(swipePics)).toBe('swipe');
+    // Swipe needs multi-select; single-select stays on the grid.
+    expect(extFieldKey({ ...swipePics, multiple: false } as Question)).toBe('picture-choice');
+    expect(extFieldKey({ ...SAMPLES.yes_no.q, display: 'swipe' } as Question)).toBe('swipe');
+    expect(extFieldKey(SAMPLES.yes_no.q)).toBeNull();
+  });
+
+  it('portable schemas keep Wave C options in known shapes (ADR-065)', () => {
+    const out = sanitizeUntrustedSchema({
+      brand: { name: 'x' },
+      theme: 'classic',
+      themeMode: 'light',
+      questions: [
+        { ...SAMPLES.image_pin.q, id: 'pin' },
+        { ...SAMPLES.location.q, id: 'loc', radiusUnit: 'km', privacyNote: 'Just the area.' },
+        { ...SAMPLES.availability.q, id: 'week', startTime: '07:30', endTime: '12:00' },
+        { ...SAMPLES.photo_checklist.q, id: 'shots' },
+        { ...SAMPLES.voice_note.q, id: 'voice', allowTyped: false },
+        { ...SAMPLES.picture_choice.q, id: 'swipe', display: 'swipe', multiple: true },
+        { ...SAMPLES.yes_no.q, id: 'yn', display: 'swipe' },
+      ],
+    } as never);
+    const by = Object.fromEntries(out.questions.map((q) => [q.id, q])) as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(by.pin!.image).toBe('https://example.com/roof.jpg');
+    expect(by.pin!.maxPins).toBe(2);
+    expect(by.loc!.center).toEqual({ lat: 34.42, lng: -119.7 });
+    expect(by.loc!.radius).toBe(25);
+    expect(by.loc!.radiusUnit).toBe('km');
+    expect(by.week!.days).toEqual(['mon', 'wed']);
+    expect(by.week!.slotMinutes).toBe(30);
+    expect(by.week!.startTime).toBe('07:30');
+    expect(by.shots!.items).toEqual(opts);
+    expect(by.voice!.maxSeconds).toBe(90);
+    expect(by.voice!.allowTyped).toBe(false);
+    expect(by.swipe!.display).toBe('swipe');
+    expect(by.yn!.display).toBe('swipe');
   });
 });

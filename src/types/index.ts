@@ -35,6 +35,15 @@ export type {
   AddressFormat,
   SignatureQuestion,
   ChoiceDisplay,
+  YesNoDisplay,
+  PictureChoiceDisplay,
+  ImagePinQuestion,
+  VoiceNoteQuestion,
+  LocationQuestion,
+  DistanceUnit,
+  PhotoChecklistQuestion,
+  AvailabilityQuestion,
+  Weekday,
   Option,
   PictureOption,
   Condition,
@@ -55,6 +64,11 @@ export type {
   ContactAnswer,
   AddressAnswer,
   SignatureAnswer,
+  ImagePinAnswer,
+  VoiceNoteAnswer,
+  LocationAnswer,
+  PhotoChecklistAnswer,
+  AvailabilityAnswer,
 } from './Answers.js';
 
 export type { Estimate, EstimateLine, EstimateSettings } from './Estimate.js';

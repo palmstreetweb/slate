@@ -1122,5 +1122,40 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
       return { id, type, title: 'What’s the address?', required: true };
     case 'signature':
       return { id, type, title: 'Sign here', required: true };
+    // Wave C (ADR-065)
+    case 'image_pin':
+      return { id, type, title: 'Where’s the problem? Tap the photo.', required: true, maxPins: 3 };
+    case 'voice_note':
+      return {
+        id,
+        type,
+        title: 'Tell us about it in your own words',
+        body: 'Tap record and talk — up to a minute.',
+        maxSeconds: 60,
+      };
+    case 'location':
+      return { id, type, title: 'Where’s the job?', required: true, radius: 25, radiusUnit: 'mi' };
+    case 'photo_checklist':
+      return {
+        id,
+        type,
+        title: 'Snap a few photos for us',
+        items: [
+          { label: 'Front of the house', value: 'front' },
+          { label: 'Roof close-up', value: 'roof' },
+          { label: 'Electrical panel', value: 'panel' },
+        ],
+      };
+    case 'availability':
+      return {
+        id,
+        type,
+        title: 'When are you free for a visit?',
+        required: true,
+        days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+        startTime: '08:00',
+        endTime: '18:00',
+        slotMinutes: 60,
+      };
   }
 }

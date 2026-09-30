@@ -31,10 +31,12 @@ const DISPLAY: Record<string, readonly unknown[]> = {
   scale: ['numbers', 'stars', 'emoji', 'slider'],
   number: ['input', 'stepper'],
   single_choice: ['list', 'cards'],
+  picture_choice: ['grid', 'swipe'],
+  yes_no: ['buttons', 'swipe'],
 };
 const FLAGS = ['allowOther', 'includeTime', 'range', 'showEstimate'];
 /** Wave B options that are real booleans either way (ADR-064). */
-const BOOLEANS = ['line2', 'country', 'allowTyped'];
+const BOOLEANS = ['line2', 'country', 'allowTyped', 'notes'];
 const PRICE_MAX = 10_000_000;
 
 function price(v: unknown): number | undefined {
@@ -88,6 +90,83 @@ function sanitizeWaveB(next: Record<string, unknown>): void {
     else delete next.serviceArea;
   }
   if ('body' in next) next.body = clampText(next.body);
+}
+
+/** A finite number in [lo, hi], or undefined. */
+function bounded(v: unknown, lo: number, hi: number): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined;
+}
+
+/** Keep a numeric key only when it's in range. */
+function keepBounded(obj: Record<string, unknown>, key: string, lo: number, hi: number): void {
+  if (!(key in obj)) return;
+  const n = bounded(obj[key], lo, hi);
+  if (n === undefined) delete obj[key];
+  else obj[key] = n;
+}
+
+const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+/**
+ * Wave C (ADR-065): pins, voice, location, photo checklist and availability
+ * settings in known shapes. A pin photo keeps only an https link — a studio
+ * upload (a data: image) is left out of portable links, as the logo is.
+ */
+function sanitizeWaveC(next: Record<string, unknown>): void {
+  if ('image' in next) {
+    const safe = httpsOnly(next.image);
+    if (safe) next.image = safe;
+    else delete next.image;
+  }
+  if ('imageAlt' in next) {
+    if (typeof next.imageAlt === 'string') next.imageAlt = next.imageAlt.slice(0, 200);
+    else delete next.imageAlt;
+  }
+  keepBounded(next, 'maxPins', 1, 10);
+  keepBounded(next, 'maxSeconds', 5, 300);
+  keepBounded(next, 'radius', 0.1, 1000);
+  if ('radiusUnit' in next && next.radiusUnit !== 'mi' && next.radiusUnit !== 'km') {
+    delete next.radiusUnit;
+  }
+  if ('center' in next) {
+    const c = next.center as Record<string, unknown> | null;
+    const lat = c && typeof c === 'object' ? bounded(c.lat, -90, 90) : undefined;
+    const lng = c && typeof c === 'object' ? bounded(c.lng, -180, 180) : undefined;
+    if (lat !== undefined && lng !== undefined) next.center = { lat, lng };
+    else delete next.center;
+  }
+  if ('privacyNote' in next) {
+    if (typeof next.privacyNote === 'string') next.privacyNote = next.privacyNote.slice(0, 300);
+    else delete next.privacyNote;
+  }
+  if ('days' in next) {
+    const days = Array.isArray(next.days)
+      ? [...new Set((next.days as unknown[]).filter((d): d is string => WEEKDAYS.includes(d as string)))]
+      : [];
+    if (days.length) next.days = days;
+    else delete next.days;
+  }
+  for (const key of ['startTime', 'endTime']) {
+    if (key in next && !(typeof next[key] === 'string' && /^\d{2}:\d{2}$/.test(next[key] as string))) {
+      delete next[key];
+    }
+  }
+  if ('slotMinutes' in next && ![15, 30, 60, 120].includes(next.slotMinutes as number)) {
+    delete next.slotMinutes;
+  }
+  if (Array.isArray(next.items)) {
+    next.items = (next.items as unknown[])
+      .filter((o): o is Record<string, unknown> => Boolean(o) && typeof o === 'object')
+      .slice(0, 30)
+      .map((o) => ({
+        label: typeof o.label === 'string' ? o.label.slice(0, 120) : '',
+        value: typeof o.value === 'string' ? o.value.slice(0, 64) : '',
+        ...(typeof o.description === 'string' ? { description: o.description.slice(0, 200) } : {}),
+      }))
+      .filter((o) => o.label && o.value);
+  } else if ('items' in next) {
+    delete next.items;
+  }
 }
 
 function sanitizeOption(o: Record<string, unknown>): void {
@@ -153,6 +232,7 @@ export function sanitizeUntrustedSchema(schema: Schema): Schema {
     }
     sanitizeOptions(next);
     sanitizeWaveB(next);
+    sanitizeWaveC(next);
     if ('redirectUrl' in next) {
       const safe = httpsOnly(next.redirectUrl);
       if (safe) next.redirectUrl = safe;

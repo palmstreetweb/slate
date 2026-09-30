@@ -33,7 +33,6 @@ import { ScaleField } from './ScaleField.js';
 import { NpsField } from './NpsField.js';
 import { SingleChoiceField } from './SingleChoiceField.js';
 import { MultiChoiceField } from './MultiChoiceField.js';
-import { DropdownField } from './DropdownField.js';
 import { YesNoField } from './YesNoField.js';
 import { LegalField } from './LegalField.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
@@ -166,11 +165,13 @@ export function QuestionRenderer({
             scheduleAutoAdvance(() => advance());
           }}
           onAdvance={advanceWithSound}
+          onAdvanceSilent={advance}
           onType={playTypingSound}
           ping={ping}
           onFileUpload={onFileUpload}
           resolveFileUploadMeta={resolveFileUploadMeta}
           currency={estimateCurrency(estimateSettings)}
+          allQuestions={allQuestions}
         />
       </>
     );
@@ -363,24 +364,6 @@ export function QuestionRenderer({
         </>
       );
 
-    case 'dropdown':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <DropdownField
-            question={question}
-            answers={answers}
-            selected={answers[question.id] as string | undefined}
-            onSelect={(v) => {
-              ping();
-              setAnswer(question.id, v);
-            }}
-            onAdvance={advance}
-            onSubmit={advanceWithSound}
-          />
-        </>
-      );
-
     case 'yes_no':
       return (
         <>
@@ -421,6 +404,12 @@ export function QuestionRenderer({
       );
 
     // Always on demand (extFieldKey above); listed so the switch stays total.
+    case 'dropdown':
+    case 'image_pin':
+    case 'voice_note':
+    case 'location':
+    case 'photo_checklist':
+    case 'availability':
     case 'contact_info':
     case 'address':
     case 'signature':

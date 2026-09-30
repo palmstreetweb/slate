@@ -18,9 +18,20 @@ const PROBE_ORIGIN = 'https://slate.invalid';
 /** ~75 KB decoded. A 24px-tall mark needs far less, and every respondent downloads the schema. */
 export const MAX_LOGO_DATA_URL_LENGTH = 100_000;
 
+/**
+ * The photo on a pin-the-spot question (ADR-065): ~150 KB decoded. The studio
+ * compresses uploads to about 110 KB; this is the ceiling the engine renders.
+ */
+export const PIN_IMAGE_DATA_MAX = 200_000;
+
 const DATA_IMAGE_URL = /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/]+={0,2}$/i;
 
 export function safeLogoSrc(raw: unknown): string | null {
+  return safeImageSrc(raw, MAX_LOGO_DATA_URL_LENGTH);
+}
+
+/** The same rules as `safeLogoSrc`, with the caller's cap on `data:` URLs. */
+export function safeImageSrc(raw: unknown, maxDataLength: number): string | null {
   if (typeof raw !== 'string') return null;
   const value = raw.trim();
   if (!value) return null;
@@ -36,7 +47,7 @@ export function safeLogoSrc(raw: unknown): string | null {
   }
 
   if (/^data:/i.test(value)) {
-    return value.length <= MAX_LOGO_DATA_URL_LENGTH && DATA_IMAGE_URL.test(value) ? value : null;
+    return value.length <= maxDataLength && DATA_IMAGE_URL.test(value) ? value : null;
   }
 
   try {

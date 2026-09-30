@@ -319,6 +319,9 @@ export type DropdownQuestion<
     required?: boolean;
   };
 
+/** How a `yes_no` question is drawn (ADR-065). The answer is the same `'yes' | 'no'`. */
+export type YesNoDisplay = 'buttons' | 'swipe';
+
 /** Binary yes/no. Stored as `'yes' | 'no'`. */
 export type YesNoQuestion<TId extends string = string> = IdField<TId> &
   Visibility &
@@ -329,7 +332,15 @@ export type YesNoQuestion<TId extends string = string> = IdField<TId> &
     noLabel?: string;
     /** Defaults to true. */
     required?: boolean;
+    /**
+     * 'buttons' (default) is two choices; 'swipe' is one card — swipe right
+     * (or →, or ✓) for yes, left for no (ADR-065).
+     */
+    display?: YesNoDisplay;
   };
+
+/** How a `picture_choice` question is drawn (ADR-065). */
+export type PictureChoiceDisplay = 'grid' | 'swipe';
 
 /**
  * Image-grid choice. Single-select by default (auto-advance, required
@@ -352,6 +363,12 @@ export type PictureChoiceQuestion<
     /** Multi-select only. */
     min?: number;
     max?: number;
+    /**
+     * 'grid' (default), or 'swipe' — a card stack: swipe right to like, left
+     * to pass (ADR-065). Swipe needs `multiple: true`; the answer is the same
+     * list of picked (liked) option values, so switching styles keeps answers.
+     */
+    display?: PictureChoiceDisplay;
   };
 
 /** Reorder a list. Stored as the full ordered array of option values. */
@@ -467,6 +484,113 @@ export type SignatureQuestion<TId extends string = string> = IdField<TId> &
     allowTyped?: boolean;
   };
 
+/* ---------- Wave C: pins, voice, location, photos, availability (ADR-065) ---------- */
+
+/**
+ * Pin the spot: the respondent taps the owner's photo (a house, a roof, a
+ * car) to drop numbered pins, each with an optional short note. Stored as
+ * `{ pins: ['x,y', …], notes?: [...], img? }` with x / y from 0 to 1.
+ */
+export type ImagePinQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'image_pin';
+    title: DynamicTitle;
+    /**
+     * The photo to mark: an `https:` URL, or a small `data:image/…` the studio
+     * compressed from an upload. It travels with the published schema.
+     */
+    image?: string;
+    /** What the photo shows, for screen readers. */
+    imageAlt?: string;
+    required?: boolean;
+    /** Most pins, 1–10; default 3. */
+    maxPins?: number;
+    /** Ask for a short note on each pin ("leak here"); default true. */
+    notes?: boolean;
+  };
+
+/**
+ * Tap to record a short voice note (MediaRecorder). Uploaded like a file;
+ * stored as `{ audio, sec }` (a storage ref and the length in seconds), or
+ * `{ typed }` when the respondent typed instead.
+ */
+export type VoiceNoteQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'voice_note';
+    title: DynamicTitle;
+    /** What to talk about, shown under the title. */
+    body?: string;
+    required?: boolean;
+    /** Longest recording, 5–300 seconds; default 60. */
+    maxSeconds?: number;
+    /**
+     * Offer "Type instead" (no microphone, mic blocked, or a quiet place);
+     * default true.
+     */
+    allowTyped?: boolean;
+  };
+
+/** Units for a service-area radius. */
+export type DistanceUnit = 'mi' | 'km';
+
+/**
+ * "Use my location" and a service-area radius. Stored as
+ * `{ lat, lng, area? }` rounded to 3 decimals (about 100 m), or `{ zip, area? }`
+ * / `{ typed }` when location is off. `area` ('in' | 'out') is recomputed by
+ * the server from the published center and radius. Conditions test it with
+ * `IN_AREA_VALUE` / `OUT_OF_AREA_VALUE`, like an address.
+ */
+export type LocationQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'location';
+    title: DynamicTitle;
+    required?: boolean;
+    /** The middle of the service area (the shop, a town). Public with the form. */
+    center?: { lat: number; lng: number };
+    /** How far you serve from `center`. */
+    radius?: number;
+    /** Default 'mi'. */
+    radiusUnit?: DistanceUnit;
+    /** The privacy line under the button; a clear default is used when unset. */
+    privacyNote?: string;
+  };
+
+/**
+ * Camera-first photo checklist: one photo per shot the owner lists ("Front of
+ * house", "Electrical panel"). Stored as `{ [itemValue]: fileRef }`.
+ */
+export type PhotoChecklistQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'photo_checklist';
+    title: DynamicTitle;
+    /** The shots, in order. */
+    items: ReadonlyArray<Option>;
+    /** Every shot is needed; default true. */
+    required?: boolean;
+  };
+
+/** Days of the week, as stored in availability answers. */
+export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+/**
+ * A week grid the respondent paints with the times they're free (When2meet
+ * style). Stored as `{ [day]: 'HH:MM-HH:MM,…' }` — only days with time.
+ */
+export type AvailabilityQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'availability';
+    title: DynamicTitle;
+    required?: boolean;
+    /** Columns, in order; default Monday to Friday. */
+    days?: ReadonlyArray<Weekday>;
+    /** First slot starts, 'HH:MM' 24-hour; default '08:00'. */
+    startTime?: string;
+    /** Last slot ends, 'HH:MM' (up to '24:00'); default '18:00'. */
+    endTime?: string;
+    /** Slot length in minutes: 15, 30, 60 or 120; default 60. */
+    slotMinutes?: number;
+  };
+
 /* ---------- scale ---------- */
 
 /** How a `scale` question is drawn (ADR-063). The answer is the same number in every style. */
@@ -528,6 +652,11 @@ export type Question =
   | ContactInfoQuestion
   | AddressQuestion
   | SignatureQuestion
+  | ImagePinQuestion
+  | VoiceNoteQuestion
+  | LocationQuestion
+  | PhotoChecklistQuestion
+  | AvailabilityQuestion
   | ReviewQuestion
   | ThanksQuestion;
 

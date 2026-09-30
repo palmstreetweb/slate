@@ -8,6 +8,7 @@
  *   Y / N (in body)            → select yes_no answer (A/B also work)
  *   A / B (in body)            → select legal accept/decline
  *   0–9 (in body)              → select scale / nps value if in range
+ *   ← / → on swipe cards       → owned by the card deck (ADR-065); letters don't pick cards
  *   Esc (opt-in)               → back
  *
  * Field-internal Enter handling (text inputs, textareas) lives inside each
@@ -99,11 +100,13 @@ export function useKeyboardNav({
         }
       }
 
-      // Choice selection — A–Z, one key per option.
+      // Choice selection — A–Z, one key per option. Swipe cards (ADR-065) are a
+      // deck, not a grid: the deck owns ← / →, so letters don't jump ahead.
       if (
         (currentQ.type === 'single_choice' ||
           currentQ.type === 'multi_choice' ||
-          currentQ.type === 'picture_choice') &&
+          (currentQ.type === 'picture_choice' &&
+            !(currentQ.display === 'swipe' && currentQ.multiple))) &&
         onSelectChoice &&
         !typing
       ) {

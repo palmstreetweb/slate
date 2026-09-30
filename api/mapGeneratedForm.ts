@@ -211,7 +211,9 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         type: 'picture_choice',
         title,
         options: pictureOptionsOf(q),
-        multiple: q.multiple,
+        // Swipe cards store the liked list, so they turn on multi-select (ADR-065).
+        multiple: q.display === 'swipe' ? true : q.multiple,
+        ...(q.display === 'swipe' ? { display: 'swipe' as const } : {}),
         required,
         min: q.min,
         max: q.max || undefined,
@@ -239,6 +241,7 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         yesLabel: text(q.yesLabel, 'Yes'),
         noLabel: text(q.noLabel, 'No'),
         required,
+        ...(q.display === 'swipe' ? { display: 'swipe' as const } : {}),
         ...vis,
       };
     case 'legal':
@@ -294,7 +297,72 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
       };
     }
     case 'signature':
-      return { id, type: 'signature', title, body: text(q.body), required, ...vis };
+      return {
+        id,
+        type: 'signature',
+        title,
+        body: text(q.body),
+        required,
+        ...(q.allowTyped === false ? { allowTyped: false } : {}),
+        ...vis,
+      };
+    // Wave C (ADR-065)
+    case 'image_pin':
+      return {
+        id,
+        type: 'image_pin',
+        title,
+        required,
+        maxPins: Math.min(10, Math.max(1, Math.round(q.max || 3))),
+        ...vis,
+      };
+    case 'voice_note':
+      return {
+        id,
+        type: 'voice_note',
+        title,
+        body: text(q.body),
+        required,
+        maxSeconds: Math.min(300, Math.max(5, Math.round(q.max || 60))),
+        ...(q.allowTyped === false ? { allowTyped: false } : {}),
+        ...vis,
+      };
+    case 'location':
+      return {
+        id,
+        type: 'location',
+        title,
+        required,
+        ...(q.radius > 0 && q.radius <= 1000
+          ? { radius: q.radius, radiusUnit: q.radiusUnit === 'km' ? ('km' as const) : ('mi' as const) }
+          : {}),
+        ...vis,
+      };
+    case 'photo_checklist':
+      return {
+        id,
+        type: 'photo_checklist',
+        title,
+        required,
+        items: plainOptions(q.options).slice(0, 30),
+        ...vis,
+      };
+    case 'availability': {
+      const time = (t: string) => (/^([01]\d|2[0-4]):[0-5]\d$/.test(t.trim()) ? t.trim() : undefined);
+      const slot = [15, 30, 60, 120].includes(q.step) ? q.step : undefined;
+      const days = [...new Set(q.days ?? [])];
+      return {
+        id,
+        type: 'availability',
+        title,
+        required,
+        ...(days.length ? { days } : {}),
+        ...(time(q.startTime) ? { startTime: time(q.startTime) } : {}),
+        ...(time(q.endTime) ? { endTime: time(q.endTime) } : {}),
+        ...(slot ? { slotMinutes: slot } : {}),
+        ...vis,
+      };
+    }
     case 'review':
       return {
         id,
@@ -342,6 +410,12 @@ function blankQuestion(
     range: false,
     unitPrice: 0,
     serviceArea: [],
+    allowTyped: true,
+    radius: 0,
+    radiusUnit: '',
+    days: [],
+    startTime: '',
+    endTime: '',
     showIfField: '',
     showIfEquals: '',
     ...partial,

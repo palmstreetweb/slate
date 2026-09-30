@@ -130,6 +130,39 @@ const PATHS: Record<Question['type'], ReactNode> = {
   signature: (
     <path d="M2.5 10.8c1.5-2.4 2.7-5.8 1.7-6.3-1.1-.5-1.6 4.9.2 5.4 1.3.4 2.3-2.7 3-2.6.6.1-.3 2.3.3 2.4.6.1 1.4-1.3 2-1.2.5.1.4 1.1 1 1.2.5 0 1-.5 1.6-.9M2.5 13.3h11" />
   ),
+  // Wave C (ADR-065)
+  image_pin: (
+    <>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M8 11s-2.3-2.1-2.3-3.8a2.3 2.3 0 0 1 4.6 0C10.3 8.9 8 11 8 11z" />
+    </>
+  ),
+  voice_note: (
+    <>
+      <rect x="6" y="2" width="4" height="7.4" rx="2" />
+      <path d="M3.6 7.6a4.4 4.4 0 0 0 8.8 0M8 12v2M5.8 14h4.4" />
+    </>
+  ),
+  location: (
+    <>
+      <circle cx="8" cy="8" r="4.6" />
+      <circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none" />
+      <path d="M8 1.6v2M8 12.4v2M1.6 8h2M12.4 8h2" />
+    </>
+  ),
+  photo_checklist: (
+    <>
+      <path d="M2.4 5.4h2.3l1.2-1.9h4.2l1.2 1.9h2.3v7.6H2.4z" />
+      <path d="M5.9 9.2 7.4 10.7l2.8-3" />
+    </>
+  ),
+  availability: (
+    <>
+      <rect x="2.5" y="2.5" width="11" height="11" rx="1.5" />
+      <path d="M2.5 6h11M6.2 6v7.5M9.8 6v7.5" />
+      <rect x="6.6" y="6.6" width="2.8" height="3.1" fill="currentColor" stroke="none" />
+    </>
+  ),
 };
 
 export function TypeIcon({

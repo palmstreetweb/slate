@@ -23,6 +23,8 @@ const ORDER = [
   'questions.css',
   // On-demand field UIs (ADR-063); in the published sheet so hosts import one file.
   'extensions.css',
+  // Wave C on-demand field UIs (ADR-065).
+  'extensions-c.css',
   'motion.css',
 ];
 

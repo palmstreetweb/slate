@@ -30,6 +30,11 @@ export const TYPE_LABEL: Record<Question['type'], string> = {
   contact_info: 'Contact Info',
   address: 'Address',
   signature: 'Signature',
+  image_pin: 'Pin the Spot',
+  voice_note: 'Voice Note',
+  location: 'Location',
+  photo_checklist: 'Photo Checklist',
+  availability: 'Availability',
   review: 'Review Screen',
 };
 
@@ -53,6 +58,12 @@ export const ADDABLE_TYPES: ReadonlyArray<{ type: QuestionType; label: string; g
   { type: 'nps', label: TYPE_LABEL.nps, group: 'Choices' },
   { type: 'ranking', label: TYPE_LABEL.ranking, group: 'Choices' },
   { type: 'matrix', label: TYPE_LABEL.matrix, group: 'Choices' },
+  // Wave C (ADR-065): things a phone captures on the spot.
+  { type: 'photo_checklist', label: TYPE_LABEL.photo_checklist, group: 'Capture' },
+  { type: 'image_pin', label: TYPE_LABEL.image_pin, group: 'Capture' },
+  { type: 'voice_note', label: TYPE_LABEL.voice_note, group: 'Capture' },
+  { type: 'location', label: TYPE_LABEL.location, group: 'Capture' },
+  { type: 'availability', label: TYPE_LABEL.availability, group: 'Capture' },
   { type: 'statement', label: TYPE_LABEL.statement, group: 'Other' },
   { type: 'legal', label: TYPE_LABEL.legal, group: 'Other' },
   { type: 'signature', label: TYPE_LABEL.signature, group: 'Other' },

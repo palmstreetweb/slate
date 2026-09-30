@@ -10,6 +10,11 @@
  * Instant estimates (ADR-064): recomputed here from the published schema and
  * the sanitized answers, and stored in meta.estimate; a client value never is.
  *
+ * Wave C (ADR-065): pins, locations and availability are re-derived from the
+ * published question (a location's in / out of the service area is the
+ * server's own); voice notes and photo checklists keep this form's own
+ * storage refs only.
+ *
  * Closed forms (ADR-063): a form past its closing time is refused (410) right
  * after the gate read, before any charge; a form at its response cap is
  * refused (409) by the insert itself, which counts under a per-form lock so
@@ -35,6 +40,7 @@ import { fillUnlockToken, isValidUnlockToken } from './fillLock.js';
 import { clientIp } from './requestIp.js';
 import { clampForQuestion, clampText, isSafeKey, keepFileRefs } from './answerShape.js';
 import { computeEstimateCore } from './estimate.js';
+import { formZipAreas } from './geo.js';
 import { aboutMinutes, charge, intEnv, ipMax, ownerKey, units, type Bucket } from './rateGate.js';
 
 /** Hard caps on what one submission may carry (ADR-046, ADR-058). */
@@ -160,12 +166,14 @@ function sanitizeAnswers(
     }
   }
   const out: Record<string, unknown> = {};
+  // Wave C (ADR-065): a ZIP typed on a location is checked against the published address areas.
+  const ctx = { formId, zipAreas: formZipAreas(questions) };
   let n = 0;
   for (const [k, v] of Object.entries(raw)) {
     const q = byId.get(k);
     if (!q) continue;
     if (n >= MAX_ANSWER_KEYS) break;
-    const c = q.type === 'file_upload' ? keepFileRefs(v, formId, q) : clampForQuestion(q, v);
+    const c = q.type === 'file_upload' ? keepFileRefs(v, formId, q) : clampForQuestion(q, v, ctx);
     if (c === undefined) continue;
     out[k] = c;
     n += 1;

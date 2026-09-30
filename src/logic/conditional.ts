@@ -12,14 +12,17 @@
  *     question's option values, passed as `others` (see `otherIndex`);
  *     without them it matches nothing.
  *   - `IN_AREA_VALUE` / `OUT_OF_AREA_VALUE` on an address question compare its
- *     ZIP with the question's service area (ADR-064), passed as `areas`
- *     (see `areaIndex`). No area, or no ZIP yet, matches neither.
+ *     ZIP with the question's service area (ADR-064); on a location question,
+ *     its position with the radius (ADR-065). Passed as `areas` (see
+ *     `areaIndex`). No area, or no answer to check yet, matches neither.
  */
 
 import type { Condition } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { OTHER_VALUE, hasOtherAnswer, type OtherIndex } from './other.js';
-import { IN_AREA_VALUE, OUT_OF_AREA_VALUE, areaStatus, type AreaIndex } from './address.js';
+import { IN_AREA_VALUE, OUT_OF_AREA_VALUE, type AreaIndex } from './address.js';
+
+type AreaCheck = (answer: unknown) => 'in' | 'out' | null;
 
 function isEmpty(v: unknown): boolean {
   if (v === undefined || v === null) return true;
@@ -40,11 +43,11 @@ function eqLeaf(
   answer: unknown,
   target: string | number,
   optionValues: ReadonlySet<string> | undefined,
-  area: ReadonlyArray<string> | undefined,
+  area: AreaCheck | undefined,
 ): boolean {
   if (target === OTHER_VALUE) return optionValues ? hasOtherAnswer(answer, optionValues) : false;
-  if (target === IN_AREA_VALUE) return area ? areaStatus(answer, area) === 'in' : false;
-  if (target === OUT_OF_AREA_VALUE) return area ? areaStatus(answer, area) === 'out' : false;
+  if (target === IN_AREA_VALUE) return area ? area(answer) === 'in' : false;
+  if (target === OUT_OF_AREA_VALUE) return area ? area(answer) === 'out' : false;
   const arr = asArray(answer);
   if (arr) return arr.some((x) => x === target);
   return answer === target;
@@ -54,7 +57,7 @@ function inLeaf(
   answer: unknown,
   targets: ReadonlyArray<string | number>,
   optionValues: ReadonlySet<string> | undefined,
-  area: ReadonlyArray<string> | undefined,
+  area: AreaCheck | undefined,
 ): boolean {
   return targets.some((t) => eqLeaf(answer, t, optionValues, area));
 }

@@ -6,7 +6,8 @@
  *
  * Auth model:
  * - public/ upload: anonymous OK when form is published and its published
- *   schema has a file question; size capped by that question (ADR-050).
+ *   schema has a file question — a file upload, a voice note or a photo
+ *   checklist (ADR-065); size capped by the roomiest one (ADR-050).
  *   Password-locked forms (ADR-043) also need the respondent's unlockToken.
  *   Charged by size to IP + form owner and IP, after the form lookup (ADR-058).
  * - draft/ upload + all download/meta/content: Bearer JWT, signature verified
@@ -87,6 +88,8 @@ const ALLOWED_TYPES = new Set([
   'audio/mpeg',
   'audio/mp4',
   'audio/wav',
+  // Chrome, Edge, Firefox and Android record voice notes as Opus in WebM (ADR-065).
+  'audio/webm',
   'video/mp4',
   'video/quicktime',
   'video/webm',

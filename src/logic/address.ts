@@ -8,6 +8,7 @@
  */
 
 import type { AddressQuestion, Question } from '@/types/Question.js';
+import { formZipAreas, hasGeoArea, locationStatus } from './geo.js';
 
 /** In a condition's value: the address's ZIP is inside the question's service area. */
 export const IN_AREA_VALUE = '__in_area__';
@@ -78,20 +79,32 @@ export function areaStatus(answer: unknown, prefixes: ReadonlyArray<string>): 'i
   return prefixes.some((p) => postal.startsWith(p)) ? 'in' : 'out';
 }
 
-/** Question id → its service-area prefixes, for address questions that have one. */
-export type AreaIndex = ReadonlyMap<string, ReadonlyArray<string>>;
+/**
+ * Question id → how to tell whether its answer is inside the service area:
+ * an address against its ZIP list (ADR-064), a location against its radius or,
+ * typed as a ZIP, against the form's address ZIP lists (ADR-065).
+ */
+export type AreaIndex = ReadonlyMap<string, (answer: unknown) => 'in' | 'out' | null>;
 
 const areaCache = new WeakMap<ReadonlyArray<Question>, AreaIndex>();
 
-/** Service areas by question id, cached per questions array. */
+/** Service-area checks by question id, cached per questions array. */
 export function areaIndex(questions: ReadonlyArray<Question>): AreaIndex {
   const hit = areaCache.get(questions);
   if (hit) return hit;
-  const map = new Map<string, ReadonlyArray<string>>();
+  const map = new Map<string, (answer: unknown) => 'in' | 'out' | null>();
+  let zips: string[] | null = null;
   for (const q of questions) {
-    if (q.type !== 'address') continue;
-    const prefixes = serviceAreaPrefixes(q.serviceArea);
-    if (prefixes.length) map.set(q.id, prefixes);
+    if (q.type === 'address') {
+      const prefixes = serviceAreaPrefixes(q.serviceArea);
+      if (prefixes.length) map.set(q.id, (a) => areaStatus(a, prefixes));
+    } else if (q.type === 'location') {
+      zips ??= formZipAreas(questions);
+      const z = zips;
+      if (hasGeoArea(q) || z.length) {
+        map.set(q.id, (a) => locationStatus(q as unknown as Record<string, unknown>, a, z));
+      }
+    }
   }
   areaCache.set(questions, map);
   return map;
@@ -100,6 +113,17 @@ export function areaIndex(questions: ReadonlyArray<Question>): AreaIndex {
 /** True when this address question checks a service area. */
 export function hasServiceArea(q: Question): q is AddressQuestion {
   return q.type === 'address' && serviceAreaPrefixes(q.serviceArea).length > 0;
+}
+
+/**
+ * True when a condition can ask "inside / outside the service area" of this
+ * question: an address with ZIP codes, or a location with a center and radius
+ * (or, for a ZIP typed instead, a form whose addresses list ZIP codes).
+ */
+export function checksArea(q: Question, questions: ReadonlyArray<Question>): boolean {
+  if (q.type === 'address') return hasServiceArea(q);
+  if (q.type === 'location') return hasGeoArea(q) || formZipAreas(questions).length > 0;
+  return false;
 }
 
 /** Address answer as one line: "12 Palm St, Apt 4, Santa Barbara, CA 93101". */

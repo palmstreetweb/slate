@@ -29,6 +29,11 @@ import type {
   ContactInfoQuestion,
   AddressQuestion,
   SignatureQuestion,
+  ImagePinQuestion,
+  VoiceNoteQuestion,
+  LocationQuestion,
+  PhotoChecklistQuestion,
+  AvailabilityQuestion,
 } from './Question.js';
 
 /**
@@ -54,6 +59,11 @@ import type {
  *   - contact_info → { name?, email?, phone? } (ADR-064)
  *   - address → { street, line2?, city, region?, postal, country? } (ADR-064)
  *   - signature → { path } (vector strokes) or { typed } (ADR-064)
+ *   - image_pin → { pins: ['x,y', …], notes?, img? } (ADR-065)
+ *   - voice_note → { audio, sec } (a stored file) or { typed } (ADR-065)
+ *   - location → { lat, lng, area? } / { zip, area? } / { typed } (ADR-065)
+ *   - photo_checklist → { [itemValue]: fileRef } (ADR-065)
+ *   - availability → { [day]: 'HH:MM-HH:MM,…' } (ADR-065)
  *   - welcome, statement, thanks → never stored
  */
 
@@ -85,6 +95,31 @@ export type AddressAnswer = {
  * typed instead.
  */
 export type SignatureAnswer = { path: string } | { typed: string };
+
+/**
+ * An `image_pin` answer (ADR-065): pins as `'x,y'` (0–1, up to 4 decimals,
+ * from the photo's top left), notes in the same order, and `img`, a short key
+ * of the photo they were placed on (set by the server from the published form).
+ */
+export type ImagePinAnswer = { pins: string[]; notes?: string[]; img?: string };
+
+/** A `voice_note` answer (ADR-065): a stored recording and its length, or typed text. */
+export type VoiceNoteAnswer = { audio: string; sec?: string } | { typed: string };
+
+/**
+ * A `location` answer (ADR-065): coordinates rounded to 3 decimals, a ZIP code
+ * typed instead, or a typed place; `area` is 'in' or 'out' when checkable.
+ */
+export type LocationAnswer =
+  | { lat: string; lng: string; area?: 'in' | 'out' }
+  | { zip: string; area?: 'in' | 'out' }
+  | { typed: string };
+
+/** A `photo_checklist` answer (ADR-065): item value → stored photo ref. */
+export type PhotoChecklistAnswer = Record<string, string>;
+
+/** An `availability` answer (ADR-065): day → free ranges, `'09:00-11:30,14:00-16:00'`. */
+export type AvailabilityAnswer = Record<string, string>;
 
 export type LooseAnswers = Record<
   string,
@@ -139,7 +174,17 @@ export type AnswerValueOf<Q extends Question> = Q extends ShortTextQuestion
                               ? AddressAnswer
                               : Q extends SignatureQuestion
                                 ? SignatureAnswer
-                                : Q extends RankingQuestion<string, infer TOpts>
+                                : Q extends ImagePinQuestion
+                                  ? ImagePinAnswer
+                                  : Q extends VoiceNoteQuestion
+                                    ? VoiceNoteAnswer
+                                    : Q extends LocationQuestion
+                                      ? LocationAnswer
+                                      : Q extends PhotoChecklistQuestion
+                                        ? PhotoChecklistAnswer
+                                        : Q extends AvailabilityQuestion
+                                          ? AvailabilityAnswer
+                                          : Q extends RankingQuestion<string, infer TOpts>
                                   ? Array<OptionValueOf<TOpts>>
                                   : Q extends PictureChoiceQuestion<string, infer TOpts>
                                     ? Q extends { multiple: true }

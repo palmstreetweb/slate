@@ -29,6 +29,11 @@ export const GENERATED_QUESTION_TYPES = [
   'contact_info',
   'address',
   'signature',
+  'image_pin',
+  'voice_note',
+  'location',
+  'photo_checklist',
+  'availability',
   'review',
 ] as const;
 
@@ -91,7 +96,7 @@ export const generatedQuestionSchema = z.object({
    * scale: numbers | stars | emoji | slider. number: stepper (ADR-063).
    * single_choice: cards (package cards, ADR-064). '' = default.
    */
-  display: z.enum(['', 'numbers', 'stars', 'emoji', 'slider', 'stepper', 'cards']),
+  display: z.enum(['', 'numbers', 'stars', 'emoji', 'slider', 'stepper', 'cards', 'swipe']),
   /** number: price per unit for the instant estimate (ADR-064). 0 = none. */
   unitPrice: z.number(),
   /** address: ZIP codes or prefixes served, only when the user lists them (ADR-064). */
@@ -102,6 +107,15 @@ export const generatedQuestionSchema = z.object({
   /** date: also ask for a time of day / ask for a start and end. */
   includeTime: z.boolean(),
   range: z.boolean(),
+  /** voice_note: offer "Type instead" (ADR-065). signature: type your name instead. */
+  allowTyped: z.boolean(),
+  /** location: how far the business serves, in radiusUnit; 0 = no radius (ADR-065). */
+  radius: z.number(),
+  radiusUnit: z.enum(['', 'mi', 'km']),
+  /** availability: weekday columns, first slot start and last slot end ("08:00", "18:00"). */
+  days: z.array(z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])),
+  startTime: z.string(),
+  endTime: z.string(),
   /** Earlier question id. Empty = always visible. */
   showIfField: z.string(),
   /** Stored answer to match (`yes`, `chicken`, option value — not the label). */
@@ -145,6 +159,7 @@ export const generatedFormSchema = z
         'dropdown',
         'picture_choice',
         'ranking',
+        'photo_checklist',
       ]);
       if (needsOptions.has(q.type) && q.options.filter((o) => o.label && o.value).length < 2) {
         ctx.addIssue({
@@ -214,6 +229,7 @@ export const generatedFormSchema = z
 
 /**
  * A draft from before Wave B (ADR-064) lacks the price, card and estimate
+ * fields, and one from before Wave C (ADR-065) the typing, radius and grid
  * fields; a revise request can still carry one (a tab open across a deploy).
  * Fill the blanks the model would have written, so it still validates.
  */
@@ -229,6 +245,13 @@ export function withDraftDefaults(raw: unknown): unknown {
       const next = { ...(q as Record<string, unknown>) };
       if (next.unitPrice === undefined) next.unitPrice = 0;
       if (next.serviceArea === undefined) next.serviceArea = [];
+      // Wave C (ADR-065)
+      if (next.allowTyped === undefined) next.allowTyped = true;
+      if (next.radius === undefined) next.radius = 0;
+      if (next.radiusUnit === undefined) next.radiusUnit = '';
+      if (next.days === undefined) next.days = [];
+      if (next.startTime === undefined) next.startTime = '';
+      if (next.endTime === undefined) next.endTime = '';
       if (Array.isArray(next.options)) {
         next.options = next.options.map((o: unknown) =>
           o && typeof o === 'object' && !Array.isArray(o)
@@ -284,6 +307,14 @@ Service-business types (use when they fit):
 - contact_info — name, email and phone on ONE screen. For quotes, bookings and leads, prefer it over separate name / email / phone questions. Title like "How can we reach you?"
 - address — a service or property address (street, unit, city, state, ZIP). serviceArea only when the user lists the ZIP codes they serve (e.g. ["93101","93103"], or a prefix "931"); otherwise [].
 - signature — only when the user asks for a signature, authorization or agreement.
+
+On-site capture (use only when they clearly fit; never "to look complete"):
+- photo_checklist — the shots a crew needs before quoting ("Front of house", "Roof close-up", "Electrical panel"): each option is one shot (label + value). Opens the phone camera.
+- image_pin — "show us where": the respondent taps the owner's photo to mark spots. max = most pins (1–10, usually 3). The owner adds the photo afterwards; do not invent one.
+- voice_note — "describe it in your own words" when talking is easier than typing. max = longest recording in seconds (default 60). allowTyped true unless the user wants audio only. body is what to talk about.
+- location — "use my location" to check the service area. radius + radiusUnit ("mi" / "km") only when the user gives a distance ("within 25 miles"); the owner sets the business location afterwards. Never invent coordinates.
+- availability — a week grid to paint free times. days (e.g. ["mon","tue","wed","thu","fri"]), startTime / endTime as "HH:MM" 24-hour, step = slot minutes (15, 30, 60 or 120; default 60).
+- display "swipe": on picture_choice with multiple true, a card stack to like / pass ("Which styles do you like?"); on yes_no, one swipe card ("this or that"). Otherwise "".
 
 Prices and the instant estimate (never invent prices — only use prices the user gave):
 - price on a choice option = its price; priceMax for a range ("$8,000–12,000" → price 8000, priceMax 12000). 0 = no price.

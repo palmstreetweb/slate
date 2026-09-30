@@ -17,6 +17,9 @@ import type { Question } from '@/types/Question.js';
 import { formatDateAnswer } from './dateValue.js';
 import { formatAddress } from './address.js';
 import { signaturePathOf, signatureTypedOf } from './signature.js';
+import { formatPins } from './pins.js';
+import { formatAvailability } from './availability.js';
+import { formatPhotoCount, formatVoiceNote } from './media.js';
 
 const PIPE_RE = /\{\{\s*(score|estimate|field:[\w-]+)\s*\}\}/g;
 
@@ -90,6 +93,22 @@ export function formatAnswerFor(q: Question | undefined, v: unknown): string {
       return formatAddress(v);
     case 'signature':
       return signatureTypedOf(v) ?? (signaturePathOf(v) ? 'Signed' : '');
+    case 'image_pin':
+      return formatPins(v);
+    case 'voice_note':
+      return formatVoiceNote(v);
+    case 'location': {
+      // In words, never the coordinates: "inside the service area" / a ZIP / a place.
+      if (typeof v !== 'object' || Array.isArray(v)) return formatAnswer(v);
+      const l = v as Record<string, unknown>;
+      if (l.area === 'in') return 'inside the service area';
+      if (l.area === 'out') return 'outside the service area';
+      return typeof l.zip === 'string' ? l.zip : typeof l.typed === 'string' ? l.typed : '';
+    }
+    case 'photo_checklist':
+      return formatPhotoCount(q, v);
+    case 'availability':
+      return formatAvailability(q as unknown as Record<string, unknown>, v);
     default:
       return formatAnswer(v);
   }

@@ -16,6 +16,10 @@
  * package cards, and the Thank You screen's estimate reveal (not a field:
  * `estimateRevealComponent()` shares the same cache). Ranking, matrix and
  * picture choice moved here too, unchanged, to keep the core under budget.
+ *
+ * Wave C (ADR-065) adds swipe cards (picture choice and yes / no), pin the
+ * spot, the voice note, location, the photo checklist and the availability
+ * grid. The dropdown moved here too, unchanged, for the same reason.
  */
 
 'use client';
@@ -38,6 +42,8 @@ export type ExtFieldProps<Q extends Question = Question> = {
   onCommit: (value: LooseAnswers[string]) => void;
   /** Move on; the field has already validated and stored its answer. */
   onAdvance: () => void;
+  /** Move on without the step sound — for an auto-advance right after a pick that pinged. */
+  onAdvanceSilent?: () => void;
   /** Typewriter tick while typing (ADR-034). */
   onType?: () => void;
   /** The form's step sound on a discrete interaction (ADR-023). */
@@ -47,6 +53,8 @@ export type ExtFieldProps<Q extends Question = Question> = {
   resolveFileUploadMeta?: (ref: string) => Promise<FileUploadMeta | null>;
   /** The form's currency for prices on package cards (ADR-064); default 'USD'. */
   currency?: string;
+  /** Every question in the form (a location checks a typed ZIP against the address areas, ADR-065). */
+  allQuestions?: ReadonlyArray<Question>;
 };
 
 export type ExtFieldKey =
@@ -60,7 +68,14 @@ export type ExtFieldKey =
   | 'choice-cards'
   | 'ranking'
   | 'matrix'
-  | 'picture-choice';
+  | 'picture-choice'
+  | 'dropdown'
+  | 'swipe'
+  | 'image-pin'
+  | 'voice-note'
+  | 'location'
+  | 'photo-checklist'
+  | 'availability';
 
 /** Chunks on the same cache that aren't question fields. */
 type ExtChunkKey = ExtFieldKey | 'estimate-reveal';
@@ -82,6 +97,13 @@ const LOADERS: Record<ExtChunkKey, () => Promise<{ default: AnyChunk }>> = {
   ranking: () => import('./ext/RankingExt.js'),
   matrix: () => import('./ext/MatrixExt.js'),
   'picture-choice': () => import('./ext/PictureChoiceExt.js'),
+  dropdown: () => import('./ext/DropdownExt.js'),
+  swipe: () => import('./ext/SwipeField.js'),
+  'image-pin': () => import('./ext/ImagePinField.js'),
+  'voice-note': () => import('./ext/VoiceNoteField.js'),
+  location: () => import('./ext/LocationField.js'),
+  'photo-checklist': () => import('./ext/PhotoChecklistField.js'),
+  availability: () => import('./ext/AvailabilityField.js'),
   'estimate-reveal': () => import('./ext/EstimateReveal.js'),
 };
 
@@ -111,7 +133,22 @@ export function extFieldKey(q: Question): ExtFieldKey | null {
     case 'matrix':
       return 'matrix';
     case 'picture_choice':
-      return 'picture-choice';
+      // Swipe cards store the same list of picks, so they need multi-select (ADR-065).
+      return q.display === 'swipe' && q.multiple ? 'swipe' : 'picture-choice';
+    case 'yes_no':
+      return q.display === 'swipe' ? 'swipe' : null;
+    case 'dropdown':
+      return 'dropdown';
+    case 'image_pin':
+      return 'image-pin';
+    case 'voice_note':
+      return 'voice-note';
+    case 'location':
+      return 'location';
+    case 'photo_checklist':
+      return 'photo-checklist';
+    case 'availability':
+      return 'availability';
     default:
       return null;
   }

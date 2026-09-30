@@ -353,11 +353,12 @@ describe('dropdown with Other', () => {
     allowOther: true,
   };
 
+  // The dropdown loads on demand (ADR-065): each test waits for the field.
   it('offers the typed text as Other and stores it', async () => {
+    const { setAnswer, advance } = renderField(q);
+    const input = await screen.findByRole('combobox');
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
-      const { setAnswer, advance } = renderField(q);
-      const input = screen.getByRole('combobox');
       fireEvent.change(input, { target: { value: 'Oak View' } });
       const other = screen.getByRole('option', { name: /other: “oak view”/i });
       fireEvent.click(other);
@@ -371,18 +372,18 @@ describe('dropdown with Other', () => {
     }
   });
 
-  it('Enter on unmatched text stores it as Other', () => {
+  it('Enter on unmatched text stores it as Other', async () => {
     const { setAnswer } = renderField(q);
-    const input = screen.getByRole('combobox');
+    const input = await screen.findByRole('combobox');
     fireEvent.change(input, { target: { value: 'Oak View' } });
     fireEvent.keyDown(input, { key: 'Escape' });
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(setAnswer).toHaveBeenLastCalledWith('town', 'Oak View');
   });
 
-  it('without allowOther unmatched text is still refused', () => {
+  it('without allowOther unmatched text is still refused', async () => {
     const { setAnswer } = renderField({ ...q, allowOther: false } as Question);
-    const input = screen.getByRole('combobox');
+    const input = await screen.findByRole('combobox');
     fireEvent.change(input, { target: { value: 'Oak View' } });
     expect(screen.queryByRole('option', { name: /other/i })).not.toBeInTheDocument();
     fireEvent.keyDown(input, { key: 'Escape' });
@@ -391,9 +392,9 @@ describe('dropdown with Other', () => {
     expect(setAnswer).not.toHaveBeenCalledWith('town', 'Oak View');
   });
 
-  it('a stored typed answer shows in the box', () => {
+  it('a stored typed answer shows in the box', async () => {
     renderField(q, { town: 'Oak View' });
-    expect(screen.getByRole('combobox')).toHaveValue('Oak View');
+    expect(await screen.findByRole('combobox')).toHaveValue('Oak View');
   });
 });
 
