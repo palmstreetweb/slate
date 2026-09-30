@@ -1108,7 +1108,9 @@ export function ResponsesSummary(props: SummaryProps) {
     chartQs.length || sourceTotal
       ? `${phone ? 'Tap' : 'Click'} a bar or tile above to filter`
       : `${phone ? 'Tap' : 'Click'} a tile above to filter`;
-  const extraCards = questions.filter((q) => q.type === 'availability' || q.type === 'image_pin').length;
+  const extraCards = questions.filter(
+    (q) => q.type === 'availability' || q.type === 'image_pin',
+  ).length;
   const chartCount = chartQs.length + extraCards + (sourceTotal ? 1 : 0) + (estimates ? 1 : 0);
   const topClass =
     chartCount === 0
@@ -1150,7 +1152,12 @@ export function ResponsesSummary(props: SummaryProps) {
         {/* Wave C (ADR-065): when people are free, and where they pinned. */}
         {questions.map((q) =>
           q.type === 'availability' ? (
-            <AvailabilityHeatCard key={q.id} question={q} number={qNumbers.get(q.id) ?? 0} subs={subs} />
+            <AvailabilityHeatCard
+              key={q.id}
+              question={q}
+              number={qNumbers.get(q.id) ?? 0}
+              subs={subs}
+            />
           ) : q.type === 'image_pin' ? (
             <PinCloudCard key={q.id} question={q} number={qNumbers.get(q.id) ?? 0} subs={subs} />
           ) : null,

@@ -125,7 +125,10 @@ export function encodeAvailability(
 }
 
 /** A stored answer re-encoded against the question's grid; undefined when nothing valid is left. */
-export function availabilityAnswerCore(q: GridRecord, v: unknown): Record<string, string> | undefined {
+export function availabilityAnswerCore(
+  q: GridRecord,
+  v: unknown,
+): Record<string, string> | undefined {
   const g = availabilityGrid(q);
   return encodeAvailability(g, decodeAvailability(g, v));
 }

@@ -55,8 +55,7 @@ export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: numbe
   const dLat = (bLat - aLat) * rad;
   const dLng = (bLng - aLng) * rad;
   const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLng / 2) ** 2;
+    Math.sin(dLat / 2) ** 2 + Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLng / 2) ** 2;
   return 2 * 6371.0088 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
@@ -140,7 +139,11 @@ export function locationAnswerCore(
 /* ---------- engine-only helpers ---------- */
 
 /** True when a location question can say in / out of a radius. */
-export function hasGeoArea(q: { center?: unknown; radius?: unknown; radiusUnit?: unknown }): boolean {
+export function hasGeoArea(q: {
+  center?: unknown;
+  radius?: unknown;
+  radiusUnit?: unknown;
+}): boolean {
   return geoCenter(q as GeoRecord) !== null && geoRadiusKm(q as GeoRecord) !== null;
 }
 

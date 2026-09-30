@@ -212,8 +212,17 @@ const submit = (formId: string, ip: string, answers: Record<string, unknown>) =>
     body: JSON.stringify({ formId, answers, meta: meta() }),
   });
 const lookup = (slug: string, ip: string) =>
-  submitApp.request(`/?op=form&slug=${slug}`, { method: 'GET', headers: { 'X-Forwarded-For': ip } });
-const sign = (formId: string, ip: string, name: string, contentType: string, contentLength: number) =>
+  submitApp.request(`/?op=form&slug=${slug}`, {
+    method: 'GET',
+    headers: { 'X-Forwarded-For': ip },
+  });
+const sign = (
+  formId: string,
+  ip: string,
+  name: string,
+  contentType: string,
+  contentLength: number,
+) =>
   signApp.request('/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
@@ -270,7 +279,9 @@ async function scenarios() {
       s.status === 200 && same(a.where, { lat: '34.052', lng: '-118.244', area: 'out' }),
       JSON.stringify(a.where),
     );
-    await submit(F.capture, '10.65.2.2', { where: { lat: '34.441234', lng: '-119.812345', area: 'out' } });
+    await submit(F.capture, '10.65.2.2', {
+      where: { lat: '34.441234', lng: '-119.812345', area: 'out' },
+    });
     check(
       'a location in Goleta claiming "out" is stored "in", rounded to 3 decimals',
       same((await latest(F.capture)).answers.where, { lat: '34.441', lng: '-119.812', area: 'in' }),
@@ -363,8 +374,18 @@ async function scenarios() {
 
   // storagesign: voice notes and checklists open public uploads, within their caps.
   {
-    const webm = await sign(F.voice, '10.65.7.1', 'voice-note.webm', 'audio/webm;codecs=opus', 900_000);
-    const webmBody = (await webm.json()) as { contentType?: string; maxBytes?: number; url?: string };
+    const webm = await sign(
+      F.voice,
+      '10.65.7.1',
+      'voice-note.webm',
+      'audio/webm;codecs=opus',
+      900_000,
+    );
+    const webmBody = (await webm.json()) as {
+      contentType?: string;
+      maxBytes?: number;
+      url?: string;
+    };
     const mp4 = await sign(F.voice, '10.65.7.2', 'voice-note.m4a', 'audio/mp4', 900_000);
     const mp4Body = (await mp4.json()) as { contentType?: string };
     const big = await sign(F.voice, '10.65.7.3', 'voice-note.webm', 'audio/webm', 2 * 1024 * 1024);
@@ -389,7 +410,11 @@ async function scenarios() {
     const [charged] = await q<{ n: number }>(
       `select count(*)::int as n from public.submit_rate_buckets where bucket_key like 'up:ipowner:10.65.7.%'`,
     );
-    check('public voice and photo signs are charged to the IP + owner bucket (ADR-058)', charged!.n >= 3, `${charged!.n} buckets`);
+    check(
+      'public voice and photo signs are charged to the IP + owner bucket (ADR-058)',
+      charged!.n >= 3,
+      `${charged!.n} buckets`,
+    );
   }
 
   // The owner reads the stored answers back through RLS.

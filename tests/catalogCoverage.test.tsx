@@ -89,7 +89,13 @@ const SAMPLES: Record<QuestionType, { q: Question; answer: unknown }> = {
   },
   // Wave C (ADR-065)
   image_pin: {
-    q: { id: 'x', type: 'image_pin', title: 'T', image: 'https://example.com/roof.jpg', maxPins: 2 },
+    q: {
+      id: 'x',
+      type: 'image_pin',
+      title: 'T',
+      image: 'https://example.com/roof.jpg',
+      maxPins: 2,
+    },
     answer: { pins: ['0.25,0.5', '0.7,0.1'], notes: ['leak here', ''] },
   },
   voice_note: {

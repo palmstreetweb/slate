@@ -27,4 +27,3 @@ export function pickVoiceMime(): string {
   if (!MR || typeof MR.isTypeSupported !== 'function') return '';
   return VOICE_MIME_PREFERENCE.find((t) => !failedMimes.has(t) && MR.isTypeSupported!(t)) ?? '';
 }
-

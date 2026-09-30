@@ -48,8 +48,7 @@ export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: numbe
   const dLat = (bLat - aLat) * rad;
   const dLng = (bLng - aLng) * rad;
   const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLng / 2) ** 2;
+    Math.sin(dLat / 2) ** 2 + Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLng / 2) ** 2;
   return 2 * 6371.0088 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 

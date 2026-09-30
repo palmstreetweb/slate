@@ -161,14 +161,16 @@ describe('Wave C file questions (ADR-065)', () => {
     expect(fileUploadLimitBytes({ questions: [{ type: 'voice_note' }] }, CAP)).toBe(
       60 * 40_000 + 64 * 1024,
     );
-    expect(fileUploadLimitBytes({ questions: [{ type: 'voice_note', maxSeconds: 300 }] }, CAP)).toBe(
-      300 * 40_000 + 64 * 1024,
-    );
+    expect(
+      fileUploadLimitBytes({ questions: [{ type: 'voice_note', maxSeconds: 300 }] }, CAP),
+    ).toBe(300 * 40_000 + 64 * 1024);
     // Nonsense lengths fall back to the question's own bounds, never the global cap.
-    expect(fileUploadLimitBytes({ questions: [{ type: 'voice_note', maxSeconds: 1e9 }] }, CAP)).toBe(
-      300 * 40_000 + 64 * 1024,
+    expect(
+      fileUploadLimitBytes({ questions: [{ type: 'voice_note', maxSeconds: 1e9 }] }, CAP),
+    ).toBe(300 * 40_000 + 64 * 1024);
+    expect(fileUploadLimitBytes({ questions: [{ type: 'voice_note', maxSeconds: 1 }] }, CAP)).toBe(
+      MB,
     );
-    expect(fileUploadLimitBytes({ questions: [{ type: 'voice_note', maxSeconds: 1 }] }, CAP)).toBe(MB);
   });
 
   it('a photo checklist is a file question, 12 MB per photo', () => {
@@ -180,7 +182,13 @@ describe('Wave C file questions (ADR-065)', () => {
   it('the roomiest file question still wins, and the cap still bounds it', () => {
     expect(
       fileUploadLimitBytes(
-        { questions: [{ type: 'voice_note' }, fileQ({ maxSizeMb: 20 }), { type: 'photo_checklist' }] },
+        {
+          questions: [
+            { type: 'voice_note' },
+            fileQ({ maxSizeMb: 20 }),
+            { type: 'photo_checklist' },
+          ],
+        },
         CAP,
       ),
     ).toBe(20 * MB);
@@ -590,14 +598,21 @@ describe('storage-sign upload gate (ADR-050, ADR-058)', () => {
       });
     const webm = await voice('audio/webm;codecs=opus', 900_000);
     expect(webm.status).toBe(200);
-    expect(await webm.json()).toMatchObject({ contentType: 'audio/webm', maxBytes: 60 * 40_000 + 64 * 1024 });
+    expect(await webm.json()).toMatchObject({
+      contentType: 'audio/webm',
+      maxBytes: 60 * 40_000 + 64 * 1024,
+    });
     const mp4 = await voice('audio/mp4', 900_000);
     expect(await mp4.json()).toMatchObject({ contentType: 'audio/mp4' });
     expect((await voice('audio/webm', 3 * MB)).status).toBe(413);
   });
 
   it('a photo checklist opens public uploads up to 12 MB a photo (ADR-065)', async () => {
-    setForm({ questions: [{ id: 'c', type: 'photo_checklist', items: [{ label: 'Front', value: 'front' }] }] });
+    setForm({
+      questions: [
+        { id: 'c', type: 'photo_checklist', items: [{ label: 'Front', value: 'front' }] },
+      ],
+    });
     expect((await sign('public', 2 * MB)).status).toBe(200);
     expect((await sign('public', 13 * MB)).status).toBe(413);
   });

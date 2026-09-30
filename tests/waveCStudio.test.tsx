@@ -48,7 +48,13 @@ beforeAll(() => {
 });
 
 const PHOTO = 'https://example.com/house.jpg';
-const pin: Question = { id: 'leak', type: 'image_pin', title: 'Where’s the leak?', image: PHOTO, maxPins: 3 };
+const pin: Question = {
+  id: 'leak',
+  type: 'image_pin',
+  title: 'Where’s the leak?',
+  image: PHOTO,
+  maxPins: 3,
+};
 const voice: Question = { id: 'story', type: 'voice_note', title: 'Tell us' };
 const loc: Question = {
   id: 'where',
@@ -93,11 +99,19 @@ function sub(id: string, answers: Record<string, unknown>): StoredSubmission {
     formId: 'f1',
     receivedAt: new Date(2026, 8, 30, 10, Number(id.slice(1))).toISOString(),
     answers: answers as StoredSubmission['answers'],
-    meta: { startedAt: '', completedAt: '', durationMs: 60_000, questionsVisited: [], hiddenFields: {}, score: 0 },
+    meta: {
+      startedAt: '',
+      completedAt: '',
+      durationMs: 60_000,
+      questionsVisited: [],
+      hiddenFields: {},
+      score: 0,
+    },
   };
 }
 
-const REF = (n: string) => `slate-file://storage:public/f1abc/0b8e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5b/${n}`;
+const REF = (n: string) =>
+  `slate-file://storage:public/f1abc/0b8e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5b/${n}`;
 const subs = [
   sub('s1', {
     leak: { pins: ['0.4,0.3', '0.6,0.3'], notes: ['leak', ''] },
@@ -127,9 +141,13 @@ describe('Responses and CSV', () => {
     expect(formatAnswerForQuestion(loc, subs[0]!.answers.where)).toBe(
       'Inside the service area · 6.6 mi away · 34.441, -119.812',
     );
-    expect(locationText(loc as never, { zip: '93105', area: 'in' })).toBe('ZIP 93105 · Inside the service area');
+    expect(locationText(loc as never, { zip: '93105', area: 'in' })).toBe(
+      'ZIP 93105 · Inside the service area',
+    );
     expect(formatAnswerForQuestion(loc, { typed: 'Goleta' })).toBe('Typed: Goleta');
-    expect(formatAnswerForQuestion(shots, subs[1]!.answers.shots)).toBe('1 of 2 photos\nFront: photo');
+    expect(formatAnswerForQuestion(shots, subs[1]!.answers.shots)).toBe(
+      '1 of 2 photos\nFront: photo',
+    );
     expect(formatAnswerForQuestion(week, subs[0]!.answers.when)).toBe('Mon 9–11 AM; Tue 10–11 AM');
     // Hostile values never throw.
     expect(() => formatAnswerForQuestion(pin, { pins: 'x' })).not.toThrow();
@@ -159,7 +177,9 @@ describe('Responses and CSV', () => {
     expect(formatAnswerForCsv(pin, subs[0]!.answers.leak)).toBe(
       'Pin 1 at 40% across, 30% down: leak; Pin 2 at 60% across, 30% down',
     );
-    expect(formatAnswerForCsv(voice, subs[0]!.answers.story)).toBe('Voice note (0:42): voice-note.webm');
+    expect(formatAnswerForCsv(voice, subs[0]!.answers.story)).toBe(
+      'Voice note (0:42): voice-note.webm',
+    );
     const csv = buildResponsesCsv(all, subs);
     const header = csv.split('\r\n')[0]!;
     expect(header).toContain('Where’s the job? — In service area');
@@ -183,7 +203,13 @@ describe('ResponseAnswers for Wave C', () => {
     const { container } = wrap(
       <ResponseAnswers
         questions={[pin]}
-        answers={{ leak: { pins: ['0.4,0.3'], notes: ['leak here'], img: imageKey('https://old.example/x.jpg') } }}
+        answers={{
+          leak: {
+            pins: ['0.4,0.3'],
+            notes: ['leak here'],
+            img: imageKey('https://old.example/x.jpg'),
+          },
+        }}
         layout="stack"
       />,
     );
@@ -211,7 +237,10 @@ describe('ResponseAnswers for Wave C', () => {
     );
     expect(screen.getByText(/Inside the service area · 6.6 mi away/)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Open in a map' });
-    expect(link).toHaveAttribute('href', expect.stringContaining('openstreetmap.org/?mlat=34.441&mlon=-119.812'));
+    expect(link).toHaveAttribute(
+      'href',
+      expect.stringContaining('openstreetmap.org/?mlat=34.441&mlon=-119.812'),
+    );
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     expect(container.querySelectorAll('.rsp-week-cell.is-on')).toHaveLength(3);
   });
@@ -223,7 +252,13 @@ describe('ResponseAnswers for Wave C', () => {
   });
 
   it('a typed voice note reads as text', () => {
-    wrap(<ResponseAnswers questions={[voice]} answers={{ story: { typed: 'It leaks' } }} layout="stack" />);
+    wrap(
+      <ResponseAnswers
+        questions={[voice]}
+        answers={{ story: { typed: 'It leaks' } }}
+        layout="stack"
+      />,
+    );
     expect(screen.getByText('It leaks')).toBeInTheDocument();
   });
 });
@@ -257,9 +292,23 @@ describe('Summary for Wave C', () => {
   });
 
   it('filters by in / out of area and by shot', () => {
-    expect(subs.filter((s) => answerMatchesFilter(s, { questionId: 'where', value: IN_AREA_VALUE }, loc)).map((s) => s.id)).toEqual(['s1']);
-    expect(subs.filter((s) => answerMatchesFilter(s, { questionId: 'where', value: OUT_OF_AREA_VALUE }, loc)).map((s) => s.id)).toEqual(['s2']);
-    expect(subs.filter((s) => answerMatchesFilter(s, { questionId: 'shots', value: 'roof' }, shots)).map((s) => s.id)).toEqual(['s1']);
+    expect(
+      subs
+        .filter((s) => answerMatchesFilter(s, { questionId: 'where', value: IN_AREA_VALUE }, loc))
+        .map((s) => s.id),
+    ).toEqual(['s1']);
+    expect(
+      subs
+        .filter((s) =>
+          answerMatchesFilter(s, { questionId: 'where', value: OUT_OF_AREA_VALUE }, loc),
+        )
+        .map((s) => s.id),
+    ).toEqual(['s2']);
+    expect(
+      subs
+        .filter((s) => answerMatchesFilter(s, { questionId: 'shots', value: 'roof' }, shots))
+        .map((s) => s.id),
+    ).toEqual(['s1']);
   });
 
   it('counts voice notes and photos as files', () => {
@@ -275,7 +324,9 @@ describe('Summary for Wave C', () => {
     expect(heat.counts.get('mon')).toEqual([1, 2, 0]);
     expect(heat.best[0]).toEqual({ day: 'mon', slot: 1, count: 2 });
     wrap(<AvailabilityHeatCard question={week as never} number={5} subs={subs} />);
-    expect(screen.getByRole('list', { name: 'Best times' })).toHaveTextContent('Mon 10 AM–11 AM2 of 2');
+    expect(screen.getByRole('list', { name: 'Best times' })).toHaveTextContent(
+      'Mon 10 AM–11 AM2 of 2',
+    );
   });
 
   it('the pin map shows every pin from every response', () => {
@@ -320,14 +371,21 @@ async function choose(user: ReturnType<typeof userEvent.setup>, select: string, 
 
 describe('Inspector for Wave C', () => {
   it('the palette has a Capture group with every Wave C type', () => {
-    expect(ADDABLE_TYPES.filter((t) => t.group === 'Capture').map((t) => t.type).sort()).toEqual(
-      ['availability', 'image_pin', 'location', 'photo_checklist', 'voice_note'],
-    );
+    expect(
+      ADDABLE_TYPES.filter((t) => t.group === 'Capture')
+        .map((t) => t.type)
+        .sort(),
+    ).toEqual(['availability', 'image_pin', 'location', 'photo_checklist', 'voice_note']);
   });
 
   it('swipe cards on picture choice turn on multi-select and leave Other out', async () => {
     const user = userEvent.setup();
-    const grid: Question = { ...swipe, display: undefined, multiple: false, allowOther: true } as Question;
+    const grid: Question = {
+      ...swipe,
+      display: undefined,
+      multiple: false,
+      allowOther: true,
+    } as Question;
     const { onChange } = renderInspector(grid);
     await choose(user, 'Picture choice style', 'Swipe cards');
     expect(onChange).toHaveBeenLastCalledWith({
@@ -359,7 +417,10 @@ describe('Inspector for Wave C', () => {
 
   it('parses pasted coordinates, from a maps link too', () => {
     expect(parseLatLng('34.4208, -119.6982')).toEqual({ lat: 34.4208, lng: -119.6982 });
-    expect(parseLatLng('https://maps.example/@34.4208,-119.6982,15z')).toEqual({ lat: 34.4208, lng: -119.6982 });
+    expect(parseLatLng('https://maps.example/@34.4208,-119.6982,15z')).toEqual({
+      lat: 34.4208,
+      lng: -119.6982,
+    });
     expect(parseLatLng('91, 10')).toBeNull();
     expect(parseLatLng('Santa Barbara')).toBeNull();
   });
@@ -375,7 +436,10 @@ describe('Inspector for Wave C', () => {
     const user = userEvent.setup();
     const { onChange } = renderInspector(week);
     const days = screen.getByRole('group', { name: 'Days on the grid' });
-    expect(within(days).getByRole('button', { name: 'Mon' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(days).getByRole('button', { name: 'Mon' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     await user.click(within(days).getByRole('button', { name: 'Sat' }));
     expect(onChange).toHaveBeenLastCalledWith({ days: ['mon', 'tue', 'sat'] });
     await choose(user, 'Slot length', '30 minutes');
@@ -410,7 +474,10 @@ describe('Inspector for Wave C', () => {
       [loc, { id: 'done', type: 'thanks', title: 'Thanks' }],
       'where',
     );
-    const where = questions.find((q) => q.id === 'where') as Extract<Question, { type: 'location' }>;
+    const where = questions.find((q) => q.id === 'where') as Extract<
+      Question,
+      { type: 'location' }
+    >;
     expect(where.logic).toEqual([
       { if: { field: 'where', op: 'equals', value: OUT_OF_AREA_VALUE }, goTo: endingId },
     ]);
@@ -424,7 +491,9 @@ describe('sharing Wave C forms', () => {
     expect(buildEmbedSnippet('https://slate.example/forms/1', 'Quote', [voice, loc])).toContain(
       'allow="microphone; geolocation"',
     );
-    expect(buildEmbedSnippet('https://slate.example/forms/1', 'Quote', [shots])).not.toContain('allow=');
+    expect(buildEmbedSnippet('https://slate.example/forms/1', 'Quote', [shots])).not.toContain(
+      'allow=',
+    );
   });
 
   it('portable links leave an uploaded pin photo out, and the reader keeps only https', () => {
@@ -458,7 +527,8 @@ describe('sharing Wave C forms', () => {
 
 describe('Build with AI for Wave C', () => {
   it('maps drafted Wave C questions, never inventing a center or a photo', () => {
-    const q = (partial: Parameters<typeof blankGeneratedQuestion>[0]) => blankGeneratedQuestion(partial);
+    const q = (partial: Parameters<typeof blankGeneratedQuestion>[0]) =>
+      blankGeneratedQuestion(partial);
     const { schema } = mapGeneratedForm({
       title: 'Roof quote',
       description: 'A quick quote.',
@@ -467,16 +537,70 @@ describe('Build with AI for Wave C', () => {
       thanks: { title: 'Thanks.', subtitle: 'We’ll call.', cta: 'Submit another' },
       estimate: { show: false, currency: 'USD', base: 0, disclaimer: '' },
       questions: [
-        q({ id: 'shots', type: 'photo_checklist', title: 'Photos', options: [{ label: 'Front', value: 'front', src: '', alt: '', price: 0, priceMax: 0, features: [], badge: '' }] }),
+        q({
+          id: 'shots',
+          type: 'photo_checklist',
+          title: 'Photos',
+          options: [
+            {
+              label: 'Front',
+              value: 'front',
+              src: '',
+              alt: '',
+              price: 0,
+              priceMax: 0,
+              features: [],
+              badge: '',
+            },
+          ],
+        }),
         q({ id: 'leak', type: 'image_pin', title: 'Where?', max: 4 }),
         q({ id: 'story', type: 'voice_note', title: 'Tell us', max: 90, allowTyped: false }),
         q({ id: 'where', type: 'location', title: 'Where?', radius: 25, radiusUnit: 'km' }),
-        q({ id: 'when', type: 'availability', title: 'When?', days: ['mon', 'sat'], startTime: '08:00', endTime: '26:00', step: 30 }),
-        q({ id: 'likes', type: 'picture_choice', title: 'Like?', display: 'swipe', options: [{ label: 'A', value: 'a', src: 'https://example.com/a.jpg', alt: '', price: 0, priceMax: 0, features: [], badge: '' }, { label: 'B', value: 'b', src: 'https://example.com/b.jpg', alt: '', price: 0, priceMax: 0, features: [], badge: '' }] }),
+        q({
+          id: 'when',
+          type: 'availability',
+          title: 'When?',
+          days: ['mon', 'sat'],
+          startTime: '08:00',
+          endTime: '26:00',
+          step: 30,
+        }),
+        q({
+          id: 'likes',
+          type: 'picture_choice',
+          title: 'Like?',
+          display: 'swipe',
+          options: [
+            {
+              label: 'A',
+              value: 'a',
+              src: 'https://example.com/a.jpg',
+              alt: '',
+              price: 0,
+              priceMax: 0,
+              features: [],
+              badge: '',
+            },
+            {
+              label: 'B',
+              value: 'b',
+              src: 'https://example.com/b.jpg',
+              alt: '',
+              price: 0,
+              priceMax: 0,
+              features: [],
+              badge: '',
+            },
+          ],
+        }),
         q({ id: 'yn', type: 'yes_no', title: 'This or that?', display: 'swipe' }),
       ],
     });
-    const by = Object.fromEntries(schema.questions.map((x) => [x.id, x])) as Record<string, Record<string, unknown>>;
+    const by = Object.fromEntries(schema.questions.map((x) => [x.id, x])) as Record<
+      string,
+      Record<string, unknown>
+    >;
     expect(by.shots!.items).toEqual([{ label: 'Front', value: 'front' }]);
     expect(by.leak).toMatchObject({ type: 'image_pin', maxPins: 4 });
     expect(by.leak!.image).toBeUndefined();
@@ -497,8 +621,13 @@ describe('Build with AI for Wave C', () => {
       welcome: { title: 'Hi', subtitle: '', cta: 'Start' },
       thanks: { title: 'Thanks', subtitle: '', cta: 'Again' },
       questions: ['a', 'b', 'c'].map((id) => {
-        const full = blankGeneratedQuestion({ id, type: 'short_text', title: id.toUpperCase() }) as Record<string, unknown>;
-        for (const k of ['allowTyped', 'radius', 'radiusUnit', 'days', 'startTime', 'endTime']) delete full[k];
+        const full = blankGeneratedQuestion({
+          id,
+          type: 'short_text',
+          title: id.toUpperCase(),
+        }) as Record<string, unknown>;
+        for (const k of ['allowTyped', 'radius', 'radiusUnit', 'days', 'startTime', 'endTime'])
+          delete full[k];
         return full;
       }),
     };

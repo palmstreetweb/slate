@@ -23,7 +23,17 @@ function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-function CardHead({ id, number, title, meta }: { id: string; number: number; title: string; meta: string }) {
+function CardHead({
+  id,
+  number,
+  title,
+  meta,
+}: {
+  id: string;
+  number: number;
+  title: string;
+  meta: string;
+}) {
   return (
     <header className="rsp-sum-chart-head">
       <h3 className="rsp-sum-chart-title" id={id}>
@@ -75,7 +85,11 @@ export const AvailabilityHeatCard = memo(function AvailabilityHeatCard({
         <p className="rsp-sum-heat-empty">No times painted yet.</p>
       ) : (
         <>
-          <div className="rsp-sum-heat-grid" role="img" aria-label="When people are free, darker is more people">
+          <div
+            className="rsp-sum-heat-grid"
+            role="img"
+            aria-label="When people are free, darker is more people"
+          >
             <span />
             {grid.days.map((d) => (
               <span key={d} className="rsp-sum-heat-day">
@@ -146,13 +160,23 @@ export const PinCloudCard = memo(function PinCloudCard({
         title={titleOf(question)}
         meta={`${plural(cloud.pins.length, 'pin', 'pins')} · ${plural(cloud.answered, 'answer', 'answers')}`}
       />
-      <div className="rsp-sum-pins-photo" role="img" aria-label={`${cloud.pins.length} pins on the photo`}>
-        {src ? <img src={src} alt="" referrerPolicy="no-referrer" /> : <span className="rsp-sum-pins-blank" />}
+      <div
+        className="rsp-sum-pins-photo"
+        role="img"
+        aria-label={`${cloud.pins.length} pins on the photo`}
+      >
+        {src ? (
+          <img src={src} alt="" referrerPolicy="no-referrer" />
+        ) : (
+          <span className="rsp-sum-pins-blank" />
+        )}
         {cloud.pins.map((p, i) => (
           <span
             key={i}
             className="rsp-sum-pin"
-            style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%`, '--rsp-i': i % 24 } as CSSProperties}
+            style={
+              { left: `${p.x * 100}%`, top: `${p.y * 100}%`, '--rsp-i': i % 24 } as CSSProperties
+            }
           />
         ))}
       </div>

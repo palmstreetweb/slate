@@ -18,7 +18,11 @@ import {
 } from '@/logic/address.js';
 import { pinsOf } from '@/logic/pins.js';
 import { voiceAudioOf } from '@/logic/media.js';
-import { availabilityGrid, decodeAvailability, type AvailabilityGrid } from '@/logic/availability.js';
+import {
+  availabilityGrid,
+  decodeAvailability,
+  type AvailabilityGrid,
+} from '@/logic/availability.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import type { TrackedSource } from '../_formsStore.js';
 import {
@@ -474,7 +478,10 @@ export function answerMatchesFilter(
   }
   // Photo checklist (ADR-065): this shot has a photo.
   if (question?.type === 'photo_checklist') {
-    const a = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+    const a =
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {};
     return typeof a[filter.value] === 'string' && a[filter.value] !== '';
   }
   // Address (ADR-064): in / out of the service area, or one ZIP code.
@@ -837,7 +844,12 @@ function checklistDistribution(
   }
   const rows = question.items.map((i) => {
     const count = counts.get(i.value) ?? 0;
-    return { value: i.value, label: i.label, count, pct: answered ? Math.round((count / answered) * 100) : 0 };
+    return {
+      value: i.value,
+      label: i.label,
+      count,
+      pct: answered ? Math.round((count / answered) * 100) : 0,
+    };
   });
   return {
     questionId: question.id,
@@ -871,7 +883,12 @@ function likeDistribution(
     .map((o, i) => {
       const count = counts.get(o.value) ?? 0;
       return {
-        row: { value: o.value, label: o.label, count, pct: answered ? Math.round((count / answered) * 100) : 0 },
+        row: {
+          value: o.value,
+          label: o.label,
+          count,
+          pct: answered ? Math.round((count / answered) * 100) : 0,
+        },
         i,
       };
     })

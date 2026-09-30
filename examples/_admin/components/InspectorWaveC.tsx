@@ -18,7 +18,12 @@ import type {
 } from '@/index.js';
 import { PINS_MAX } from '@/logic/pins.js';
 import { LOCATION_PRIVACY_DEFAULT } from '@/logic/geoText.js';
-import { VOICE_SECONDS_MAX, VOICE_SECONDS_MIN, formatClock, voiceMaxSeconds } from '@/logic/media.js';
+import {
+  VOICE_SECONDS_MAX,
+  VOICE_SECONDS_MIN,
+  formatClock,
+  voiceMaxSeconds,
+} from '@/logic/media.js';
 import { WEEKDAY_KEYS, WEEKDAY_SHORT, availabilityGrid, clockLabel } from '@/logic/availability.js';
 import { PIN_IMAGE_DATA_MAX, safeImageSrc } from '@/utils/brandLogo.js';
 import { dataUrlKb, pinImageFromFile } from '../pinImage.js';
@@ -66,12 +71,22 @@ export function PictureStyleSetting({
 }
 
 /** Yes / no: two buttons or one swipe card. */
-export function YesNoStyleSetting({ question, onChange }: { question: YesNoQuestion; onChange: Patch }) {
+export function YesNoStyleSetting({
+  question,
+  onChange,
+}: {
+  question: YesNoQuestion;
+  onChange: Patch;
+}) {
   const swipe = question.display === 'swipe';
   return (
     <Field
       label="Style"
-      hint={swipe ? 'The question sits on a card: right is yes, left is no. Y / N and the buttons work too.' : undefined}
+      hint={
+        swipe
+          ? 'The question sits on a card: right is yes, left is no. Y / N and the buttons work too.'
+          : undefined
+      }
     >
       <SlateSelect
         value={swipe ? 'swipe' : 'buttons'}
@@ -80,14 +95,22 @@ export function YesNoStyleSetting({ question, onChange }: { question: YesNoQuest
           { value: 'swipe', label: 'Swipe card (this or that)' },
         ]}
         aria-label="Yes / no style"
-        onChange={(display) => onChange({ display: display === 'swipe' ? 'swipe' : undefined } as Partial<Question>)}
+        onChange={(display) =>
+          onChange({ display: display === 'swipe' ? 'swipe' : undefined } as Partial<Question>)
+        }
       />
     </Field>
   );
 }
 
 /** Pin the spot: the photo (upload or link), how many pins, notes. */
-export function ImagePinSettings({ question, onChange }: { question: ImagePinQuestion; onChange: Patch }) {
+export function ImagePinSettings({
+  question,
+  onChange,
+}: {
+  question: ImagePinQuestion;
+  onChange: Patch;
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,7 +142,9 @@ export function ImagePinSettings({ question, onChange }: { question: ImagePinQue
         {src ? (
           <img className="slate-insp-photo-img" src={src} alt="" referrerPolicy="no-referrer" />
         ) : (
-          <span className="slate-insp-photo-empty">No photo yet — respondents see a blank grid.</span>
+          <span className="slate-insp-photo-empty">
+            No photo yet — respondents see a blank grid.
+          </span>
         )}
         <div className="slate-insp-photo-actions">
           <button
@@ -210,7 +235,13 @@ export function ImagePinSettings({ question, onChange }: { question: ImagePinQue
 }
 
 /** Voice note: what to talk about, how long, and typing instead. */
-export function VoiceNoteSettings({ question, onChange }: { question: VoiceNoteQuestion; onChange: Patch }) {
+export function VoiceNoteSettings({
+  question,
+  onChange,
+}: {
+  question: VoiceNoteQuestion;
+  onChange: Patch;
+}) {
   return (
     <>
       <Field label="What to Talk About (Optional)" hint="Shown under the title.">
@@ -289,7 +320,8 @@ export function LocationSettings({
     setNote(null);
   }, [question.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const parsed = text.trim() ? parseLatLng(text) : null;
-  const ready = Boolean(question.center) && typeof question.radius === 'number' && question.radius > 0;
+  const ready =
+    Boolean(question.center) && typeof question.radius === 'number' && question.radius > 0;
 
   const useMine = () => {
     const geo = typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
@@ -392,7 +424,9 @@ export function LocationSettings({
                 { value: 'km', label: 'Kilometres' },
               ]}
               aria-label="Radius unit"
-              onChange={(u) => onChange({ radiusUnit: u === 'km' ? 'km' : 'mi' } as Partial<Question>)}
+              onChange={(u) =>
+                onChange({ radiusUnit: u === 'km' ? 'km' : 'mi' } as Partial<Question>)
+              }
             />
           </Field>
         </Row>
@@ -417,7 +451,9 @@ export function LocationSettings({
           maxLength={300}
           value={question.privacyNote ?? ''}
           placeholder={LOCATION_PRIVACY_DEFAULT}
-          onChange={(e) => onChange({ privacyNote: e.target.value || undefined } as Partial<Question>)}
+          onChange={(e) =>
+            onChange({ privacyNote: e.target.value || undefined } as Partial<Question>)
+          }
         />
       </Field>
       <p className="slate-help">
@@ -456,11 +492,7 @@ export function AvailabilitySettings({
         <span className="slate-label" id={`${question.id}-days`}>
           Days
         </span>
-        <span
-          className="slate-insp-days"
-          role="group"
-          aria-label="Days on the grid"
-        >
+        <span className="slate-insp-days" role="group" aria-label="Days on the grid">
           {WEEKDAY_KEYS.map((d) => (
             <button
               key={d}
@@ -478,7 +510,11 @@ export function AvailabilitySettings({
         <Field label="From">
           <SlateSelect
             value={start}
-            options={TIMES.slice(0, -1).some((t) => t.value === start) ? TIMES.slice(0, -1) : [...TIMES, { value: start, label: start }]}
+            options={
+              TIMES.slice(0, -1).some((t) => t.value === start)
+                ? TIMES.slice(0, -1)
+                : [...TIMES, { value: start, label: start }]
+            }
             aria-label="First time on the grid"
             onChange={(v) => onChange({ startTime: v } as Partial<Question>)}
           />
@@ -486,7 +522,11 @@ export function AvailabilitySettings({
         <Field label="Until">
           <SlateSelect
             value={end}
-            options={TIMES.slice(1).some((t) => t.value === end) ? TIMES.slice(1) : [...TIMES, { value: end, label: end }]}
+            options={
+              TIMES.slice(1).some((t) => t.value === end)
+                ? TIMES.slice(1)
+                : [...TIMES, { value: end, label: end }]
+            }
             aria-label="Last time on the grid"
             onChange={(v) => onChange({ endTime: v } as Partial<Question>)}
           />
@@ -518,9 +558,7 @@ export function AvailabilitySettings({
         onChange={(v) => onChange({ required: v } as Partial<Question>)}
         label="Required (at least one time)"
       />
-      <p className="slate-help">
-        Summary shows a heatmap of when most people are free.
-      </p>
+      <p className="slate-help">Summary shows a heatmap of when most people are free.</p>
     </>
   );
 }

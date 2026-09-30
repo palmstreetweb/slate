@@ -689,7 +689,8 @@
 
 [data-slate-forms] .slate-voice--recording .slate-voice-record {
   background: var(--slate-error);
-  box-shadow: 0 0 0 calc(4px + var(--slate-level) * 16px) color-mix(in srgb, var(--slate-error) 22%, transparent);
+  box-shadow: 0 0 0 calc(4px + var(--slate-level) * 16px)
+    color-mix(in srgb, var(--slate-error) 22%, transparent);
 }
 
 [data-slate-forms] .slate-voice-stop {
@@ -1672,7 +1673,9 @@
     transform: scale(0.94);
   }
 
-  [data-slate-forms]:not([data-reduced-motion]) .slate-voice:not(.slate-voice--recording) .slate-voice-record:not(:disabled) {
+  [data-slate-forms]:not([data-reduced-motion])
+    .slate-voice:not(.slate-voice--recording)
+    .slate-voice-record:not(:disabled) {
     animation: slate-voice-pulse 1.6s ease-in-out 3;
   }
 

@@ -386,14 +386,22 @@ export function validate(question: Question, answer: unknown): ValidationResult 
     case 'image_pin': {
       const pins = isRecord(answer) && Array.isArray(answer.pins) ? answer.pins : null;
       if (answer === undefined || answer === null || (pins !== null && pins.length === 0)) {
-        return question.required ? { code: 'required', message: 'Tap the photo to mark a spot' } : null;
+        return question.required
+          ? { code: 'required', message: 'Tap the photo to mark a spot' }
+          : null;
       }
       if (pins === null || pins.some((p) => !parsePin(p))) {
-        return { code: 'shape', message: 'Those pins didn’t come through. Clear them and try again.' };
+        return {
+          code: 'shape',
+          message: 'Those pins didn’t come through. Clear them and try again.',
+        };
       }
       const limit = pinLimit(question as unknown as Record<string, unknown>);
       if (pins.length > limit) {
-        return { code: 'max_pins', message: `Mark at most ${limit} ${limit === 1 ? 'spot' : 'spots'}` };
+        return {
+          code: 'max_pins',
+          message: `Mark at most ${limit} ${limit === 1 ? 'spot' : 'spots'}`,
+        };
       }
       const notes = isRecord(answer) && Array.isArray(answer.notes) ? answer.notes : [];
       if (notes.some((n) => typeof n !== 'string' || n.length > PIN_NOTE_MAX)) {
@@ -412,7 +420,9 @@ export function validate(question: Question, answer: unknown): ValidationResult 
         return {
           code: 'required',
           message:
-            question.allowTyped === false ? 'Please record a voice note' : 'Please record or type an answer',
+            question.allowTyped === false
+              ? 'Please record a voice note'
+              : 'Please record or type an answer',
         };
       }
       if (!isRecord(answer)) return { code: 'shape', message: 'Please record a voice note' };
@@ -426,7 +436,9 @@ export function validate(question: Question, answer: unknown): ValidationResult 
       if (typeof answer.typed === 'string' && question.allowTyped !== false) {
         const typed = answer.typed.trim();
         if (typed.length === 0) {
-          return question.required ? { code: 'required', message: 'Please type your answer' } : null;
+          return question.required
+            ? { code: 'required', message: 'Please type your answer' }
+            : null;
         }
         if (typed.length > VOICE_TYPED_MAX) {
           return { code: 'too_long', message: `Max ${VOICE_TYPED_MAX} characters` };
@@ -470,14 +482,14 @@ export function validate(question: Question, answer: unknown): ValidationResult 
     case 'availability': {
       // Shape only: the grid field writes canonical ranges, and the server
       // re-encodes every answer against the published grid (ADR-065).
-      const days = isRecord(answer)
-        ? Object.values(answer).filter((v) => !isBlankString(v))
-        : [];
+      const days = isRecord(answer) ? Object.values(answer).filter((v) => !isBlankString(v)) : [];
       if (answer !== undefined && answer !== null && !isRecord(answer)) {
         return { code: 'shape', message: 'Those times didn’t come through. Paint them again.' };
       }
       if (days.length === 0) {
-        return question.required ? { code: 'required', message: 'Paint at least one time you’re free' } : null;
+        return question.required
+          ? { code: 'required', message: 'Paint at least one time you’re free' }
+          : null;
       }
       if (days.some((v) => typeof v !== 'string' || !RANGES_RE.test(v))) {
         return { code: 'shape', message: 'Those times didn’t come through. Paint them again.' };

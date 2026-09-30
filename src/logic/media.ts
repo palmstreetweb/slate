@@ -78,10 +78,7 @@ export function formatVoiceNote(answer: unknown): string {
 }
 
 /** Items of a checklist that have a photo in this answer. */
-export function photosTaken(
-  q: Pick<PhotoChecklistQuestion, 'items'>,
-  answer: unknown,
-): string[] {
+export function photosTaken(q: Pick<PhotoChecklistQuestion, 'items'>, answer: unknown): string[] {
   if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) return [];
   const a = answer as Record<string, unknown>;
   return (q.items ?? [])
@@ -90,7 +87,10 @@ export function photosTaken(
 }
 
 /** "3 of 5 photos". */
-export function formatPhotoCount(q: Pick<PhotoChecklistQuestion, 'items'>, answer: unknown): string {
+export function formatPhotoCount(
+  q: Pick<PhotoChecklistQuestion, 'items'>,
+  answer: unknown,
+): string {
   const n = photosTaken(q, answer).length;
   const total = (q.items ?? []).length;
   return n === 0 ? '' : `${n} of ${total} ${total === 1 ? 'photo' : 'photos'}`;

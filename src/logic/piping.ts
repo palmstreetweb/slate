@@ -113,7 +113,10 @@ export function formatAnswerFor(q: Question | undefined, v: unknown): string {
       const a = v as Record<string, unknown>;
       return (q.days?.length ? q.days : Object.keys(a))
         .filter((d) => typeof a[d] === 'string' && a[d] !== '')
-        .map((d) => `${d[0]!.toUpperCase()}${d.slice(1)} ${(a[d] as string).replace(/,/g, ', ').replace(/-/g, '–')}`)
+        .map(
+          (d) =>
+            `${d[0]!.toUpperCase()}${d.slice(1)} ${(a[d] as string).replace(/,/g, ', ').replace(/-/g, '–')}`,
+        )
         .join('; ');
     }
     default:

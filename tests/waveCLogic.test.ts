@@ -84,7 +84,16 @@ describe('pins', () => {
     expect(parsePin('0.25,0.5')).toEqual([0.25, 0.5]);
     expect(parsePin('0,1')).toEqual([0, 1]);
     expect(parsePin('1.0000,0.0001')).toEqual([1, 0.0001]);
-    for (const bad of ['1.1,0', '-0.1,0.2', '0.12345,0.1', '0.5', ' 0.5,0.5', '0.5, 0.5', '.5,.5', '1e-3,0']) {
+    for (const bad of [
+      '1.1,0',
+      '-0.1,0.2',
+      '0.12345,0.1',
+      '0.5',
+      ' 0.5,0.5',
+      '0.5, 0.5',
+      '.5,.5',
+      '1e-3,0',
+    ]) {
       expect(parsePin(bad)).toBeNull();
     }
     expect(parsePin(5)).toBeNull();
@@ -109,7 +118,11 @@ describe('pins', () => {
       notes: ['  leak here ', 'x', '', 'too many'],
       img: 'forged',
     });
-    expect(out).toEqual({ pins: ['0.1,0.1', '0.2,0.2'], notes: ['leak here', ''], img: imageKey(q.image) });
+    expect(out).toEqual({
+      pins: ['0.1,0.1', '0.2,0.2'],
+      notes: ['leak here', ''],
+      img: imageKey(q.image),
+    });
     expect(pinAnswerCore({ ...q, notes: false }, { pins: ['0.1,0.1'], notes: ['a'] })).toEqual({
       pins: ['0.1,0.1'],
       img: imageKey(q.image),
@@ -185,7 +198,10 @@ describe('location and the service-area radius', () => {
   });
 
   it('checks a typed ZIP against the form’s address areas, and keeps a typed place', () => {
-    expect(locationAnswerCore(q, { zip: '93101-1234' }, ['931'])).toEqual({ zip: '931011234', area: 'in' });
+    expect(locationAnswerCore(q, { zip: '93101-1234' }, ['931'])).toEqual({
+      zip: '931011234',
+      area: 'in',
+    });
     expect(locationAnswerCore(q, { zip: '90210' }, ['931'])).toEqual({ zip: '90210', area: 'out' });
     expect(locationAnswerCore(q, { zip: '93101' }, [])).toEqual({ zip: '93101' });
     expect(locationAnswerCore(q, { zip: '<b>' }, ['931'])).toBeUndefined();
@@ -219,7 +235,13 @@ describe('location and the service-area radius', () => {
 /* ---------- availability ---------- */
 
 describe('availability grid', () => {
-  const q = { type: 'availability', days: ['mon', 'wed'], startTime: '08:00', endTime: '12:00', slotMinutes: 30 };
+  const q = {
+    type: 'availability',
+    days: ['mon', 'wed'],
+    startTime: '08:00',
+    endTime: '12:00',
+    slotMinutes: 30,
+  };
 
   it('reads the grid, falling back to Mon–Fri, 8–6, hourly', () => {
     expect(availabilityGrid(q)).toEqual({ days: ['mon', 'wed'], start: 480, slot: 30, count: 8 });
@@ -234,12 +256,18 @@ describe('availability grid', () => {
       days: ['sun'],
       slot: 60,
     });
-    expect(availabilityGrid({ startTime: '00:00', endTime: '24:00', slotMinutes: 15 }).count).toBe(96);
+    expect(availabilityGrid({ startTime: '00:00', endTime: '24:00', slotMinutes: 15 }).count).toBe(
+      96,
+    );
   });
 
   it('decodes, merges and re-encodes canonically', () => {
     const g = availabilityGrid(q);
-    const picked = decodeAvailability(g, { mon: '08:00-09:00,09:00-10:30', wed: '11:30-12:00', fri: '08:00-09:00' });
+    const picked = decodeAvailability(g, {
+      mon: '08:00-09:00,09:00-10:30',
+      wed: '11:30-12:00',
+      fri: '08:00-09:00',
+    });
     expect([...picked.get('mon')!]).toEqual([0, 1, 2, 3, 4]);
     expect(encodeAvailability(g, picked)).toEqual({ mon: '08:00-10:30', wed: '11:30-12:00' });
   });
@@ -283,7 +311,12 @@ describe('voice notes and photo checklists', () => {
     expect(formatVoiceNote({ audio: 'slate-file://x', sec: '42' })).toBe('Voice note (0:42)');
     expect(formatVoiceNote({ typed: ' It leaks ' })).toBe('It leaks');
     expect(formatVoiceNote({})).toBe('');
-    const pq = { items: [{ label: 'Front', value: 'front' }, { label: 'Roof', value: 'roof' }] };
+    const pq = {
+      items: [
+        { label: 'Front', value: 'front' },
+        { label: 'Roof', value: 'roof' },
+      ],
+    };
     expect(photosTaken(pq, { front: 'ref', roof: '', junk: 'x' })).toEqual(['front']);
     expect(formatPhotoCount(pq, { front: 'ref' })).toBe('1 of 2 photos');
   });
@@ -305,7 +338,9 @@ describe('Wave C validation', () => {
   it('voice notes', () => {
     const q: Question = { id: 'v', type: 'voice_note', title: 'T', required: true };
     expect(validate(q, undefined)?.message).toMatch(/record or type/i);
-    expect(validate({ ...q, allowTyped: false } as Question, undefined)?.message).toMatch(/record a voice/i);
+    expect(validate({ ...q, allowTyped: false } as Question, undefined)?.message).toMatch(
+      /record a voice/i,
+    );
     expect(validate(q, { audio: 'slate-file://x', sec: '12' })).toBeNull();
     expect(validate(q, { audio: 'slate-file://x', sec: '9999' })?.code).toBe('shape');
     expect(validate(q, { typed: 'The gutter leaks' })).toBeNull();
@@ -352,12 +387,18 @@ describe('Wave C validation', () => {
 describe('Wave C piping', () => {
   it('reads answers in words, never coordinates', () => {
     const loc: Question = { id: 'l', type: 'location', title: 'T' };
-    expect(formatAnswerFor(loc, { lat: '1.000', lng: '2.000', area: 'in' })).toBe('inside the service area');
-    expect(formatAnswerFor(loc, { lat: '1.000', lng: '2.000', area: 'out' })).toBe('outside the service area');
+    expect(formatAnswerFor(loc, { lat: '1.000', lng: '2.000', area: 'in' })).toBe(
+      'inside the service area',
+    );
+    expect(formatAnswerFor(loc, { lat: '1.000', lng: '2.000', area: 'out' })).toBe(
+      'outside the service area',
+    );
     expect(formatAnswerFor(loc, { lat: '1.000', lng: '2.000' })).toBe('');
     expect(formatAnswerFor(loc, { zip: '93101' })).toBe('93101');
     const week: Question = { id: 'w', type: 'availability', title: 'T', days: ['tue'] };
-    expect(formatAnswerFor(week, { tue: '09:00-11:00,14:00-15:00' })).toBe('Tue 09:00–11:00, 14:00–15:00');
+    expect(formatAnswerFor(week, { tue: '09:00-11:00,14:00-15:00' })).toBe(
+      'Tue 09:00–11:00, 14:00–15:00',
+    );
     const pin: Question = { id: 'p', type: 'image_pin', title: 'T' };
     expect(formatAnswerFor(pin, { pins: ['0.1,0.1'], notes: ['here'] })).toBe('1 spot: here');
   });
@@ -422,21 +463,31 @@ describe('Wave C schema checks', () => {
 
   it('flags a pin question without a usable photo', () => {
     expect(kinds([{ id: 'p', type: 'image_pin', title: 'T' }])).toContain('no_image');
-    expect(kinds([{ id: 'p', type: 'image_pin', title: 'T', image: 'http://x.com/a.jpg' }])).toContain('no_image');
-    expect(kinds([{ id: 'p', type: 'image_pin', title: 'T', image: 'https://x.com/a.jpg' }])).toEqual([]);
+    expect(
+      kinds([{ id: 'p', type: 'image_pin', title: 'T', image: 'http://x.com/a.jpg' }]),
+    ).toContain('no_image');
+    expect(
+      kinds([{ id: 'p', type: 'image_pin', title: 'T', image: 'https://x.com/a.jpg' }]),
+    ).toEqual([]);
     expect(
       kinds([{ id: 'p', type: 'image_pin', title: 'T', image: 'data:image/jpeg;base64,AAAA' }]),
     ).toEqual([]);
   });
 
   it('flags an empty checklist, a bad grid, a half-set area and single-select swipe', () => {
-    expect(kinds([{ id: 'c', type: 'photo_checklist', title: 'T', items: [] }])).toContain('no_items');
-    expect(kinds([{ id: 'a', type: 'availability', title: 'T', slotMinutes: 45 }])).toContain('bad_grid');
+    expect(kinds([{ id: 'c', type: 'photo_checklist', title: 'T', items: [] }])).toContain(
+      'no_items',
+    );
+    expect(kinds([{ id: 'a', type: 'availability', title: 'T', slotMinutes: 45 }])).toContain(
+      'bad_grid',
+    );
     expect(
       kinds([{ id: 'a', type: 'availability', title: 'T', startTime: '17:00', endTime: '09:00' }]),
     ).toContain('bad_grid');
     expect(kinds([{ id: 'a', type: 'availability', title: 'T' }])).toEqual([]);
-    expect(kinds([{ id: 'l', type: 'location', title: 'T', radius: 10 }])).toContain('bad_service_area');
+    expect(kinds([{ id: 'l', type: 'location', title: 'T', radius: 10 }])).toContain(
+      'bad_service_area',
+    );
     expect(
       kinds([{ id: 's', type: 'picture_choice', title: 'T', options: [], display: 'swipe' }]),
     ).toContain('swipe_single');

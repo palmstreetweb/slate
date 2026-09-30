@@ -7,7 +7,10 @@
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clampForQuestion, VOICE_TYPED_MAX } from '../neon/functions/submit-response/answerShape.js';
+import {
+  clampForQuestion,
+  VOICE_TYPED_MAX,
+} from '../neon/functions/submit-response/answerShape.js';
 import { imageKey } from '@/logic/pins.js';
 import * as media from '@/logic/media.js';
 import { resetFnDb, type newFnDbState } from './_fnDb.js';
@@ -24,7 +27,8 @@ const FORM = 'f_wavecform001';
 const OTHER = 'f_otherform001';
 const IP = '203.0.113.65';
 const UUID = '0b8e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5b';
-const ref = (form = FORM, name = 'front.jpg') => `slate-file://storage:public/${form}/${UUID}/${name}`;
+const ref = (form = FORM, name = 'front.jpg') =>
+  `slate-file://storage:public/${form}/${UUID}/${name}`;
 const PHOTO = 'https://example.com/roof.jpg';
 
 const schema = {
@@ -53,7 +57,14 @@ const schema = {
         { label: 'Roof', value: 'roof' },
       ],
     },
-    { id: 'likes', type: 'picture_choice', title: 'Like?', display: 'swipe', multiple: true, options: [{ label: 'A', value: 'a', src: PHOTO }] },
+    {
+      id: 'likes',
+      type: 'picture_choice',
+      title: 'Like?',
+      display: 'swipe',
+      multiple: true,
+      options: [{ label: 'A', value: 'a', src: PHOTO }],
+    },
     { id: 'done', type: 'thanks', title: 'Thanks' },
   ],
 };
@@ -153,12 +164,16 @@ describe('clampForQuestion: Wave C shapes', () => {
 
   it('voice: this form’s own recording and a capped length, or typed text when allowed', () => {
     const ctx = { formId: FORM };
-    expect(clampForQuestion(byId.story!, { audio: ref(FORM, 'voice.webm'), sec: '42' }, ctx)).toEqual({
+    expect(
+      clampForQuestion(byId.story!, { audio: ref(FORM, 'voice.webm'), sec: '42' }, ctx),
+    ).toEqual({
       audio: ref(FORM, 'voice.webm'),
       sec: '30',
     });
     expect(clampForQuestion(byId.story!, { audio: ref(OTHER, 'voice.webm') }, ctx)).toBeUndefined();
-    expect(clampForQuestion(byId.story!, { audio: 'https://evil.example/a.mp3' }, ctx)).toBeUndefined();
+    expect(
+      clampForQuestion(byId.story!, { audio: 'https://evil.example/a.mp3' }, ctx),
+    ).toBeUndefined();
     expect(clampForQuestion(byId.story!, { audio: ref(FORM, 'v.m4a'), sec: 'x' }, ctx)).toEqual({
       audio: ref(FORM, 'v.m4a'),
     });
@@ -210,6 +225,8 @@ describe('submit: Wave C answers as stored', () => {
     await submit({ leak: { pins: ['9,9'] }, when: { mon: 'soon' }, story: { audio: ref(OTHER) } });
     expect(stored().answers).toEqual({});
     await submit({ where: { typed: 'Goleta' } });
-    expect(db.state.submissions.some((s) => (s as { answers: { where?: unknown } }).answers.where)).toBe(true);
+    expect(
+      db.state.submissions.some((s) => (s as { answers: { where?: unknown } }).answers.where),
+    ).toBe(true);
   });
 });

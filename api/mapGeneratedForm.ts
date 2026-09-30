@@ -334,7 +334,10 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         title,
         required,
         ...(q.radius > 0 && q.radius <= 1000
-          ? { radius: q.radius, radiusUnit: q.radiusUnit === 'km' ? ('km' as const) : ('mi' as const) }
+          ? {
+              radius: q.radius,
+              radiusUnit: q.radiusUnit === 'km' ? ('km' as const) : ('mi' as const),
+            }
           : {}),
         ...vis,
       };
@@ -348,7 +351,8 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         ...vis,
       };
     case 'availability': {
-      const time = (t: string) => (/^([01]\d|2[0-4]):[0-5]\d$/.test(t.trim()) ? t.trim() : undefined);
+      const time = (t: string) =>
+        /^([01]\d|2[0-4]):[0-5]\d$/.test(t.trim()) ? t.trim() : undefined;
       const slot = [15, 30, 60, 120].includes(q.step) ? q.step : undefined;
       const days = [...new Set(q.days ?? [])];
       return {

@@ -141,13 +141,20 @@ function sanitizeWaveC(next: Record<string, unknown>): void {
   }
   if ('days' in next) {
     const days = Array.isArray(next.days)
-      ? [...new Set((next.days as unknown[]).filter((d): d is string => WEEKDAYS.includes(d as string)))]
+      ? [
+          ...new Set(
+            (next.days as unknown[]).filter((d): d is string => WEEKDAYS.includes(d as string)),
+          ),
+        ]
       : [];
     if (days.length) next.days = days;
     else delete next.days;
   }
   for (const key of ['startTime', 'endTime']) {
-    if (key in next && !(typeof next[key] === 'string' && /^\d{2}:\d{2}$/.test(next[key] as string))) {
+    if (
+      key in next &&
+      !(typeof next[key] === 'string' && /^\d{2}:\d{2}$/.test(next[key] as string))
+    ) {
       delete next[key];
     }
   }

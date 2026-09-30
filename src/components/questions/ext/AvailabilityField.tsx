@@ -15,7 +15,15 @@
 
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import type { AvailabilityQuestion } from '@/types/Question.js';
 import { validate } from '@/logic/validation.js';
 import {
@@ -49,10 +57,15 @@ export default function AvailabilityField({
 }: ExtFieldProps<AvailabilityQuestion>) {
   const titleId = useId();
   const howId = useId();
-  const grid = useMemo(() => availabilityGrid(question as unknown as Record<string, unknown>), [question]);
+  const grid = useMemo(
+    () => availabilityGrid(question as unknown as Record<string, unknown>),
+    [question],
+  );
   const [picked, setPicked] = useState<Set<string>>(() => {
     const out = new Set<string>();
-    decodeAvailability(grid, value).forEach((slots, day) => slots.forEach((i) => out.add(cellKey(day, i))));
+    decodeAvailability(grid, value).forEach((slots, day) =>
+      slots.forEach((i) => out.add(cellKey(day, i))),
+    );
     return out;
   });
   const [focus, setFocus] = useState<{ d: number; s: number }>({ d: 0, s: 0 });
@@ -253,9 +266,12 @@ export default function AvailabilityField({
       e.preventDefault();
       const d = Math.min(grid.days.length - 1, Math.max(0, focus.d + mv[0]));
       const s = Math.min(grid.count - 1, Math.max(0, focus.s + mv[1]));
-      if (e.shiftKey) setCells([here, cellKey(grid.days[d]!, s)], pickedRef.current.has(here) ? 'add' : 'remove');
+      if (e.shiftKey)
+        setCells([here, cellKey(grid.days[d]!, s)], pickedRef.current.has(here) ? 'add' : 'remove');
       setFocus({ d, s });
-      gridRef.current?.querySelector<HTMLElement>(`[data-cell="${cellKey(grid.days[d]!, s)}"]`)?.focus();
+      gridRef.current
+        ?.querySelector<HTMLElement>(`[data-cell="${cellKey(grid.days[d]!, s)}"]`)
+        ?.focus();
     } else if (e.key === ' ') {
       e.preventDefault();
       setCells([here], pickedRef.current.has(here) ? 'remove' : 'add');
@@ -264,7 +280,9 @@ export default function AvailabilityField({
       e.preventDefault();
       const s = e.key === 'Home' ? 0 : grid.count - 1;
       setFocus({ d: focus.d, s });
-      gridRef.current?.querySelector<HTMLElement>(`[data-cell="${cellKey(grid.days[focus.d]!, s)}"]`)?.focus();
+      gridRef.current
+        ?.querySelector<HTMLElement>(`[data-cell="${cellKey(grid.days[focus.d]!, s)}"]`)
+        ?.focus();
     }
   };
 

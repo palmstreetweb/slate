@@ -13,7 +13,15 @@
 
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import type { PhotoChecklistQuestion } from '@/types/Question.js';
 import { validate } from '@/logic/validation.js';
 import { PHOTO_MAX_BYTES } from '@/logic/media.js';
@@ -70,7 +78,8 @@ export default function PhotoChecklistField({
     const out: Record<string, Shot> = {};
     for (const it of items) {
       const ref = stored[it.value];
-      if (typeof ref === 'string' && ref) out[it.value] = { state: 'done', ref, thumb: thumbs.get(ref) };
+      if (typeof ref === 'string' && ref)
+        out[it.value] = { state: 'done', ref, thumb: thumbs.get(ref) };
     }
     return out;
   });
@@ -110,7 +119,10 @@ export default function PhotoChecklistField({
     async (item: string, file: File) => {
       const label = items.find((i) => i.value === item)?.label ?? 'Photo';
       if (!onFileUpload) {
-        setShots((s) => ({ ...s, [item]: { state: 'error', error: 'Photos can’t be saved on this form.' } }));
+        setShots((s) => ({
+          ...s,
+          [item]: { state: 'error', error: 'Photos can’t be saved on this form.' },
+        }));
         return;
       }
       if (file.size > PHOTO_MAX_BYTES * 3) {
@@ -137,7 +149,8 @@ export default function PhotoChecklistField({
           [item]: {
             state: 'error',
             thumb,
-            error: err instanceof Error && err.message ? err.message : 'Couldn’t upload that photo.',
+            error:
+              err instanceof Error && err.message ? err.message : 'Couldn’t upload that photo.',
           },
         }));
         setSaid(`${label}: upload failed.`);
@@ -193,7 +206,12 @@ export default function PhotoChecklistField({
 
       <div className={`slate-shots${complete ? ' slate-shots--complete' : ''}`}>
         <div className="slate-shots-progress" role="status">
-          <svg className="slate-shots-ring" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
+          <svg
+            className="slate-shots-ring"
+            viewBox="0 0 36 36"
+            aria-hidden="true"
+            focusable="false"
+          >
             <circle className="slate-shots-ring-track" cx="18" cy="18" r="15" pathLength={100} />
             <circle
               className="slate-shots-ring-fill"
@@ -231,7 +249,9 @@ export default function PhotoChecklistField({
                 </span>
                 <span className="slate-shot-text">
                   <span className="slate-shot-label">{it.label}</span>
-                  {it.description ? <span className="slate-shot-desc">{it.description}</span> : null}
+                  {it.description ? (
+                    <span className="slate-shot-desc">{it.description}</span>
+                  ) : null}
                   {state === 'error' ? (
                     <span className="slate-shot-err" role="alert">
                       {shot?.error}
@@ -250,7 +270,9 @@ export default function PhotoChecklistField({
                     onClick={() => pick(it.value, true)}
                   >
                     <CameraIcon />
-                    <span className="slate-shot-btn-text">{state === 'done' ? 'Retake' : 'Take photo'}</span>
+                    <span className="slate-shot-btn-text">
+                      {state === 'done' ? 'Retake' : 'Take photo'}
+                    </span>
                   </button>
                   <button
                     type="button"

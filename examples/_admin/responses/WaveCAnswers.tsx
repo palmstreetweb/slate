@@ -33,11 +33,16 @@ export function PinnedImage({ question, value }: { question: Q<'image_pin'>; val
   const pins = pinsOf(value);
   const src = safeImageSrc(question.image, PIN_IMAGE_DATA_MAX);
   const placedOn = (value as { img?: unknown } | null)?.img;
-  const moved = typeof placedOn === 'string' && placedOn !== '' && placedOn !== imageKey(question.image);
+  const moved =
+    typeof placedOn === 'string' && placedOn !== '' && placedOn !== imageKey(question.image);
   return (
     <div className="rsp-pins">
       <div className="rsp-pins-photo">
-        {src ? <img src={src} alt={question.imageAlt ?? ''} referrerPolicy="no-referrer" /> : <span className="rsp-pins-blank" />}
+        {src ? (
+          <img src={src} alt={question.imageAlt ?? ''} referrerPolicy="no-referrer" />
+        ) : (
+          <span className="rsp-pins-blank" />
+        )}
         {pins.map((p, i) => (
           <span
             key={i}
@@ -93,7 +98,9 @@ export function VoiceNoteAnswer({ value }: { value: unknown }) {
       const type = (blob.type || '').split(';')[0]!;
       const probe = typeof document !== 'undefined' ? document.createElement('audio') : null;
       if (type && probe && probe.canPlayType(type) === '') {
-        setProblem('This browser can’t play this recording (it was made in another browser). Use Download below.');
+        setProblem(
+          'This browser can’t play this recording (it was made in another browser). Use Download below.',
+        );
         return;
       }
       made = URL.createObjectURL(blob);
@@ -157,10 +164,21 @@ export function LocationAnswer({
   return (
     <div className="rsp-loc">
       {c && r ? (
-        <svg className={`rsp-loc-map${area ? ` rsp-loc-map--${area}` : ''}`} viewBox="-50 -50 100 100" aria-hidden="true">
+        <svg
+          className={`rsp-loc-map${area ? ` rsp-loc-map--${area}` : ''}`}
+          viewBox="-50 -50 100 100"
+          aria-hidden="true"
+        >
           <circle r="46" className="rsp-loc-outer" />
           <circle r="30" className="rsp-loc-area" />
-          <rect x="-3" y="-3" width="6" height="6" transform="rotate(45)" className="rsp-loc-home" />
+          <rect
+            x="-3"
+            y="-3"
+            width="6"
+            height="6"
+            transform="rotate(45)"
+            className="rsp-loc-home"
+          />
           {dot ? <circle cx={dot.x} cy={dot.y} r="5" className="rsp-loc-dot" /> : null}
         </svg>
       ) : null}
@@ -189,8 +207,13 @@ export function PhotoChecklistAnswer({
   question: Q<'photo_checklist'>;
   value: unknown;
 }) {
-  const a = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-  const done = question.items.filter((i) => typeof a[i.value] === 'string' && a[i.value] !== '').length;
+  const a =
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const done = question.items.filter(
+    (i) => typeof a[i.value] === 'string' && a[i.value] !== '',
+  ).length;
   return (
     <div className="rsp-shots">
       <p className="rsp-muted rsp-shots-count">
@@ -202,7 +225,11 @@ export function PhotoChecklistAnswer({
           return (
             <li key={item.value} className={`rsp-shot${ref ? '' : ' rsp-shot--missing'}`}>
               <span className="rsp-shot-label">{item.label}</span>
-              {ref ? <ResponseFileAnswer value={ref} /> : <span className="rsp-muted">No photo</span>}
+              {ref ? (
+                <ResponseFileAnswer value={ref} />
+              ) : (
+                <span className="rsp-muted">No photo</span>
+              )}
             </li>
           );
         })}
@@ -240,7 +267,9 @@ export function AvailabilityAnswer({
         ))}
         {Array.from({ length: grid.count }, (_, s) => (
           <div key={s} className="rsp-week-row">
-            <span className="rsp-week-time">{s % every === 0 ? clockLabel(grid.start + s * grid.slot) : ''}</span>
+            <span className="rsp-week-time">
+              {s % every === 0 ? clockLabel(grid.start + s * grid.slot) : ''}
+            </span>
             {grid.days.map((d) => (
               <span
                 key={d}

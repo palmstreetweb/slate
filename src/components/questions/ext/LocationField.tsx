@@ -13,7 +13,15 @@
 
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import type { LocationQuestion } from '@/types/Question.js';
 import { validate } from '@/logic/validation.js';
 import { OUT_OF_AREA_VALUE } from '@/logic/address.js';
@@ -88,9 +96,7 @@ export default function LocationField({
 
   const seeded = locationAnswerCore(rec, value, zips);
   const [answer, setAnswer] = useState<Record<string, string> | undefined>(seeded);
-  const [phase, setPhase] = useState<Phase>(
-    seeded ? (seeded.lat ? 'done' : 'manual') : 'idle',
-  );
+  const [phase, setPhase] = useState<Phase>(seeded ? (seeded.lat ? 'done' : 'manual') : 'idle');
   const [offReason, setOffReason] = useState<'denied' | 'unavailable' | 'timeout'>('denied');
   const [text, setText] = useState(seeded?.zip ?? seeded?.typed ?? '');
   const [error, setError] = useState<string | null>(null);
@@ -204,7 +210,9 @@ export default function LocationField({
   const area = answer?.area;
   const typing = phase === 'manual' || phase === 'off';
   // When the owner routes people outside the area to their own ending, don't promise "continue".
-  const routesOut = (question.logic ?? []).some((r) => JSON.stringify(r.if).includes(OUT_OF_AREA_VALUE));
+  const routesOut = (question.logic ?? []).some((r) =>
+    JSON.stringify(r.if).includes(OUT_OF_AREA_VALUE),
+  );
 
   return (
     <div ref={rootRef}>
@@ -237,12 +245,16 @@ export default function LocationField({
               {area === 'in' ? (
                 <>
                   <strong>You’re in our service area.</strong>
-                  {distance !== null ? ` About ${formatDistance(distance, question.radiusUnit)} away.` : ''}
+                  {distance !== null
+                    ? ` About ${formatDistance(distance, question.radiusUnit)} away.`
+                    : ''}
                 </>
               ) : area === 'out' ? (
                 <>
                   <strong>You’re outside our usual area.</strong>
-                  {distance !== null ? ` About ${formatDistance(distance, question.radiusUnit)} away.` : ''}
+                  {distance !== null
+                    ? ` About ${formatDistance(distance, question.radiusUnit)} away.`
+                    : ''}
                   {routesOut ? '' : ' You can still continue.'}
                 </>
               ) : (

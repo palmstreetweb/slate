@@ -13,7 +13,11 @@ import { Form, defineSchema, OUT_OF_AREA_VALUE } from '@/index.js';
 import type { Question } from '@/index.js';
 import { QuestionRenderer } from '@/components/questions/QuestionRenderer.js';
 import { FormConfirmRefContext } from '@/hooks/useRegisterFormConfirm.js';
-import { VOICE_MIME_PREFERENCE, failedMimes, pickVoiceMime } from '@/components/questions/ext/voiceFormat.js';
+import {
+  VOICE_MIME_PREFERENCE,
+  failedMimes,
+  pickVoiceMime,
+} from '@/components/questions/ext/voiceFormat.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 
@@ -60,7 +64,13 @@ function renderField(
   const setAnswer = vi.fn<(id: string, value: unknown) => void>();
   const advance = vi.fn<() => void>();
   const utils = render(
-    <Harness question={question} answers={answers} setAnswer={setAnswer} advance={advance} {...extra} />,
+    <Harness
+      question={question}
+      answers={answers}
+      setAnswer={setAnswer}
+      advance={advance}
+      {...extra}
+    />,
   );
   return { ...utils, setAnswer, advance };
 }
@@ -127,15 +137,37 @@ describe('swipe cards on picture choice', () => {
     const { setAnswer } = renderField(q);
     await screen.findByRole('button', { name: 'Like Craftsman' });
     const card = document.querySelector('.slate-swipe-card--top') as HTMLElement;
-    card.getBoundingClientRect = () => ({ width: 300, height: 400, x: 0, y: 0, top: 0, left: 0, right: 300, bottom: 400, toJSON: () => ({}) });
-    fireEvent.pointerDown(card, { pointerId: 1, clientX: 150, clientY: 200, button: 0, pointerType: 'mouse' });
+    card.getBoundingClientRect = () => ({
+      width: 300,
+      height: 400,
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 300,
+      bottom: 400,
+      toJSON: () => ({}),
+    });
+    fireEvent.pointerDown(card, {
+      pointerId: 1,
+      clientX: 150,
+      clientY: 200,
+      button: 0,
+      pointerType: 'mouse',
+    });
     // Under the flick distance, however fast.
     fireEvent.pointerMove(card, { pointerId: 1, clientX: 170, clientY: 200 });
     fireEvent.pointerUp(card, { pointerId: 1, clientX: 170, clientY: 200 });
     expect(screen.getByRole('button', { name: 'Like Craftsman' })).toBeInTheDocument();
     const top = document.querySelector('.slate-swipe-card--top') as HTMLElement;
     top.getBoundingClientRect = card.getBoundingClientRect;
-    fireEvent.pointerDown(top, { pointerId: 2, clientX: 150, clientY: 200, button: 0, pointerType: 'mouse' });
+    fireEvent.pointerDown(top, {
+      pointerId: 2,
+      clientX: 150,
+      clientY: 200,
+      button: 0,
+      pointerType: 'mouse',
+    });
     fireEvent.pointerMove(top, { pointerId: 2, clientX: 60, clientY: 210 });
     fireEvent.pointerMove(top, { pointerId: 2, clientX: -60, clientY: 210 });
     fireEvent.pointerUp(top, { pointerId: 2, clientX: -60, clientY: 210 });
@@ -151,13 +183,20 @@ describe('swipe cards on picture choice', () => {
 });
 
 describe('swipe card on yes / no', () => {
-  const q: Question = { id: 'first', type: 'yes_no', title: 'First time with us?', display: 'swipe' };
+  const q: Question = {
+    id: 'first',
+    type: 'yes_no',
+    title: 'First time with us?',
+    display: 'swipe',
+  };
 
   it('the question is the card; ✓ commits yes and advances', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const { setAnswer, advance } = renderField(q);
-      expect(await screen.findByRole('heading', { name: 'First time with us?' })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('heading', { name: 'First time with us?' }),
+      ).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /yes/i }));
       expect(setAnswer).toHaveBeenCalledWith('first', 'yes');
       act(() => {
@@ -317,17 +356,25 @@ function stubMic(mode: 'ok' | 'deny' | 'none') {
         ? undefined
         : {
             getUserMedia: vi.fn(async () => {
-              if (mode === 'deny') throw Object.assign(new Error('no'), { name: 'NotAllowedError' });
+              if (mode === 'deny')
+                throw Object.assign(new Error('no'), { name: 'NotAllowedError' });
               return stream;
             }),
           },
   });
-  (globalThis as { MediaRecorder?: unknown }).MediaRecorder = mode === 'none' ? undefined : FakeRecorder;
+  (globalThis as { MediaRecorder?: unknown }).MediaRecorder =
+    mode === 'none' ? undefined : FakeRecorder;
   return track;
 }
 
 describe('voice note', () => {
-  const q: Question = { id: 'story', type: 'voice_note', title: 'Tell us', maxSeconds: 30, required: true };
+  const q: Question = {
+    id: 'story',
+    type: 'voice_note',
+    title: 'Tell us',
+    maxSeconds: 30,
+    required: true,
+  };
 
   afterEach(() => {
     delete (globalThis as { MediaRecorder?: unknown }).MediaRecorder;
@@ -355,7 +402,9 @@ describe('voice note', () => {
     expect(file.name).toBe('voice-note.webm');
     expect(qid).toBe('story');
     expect(ctx?.maxSizeMb).toBeCloseTo((30 * 40_000 + 64 * 1024) / (1024 * 1024));
-    await waitFor(() => expect(lastAnswer(setAnswer)).toEqual({ audio: 'slate-file://voice-1', sec: '1' }));
+    await waitFor(() =>
+      expect(lastAnswer(setAnswer)).toEqual({ audio: 'slate-file://voice-1', sec: '1' }),
+    );
     expect(await screen.findByText('Saved')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Play your recording' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
@@ -411,7 +460,10 @@ function stubGeo(result: { lat: number; lng: number } | 'deny') {
       else ok({ coords: { latitude: result.lat, longitude: result.lng } });
     },
   );
-  Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition } });
+  Object.defineProperty(navigator, 'geolocation', {
+    configurable: true,
+    value: { getCurrentPosition },
+  });
   return getCurrentPosition;
 }
 
@@ -448,7 +500,12 @@ describe('location', () => {
 
   it('denied: a ZIP typed instead is checked against the form’s address areas', async () => {
     stubGeo('deny');
-    const address: Question = { id: 'addr', type: 'address', title: 'Address', serviceArea: ['931'] };
+    const address: Question = {
+      id: 'addr',
+      type: 'address',
+      title: 'Address',
+      serviceArea: ['931'],
+    };
     const { setAnswer } = renderField(q, {}, { allQuestions: [q, address] });
     fireEvent.click(await screen.findByRole('button', { name: 'Use my location' }));
     expect(screen.getByText(/type your ZIP code instead/i)).toBeInTheDocument();
@@ -461,7 +518,9 @@ describe('location', () => {
     stubGeo('deny');
     const { setAnswer } = renderField(q);
     fireEvent.click(await screen.findByRole('button', { name: 'Use my location' }));
-    fireEvent.change(screen.getByLabelText('Your town or ZIP code'), { target: { value: 'Goleta' } });
+    fireEvent.change(screen.getByLabelText('Your town or ZIP code'), {
+      target: { value: 'Goleta' },
+    });
     expect(lastAnswer(setAnswer)).toEqual({ typed: 'Goleta' });
   });
 
@@ -509,7 +568,9 @@ describe('<Form> location routing', () => {
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(await screen.findByRole('heading', { name: 'Out of area' })).toBeInTheDocument();
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-    expect(onSubmit.mock.calls[0]![0]).toEqual({ where: { lat: '34.052', lng: '-118.244', area: 'out' } });
+    expect(onSubmit.mock.calls[0]![0]).toEqual({
+      where: { lat: '34.052', lng: '-118.244', area: 'out' },
+    });
   });
 });
 
@@ -531,13 +592,17 @@ describe('photo checklist', () => {
     const onFileUpload = vi.fn<FileUploadHandler>(async () => `slate-file://photo-${++n}`);
     const { setAnswer, advance } = renderField(q, {}, { onFileUpload });
     await screen.findByText('0 of 2 photos');
-    const [camera, library] = Array.from(document.querySelectorAll<HTMLInputElement>('.slate-shots-input'));
+    const [camera, library] = Array.from(
+      document.querySelectorAll<HTMLInputElement>('.slate-shots-input'),
+    );
     expect(camera).toHaveAttribute('capture', 'environment');
     expect(camera).toHaveAttribute('accept', 'image/*');
     expect(library).not.toHaveAttribute('capture');
     fireEvent.click(screen.getByRole('button', { name: 'Take photo: Roof close-up' }));
     await act(async () => {
-      fireEvent.change(camera!, { target: { files: [new File(['x'], 'IMG_1.jpg', { type: 'image/jpeg' })] } });
+      fireEvent.change(camera!, {
+        target: { files: [new File(['x'], 'IMG_1.jpg', { type: 'image/jpeg' })] },
+      });
     });
     await waitFor(() => expect(lastAnswer(setAnswer)).toEqual({ roof: 'slate-file://photo-1' }));
     expect(screen.getByText('1 of 2 photos')).toBeInTheDocument();
@@ -547,10 +612,15 @@ describe('photo checklist', () => {
     expect(screen.getByText(/one more photo to go/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Choose a photo for Front of the house' }));
     await act(async () => {
-      fireEvent.change(library!, { target: { files: [new File(['y'], 'IMG_2.jpg', { type: 'image/jpeg' })] } });
+      fireEvent.change(library!, {
+        target: { files: [new File(['y'], 'IMG_2.jpg', { type: 'image/jpeg' })] },
+      });
     });
     await waitFor(() =>
-      expect(lastAnswer(setAnswer)).toEqual({ roof: 'slate-file://photo-1', front: 'slate-file://photo-2' }),
+      expect(lastAnswer(setAnswer)).toEqual({
+        roof: 'slate-file://photo-1',
+        front: 'slate-file://photo-2',
+      }),
     );
     expect(screen.getByText('All set')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));

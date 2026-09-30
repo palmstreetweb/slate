@@ -207,7 +207,9 @@ function formatAnswer(question: Question, value: unknown): string {
       const lines = question.items
         .filter((i) => typeof a[i.value] === 'string' && a[i.value] !== '')
         .map((i) => `${i.label}: photo`);
-      return lines.length ? `${lines.length} of ${question.items.length} photos\n${lines.join('\n')}` : '—';
+      return lines.length
+        ? `${lines.length} of ${question.items.length} photos\n${lines.join('\n')}`
+        : '—';
     }
 
     case 'availability':
@@ -230,7 +232,8 @@ export function locationText(
   if (!value || typeof value !== 'object' || Array.isArray(value)) return safeText(value) || '—';
   const v = value as Record<string, unknown>;
   const area = locationAreaOf(question, value, form);
-  const areaText = area === 'in' ? 'Inside the service area' : area === 'out' ? 'Outside the service area' : '';
+  const areaText =
+    area === 'in' ? 'Inside the service area' : area === 'out' ? 'Outside the service area' : '';
   if (typeof v.lat === 'string' && typeof v.lng === 'string') {
     const d = locationDistance(question as unknown as Record<string, unknown>, value);
     const far = d !== null ? `${formatDistance(d, question.radiusUnit)} away` : '';
@@ -366,7 +369,9 @@ export function csvParts(
           }
           let j = i;
           while (j < grid.count && set.has(j)) j += 1;
-          out.push(`${clockLabel(grid.start + i * grid.slot)}–${clockLabel(grid.start + j * grid.slot)}`);
+          out.push(
+            `${clockLabel(grid.start + i * grid.slot)}–${clockLabel(grid.start + j * grid.slot)}`,
+          );
           i = j;
         }
         return out.join(', ');

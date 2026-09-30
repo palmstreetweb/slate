@@ -265,7 +265,9 @@ export default function ImagePinField({
             />
           ) : (
             <span className="slate-pin-blank" data-pin-surface="1" aria-hidden="true">
-              {broken ? 'The photo didn’t load — tap to mark the spot anyway' : 'Tap to mark the spot'}
+              {broken
+                ? 'The photo didn’t load — tap to mark the spot anyway'
+                : 'Tap to mark the spot'}
             </span>
           )}
           {cursor ? (
