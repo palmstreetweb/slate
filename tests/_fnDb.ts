@@ -179,10 +179,14 @@ export function lookupPublicForm(
 export function signupDef(f: FormRow): Record<string, Record<string, number>> | null {
   const qs = (f.published_schema as { questions?: unknown } | null)?.questions;
   const out: Record<string, Record<string, number>> = {};
+  // The last question with each id decides, as in the Function's map.
   for (const q of Array.isArray(qs) ? qs : []) {
     const r = q as Record<string, unknown>;
-    if (!r || r.type !== 'signup_slots' || typeof r.id !== 'string') continue;
-    const caps = Object.fromEntries(signupSlotsOf(r).map((x) => [x.value, x.capacity]));
+    if (!r || typeof r !== 'object' || typeof r.id !== 'string') continue;
+    const caps =
+      r.type === 'signup_slots'
+        ? Object.fromEntries(signupSlotsOf(r).map((x) => [x.value, x.capacity]))
+        : {};
     if (Object.keys(caps).length) out[r.id] = caps;
     else delete out[r.id];
   }

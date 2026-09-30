@@ -39,7 +39,9 @@ set search_path = public, pg_temp
 as $fn$
   select jsonb_object_agg(t.qid, t.caps)
     from (
-      select distinct on (q.value->>'id') q.value->>'id' as qid, c.caps
+      -- The last question with each id decides (the Function keeps the last one too); it counts
+      -- only when it is a sign-up question with at least one usable slot.
+      select distinct on (q.value->>'id') q.value->>'id' as qid, q.value->>'type' as qtype, c.caps
         from jsonb_array_elements(
                case when jsonb_typeof(p_schema->'questions') = 'array'
                     then p_schema->'questions' else '[]'::jsonb end
@@ -67,11 +69,10 @@ as $fn$
             ) s
         ) c
        where jsonb_typeof(q.value) = 'object'
-         and q.value->>'type' = 'signup_slots'
          and jsonb_typeof(q.value->'id') = 'string'
-         and c.caps is not null
        order by q.value->>'id', q.qord desc
-    ) t;
+    ) t
+   where t.qtype = 'signup_slots' and t.caps is not null;
 $fn$;
 
 alter table public.forms add column if not exists signup_slots jsonb;
@@ -85,9 +86,11 @@ update public.forms
 alter table public.forms enable trigger forms_set_updated_at;
 
 -- Derived on every write, pinned otherwise: a client-sent value is always replaced.
+-- SECURITY DEFINER: studio saves run as `authenticated`, which may not call signup_slots_of.
 create or replace function public.forms_signup_slots()
 returns trigger
 language plpgsql
+security definer
 set search_path = public, pg_temp
 as $fn$
 begin
