@@ -46,6 +46,16 @@ import '@/styles/extensions-c.css';
 
 type Phase = 'idle' | 'locating' | 'done' | 'off' | 'manual';
 
+/** A padlock, so the privacy line doesn't read as an empty checkbox to tick. */
+function LockIcon() {
+  return (
+    <svg className="slate-loc-privacy-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
+    </svg>
+  );
+}
+
 function PinIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -341,7 +351,8 @@ export default function LocationField({
           )}
 
           <p id={noteId} className="slate-loc-privacy">
-            {locationPrivacyLine(question)}
+            <LockIcon />
+            <span>{locationPrivacyLine(question)}</span>
           </p>
         </div>
       </div>
