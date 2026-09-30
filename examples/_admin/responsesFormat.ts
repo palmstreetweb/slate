@@ -250,6 +250,28 @@ export function slotLine(
   return when ? `${slotName(slot)} (${when})` : slotName(slot);
 }
 
+/**
+ * How a location was given: their device's location, a ZIP code or a typed
+ * place — from a kept answer's shape or a verdict-only answer's `via` (ADR-068).
+ */
+export function locationViaOf(value: unknown): 'gps' | 'zip' | 'typed' | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.lat === 'string' && typeof v.lng === 'string') return 'gps';
+  if (typeof v.zip === 'string') return 'zip';
+  if (typeof v.typed === 'string') return 'typed';
+  return v.via === 'gps' || v.via === 'zip' || v.via === 'typed' ? v.via : null;
+}
+
+/** True for a stored location that is only a verdict (the default, ADR-068). */
+export function isVerdictOnlyLocation(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.via === 'string' && !('lat' in v) && !('zip' in v) && !('typed' in v);
+}
+
+const VIA_TEXT = { gps: 'Their location', zip: 'A ZIP code', typed: 'A typed place' } as const;
+
 /** A location in words: in / out of the area and how far, a ZIP, or a typed place (ADR-065). */
 export function locationText(
   question: Extract<Question, { type: 'location' }>,
@@ -268,7 +290,18 @@ export function locationText(
   }
   if (typeof v.zip === 'string') return [`ZIP ${v.zip}`, areaText].filter(Boolean).join(' · ');
   if (typeof v.typed === 'string') return `Typed: ${v.typed}`;
-  return '—';
+  // Verdict only (ADR-068): the area, and how it was checked; the place itself wasn't kept.
+  const via = locationViaOf(value);
+  if (via === 'gps') {
+    return areaText
+      ? `${areaText} · checked with their location`
+      : 'Shared their location · not checked';
+  }
+  if (via === 'zip') {
+    return areaText ? `${areaText} · checked with a ZIP code` : 'Typed a ZIP code · not checked';
+  }
+  if (via === 'typed') return 'Typed a place · not checked';
+  return areaText || '—';
 }
 
 /**
@@ -296,13 +329,15 @@ export function locationAreaOf(
  * Spreadsheet columns for an answer made of parts (ADR-064): a contact block
  * becomes Name / Email / Phone, an address Street / Unit / City / State / ZIP
  * (/ Country, / In service area). Wave C (ADR-065): a location becomes
- * Latitude / Longitude / ZIP or place / In service area / Distance, a photo
+ * In service area / Answered with (and, when kept — ADR-068 — Latitude /
+ * Longitude / ZIP or place / Distance; `subs` tells whether any is), a photo
  * checklist one column per shot, availability one column per day. Wave D
  * (ADR-066): sign-up slots become Slot (and Waitlist). Null for
  * one-column answers.
  */
 export function csvParts(
   question: Question,
+  subs?: ReadonlyArray<{ answers?: Record<string, unknown> }>,
 ): Array<{ key: string; label: string; cell: (value: unknown) => string }> | null {
   const part = (value: unknown, key: string): string => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
@@ -340,18 +375,12 @@ export function csvParts(
     }
     return cols;
   }
-  // Wave C (ADR-065)
+  // Wave C (ADR-065). By default only the verdict is stored (ADR-068): In service area and
+  // what they answered with. Latitude / Longitude / ZIP or place / Distance join when the owner
+  // keeps the approximate location, or when any response being exported still has one.
   if (question.type === 'location') {
-    const coord = (v: unknown, k: 'lat' | 'lng') => part(v, k);
     const unit = question.radiusUnit === 'km' ? 'km' : 'mi';
-    return [
-      { key: 'lat', label: 'Latitude', cell: (v) => coord(v, 'lat') },
-      { key: 'lng', label: 'Longitude', cell: (v) => coord(v, 'lng') },
-      {
-        key: 'place',
-        label: 'ZIP or place',
-        cell: (v) => part(v, 'zip') || part(v, 'typed'),
-      },
+    const cols: Array<{ key: string; label: string; cell: (value: unknown) => string }> = [
       {
         key: 'area',
         label: 'In service area',
@@ -359,6 +388,33 @@ export function csvParts(
           const a = locationAreaOf(question, v);
           return a === 'in' ? 'Yes' : a === 'out' ? 'No' : '';
         },
+      },
+      {
+        key: 'via',
+        label: 'Answered with',
+        cell: (v) => {
+          const via = locationViaOf(v);
+          return via ? VIA_TEXT[via] : '';
+        },
+      },
+    ];
+    const kept =
+      question.keepLocation === true ||
+      Boolean(
+        subs?.some((s) => {
+          const v = s.answers?.[question.id];
+          return locationViaOf(v) !== null && !isVerdictOnlyLocation(v);
+        }),
+      );
+    if (!kept) return cols;
+    return [
+      ...cols,
+      { key: 'lat', label: 'Latitude', cell: (v) => part(v, 'lat') },
+      { key: 'lng', label: 'Longitude', cell: (v) => part(v, 'lng') },
+      {
+        key: 'place',
+        label: 'ZIP or place',
+        cell: (v) => part(v, 'zip') || part(v, 'typed'),
       },
       {
         key: 'distance',

@@ -139,6 +139,8 @@ function sanitizeWaveC(next: Record<string, unknown>): void {
     if (typeof next.privacyNote === 'string') next.privacyNote = next.privacyNote.slice(0, 300);
     else delete next.privacyNote;
   }
+  // Only a real `true` keeps the approximate location (ADR-068); anything else is verdict-only.
+  if ('keepLocation' in next && next.keepLocation !== true) delete next.keepLocation;
   if ('days' in next) {
     const days = Array.isArray(next.days)
       ? [

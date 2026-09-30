@@ -113,7 +113,8 @@ export function Inspector({
         {'title' in question && typeof question.title === 'function' && (
           <Field label="Title (Dynamic Function)">
             <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
-              This title is a function — edit the schema in code to change it, or replace with a static string.
+              This title is a function — edit the schema in code to change it, or replace with a
+              static string.
             </p>
           </Field>
         )}
@@ -232,9 +233,7 @@ export function Inspector({
                 { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
               ]}
               aria-label="Date format"
-              onChange={(format) =>
-                onChange({ format } as Partial<Question>)
-              }
+              onChange={(format) => onChange({ format } as Partial<Question>)}
             />
           </Field>
         )}
@@ -447,7 +446,9 @@ export function Inspector({
         )}
 
         {/* Wave C (ADR-065) */}
-        {question.type === 'image_pin' && <ImagePinSettings question={question} onChange={onChange} />}
+        {question.type === 'image_pin' && (
+          <ImagePinSettings question={question} onChange={onChange} />
+        )}
 
         {question.type === 'voice_note' && (
           <VoiceNoteSettings question={question} onChange={onChange} />
@@ -457,6 +458,7 @@ export function Inspector({
           <LocationSettings
             question={question}
             onChange={onChange}
+            form={allQuestions}
             hasOutOfAreaRoute={routesOutOfArea(allQuestions, question.id)}
             onAddOutOfAreaEnding={
               onAddOutOfAreaEnding ? () => onAddOutOfAreaEnding(question.id) : undefined
@@ -647,7 +649,9 @@ export function Inspector({
               ]}
               aria-label="Choice style"
               onChange={(display) =>
-                onChange({ display: display === 'cards' ? 'cards' : undefined } as Partial<Question>)
+                onChange({
+                  display: display === 'cards' ? 'cards' : undefined,
+                } as Partial<Question>)
               }
             />
           </Field>
@@ -753,10 +757,7 @@ export function Inspector({
         )}
 
         {question.type === 'thanks' && (
-          <Field
-            label="Redirect URL (Optional)"
-            hint="Navigate here after a successful submit."
-          >
+          <Field label="Redirect URL (Optional)" hint="Navigate here after a successful submit.">
             <input
               className="slate-input"
               value={question.redirectUrl ?? ''}
@@ -805,26 +806,28 @@ export function Inspector({
           </>
         )}
 
-        {question.type !== 'welcome' && question.type !== 'thanks' && question.type !== 'review' && (
-          <CollapsibleSection
-            label="Skip ahead"
-            hint="After they answer, jump to another question. First matching rule wins; otherwise they go to the next question in order."
-            summary={
-              skipRuleCount(question) > 0
-                ? `${skipRuleCount(question)} skip ${skipRuleCount(question) === 1 ? 'rule' : 'rules'}`
-                : 'Next question in order'
-            }
-            defaultOpen={skipRuleCount(question) > 0}
-            questionId={question.id}
-          >
-            <JumpRulesEditor
-              rules={('logic' in question ? question.logic : undefined) ?? []}
-              onChange={(logic) => onChange({ logic } as Partial<Question>)}
-              questions={allQuestions}
-              currentId={question.id}
-            />
-          </CollapsibleSection>
-        )}
+        {question.type !== 'welcome' &&
+          question.type !== 'thanks' &&
+          question.type !== 'review' && (
+            <CollapsibleSection
+              label="Skip ahead"
+              hint="After they answer, jump to another question. First matching rule wins; otherwise they go to the next question in order."
+              summary={
+                skipRuleCount(question) > 0
+                  ? `${skipRuleCount(question)} skip ${skipRuleCount(question) === 1 ? 'rule' : 'rules'}`
+                  : 'Next question in order'
+              }
+              defaultOpen={skipRuleCount(question) > 0}
+              questionId={question.id}
+            >
+              <JumpRulesEditor
+                rules={('logic' in question ? question.logic : undefined) ?? []}
+                onChange={(logic) => onChange({ logic } as Partial<Question>)}
+                questions={allQuestions}
+                currentId={question.id}
+              />
+            </CollapsibleSection>
+          )}
 
         {canDelete && (
           <>
@@ -1169,7 +1172,9 @@ function OptionsEditor({
           ) : null}
         </div>
       ))}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}
+      >
         <button
           type="button"
           className="slate-btn slate-btn--ghost slate-btn--compact"
@@ -1345,9 +1350,6 @@ function PictureOptionsEditor({
 
 function Divider() {
   return (
-    <div
-      style={{ height: 1, background: 'var(--slate-border)', margin: '0 12px' }}
-      aria-hidden
-    />
+    <div style={{ height: 1, background: 'var(--slate-border)', margin: '0 12px' }} aria-hidden />
   );
 }

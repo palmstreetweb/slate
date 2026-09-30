@@ -1399,6 +1399,34 @@ body[data-slate-scale='3'] [data-slate-forms][data-theme-name='slate']:has(.slat
   min-width: 0;
 }
 
+/* Verdict only (ADR-068): no dot, so the side of the ring they're on is lit instead. */
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-loc-map--verdict.rsp-loc-map--in
+  .rsp-loc-area {
+  fill: rgb(var(--slate-accent-rgb) / 0.26);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-loc-map--verdict.rsp-loc-map--out
+  .rsp-loc-outer {
+  fill: rgb(var(--slate-accent-rgb) / 0.12);
+  stroke-dasharray: none;
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-loc-map--verdict.rsp-loc-map--out
+  .rsp-loc-area {
+  fill: var(--chrome-panel);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-loc-note {
+  margin: 0;
+  font-size: 12.5px;
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-shots {
   display: grid;
   gap: 8px;

@@ -24,7 +24,7 @@ import { PIN_IMAGE_DATA_MAX, safeImageSrc } from '@/utils/brandLogo.js';
 import { ResponseFileAnswer } from '../components/ResponseFileAnswer.js';
 import { getLocalUploadBlob } from '../localFileStore.js';
 import { getStorageContentBlob, isStorageUploadRef } from '../storageUpload.js';
-import { locationAreaOf, locationText } from '../responsesFormat.js';
+import { isVerdictOnlyLocation, locationAreaOf, locationText } from '../responsesFormat.js';
 
 type Q<T extends Question['type']> = Extract<Question, { type: T }>;
 
@@ -136,7 +136,11 @@ export function VoiceNoteAnswer({ value }: { value: unknown }) {
   );
 }
 
-/** Where the respondent is, in words and on a small map of the service area. */
+/**
+ * Where the respondent is, in words and on a small map of the service area.
+ * By default only the verdict is stored (ADR-068): the map shows the area
+ * lit in or out, with no dot and no map link, and says the place wasn't kept.
+ */
 export function LocationAnswer({
   question,
   value,
@@ -165,7 +169,9 @@ export function LocationAnswer({
     <div className="rsp-loc">
       {c && r ? (
         <svg
-          className={`rsp-loc-map${area ? ` rsp-loc-map--${area}` : ''}`}
+          className={`rsp-loc-map${area ? ` rsp-loc-map--${area}` : ''}${
+            isVerdictOnlyLocation(value) ? ' rsp-loc-map--verdict' : ''
+          }`}
           viewBox="-50 -50 100 100"
           aria-hidden="true"
         >
@@ -193,6 +199,10 @@ export function LocationAnswer({
           >
             Open in a map
           </a>
+        ) : isVerdictOnlyLocation(value) ? (
+          <p className="rsp-muted rsp-loc-note">
+            Only whether they’re in the area is saved, not where they are.
+          </p>
         ) : null}
       </div>
     </div>

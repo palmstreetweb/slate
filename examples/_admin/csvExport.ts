@@ -63,7 +63,7 @@ export function buildCsvColumns(questions: Question[], subs: StoredSubmission[])
   return [
     ...questions.flatMap((q): CsvColumn[] => {
       // A contact block or an address gets a column per part (ADR-064).
-      const parts = csvParts(q);
+      const parts = csvParts(q, subs);
       if (!parts) return [{ id: q.id, title: titleOf(q), question: q }];
       return parts.map((p) => ({
         id: q.id,

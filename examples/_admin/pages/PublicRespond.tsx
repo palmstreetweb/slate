@@ -3,6 +3,7 @@ import { Form } from '@/index.js';
 import { decodePortableSchema } from '../portableShare.js';
 import { sanitizeUntrustedSchema } from '../sanitizeUntrustedSchema.js';
 import { addSubmission } from '../_submissionStore.js';
+import { asStoredAnswers } from '../storedAnswers.js';
 import { navigate } from '../_router.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
 import { localHostFileUpload } from '../hostFileUpload.js';
@@ -48,7 +49,8 @@ export function PublicRespond({ token }: Props) {
         onFileUpload={localHostFileUpload}
         resolveFileUploadMeta={resolveUploadMeta}
         onSubmit={async (answers, meta) => {
-          addSubmission(submissionFormId, answers, meta);
+          // No server here: store what the submit Function would (ADR-068).
+          addSubmission(submissionFormId, asStoredAnswers(schema.questions, answers), meta);
         }}
       />
       {name ? (

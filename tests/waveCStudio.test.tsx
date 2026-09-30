@@ -7,12 +7,11 @@
  */
 
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Question, Schema } from '@/index.js';
 import { OUT_OF_AREA_VALUE, IN_AREA_VALUE } from '@/index.js';
 import { imageKey } from '@/logic/pins.js';
-import type { StoredSubmission } from '../examples/_admin/_submissionStore.js';
 import { Inspector } from '../examples/_admin/components/Inspector.js';
 import { ConditionBuilder } from '../examples/_admin/components/LogicEditor.js';
 import { parseLatLng } from '../examples/_admin/components/InspectorWaveC.js';
@@ -35,6 +34,9 @@ import {
 import { ResponseAnswers } from '../examples/_admin/responses/ResponseAnswers.js';
 import { AvailabilityHeatCard, PinCloudCard } from '../examples/_admin/responses/SummaryWaveC.js';
 import { withOutOfAreaEnding } from '../examples/_admin/outOfArea.js';
+import { asStoredAnswers } from '../examples/_admin/storedAnswers.js';
+import { PublicRespond } from '../examples/_admin/pages/PublicRespond.js';
+import { listSubmissions, type StoredSubmission } from '../examples/_admin/_submissionStore.js';
 import { buildEmbedSnippet } from '../examples/_admin/shareUrls.js';
 import { decodePortableSchema, encodePortableSchema } from '../examples/_admin/portableShare.js';
 import { sanitizeUntrustedSchema } from '../examples/_admin/sanitizeUntrustedSchema.js';
@@ -155,18 +157,26 @@ describe('Responses and CSV', () => {
   });
 
   it('CSV: a location, a checklist and a week get a column per part; pins say where', () => {
-    expect(csvParts(loc)!.map((c) => c.label)).toEqual([
+    // By default only the verdict is stored (ADR-068), so two columns.
+    expect(csvParts(loc)!.map((c) => c.label)).toEqual(['In service area', 'Answered with']);
+    // A kept location — or rows that still hold one — adds where they were.
+    const kept = { ...loc, keepLocation: true } as Question;
+    const full = [
+      'In service area',
+      'Answered with',
       'Latitude',
       'Longitude',
       'ZIP or place',
-      'In service area',
       'Distance (mi)',
-    ]);
-    expect(csvParts(loc)!.map((c) => c.cell(subs[1]!.answers.where))).toEqual([
+    ];
+    expect(csvParts(kept)!.map((c) => c.label)).toEqual(full);
+    expect(csvParts(loc, subs)!.map((c) => c.label)).toEqual(full);
+    expect(csvParts(kept)!.map((c) => c.cell(subs[1]!.answers.where))).toEqual([
+      'No',
+      'Their location',
       '34.052',
       '-118.244',
       '',
-      'No',
       '86.9',
     ]);
     expect(csvParts(shots)!.map((c) => c.label)).toEqual(['Front', 'Roof']);
@@ -619,6 +629,8 @@ describe('Build with AI for Wave C', () => {
     expect(by.story).toMatchObject({ maxSeconds: 90, allowTyped: false });
     expect(by.where).toMatchObject({ radius: 25, radiusUnit: 'km' });
     expect(by.where!.center).toBeUndefined();
+    // Never opts into keeping respondents' locations (ADR-068).
+    expect(by.where!.keepLocation).toBeUndefined();
     expect(by.when).toMatchObject({ days: ['mon', 'sat'], startTime: '08:00', slotMinutes: 30 });
     expect(by.when!.endTime).toBeUndefined();
     expect(by.likes).toMatchObject({ display: 'swipe', multiple: true });
@@ -645,5 +657,190 @@ describe('Build with AI for Wave C', () => {
     };
     expect(generatedFormSchema.safeParse(old).success).toBe(false);
     expect(generatedFormSchema.safeParse(withDraftDefaults(old)).success).toBe(true);
+  });
+});
+
+/* ---------- Verdict-only locations (ADR-068) ---------- */
+
+describe('locations stored as a verdict only (ADR-068)', () => {
+  const verdictSubs = [
+    sub('s1', { where: { area: 'in', via: 'gps' } }),
+    sub('s2', { where: { area: 'in', via: 'zip' } }),
+    sub('s3', { where: { area: 'out', via: 'gps' } }),
+    sub('s4', { where: { via: 'typed' } }),
+  ];
+
+  it('reads in words: the verdict and how it was checked', () => {
+    expect(formatAnswerForQuestion(loc, { area: 'in', via: 'gps' })).toBe(
+      'Inside the service area · checked with their location',
+    );
+    expect(formatAnswerForQuestion(loc, { area: 'out', via: 'zip' })).toBe(
+      'Outside the service area · checked with a ZIP code',
+    );
+    expect(formatAnswerForQuestion(loc, { via: 'gps' })).toBe(
+      'Shared their location · not checked',
+    );
+    expect(formatAnswerForQuestion(loc, { via: 'typed' })).toBe('Typed a place · not checked');
+    expect(formatAnswerForQuestion(loc, { via: 'zip' })).toBe('Typed a ZIP code · not checked');
+  });
+
+  it('CSV: in / out and what they answered with, and no place columns', () => {
+    expect(csvParts(loc, verdictSubs)!.map((c) => c.cell(verdictSubs[1]!.answers.where))).toEqual([
+      'Yes',
+      'A ZIP code',
+    ]);
+    expect(csvParts(loc, verdictSubs)!.map((c) => c.cell(verdictSubs[3]!.answers.where))).toEqual([
+      '',
+      'A typed place',
+    ]);
+    const header = buildResponsesCsv([loc], verdictSubs).split('\r\n')[0]!;
+    expect(header).toContain('Where’s the job? — In service area,Where’s the job? — Answered with');
+    expect(header).not.toMatch(/Latitude|Longitude|Distance|ZIP or place/);
+  });
+
+  it('the response view lights the side of the ring, with no dot and no map link', () => {
+    const { container } = wrap(
+      <ResponseAnswers questions={[loc]} answers={verdictSubs[0]!.answers} layout="stack" />,
+    );
+    expect(screen.getByText('Inside the service area · checked with their location')).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Open in a map' })).toBeNull();
+    expect(screen.getByText(/not where they are/)).toBeInTheDocument();
+    const map = container.querySelector('.rsp-loc-map')!;
+    expect(map).toHaveClass('rsp-loc-map--verdict', 'rsp-loc-map--in');
+    expect(container.querySelector('.rsp-loc-dot')).toBeNull();
+  });
+
+  it('a kept location still has its dot and map link, and no verdict-only note', () => {
+    const { container } = wrap(
+      <ResponseAnswers
+        questions={[{ ...loc, keepLocation: true } as Question]}
+        answers={subs[0]!.answers}
+        layout="stack"
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Open in a map' })).toBeInTheDocument();
+    expect(container.querySelector('.rsp-loc-dot')).not.toBeNull();
+    expect(screen.queryByText(/not where they are/)).toBeNull();
+  });
+
+  it('Summary counts in / out / not checked, and filters by area', () => {
+    const where = questionDistribution(loc, verdictSubs);
+    expect(where.rows.map((r) => [r.label, r.count])).toEqual([
+      ['In area', 2],
+      ['Out of area', 1],
+      ['Not checked', 1],
+    ]);
+    const pick = (value: string) =>
+      verdictSubs
+        .filter((s) => answerMatchesFilter(s, { questionId: 'where', value }, loc))
+        .map((s) => s.id);
+    expect(pick(IN_AREA_VALUE)).toEqual(['s1', 's2']);
+    expect(pick(OUT_OF_AREA_VALUE)).toEqual(['s3']);
+  });
+
+  it('test runs and local links store what the submit Function stores', () => {
+    const address: Question = { id: 'addr', type: 'address', title: 'A', serviceArea: ['931'] };
+    const plain: Question = { id: 'zipq', type: 'location', title: 'ZIP?' };
+    const kept = { ...loc, id: 'kept', keepLocation: true } as Question;
+    const qs = [loc, plain, kept, address, voice];
+    const engine = {
+      where: { lat: '34.052', lng: '-118.244', area: 'in' },
+      zipq: { zip: '93105' },
+      kept: { lat: '34.441', lng: '-119.812', area: 'in' },
+      story: { typed: 'It leaks' },
+    };
+    expect(asStoredAnswers(qs, engine)).toEqual({
+      // The claimed "in" from Los Angeles is re-checked here too.
+      where: { area: 'out', via: 'gps' },
+      zipq: { area: 'in', via: 'zip' },
+      kept: { lat: '34.441', lng: '-119.812', area: 'in' },
+      story: { typed: 'It leaks' },
+    });
+    // Nothing to reduce: the same object back.
+    const none = { story: { typed: 'x' } };
+    expect(asStoredAnswers(qs, none)).toBe(none);
+    expect(asStoredAnswers(qs, { where: { area: 'in' } })).toEqual({});
+  });
+
+  it('a portable link stores only the verdict, end to end', async () => {
+    const getCurrentPosition = vi.fn((ok: (p: unknown) => void) =>
+      ok({ coords: { latitude: 34.44123, longitude: -119.81234 } }),
+    );
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition },
+    });
+    const schema: Schema = {
+      brand: { name: 'Pools' },
+      theme: 'classic',
+      themeMode: 'light',
+      questions: [
+        { ...loc, required: true } as Question,
+        { id: 'done', type: 'thanks', title: 'Thanks' },
+      ],
+    };
+    const token = encodePortableSchema(schema, { formId: 'portable_loc068' });
+    render(<PublicRespond token={token} />);
+    expect(
+      await screen.findByText('We only save whether you’re in the service area.'),
+    ).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Use my location' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /ok/i }));
+    await screen.findByRole('heading', { name: 'Thanks' });
+    const [stored] = listSubmissions('portable_loc068');
+    expect(stored!.answers).toEqual({ where: { area: 'in', via: 'gps' } });
+    expect(JSON.stringify(stored)).not.toMatch(/34\.44|119\.81|"lat"/);
+  });
+
+  it('the inspector: keep the approximate location, off by default, and says what that means', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderInspector(loc);
+    const box = screen.getByRole('checkbox', { name: 'Keep Approximate Location (About 110 m)' });
+    expect(box).not.toBeChecked();
+    expect(screen.getByText(/Where they are isn’t saved/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Always followed by “We only save whether you’re in the service area\.”/),
+    ).toBeInTheDocument();
+    await user.click(box);
+    expect(onChange).toHaveBeenLastCalledWith({ keepLocation: true });
+  });
+
+  it('the inspector: turning it off clears the key; a location with nothing to check warns', async () => {
+    const user = userEvent.setup();
+    const bare: Question = { id: 'where', type: 'location', title: 'Where?', keepLocation: true };
+    const { onChange } = renderInspector(bare);
+    expect(
+      screen.getByText(/rounded coordinates \(or the ZIP or town typed\)/),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Keep Approximate Location (About 110 m)' }),
+    );
+    expect(onChange).toHaveBeenLastCalledWith({ keepLocation: undefined });
+    cleanup();
+    renderInspector({ ...bare, keepLocation: undefined } as Question);
+    expect(screen.getByText(/only “shared their location” is\s+saved/)).toBeInTheDocument();
+    cleanup();
+    // A ZIP list on the form is something to check against: no warning.
+    const address: Question = { id: 'addr', type: 'address', title: 'A', serviceArea: ['931'] };
+    renderInspector({ ...bare, keepLocation: undefined } as Question, [bare, address]);
+    expect(screen.queryByText(/only “shared their location”/)).toBeNull();
+  });
+
+  it('portable schemas keep keepLocation only when it is a real true', () => {
+    const out = sanitizeUntrustedSchema({
+      brand: { name: 'x' },
+      theme: 'classic',
+      themeMode: 'light',
+      questions: [
+        { ...loc, id: 'a', keepLocation: true },
+        { ...loc, id: 'b', keepLocation: 'yes' },
+        { ...loc, id: 'c', keepLocation: 1 },
+      ],
+    } as never);
+    expect(out.questions.map((q) => (q as { keepLocation?: unknown }).keepLocation)).toEqual([
+      true,
+      undefined,
+      undefined,
+    ]);
   });
 });
