@@ -9,6 +9,7 @@
 import type { Question } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { evaluate } from './conditional.js';
+import { otherIndex, type OtherIndex } from './other.js';
 
 /** Question types that are not answer-bearing. */
 const CHROME_TYPES = new Set(['welcome', 'statement', 'review', 'thanks']);
@@ -22,13 +23,11 @@ function isChrome(q: Question): boolean {
  * the answer state. `visibleIf` is the only filter; chrome questions don't
  * carry one and pass through.
  */
-export function visibleQuestions(
-  all: ReadonlyArray<Question>,
-  answers: LooseAnswers,
-): Question[] {
+export function visibleQuestions(all: ReadonlyArray<Question>, answers: LooseAnswers): Question[] {
+  const others = otherIndex(all);
   return all.filter((q) => {
     if ('visibleIf' in q && q.visibleIf) {
-      return evaluate(q.visibleIf, answers);
+      return evaluate(q.visibleIf, answers, others);
     }
     return true;
   });
@@ -45,10 +44,11 @@ export function resolveJumpTarget(
   current: Question,
   visible: ReadonlyArray<Question>,
   answers: LooseAnswers,
+  others: OtherIndex = otherIndex(visible),
 ): number | null {
   if (!('logic' in current) || !current.logic || current.logic.length === 0) return null;
   for (const rule of current.logic) {
-    if (evaluate(rule.if, answers)) {
+    if (evaluate(rule.if, answers, others)) {
       const idx = visible.findIndex((q) => q.id === rule.goTo);
       return idx >= 0 ? idx : null;
     }

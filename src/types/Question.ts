@@ -57,6 +57,29 @@ type Visibility = {
   logic?: ReadonlyArray<LogicRule>;
 };
 
+/**
+ * Prefill from the page link (ADR-063). When set, `?{prefillKey}=…` on the
+ * fill link (passed to `<Form prefill>`) fills this answer before the
+ * respondent starts. The respondent still sees and can change it. Unset =
+ * never prefilled. Consent (`legal`), files, rankings and grids can't be
+ * prefilled.
+ */
+type Prefill = {
+  prefillKey?: string;
+};
+
+/**
+ * Free-text "Other" on choice questions (ADR-063). The respondent picks
+ * Other and types; the typed text is stored in place of an option value
+ * (text that names an option is stored as that option). In conditions,
+ * `OTHER_VALUE` means "picked Other".
+ */
+type OtherChoice = {
+  allowOther?: boolean;
+  /** Label of the Other choice; default 'Other'. */
+  otherLabel?: string;
+};
+
 /* ---------- chrome screens (no answer stored) ---------- */
 
 export type WelcomeQuestion<TId extends string = string> = IdField<TId> & {
@@ -105,7 +128,8 @@ export type ReviewQuestion<TId extends string = string> = IdField<TId> & {
 /* ---------- text input questions ---------- */
 
 export type ShortTextQuestion<TId extends string = string> = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill & {
     type: 'short_text';
     title: DynamicTitle;
     placeholder?: string;
@@ -116,7 +140,8 @@ export type ShortTextQuestion<TId extends string = string> = IdField<TId> &
   };
 
 export type LongTextQuestion<TId extends string = string> = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill & {
     type: 'long_text';
     title: DynamicTitle;
     placeholder?: string;
@@ -125,7 +150,8 @@ export type LongTextQuestion<TId extends string = string> = IdField<TId> &
   };
 
 export type EmailQuestion<TId extends string = string> = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill & {
     type: 'email';
     title: DynamicTitle;
     placeholder?: string;
@@ -133,7 +159,8 @@ export type EmailQuestion<TId extends string = string> = IdField<TId> &
   };
 
 export type UrlQuestion<TId extends string = string> = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill & {
     type: 'url';
     title: DynamicTitle;
     placeholder?: string;
@@ -141,7 +168,8 @@ export type UrlQuestion<TId extends string = string> = IdField<TId> &
   };
 
 export type PhoneQuestion<TId extends string = string> = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill & {
     type: 'phone';
     title: DynamicTitle;
     placeholder?: string;
@@ -152,8 +180,12 @@ export type PhoneQuestion<TId extends string = string> = IdField<TId> &
 
 /* ---------- numeric input ---------- */
 
+/** How a `number` question is drawn (ADR-063). */
+export type NumberDisplay = 'input' | 'stepper';
+
 export type NumberQuestion<TId extends string = string> = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill & {
     type: 'number';
     title: DynamicTitle;
     placeholder?: string;
@@ -161,6 +193,12 @@ export type NumberQuestion<TId extends string = string> = IdField<TId> &
     min?: number;
     max?: number;
     step?: number;
+    /** 'input' (default) is a typed number; 'stepper' adds big − / + buttons. */
+    display?: NumberDisplay;
+    /** Shown before the number, e.g. '$'. Display only — the answer stays a number. */
+    prefix?: string;
+    /** Shown after the number, e.g. 'sq ft'. Display only. */
+    unit?: string;
   };
 
 /* ---------- file upload ---------- */
@@ -183,15 +221,26 @@ export type FileUploadQuestion<TId extends string = string> = IdField<TId> &
 /* ---------- date ---------- */
 
 export type DateQuestion<TId extends string = string> = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill & {
     type: 'date';
     title: DynamicTitle;
     required?: boolean;
     /** Display order of the segmented inputs; default 'MM/DD/YYYY'. */
     format?: 'MM/DD/YYYY' | 'DD/MM/YYYY';
-    /** Inclusive bounds, ISO `YYYY-MM-DD`. */
+    /** Inclusive bounds, ISO `YYYY-MM-DD`. Apply to both ends of a range. */
     min?: string;
     max?: string;
+    /**
+     * Also ask for a time of day (ADR-063). Stored as `YYYY-MM-DDTHH:MM`
+     * (24-hour wall clock, no time zone). 12-hour entry for MM/DD/YYYY forms.
+     */
+    includeTime?: boolean;
+    /**
+     * Ask for a start and an end (ADR-063). Stored as one ISO 8601 interval
+     * string, `start/end` — e.g. `2026-10-03/2026-10-07`.
+     */
+    range?: boolean;
   };
 
 /* ---------- choice questions ---------- */
@@ -200,7 +249,9 @@ export type SingleChoiceQuestion<
   TId extends string = string,
   TOptions extends ReadonlyArray<Option> = ReadonlyArray<Option>,
 > = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill &
+  OtherChoice & {
     type: 'single_choice';
     title: DynamicTitle;
     options: TOptions;
@@ -212,7 +263,9 @@ export type MultiChoiceQuestion<
   TId extends string = string,
   TOptions extends ReadonlyArray<Option> = ReadonlyArray<Option>,
 > = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill &
+  OtherChoice & {
     type: 'multi_choice';
     title: DynamicTitle;
     options: TOptions;
@@ -225,7 +278,9 @@ export type DropdownQuestion<
   TId extends string = string,
   TOptions extends ReadonlyArray<Option> = ReadonlyArray<Option>,
 > = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill &
+  OtherChoice & {
     type: 'dropdown';
     title: DynamicTitle;
     options: TOptions;
@@ -236,7 +291,8 @@ export type DropdownQuestion<
 
 /** Binary yes/no. Stored as `'yes' | 'no'`. */
 export type YesNoQuestion<TId extends string = string> = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill & {
     type: 'yes_no';
     title: DynamicTitle;
     yesLabel?: string;
@@ -254,7 +310,9 @@ export type PictureChoiceQuestion<
   TId extends string = string,
   TOptions extends ReadonlyArray<PictureOption> = ReadonlyArray<PictureOption>,
 > = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill &
+  OtherChoice & {
     type: 'picture_choice';
     title: DynamicTitle;
     options: TOptions;
@@ -309,8 +367,12 @@ export type LegalQuestion<TId extends string = string> = IdField<TId> &
 
 /* ---------- scale ---------- */
 
+/** How a `scale` question is drawn (ADR-063). The answer is the same number in every style. */
+export type ScaleDisplay = 'numbers' | 'stars' | 'emoji' | 'slider';
+
 export type ScaleQuestion<TId extends string = string> = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill & {
     type: 'scale';
     title: DynamicTitle;
     min: number;
@@ -319,11 +381,16 @@ export type ScaleQuestion<TId extends string = string> = IdField<TId> &
     maxLabel?: string;
     step?: number;
     required?: boolean;
+    /** Default 'numbers'. Stars and faces work best up to 7 points. */
+    display?: ScaleDisplay;
+    /** Slider only: what reacts above the thumb while dragging; default 'emoji'. */
+    sliderIcon?: 'emoji' | 'stars' | 'none';
   };
 
 /** Net Promoter Score — fixed 0–10 scale with standard anchors. */
 export type NpsQuestion<TId extends string = string> = IdField<TId> &
-  Visibility & {
+  Visibility &
+  Prefill & {
     type: 'nps';
     title: DynamicTitle;
     /** Defaults to 'Not at all likely'. */

@@ -9,7 +9,7 @@
 import { useId } from 'react';
 import type { Question, ReviewQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
-import { formatAnswer } from '@/logic/piping.js';
+import { formatAnswerFor } from '@/logic/piping.js';
 
 const CHROME = new Set(['welcome', 'statement', 'review', 'thanks']);
 
@@ -41,7 +41,8 @@ export function ReviewScreen({ question, visible, answers, onEdit, onAdvance }: 
 
       <dl className="slate-review" aria-labelledby={labelId}>
         {rows.map((q) => {
-          const value = formatAnswer(answers[q.id]);
+          // Labels, not stored values; typed Other text and dates read as entered (ADR-063).
+          const value = formatAnswerFor(q, answers[q.id]);
           return (
             <div key={q.id} className="slate-review-row">
               <dt className="slate-review-q">{titleOf(q, answers)}</dt>

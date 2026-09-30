@@ -2,6 +2,10 @@
  * Type-discriminated dispatcher for question rendering. Each `case` returns
  * the field component for that question type. New question types only need
  * an entry here + an `import` above + a Field component.
+ *
+ * Variants that load on demand (ADR-063 — styled scales, the stepper, date
+ * ranges and times, and later waves' types) are dispatched first, through
+ * `lazyFields.tsx`, with one shared prop contract.
  */
 
 'use client';
@@ -30,11 +34,12 @@ import { MultiChoiceField } from './MultiChoiceField.js';
 import { DropdownField } from './DropdownField.js';
 import { YesNoField } from './YesNoField.js';
 import { LegalField } from './LegalField.js';
-import { FileUploadField, type FileUploadHandler } from './FileUploadField.js';
+import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import type { FileUploadMeta } from '@/utils/fileUploadRef.js';
 import { PictureChoiceField } from './PictureChoiceField.js';
 import { RankingField } from './RankingField.js';
 import { MatrixField } from './MatrixField.js';
+import { ExtField, extFieldKey } from './lazyFields.js';
 import type { MatrixAnswer } from '@/types/Answers.js';
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
@@ -68,6 +73,11 @@ export type QuestionRendererProps = {
   playInteractionSound?: () => void;
   /** Soft typewriter tick while typing in text fields (ADR-034). */
   playTypingSound?: () => void;
+  /**
+   * Every question in the schema, so piped answers read as labels and
+   * formatted dates (ADR-063). Optional: without it, raw values are piped.
+   */
+  allQuestions?: ReadonlyArray<Question>;
 };
 
 function StepBadge({ step, total }: { step: number; total: number }) {
@@ -98,12 +108,13 @@ export function QuestionRenderer({
   onEditQuestion,
   playInteractionSound,
   playTypingSound,
+  allQuestions,
 }: QuestionRendererProps) {
   // Resolve {{field:id}} / {{score}} piping (and function-style DynamicTitle)
   // once here, so every field component receives ready-to-render copy.
   const question = useMemo(
-    () => pipeQuestionCopy(rawQuestion, answers, score),
-    [rawQuestion, answers, score],
+    () => pipeQuestionCopy(rawQuestion, answers, score, allQuestions),
+    [rawQuestion, answers, score, allQuestions],
   );
 
   const { schedule: scheduleAutoAdvance } = useAutoAdvanceTimer(rawQuestion.id);
@@ -127,6 +138,34 @@ export function QuestionRenderer({
     setAnswer(id, value);
     scheduleAutoAdvance(() => advance());
   };
+
+  const extKey = extFieldKey(question);
+  if (extKey) {
+    const id = question.id;
+    return (
+      <>
+        <StepBadge step={stepNumber} total={totalSteps} />
+        <ExtField
+          key={id}
+          extKey={extKey}
+          question={question}
+          answers={answers}
+          value={answers[id]}
+          onAnswer={(v) => setAnswer(id, v)}
+          onCommit={(v) => {
+            ping();
+            setAnswer(id, v);
+            scheduleAutoAdvance(() => advance());
+          }}
+          onAdvance={advanceWithSound}
+          onType={playTypingSound}
+          ping={ping}
+          onFileUpload={onFileUpload}
+          resolveFileUploadMeta={resolveFileUploadMeta}
+        />
+      </>
+    );
+  }
 
   switch (question.type) {
     case 'welcome':
@@ -290,6 +329,7 @@ export function QuestionRenderer({
             answers={answers}
             selected={answers[question.id] as string | undefined}
             onSelect={(v) => selectAndAdvance(question.id, v)}
+            onType={playTypingSound}
           />
         </>
       );
@@ -307,6 +347,7 @@ export function QuestionRenderer({
               setAnswer(question.id, vs);
             }}
             onAdvance={advanceWithSound}
+            onType={playTypingSound}
           />
         </>
       );
@@ -368,22 +409,6 @@ export function QuestionRenderer({
         </>
       );
 
-    case 'file_upload':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <FileUploadField
-            question={question}
-            answers={answers}
-            initialValue={answers[question.id] as File | string | Array<File | string> | undefined}
-            onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advanceWithSound}
-            onFileUpload={onFileUpload}
-            resolveFileUploadMeta={resolveFileUploadMeta}
-          />
-        </>
-      );
-
     case 'picture_choice':
       return (
         <>
@@ -398,6 +423,7 @@ export function QuestionRenderer({
               setAnswer(question.id, vs);
             }}
             onAdvance={advanceWithSound}
+            onType={playTypingSound}
           />
         </>
       );

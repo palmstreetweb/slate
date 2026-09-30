@@ -1,24 +1,57 @@
 'use client';
 
-import { useId } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 import type { SingleChoiceQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { choiceListIsSplit } from '@/utils/choiceLayout.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
 import { useChoiceCommit } from '@/hooks/useChoiceCommit.js';
+import { useRegisterFormConfirm, useRegisterOtherKey } from '@/hooks/useRegisterFormConfirm.js';
+import { resolveOtherText } from '@/logic/other.js';
+import { shakeInvalid } from '@/utils/motion.js';
 import { ChoiceBadge } from './ChoiceBadge.js';
+import { OTHER_EMPTY, OtherTextBox, useOtherChoice } from './OtherChoice.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
   question: SingleChoiceQuestion;
   answers: LooseAnswers;
   selected: string | undefined;
+  /** Store the value and auto-advance. Typed "Other" text arrives here too (ADR-063). */
   onSelect: (value: string) => void;
+  onType?: () => void;
 };
 
-export function SingleChoiceField({ question, answers, selected, onSelect }: Props) {
+export function SingleChoiceField({ question, answers, selected, onSelect, onType }: Props) {
   const labelId = useId();
   const { committed, markCommitted } = useChoiceCommit(selected);
+  const other = useOtherChoice(question, selected, labelId);
+  const isOption = (v: string | undefined) => question.options.some((o) => o.value === v);
+
+  // A new pick of a listed option (click or letter key) closes the Other box.
+  const [seen, setSeen] = useState(selected);
+  if (selected !== seen) {
+    setSeen(selected);
+    if (other.open && isOption(selected)) other.close();
+  }
+
+  const choicesRef = useRef<HTMLDivElement>(null);
+  const otherCommitted = other.open && committed !== null && !isOption(committed);
+
+  const commitOther = useCallback(() => {
+    if (!other.text.trim()) {
+      other.setError(OTHER_EMPTY);
+      shakeInvalid(other.inputRef.current);
+      return;
+    }
+    const { value } = resolveOtherText(question.options, other.text);
+    markCommitted(value);
+    onSelect(value);
+  }, [other, question.options, markCommitted, onSelect]);
+
+  useRegisterFormConfirm(commitOther, other.open);
+  useRegisterOtherKey(other.openBox, other.enabled);
+
   return (
     <div>
       <h1 id={labelId} className="slate-title">
@@ -26,12 +59,13 @@ export function SingleChoiceField({ question, answers, selected, onSelect }: Pro
       </h1>
 
       <div
+        ref={choicesRef}
         className={`slate-choices${choiceListIsSplit(question.options) ? ' slate-choices--split' : ''}${committed ? ' slate-choices--committed' : ''}`}
         role="radiogroup"
         aria-labelledby={labelId}
       >
         {question.options.map((opt, i) => {
-          const isSelected = selected === opt.value;
+          const isSelected = !other.open && selected === opt.value;
           const isCommitted = isSelected && committed === opt.value;
           return (
             <button
@@ -40,6 +74,7 @@ export function SingleChoiceField({ question, answers, selected, onSelect }: Pro
               role="radio"
               aria-checked={isSelected}
               onClick={() => {
+                other.close();
                 markCommitted(opt.value);
                 onSelect(opt.value);
               }}
@@ -48,17 +83,43 @@ export function SingleChoiceField({ question, answers, selected, onSelect }: Pro
               <ChoiceBadge letter={CHOICE_LETTERS[i] ?? ''} committed={isCommitted} />
               <span>
                 {opt.label}
-                {opt.description && (
-                  <span className="slate-choice-desc">{opt.description}</span>
-                )}
+                {opt.description && <span className="slate-choice-desc">{opt.description}</span>}
               </span>
             </button>
           );
         })}
+        {other.enabled ? (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={other.open}
+            aria-controls={other.open ? other.boxId : undefined}
+            onClick={other.openBox}
+            className={`slate-choice slate-choice--other${other.open ? ' slate-choice--selected' : ''}${otherCommitted ? ' slate-choice--committed' : ''}`}
+          >
+            <ChoiceBadge letter={other.letter} committed={otherCommitted} />
+            <span>{other.label}</span>
+          </button>
+        ) : null}
       </div>
-      <p className="slate-hint" style={{ marginTop: 20 }}>
-        tap a key (A, B, C, D) or click to select
-      </p>
+      <OtherTextBox other={other} onEnter={commitOther} onType={onType} />
+      {other.error ? (
+        <p className="slate-err" aria-live="polite">
+          ! {other.error}
+        </p>
+      ) : null}
+      {other.open ? (
+        <div className="slate-actions">
+          <button type="button" className="slate-ok-btn" onClick={commitOther}>
+            OK <span aria-hidden>✓</span>
+          </button>
+          <span className="slate-hint">press Enter ↵</span>
+        </div>
+      ) : (
+        <p className="slate-hint" style={{ marginTop: 20 }}>
+          tap a key (A, B, C, D) or click to select
+        </p>
+      )}
     </div>
   );
 }

@@ -362,6 +362,99 @@
   font-weight: 400;
 }
 
+/* ---------- "Other: ___" (ADR-063) ----------
+   The Other choice is an ordinary choice row / picture tile; picking it
+   opens this box right under the list. */
+
+[data-slate-forms] .slate-other-box {
+  margin-top: 12px;
+  padding-left: 44px;
+}
+
+[data-slate-forms] .slate-choices--split + .slate-other-box {
+  padding-left: 0;
+}
+
+[data-slate-forms] .slate-picture-grid + .slate-other-box {
+  margin-top: 16px;
+  padding-left: 0;
+}
+
+[data-slate-forms] .slate-input.slate-other-input {
+  font-size: clamp(1.1rem, 2.4vw, 1.35rem);
+}
+
+@media (max-width: 560px) {
+  [data-slate-forms] .slate-other-box {
+    padding-left: 0;
+  }
+}
+
+[data-slate-forms] .slate-picture-other-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--slate-accent-lo);
+  color: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-picture-other-art svg {
+  width: 34%;
+  height: 34%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-slate-forms] .slate-dropdown-item--other {
+  font-style: italic;
+  border-top: 1px solid var(--slate-border);
+}
+
+/* ---------- number prefix / unit (ADR-063) ---------- */
+
+[data-slate-forms] .slate-num-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-bottom: var(--slate-border-width) solid var(--slate-border-md);
+  transition: border-color 180ms ease-out;
+}
+
+[data-slate-forms] .slate-num-wrap:focus-within {
+  border-bottom-color: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-num-wrap--error {
+  border-bottom-color: var(--slate-error);
+}
+
+[data-slate-forms] .slate-num-wrap .slate-input {
+  border-bottom: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+[data-slate-forms] .slate-num-affix {
+  font-family: var(--slate-font-body);
+  font-size: clamp(1.2rem, 2.8vw, 1.6rem);
+  color: var(--slate-muted);
+  white-space: nowrap;
+  flex: none;
+}
+
+/* ---------- an on-demand field still downloading (ADR-063) ---------- */
+
+[data-slate-forms] .slate-ext-loading {
+  margin-top: 36px;
+  height: 88px;
+  border-radius: var(--slate-radius);
+  background: var(--slate-accent-lo);
+  opacity: 0.6;
+}
+
 /* ---------- scale slider ---------- */
 
 [data-slate-forms] .slate-scale {

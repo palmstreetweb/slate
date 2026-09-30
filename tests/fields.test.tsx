@@ -440,7 +440,10 @@ describe('phase 3 question types', () => {
     { label: 'Bird', value: 'bird', src: 'https://example.com/bird.jpg' },
   ];
 
-  it('file_upload renders drop zone + snapshot', () => {
+  // file_upload loads on demand since ADR-063, so each test waits for the field.
+  const fileFieldReady = () => screen.findByText(/^choose (a file|files)$/i);
+
+  it('file_upload renders drop zone + snapshot', async () => {
     const { container } = renderQuestion({
       id: 'doc',
       type: 'file_upload',
@@ -448,7 +451,7 @@ describe('phase 3 question types', () => {
       maxSizeMb: 5,
       multiple: false,
     });
-    expect(screen.getByText(/choose a file/i)).toBeInTheDocument();
+    expect(await screen.findByText(/choose a file/i)).toBeInTheDocument();
     expect(screen.getByText(/max 5 MB/i)).toBeInTheDocument();
     expect(container).toMatchSnapshot();
   });
@@ -462,6 +465,7 @@ describe('phase 3 question types', () => {
       required: true,
       multiple: false,
     });
+    await fileFieldReady();
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
     const input = container.querySelector('input[type="file"]')!;
     fireEvent.change(input, { target: { files: [file] } });
@@ -479,6 +483,7 @@ describe('phase 3 question types', () => {
       {},
       onFileUpload,
     );
+    await fileFieldReady();
     const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
     fireEvent.change(container.querySelector('input[type="file"]')!, {
       target: { files: [file] },
@@ -489,7 +494,7 @@ describe('phase 3 question types', () => {
     expect(onFileUpload).toHaveBeenCalledWith(file, 'doc', { maxSizeMb: undefined });
   });
 
-  it('file_upload rejects files over maxSizeMb', () => {
+  it('file_upload rejects files over maxSizeMb', async () => {
     const { container, setAnswer } = renderQuestion({
       id: 'doc',
       type: 'file_upload',
@@ -497,6 +502,7 @@ describe('phase 3 question types', () => {
       maxSizeMb: 1,
       multiple: false,
     });
+    await fileFieldReady();
     const big = new File([new ArrayBuffer(2 * 1024 * 1024)], 'big.bin');
     fireEvent.change(container.querySelector('input[type="file"]')!, {
       target: { files: [big] },
@@ -513,7 +519,7 @@ describe('phase 3 question types', () => {
       multiple: true,
       maxFiles: 5,
     });
-    expect(screen.getByText(/choose files/i)).toBeInTheDocument();
+    expect(await screen.findByText(/choose files/i)).toBeInTheDocument();
     const a = new File(['a'], 'a.txt', { type: 'text/plain' });
     fireEvent.change(container.querySelector('input[type="file"]')!, {
       target: { files: [a] },
@@ -539,6 +545,7 @@ describe('phase 3 question types', () => {
       required: true,
       multiple: false,
     });
+    await fileFieldReady();
     await user.click(screen.getByRole('button', { name: /ok/i }));
     expect(await screen.findByText(/Please choose a file/)).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();

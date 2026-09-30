@@ -1,7 +1,7 @@
 /** Answer piping resolver (ADR-014). */
 
 import { describe, it, expect } from 'vitest';
-import { pipe, formatAnswer, pipeQuestionCopy } from '@/logic/piping.js';
+import { pipe, formatAnswer, formatAnswerFor, pipeQuestionCopy } from '@/logic/piping.js';
 import type { Question } from '@/types/Question.js';
 
 describe('formatAnswer', () => {
@@ -86,5 +86,42 @@ describe('pipeQuestionCopy', () => {
     const q: Question = { id: 't', type: 'thanks', title: 'Bye {{field:name}}' };
     pipeQuestionCopy(q, { name: 'Ada' });
     expect(q.title).toBe('Bye {{field:name}}');
+  });
+});
+
+describe('formatAnswerFor (question-aware, ADR-063)', () => {
+  const choice: Question = {
+    id: 'svc',
+    type: 'multi_choice',
+    title: 'Services',
+    options: [
+      { label: 'Roof repair', value: 'opt_1' },
+      { label: 'Gutters', value: 'opt_2' },
+    ],
+    allowOther: true,
+  };
+
+  it('reads option labels, and typed Other text as typed', () => {
+    expect(formatAnswerFor(choice, ['opt_1', 'Skylight'])).toBe('Roof repair, Skylight');
+  });
+
+  it('formats dates in the question format and numbers with prefix/unit', () => {
+    expect(
+      formatAnswerFor({ id: 'd', type: 'date', title: 'D', range: true }, '2026-10-03/2026-10-07'),
+    ).toBe('10/03/2026 – 10/07/2026');
+    expect(
+      formatAnswerFor({ id: 'n', type: 'number', title: 'N', prefix: '$', unit: 'per month' }, 90),
+    ).toBe('$90 per month');
+    expect(formatAnswerFor({ id: 'y', type: 'yes_no', title: 'Y', yesLabel: 'Sure' }, 'yes')).toBe(
+      'Sure',
+    );
+  });
+
+  it('pipe uses it when the questions are passed', () => {
+    expect(pipe('You picked {{field:svc}}', { svc: ['opt_2'] }, 0, [choice])).toBe(
+      'You picked Gutters',
+    );
+    // Without questions: the raw value, as before.
+    expect(pipe('You picked {{field:svc}}', { svc: ['opt_2'] })).toBe('You picked opt_2');
   });
 });

@@ -15,7 +15,16 @@ const SRC_STYLES = join(__dirname, '..', 'src', 'styles');
 const DIST = join(__dirname, '..', 'dist');
 
 // Concatenation order matters — tokens first so later rules can reference them.
-const ORDER = ['tokens.css', 'base.css', 'animations.css', 'toggle.css', 'questions.css', 'motion.css'];
+const ORDER = [
+  'tokens.css',
+  'base.css',
+  'animations.css',
+  'toggle.css',
+  'questions.css',
+  // On-demand field UIs (ADR-063); in the published sheet so hosts import one file.
+  'extensions.css',
+  'motion.css',
+];
 
 async function main() {
   const parts = [];

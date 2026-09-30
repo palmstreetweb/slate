@@ -36,10 +36,13 @@ import type {
  *
  * Per brief §6 (+ Typeform-parity roadmap additions):
  *   - short_text, long_text, email, phone, url → string
- *   - date → string (ISO `YYYY-MM-DD`)
+ *   - date → string: ISO `YYYY-MM-DD`; `YYYY-MM-DDTHH:MM` with `includeTime`;
+ *     `start/end` (ISO 8601 interval) with `range` (ADR-063)
  *   - number, scale, nps → number
- *   - single_choice, dropdown → string (the option `value`)
- *   - multi_choice, ranking → string[] (option `value`s; full order for ranking)
+ *   - single_choice, dropdown → string (the option `value`, or the typed
+ *     "Other" text when `allowOther` — ADR-063)
+ *   - multi_choice, ranking → string[] (option `value`s; full order for ranking;
+ *     plus at most one typed "Other" text for multi_choice with `allowOther`)
  *   - picture_choice → string, or string[] when `multiple: true`
  *   - yes_no → 'yes' | 'no'
  *   - legal → 'accept' | 'decline'
@@ -71,6 +74,9 @@ export type HiddenFields = Record<string, unknown>;
 /* ---------- per-question answer value derivation ---------- */
 
 type OptionValueOf<TOptions> = TOptions extends ReadonlyArray<Option<infer V>> ? V : string;
+
+/** With `allowOther: true` the answer may also be the respondent's own text (ADR-063). */
+type WithOther<Q, V> = Q extends { allowOther: true } ? V | (string & {}) : V;
 
 /** Resolves a single question to its stored answer value type (no `undefined`). */
 export type AnswerValueOf<Q extends Question> = Q extends ShortTextQuestion
@@ -105,14 +111,14 @@ export type AnswerValueOf<Q extends Question> = Q extends ShortTextQuestion
                             ? Array<OptionValueOf<TOpts>>
                             : Q extends PictureChoiceQuestion<string, infer TOpts>
                               ? Q extends { multiple: true }
-                                ? Array<OptionValueOf<TOpts>>
-                                : OptionValueOf<TOpts>
+                                ? Array<WithOther<Q, OptionValueOf<TOpts>>>
+                                : WithOther<Q, OptionValueOf<TOpts>>
                               : Q extends SingleChoiceQuestion<string, infer TOpts>
-                                ? OptionValueOf<TOpts>
+                                ? WithOther<Q, OptionValueOf<TOpts>>
                                 : Q extends DropdownQuestion<string, infer TOpts>
-                                  ? OptionValueOf<TOpts>
+                                  ? WithOther<Q, OptionValueOf<TOpts>>
                                   : Q extends MultiChoiceQuestion<string, infer TOpts>
-                                    ? Array<OptionValueOf<TOpts>>
+                                    ? Array<WithOther<Q, OptionValueOf<TOpts>>>
                                     : never;
 
 /**
@@ -121,7 +127,11 @@ export type AnswerValueOf<Q extends Question> = Q extends ShortTextQuestion
  * required:true per brief §5; `dropdown`, `yes_no`, and `legal` follow the
  * same default.
  */
-type DefaultRequiredQuestion = SingleChoiceQuestion | DropdownQuestion | YesNoQuestion | LegalQuestion;
+type DefaultRequiredQuestion =
+  | SingleChoiceQuestion
+  | DropdownQuestion
+  | YesNoQuestion
+  | LegalQuestion;
 
 type IsRequired<Q extends Question> = Q extends { required: true }
   ? true
@@ -141,7 +151,5 @@ type IsRequired<Q extends Question> = Q extends { required: true }
 export type AnswersOf<Q extends ReadonlyArray<Question>> = {
   [K in Q[number] as K extends { id: infer I extends string; type: StoredQuestionType }
     ? I
-    : never]: IsRequired<K> extends true
-    ? AnswerValueOf<K>
-    : AnswerValueOf<K> | undefined;
+    : never]: IsRequired<K> extends true ? AnswerValueOf<K> : AnswerValueOf<K> | undefined;
 };

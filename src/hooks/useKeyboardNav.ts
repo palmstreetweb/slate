@@ -3,7 +3,8 @@
  *
  *   Enter (in body)            → advance from welcome/statement/review, or
  *                                confirm OK steps (multi_choice, text fields, …)
- *   A–Z (any focus)            → select choice option N (auto-advance for single_choice — caller decides)
+ *   A–Z (any focus)            → select choice option N (auto-advance for single_choice — caller decides);
+ *                                the letter after the last option is "Other" when offered (ADR-063)
  *   Y / N (in body)            → select yes_no answer (A/B also work)
  *   A / B (in body)            → select legal accept/decline
  *   0–9 (in body)              → select scale / nps value if in range
@@ -21,6 +22,7 @@ import { useEffect, useRef } from 'react';
 import type { Question } from '@/types/Question.js';
 import { indexFromLetter } from '@/utils/letters.js';
 import { isScaleStepValue } from '@/utils/scaleStep.js';
+import { allowsOther } from '@/logic/other.js';
 
 const DIGIT_COMPOSE_MS = 350;
 
@@ -106,7 +108,9 @@ export function useKeyboardNav({
         !typing
       ) {
         const idx = indexFromLetter(e.key);
-        if (idx >= 0 && idx < currentQ.options.length) {
+        // One more key than options when the question offers Other (its index is options.length).
+        const keys = currentQ.options.length + (allowsOther(currentQ) ? 1 : 0);
+        if (idx >= 0 && idx < keys) {
           e.preventDefault();
           onSelectChoice(idx);
           return;

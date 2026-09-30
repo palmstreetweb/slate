@@ -2,6 +2,10 @@
  * Searchable dropdown — Typeform-style select for long option lists.
  * A combobox text input filters the option list; arrows + Enter or click
  * select. Selecting auto-advances like single_choice.
+ *
+ * With `allowOther` (ADR-063) the list ends with "Other: “…”": whatever the
+ * respondent typed that isn't an option becomes their answer, from the list
+ * or with Enter / OK.
  */
 
 'use client';
@@ -14,7 +18,11 @@ import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import { focusAfter } from '@/utils/focus.js';
 import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
+import { OTHER_MAX, allowsOther, otherLabelOf, resolveOtherText } from '@/logic/other.js';
 import { resolveTitle } from './_resolveTitle.js';
+
+/** Listbox row id for the Other entry (never an option value: options are keyed by value). */
+const OTHER_ROW = '\u0000other';
 
 type Props = {
   question: DropdownQuestion;
@@ -26,16 +34,28 @@ type Props = {
   onSubmit?: () => void;
 };
 
-export function DropdownField({ question, answers, selected, onSelect, onAdvance, onSubmit }: Props) {
+export function DropdownField({
+  question,
+  answers,
+  selected,
+  onSelect,
+  onAdvance,
+  onSubmit,
+}: Props) {
   const selectedOption = question.options.find((o) => o.value === selected);
-  const [query, setQuery] = useState(selectedOption?.label ?? '');
+  const withOther = allowsOther(question);
+  // A stored answer that isn't an option is typed Other text: show it as typed.
+  const [query, setQuery] = useState(
+    selectedOption?.label ?? (withOther && typeof selected === 'string' ? selected : ''),
+  );
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const labelId = useId();
   const listId = useId();
-  const optionId = (value: string) => `${listId}-opt-${value}`;
+  const optionId = (value: string) =>
+    value === OTHER_ROW ? `${listId}-other-row` : `${listId}-opt-${value}`;
   const { schedule: scheduleAutoAdvance } = useAutoAdvanceTimer(question.id);
 
   useEffect(() => {
@@ -50,7 +70,37 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
     return question.options.filter((o) => o.label.toLowerCase().includes(q));
   }, [query, question.options, selectedOption]);
 
+  /** Typed text that names no option — offered as the Other answer. */
+  const typedOther =
+    withOther && query.trim() !== '' && !resolveOtherText(question.options, query).isOption
+      ? query.trim().slice(0, OTHER_MAX)
+      : '';
+  const rows: Array<{ value: string; label: string; description?: string }> = withOther
+    ? [
+        ...filtered,
+        {
+          value: OTHER_ROW,
+          label: typedOther
+            ? `${otherLabelOf(question)}: “${typedOther}”`
+            : `${otherLabelOf(question)} — type your answer above`,
+        },
+      ]
+    : filtered;
+
   const choose = (value: string) => {
+    if (value === OTHER_ROW) {
+      if (!typedOther) {
+        setOpen(false);
+        setError('Type your answer, then pick Other');
+        inputRef.current?.focus();
+        return;
+      }
+      setOpen(false);
+      setError(null);
+      onSelect(typedOther);
+      scheduleAutoAdvance(() => onAdvance());
+      return;
+    }
     const opt = question.options.find((o) => o.value === value);
     if (!opt) return;
     setQuery(opt.label);
@@ -66,7 +116,9 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
     if (selectedOption && q.toLowerCase() === selectedOption.label.toLowerCase()) {
       return selected;
     }
-    return question.options.find((o) => o.label.toLowerCase() === q.toLowerCase())?.value;
+    const hit = question.options.find((o) => o.label.toLowerCase() === q.toLowerCase())?.value;
+    if (hit !== undefined) return hit;
+    return withOther ? resolveOtherText(question.options, q).value : undefined;
   };
 
   const submit = useCallback(() => {
@@ -80,7 +132,8 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
     setError(null);
     if (value) onSelect(value);
     (onSubmit ?? onAdvance)();
-  }, [question, query, selected, selectedOption, onSelect, onSubmit, onAdvance]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question, query, selected, selectedOption, onSelect, onSubmit, onAdvance, withOther]);
 
   useRegisterFormConfirm(submit);
 
@@ -88,14 +141,14 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setOpen(true);
-      setHighlight((h) => Math.min(h + 1, filtered.length - 1));
+      setHighlight((h) => Math.min(h + 1, rows.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setHighlight((h) => Math.max(h - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (open && filtered[highlight]) {
-        choose(filtered[highlight].value);
+      if (open && rows[highlight] && (rows[highlight].value !== OTHER_ROW || typedOther)) {
+        choose(rows[highlight].value);
       } else {
         submit();
       }
@@ -120,7 +173,7 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
           aria-labelledby={labelId}
           aria-invalid={Boolean(error)}
           aria-activedescendant={
-            open && filtered[highlight] ? optionId(filtered[highlight].value) : undefined
+            open && rows[highlight] ? optionId(rows[highlight].value) : undefined
           }
           value={query}
           onChange={(e) => {
@@ -130,6 +183,14 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
             if (error) setError(null);
             if (selectedOption && e.target.value !== selectedOption.label) {
               onSelect('');
+            } else if (
+              withOther &&
+              !selectedOption &&
+              selected &&
+              e.target.value.trim() !== selected
+            ) {
+              // A typed Other answer is being edited: it is only stored again on Enter / OK.
+              onSelect('');
             }
           }}
           onFocus={() => setOpen(true)}
@@ -137,11 +198,15 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
           placeholder={question.placeholder ?? 'Type or select an option...'}
           className={`slate-input${error ? ' slate-input--error' : ''}`}
           autoComplete="off"
+          maxLength={withOther ? OTHER_MAX : undefined}
         />
-        {open && filtered.length > 0 && (
+        {open && rows.length > 0 && (
           <ul id={listId} role="listbox" aria-labelledby={labelId} className="slate-dropdown-list">
-            {filtered.map((opt, i) => {
-              const isSelected = selected === opt.value;
+            {rows.map((opt, i) => {
+              const isOther = opt.value === OTHER_ROW;
+              const isSelected = isOther
+                ? Boolean(typedOther) && selected === typedOther
+                : selected === opt.value;
               const isHighlighted = i === highlight;
               return (
                 <li key={opt.value} role="presentation">
@@ -152,7 +217,7 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
                     aria-selected={isSelected}
                     className={`slate-dropdown-item${isHighlighted ? ' slate-dropdown-item--hl' : ''}${
                       isSelected ? ' slate-dropdown-item--selected' : ''
-                    }`}
+                    }${isOther ? ' slate-dropdown-item--other' : ''}`}
                     onMouseEnter={() => setHighlight(i)}
                     onClick={() => choose(opt.value)}
                   >
@@ -166,7 +231,7 @@ export function DropdownField({ question, answers, selected, onSelect, onAdvance
             })}
           </ul>
         )}
-        {open && filtered.length === 0 && (
+        {open && rows.length === 0 && (
           <p className="slate-hint" style={{ marginTop: 12 }}>
             no matches
           </p>

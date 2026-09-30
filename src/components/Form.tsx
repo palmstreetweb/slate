@@ -26,16 +26,19 @@ import { useFormState } from '@/hooks/useFormState.js';
 import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 import { useAutosave } from '@/hooks/useAutosave.js';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
-import { FormConfirmRefContext } from '@/hooks/useRegisterFormConfirm.js';
+import { FormConfirmRefContext, FormOtherRefContext } from '@/hooks/useRegisterFormConfirm.js';
 import { useTheme } from '@/hooks/useTheme.js';
 import { useReducedMotion } from '@/hooks/useReducedMotion.js';
 import { progress as progressFn } from '@/logic/progress.js';
 import { computeScore } from '@/logic/scoring.js';
+import { prefillAnswers } from '@/logic/prefill.js';
+import { allowsOther } from '@/logic/other.js';
 import { TopBar } from './chrome/TopBar.js';
 import { ProgressBar } from './chrome/ProgressBar.js';
 import { FooterCounter } from './chrome/FooterCounter.js';
 import { ThemeToggle } from './chrome/ThemeToggle.js';
 import { QuestionRenderer } from './questions/QuestionRenderer.js';
+import { preloadExtFields } from './questions/lazyFields.js';
 import {
   ThemeDecoration,
   hasStepDecorationBackdrop,
@@ -72,6 +75,7 @@ export function Form<S extends Schema>({
   onSubmit,
   onQuestionChange,
   hiddenFields,
+  prefill,
   errorMessage = 'Something went wrong submitting your form. Please try again.',
   onFileUpload,
   resolveFileUploadMeta,
@@ -81,11 +85,21 @@ export function Form<S extends Schema>({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const confirmStepRef = useRef<(() => void) | null>(null);
+  const otherKeyRef = useRef<(() => void) | null>(null);
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     migrateSlateLocalStorageKeys();
   }, []);
+
+  // On-demand field UIs this schema uses start downloading now, so they are
+  // usually there before the respondent reaches them (ADR-063).
+  useEffect(() => {
+    preloadExtFields(schema.questions);
+  }, [schema.questions]);
+
+  // The link's prefill (ADR-063), read once on mount like the rest of the start state.
+  const [initialAnswers] = useState(() => prefillAnswers(schema.questions, prefill));
 
   const {
     resolved: themeMode,
@@ -108,7 +122,7 @@ export function Form<S extends Schema>({
     animationEnd,
     restart,
     hydrate,
-  } = useFormState(schema);
+  } = useFormState(schema, { initialAnswers });
 
   const { schedule: scheduleAutoAdvance, clear: clearAutoAdvance } = useAutoAdvanceTimer(
     currentQuestion?.id,
@@ -164,6 +178,17 @@ export function Form<S extends Schema>({
   const onSelectChoice = useCallback(
     (idx: number) => {
       if (!currentQuestion) return;
+      // The key after the last option is Other (ADR-063): the field owns its text box.
+      if (
+        (currentQuestion.type === 'single_choice' ||
+          currentQuestion.type === 'multi_choice' ||
+          currentQuestion.type === 'picture_choice') &&
+        idx === currentQuestion.options.length &&
+        allowsOther(currentQuestion)
+      ) {
+        otherKeyRef.current?.();
+        return;
+      }
       if (currentQuestion.type === 'single_choice') {
         const opt = currentQuestion.options[idx];
         if (!opt) return;
@@ -214,6 +239,8 @@ export function Form<S extends Schema>({
       if (currentQuestion.type !== 'scale' && currentQuestion.type !== 'nps') return;
       playInteractionSound();
       setAnswer(currentQuestion.id, value);
+      // A slider waits for OK (ADR-063); every other scale commits on the key.
+      if (currentQuestion.type === 'scale' && currentQuestion.display === 'slider') return;
       scheduleAutoAdvance(() => next());
     },
     [currentQuestion, setAnswer, next, playInteractionSound, scheduleAutoAdvance],
@@ -465,38 +492,41 @@ export function Form<S extends Schema>({
         {/* Outgoing question copies land here (never React-managed children). */}
         <div className="slate-q-leave-host" ref={leaveHostRef} aria-hidden="true" />
         <FormConfirmRefContext.Provider value={confirmStepRef}>
-          <div
-            key={questionKey}
-            ref={stageContentRef}
-            className="slate-q-enter slate-stage-content"
-            data-direction={state.direction}
-            onAnimationEnd={animationEnd}
-          >
-            {currentQuestion ? (
-              <QuestionRenderer
-                question={currentQuestion}
-                answers={state.answers}
-                setAnswer={setAnswer}
-                advance={next}
-                stepNumber={stepNumber}
-                totalSteps={counted}
-                submitStatus={currentQuestion.type === 'thanks' ? submitStatus : 'idle'}
-                submitError={submitErrorMsg}
-                onRetrySubmit={retrySubmit}
-                onRestart={restartForm}
-                onFileUpload={onFileUpload}
-                resolveFileUploadMeta={resolveFileUploadMeta}
-                score={score}
-                visibleList={state.visible}
-                onEditQuestion={(id) => {
-                  const idx = state.visible.findIndex((q) => q.id === id);
-                  if (idx >= 0) goTo(idx, 'backward');
-                }}
-                playInteractionSound={playInteractionSound}
-                playTypingSound={playTypingSound}
-              />
-            ) : null}
-          </div>
+          <FormOtherRefContext.Provider value={otherKeyRef}>
+            <div
+              key={questionKey}
+              ref={stageContentRef}
+              className="slate-q-enter slate-stage-content"
+              data-direction={state.direction}
+              onAnimationEnd={animationEnd}
+            >
+              {currentQuestion ? (
+                <QuestionRenderer
+                  question={currentQuestion}
+                  answers={state.answers}
+                  setAnswer={setAnswer}
+                  advance={next}
+                  stepNumber={stepNumber}
+                  totalSteps={counted}
+                  submitStatus={currentQuestion.type === 'thanks' ? submitStatus : 'idle'}
+                  submitError={submitErrorMsg}
+                  onRetrySubmit={retrySubmit}
+                  onRestart={restartForm}
+                  onFileUpload={onFileUpload}
+                  resolveFileUploadMeta={resolveFileUploadMeta}
+                  score={score}
+                  visibleList={state.visible}
+                  onEditQuestion={(id) => {
+                    const idx = state.visible.findIndex((q) => q.id === id);
+                    if (idx >= 0) goTo(idx, 'backward');
+                  }}
+                  playInteractionSound={playInteractionSound}
+                  playTypingSound={playTypingSound}
+                  allQuestions={schema.questions}
+                />
+              ) : null}
+            </div>
+          </FormOtherRefContext.Provider>
         </FormConfirmRefContext.Provider>
       </div>
 

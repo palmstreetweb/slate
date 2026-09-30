@@ -113,4 +113,41 @@ describe('defineSchema → AnswersOf inference', () => {
       >
     >();
   });
+
+  it('allowOther widens a choice answer to also take typed text (ADR-063)', () => {
+    const _schema = defineSchema({
+      brand: { name: 'X' },
+      theme: 'classic',
+      themeMode: 'toggle',
+      questions: [
+        {
+          id: 'src',
+          type: 'single_choice',
+          title: 'Where?',
+          allowOther: true,
+          options: [
+            { label: 'Flyer', value: 'flyer' },
+            { label: 'Google', value: 'google' },
+          ],
+        },
+        {
+          id: 'plain',
+          type: 'single_choice',
+          title: 'Plain',
+          options: [{ label: 'A', value: 'a' }],
+        },
+        {
+          id: 'many',
+          type: 'multi_choice',
+          title: 'Many',
+          allowOther: true,
+          options: [{ label: 'A', value: 'a' }],
+        },
+      ],
+    });
+    type A = AnswersOf<typeof _schema.questions>;
+    expectTypeOf<A['src']>().toEqualTypeOf<'flyer' | 'google' | (string & {})>();
+    expectTypeOf<A['plain']>().toEqualTypeOf<'a'>();
+    expectTypeOf<A['many']>().toEqualTypeOf<Array<'a' | (string & {})> | undefined>();
+  });
 });

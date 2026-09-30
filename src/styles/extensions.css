@@ -1,0 +1,559 @@
+/* On-demand field UIs (ADR-063): styled scales (stars, faces, slider), the
+   number stepper, and date ranges / times. The components that use these
+   rules load on demand; the published stylesheet includes them after
+   questions.css (scripts/bundle-css.mjs).
+
+   Wrapper-scoped. Colours come from tokens only (no literals). Tap targets
+   are at least 44 px and inputs at least 16 px (iOS zoom). Motion follows the
+   ADR-059 pattern: rules outside the motion block are the static end state;
+   keyframes run only under `prefers-reduced-motion: no-preference` on a
+   wrapper without `data-reduced-motion`. */
+
+/* ============================================================
+   Stars and faces
+   ============================================================ */
+
+[data-slate-forms] .slate-scale-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-slate-forms] .slate-scale-icon {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px;
+  background: transparent;
+  border: var(--slate-border-width) solid transparent;
+  border-radius: var(--slate-radius);
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    border-color 120ms,
+    background 120ms,
+    color 120ms;
+}
+
+[data-slate-forms] .slate-scale-icon:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 2px;
+}
+
+/* Stars: bare, big, and close together — the row reads as one control. */
+[data-slate-forms] .slate-scale-icons--stars {
+  gap: 2px;
+}
+
+[data-slate-forms] .slate-scale-icons--stars .slate-scale-icon {
+  width: clamp(44px, 13vw, 60px);
+  height: clamp(44px, 13vw, 60px);
+  padding: 3px;
+}
+
+[data-slate-forms] .slate-star {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+[data-slate-forms] .slate-star path {
+  fill: transparent;
+  stroke: var(--slate-dim);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+  transition:
+    fill 120ms,
+    stroke 120ms;
+}
+
+[data-slate-forms] .slate-star--on path {
+  fill: var(--slate-accent);
+  stroke: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-star--preview path {
+  fill: rgb(var(--slate-accent-rgb) / 0.3);
+  stroke: var(--slate-accent);
+}
+
+/* Faces: one bordered cell per point, like the numbers scale. */
+[data-slate-forms] .slate-scale-icons--emoji .slate-scale-icon {
+  flex: 1 1 0;
+  min-width: 52px;
+  max-width: 104px;
+  padding: 10px 4px 8px;
+  border-color: var(--slate-border-md);
+}
+
+[data-slate-forms] .slate-face {
+  display: block;
+  width: min(52px, 100%);
+  height: auto;
+  aspect-ratio: 1;
+  overflow: visible;
+}
+
+[data-slate-forms] .slate-face-head {
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 3.5;
+}
+
+[data-slate-forms] .slate-face-eye {
+  fill: currentColor;
+}
+
+[data-slate-forms] .slate-face-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-slate-forms] .slate-scale-icon-n {
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+[data-slate-forms] .slate-scale-icons--emoji .slate-scale-icon:hover,
+[data-slate-forms] .slate-scale-icons--emoji .slate-scale-icon--lit {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent-lo);
+  color: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-scale-icons--emoji .slate-scale-icon--selected {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+}
+
+[data-slate-forms][data-theme-name='swiss'] .slate-scale-icons--emoji .slate-scale-icon {
+  border-color: var(--slate-text);
+}
+
+[data-slate-forms][data-theme-name='swiss'] .slate-scale-icons--emoji .slate-scale-icon:hover,
+[data-slate-forms][data-theme-name='swiss'] .slate-scale-icons--emoji .slate-scale-icon--lit,
+[data-slate-forms][data-theme-name='swiss'] .slate-scale-icons--emoji .slate-scale-icon--selected {
+  background: var(--slate-text);
+  border-color: var(--slate-text);
+  color: var(--slate-bg);
+}
+
+[data-slate-forms][data-has-decoration]:not([data-theme-name='swiss'])
+  .slate-scale-icons--emoji
+  .slate-scale-icon:not(.slate-scale-icon--selected):not(.slate-scale-icon--lit) {
+  background: var(--slate-bg-2);
+}
+
+/* ============================================================
+   Slider
+   ============================================================ */
+
+[data-slate-forms] .slate-slider-readout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 104px;
+  margin-bottom: 8px;
+  color: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-slider[data-untouched] .slate-slider-readout {
+  color: var(--slate-dim);
+}
+
+[data-slate-forms] .slate-slider-face {
+  width: 92px;
+}
+
+[data-slate-forms] .slate-slider-stars {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  max-width: 320px;
+}
+
+[data-slate-forms] .slate-slider-stars .slate-star {
+  width: 28px;
+  height: 28px;
+}
+
+[data-slate-forms] .slate-slider[data-untouched] .slate-star--on path {
+  fill: transparent;
+  stroke: var(--slate-dim);
+}
+
+[data-slate-forms] .slate-slider-value {
+  min-width: 2ch;
+  font-family: var(--slate-font-display);
+  font-size: clamp(2.2rem, 7vw, 3rem);
+  font-weight: var(--slate-title-weight, 600);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-slider[data-untouched] .slate-slider-value {
+  color: var(--slate-dim);
+}
+
+[data-slate-forms] .slate-slider-input {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms] .slate-slider-input:focus {
+  outline: none;
+}
+
+[data-slate-forms] .slate-slider-input::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--slate-accent) 0 var(--slate-slider-pct, 50%),
+    var(--slate-border-md) var(--slate-slider-pct, 50%) 100%
+  );
+}
+
+[data-slate-forms] .slate-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  margin-top: -12px;
+  border-radius: 50%;
+  background: var(--slate-accent);
+  border: 4px solid var(--slate-bg);
+  box-shadow: 0 0 0 1.5px var(--slate-accent);
+}
+
+[data-slate-forms] .slate-slider-input::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--slate-border-md);
+}
+
+[data-slate-forms] .slate-slider-input::-moz-range-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-slider-input::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--slate-accent);
+  border: 4px solid var(--slate-bg);
+  box-shadow: 0 0 0 1.5px var(--slate-accent);
+}
+
+[data-slate-forms] .slate-slider-input:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 1.5px var(--slate-accent),
+    0 0 0 8px rgb(var(--slate-accent-rgb) / 0.25);
+}
+
+[data-slate-forms] .slate-slider-input:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 0 0 1.5px var(--slate-accent),
+    0 0 0 8px rgb(var(--slate-accent-rgb) / 0.25);
+}
+
+/* Untouched: a hollow thumb on a plain track, so "no answer yet" reads at a glance. */
+[data-slate-forms]
+  .slate-slider[data-untouched]
+  .slate-slider-input::-webkit-slider-runnable-track {
+  background: var(--slate-border-md);
+}
+
+[data-slate-forms] .slate-slider[data-untouched] .slate-slider-input::-webkit-slider-thumb {
+  background: var(--slate-bg);
+  box-shadow: 0 0 0 2px var(--slate-dim);
+}
+
+[data-slate-forms] .slate-slider[data-untouched] .slate-slider-input::-moz-range-progress {
+  background: transparent;
+}
+
+[data-slate-forms] .slate-slider[data-untouched] .slate-slider-input::-moz-range-thumb {
+  background: var(--slate-bg);
+  box-shadow: 0 0 0 2px var(--slate-dim);
+}
+
+/* ============================================================
+   Number stepper
+   ============================================================ */
+
+[data-slate-forms] .slate-stepper {
+  margin-top: 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 440px;
+}
+
+[data-slate-forms] .slate-stepper-btn {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
+  background: transparent;
+  color: var(--slate-text);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color 120ms,
+    background 120ms,
+    color 120ms,
+    transform 120ms;
+}
+
+[data-slate-forms] .slate-stepper-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+[data-slate-forms] .slate-stepper-btn:hover:not([aria-disabled]) {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent-lo);
+}
+
+[data-slate-forms] .slate-stepper-btn:active:not([aria-disabled]) {
+  border-color: var(--slate-accent);
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+}
+
+[data-slate-forms] .slate-stepper-btn:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 2px;
+}
+
+[data-slate-forms] .slate-stepper-btn[aria-disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+[data-slate-forms][data-theme-name='swiss'] .slate-stepper-btn {
+  border-color: var(--slate-text);
+}
+
+[data-slate-forms][data-theme-name='swiss'] .slate-stepper-btn:active:not([aria-disabled]) {
+  background: var(--slate-text);
+  border-color: var(--slate-text);
+  color: var(--slate-bg);
+}
+
+[data-slate-forms][data-has-decoration] .slate-stepper-btn {
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms] .slate-stepper-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: var(--slate-border-width) solid var(--slate-border-md);
+  transition: border-color 180ms ease-out;
+}
+
+[data-slate-forms] .slate-stepper-field:focus-within {
+  border-bottom-color: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-stepper-field--error {
+  border-bottom-color: var(--slate-error);
+}
+
+[data-slate-forms] .slate-stepper-input {
+  width: auto;
+  min-width: 2ch;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: center;
+  color: var(--slate-text);
+  font-family: var(--slate-font-display);
+  font-size: clamp(2rem, 6vw, 2.6rem);
+  font-weight: var(--slate-title-weight, 500);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+/* ============================================================
+   Date range / time
+   ============================================================ */
+
+[data-slate-forms] .slate-date-ext {
+  margin-top: 24px;
+  display: grid;
+  gap: 18px;
+}
+
+[data-slate-forms] .slate-date-ext--range {
+  gap: 26px;
+}
+
+[data-slate-forms] .slate-date-ext-label {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--slate-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--slate-text);
+  opacity: 0.55;
+}
+
+[data-slate-forms] .slate-date-ext-part {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 28px;
+}
+
+[data-slate-forms] .slate-time-row {
+  align-items: center;
+}
+
+[data-slate-forms] .slate-meridiem {
+  display: inline-flex;
+  margin-left: 6px;
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
+  overflow: hidden;
+}
+
+[data-slate-forms] .slate-meridiem-btn {
+  min-width: 48px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: var(--slate-text);
+  font-family: var(--slate-font-mono);
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms] .slate-meridiem-btn + .slate-meridiem-btn {
+  border-left: var(--slate-border-width) solid var(--slate-border-md);
+}
+
+[data-slate-forms] .slate-meridiem-btn--on {
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+}
+
+[data-slate-forms][data-theme-name='swiss'] .slate-meridiem-btn--on {
+  background: var(--slate-text);
+  color: var(--slate-bg);
+}
+
+[data-slate-forms] .slate-meridiem-btn:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: -2px;
+}
+
+/* ============================================================
+   Motion (ADR-059 pattern)
+   ============================================================ */
+
+@keyframes slate-ext-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.16);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-scale-icons,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-slider,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-stepper,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-date-ext {
+    animation: slate-q-child-in 460ms cubic-bezier(0.16, 1, 0.3, 1) 140ms both;
+  }
+
+  /* Commit beat: the picked face pops; lit stars pop left to right. All
+     inside the ~220 ms before auto-advance. */
+  [data-slate-forms]:not([data-reduced-motion])
+    .slate-scale-icons--committed.slate-scale-icons--emoji
+    .slate-scale-icon--committed {
+    animation: slate-ext-pop 220ms cubic-bezier(0.34, 1.45, 0.64, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion])
+    .slate-scale-icons--committed.slate-scale-icons--stars
+    .slate-star--on {
+    transform-origin: center;
+    animation: slate-ext-pop 200ms cubic-bezier(0.34, 1.45, 0.64, 1) both;
+    animation-delay: calc(var(--slate-i, 0) * 22ms);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-scale-icons--emoji .slate-face,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-scale-icons--stars .slate-star {
+    transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-scale-icon:hover .slate-face,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-scale-icon:hover .slate-star {
+    transform: scale(1.08);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-stepper-btn:active:not([aria-disabled]) {
+    transform: scale(0.94);
+  }
+}

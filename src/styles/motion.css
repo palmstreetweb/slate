@@ -557,7 +557,19 @@
    Motion — only when allowed
    ============================================================ */
 
+@keyframes slate-other-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  /* ---- "Other: ___" box opens under the list (ADR-063) ---- */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-other-box {
+    animation: slate-other-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
   /* ---- choice commit (runs inside the ~220ms before auto-advance) ---- */
 
   [data-slate-forms]:not([data-reduced-motion])

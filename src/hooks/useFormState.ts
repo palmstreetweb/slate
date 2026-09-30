@@ -16,6 +16,7 @@ import type { Schema } from '@/types/Schema.js';
 import type { Question } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { resolveJumpTarget, visibleAnswersForSubmit, visibleQuestions } from '@/logic/progress.js';
+import { otherIndex } from '@/logic/other.js';
 
 export type AnimDirection = 'forward' | 'backward';
 
@@ -97,7 +98,7 @@ type Action =
   | { type: 'hydrate'; snapshot: ResumeSnapshot }
   | { type: 'reset' };
 
-function makeReducer(allQuestions: ReadonlyArray<Question>) {
+function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
   return function reducer(s: RawState, a: Action): RawState {
     switch (a.type) {
       case 'set_answer': {
@@ -120,10 +121,11 @@ function makeReducer(allQuestions: ReadonlyArray<Question>) {
         // Logic jumps (ADR-015): first matching rule on the current question
         // overrides the default step+1. Back-nav still works — the jump
         // origin is pushed onto history like any other advance.
-        const jump = current ? resolveJumpTarget(current, visible, s.answers) : null;
-        const next = jump !== null && jump !== s.step
-          ? jump
-          : Math.min(s.step + 1, visible.length - 1);
+        const jump = current
+          ? resolveJumpTarget(current, visible, s.answers, otherIndex(allQuestions))
+          : null;
+        const next =
+          jump !== null && jump !== s.step ? jump : Math.min(s.step + 1, visible.length - 1);
         if (next === s.step) return s;
         return {
           ...s,
@@ -184,7 +186,7 @@ function makeReducer(allQuestions: ReadonlyArray<Question>) {
         return { ...s, visitedIds: [...s.visitedIds, a.id] };
       }
       case 'reset':
-        return { ...INITIAL_RAW };
+        return { ...initial };
     }
   };
 }
@@ -198,10 +200,26 @@ const INITIAL_RAW: Omit<RawState, never> = {
   visitedIds: [],
 };
 
-export function useFormState(schema: Schema): UseFormStateApi {
+export type UseFormStateOptions = {
+  /**
+   * Answers to start from — the link's prefill (ADR-063). Read on mount;
+   * "Submit another" starts from them again.
+   */
+  initialAnswers?: LooseAnswers;
+};
+
+export function useFormState(schema: Schema, opts: UseFormStateOptions = {}): UseFormStateApi {
   const startedAtRef = useRef<Date>(new Date());
-  const reducer = useMemo(() => makeReducer(schema.questions), [schema.questions]);
-  const [raw, dispatch] = useReducer(reducer, INITIAL_RAW);
+  const initialRef = useRef<RawState | null>(null);
+  if (initialRef.current === null) {
+    initialRef.current = { ...INITIAL_RAW, answers: { ...(opts.initialAnswers ?? {}) } };
+  }
+  const initial = initialRef.current;
+  const reducer = useMemo(
+    () => makeReducer(schema.questions, initial),
+    [schema.questions, initial],
+  );
+  const [raw, dispatch] = useReducer(reducer, initial);
 
   const visible = useMemo(
     () => visibleQuestions(schema.questions, raw.answers),
@@ -216,12 +234,9 @@ export function useFormState(schema: Schema): UseFormStateApi {
     if (currentQuestion) dispatch({ type: 'record_visited', id: currentQuestion.id });
   }, [currentQuestion]);
 
-  const setAnswer = useCallback(
-    (id: string, value: SetAnswerValue | SetAnswerUpdater) => {
-      dispatch({ type: 'set_answer', id, value });
-    },
-    [],
-  );
+  const setAnswer = useCallback((id: string, value: SetAnswerValue | SetAnswerUpdater) => {
+    dispatch({ type: 'set_answer', id, value });
+  }, []);
 
   const next = useCallback(() => dispatch({ type: 'go_next' }), []);
   const back = useCallback(() => dispatch({ type: 'go_back' }), []);

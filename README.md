@@ -124,23 +124,33 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `email` | `title`, `placeholder?`, `required?` | RFC-lite regex | `string` |
 | `phone` | `title`, `placeholder?`, `required?`, `defaultCountry?` (default `'US'`) | E.164 normalization via `libphonenumber-js` | `string` (E.164) |
 | `url` | `title`, `placeholder?`, `required?` | website shape; bare domains get `https://` prefixed | `string` |
-| `number` | `title`, `placeholder?`, `min?`, `max?`, `step?`, `required?` | range | `number` |
-| `date` | `title`, `required?`, `format?` (`'MM/DD/YYYY'` default), `min?`, `max?` (ISO) | real calendar date + bounds | `string` (ISO `YYYY-MM-DD`) |
+| `number` | `title`, `placeholder?`, `min?`, `max?`, `step?`, `required?`, `display?` (`'input'` \| `'stepper'`), `prefix?`, `unit?` | range | `number` |
+| `date` | `title`, `required?`, `format?` (`'MM/DD/YYYY'` default), `min?`, `max?` (ISO), `includeTime?`, `range?` | real calendar date + bounds; range in order | `string`: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM` with a time, `start/end` for a range |
 | `file_upload` | `title`, `required?`, `accept?`, `maxSizeMb?`, `multiple?`, `maxFiles?` | presence + size; max files when multiple | `File` / `string`, or `(File \| string)[]` when `multiple` |
-| `single_choice` | `title`, `options: Option[]`, `required?` (default `true`) | required | `string` |
-| `multi_choice` | `title`, `options: Option[]`, `min?`, `max?` | min/max selections | `string[]` |
-| `dropdown` | `title`, `options: Option[]`, `placeholder?`, `required?` (default `true`) | required | `string` |
-| `picture_choice` | `title`, `options: PictureOption[]`, `multiple?`, `required?`, `min?`, `max?` | required / min-max | `string` or `string[]` |
+| `single_choice` | `title`, `options: Option[]`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` (option value, or the typed Other text) |
+| `multi_choice` | `title`, `options: Option[]`, `min?`, `max?`, `allowOther?`, `otherLabel?` | min/max selections | `string[]` (plus at most one typed Other text) |
+| `dropdown` | `title`, `options: Option[]`, `placeholder?`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` |
+| `picture_choice` | `title`, `options: PictureOption[]`, `multiple?`, `required?`, `min?`, `max?`, `allowOther?`, `otherLabel?` | required / min-max | `string` or `string[]` |
 | `ranking` | `title`, `options: Option[]` | full permutation | `string[]` (ordered) |
 | `matrix` | `title`, `rows: Option[]`, `columns: Option[]`, `multiple?`, `required?` | all rows when required | `Record<row, col \| col[]>` |
 | `yes_no` | `title`, `yesLabel?`, `noLabel?`, `required?` (default `true`) | required | `'yes' \| 'no'` |
 | `legal` | `title`, `body?`, `acceptLabel?`, `declineLabel?`, `required?` (default `true`) | required | `'accept' \| 'decline'` |
-| `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?` | range | `number` |
+| `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?`, `display?` (`'numbers'` \| `'stars'` \| `'emoji'` \| `'slider'`), `sliderIcon?` | range | `number` |
 | `nps` | `title`, `minLabel?`, `maxLabel?`, `required?` | 0–10 | `number` |
 | `review` | `title`, `subtitle?`, `cta?`, `visibleIf?` | — | _not stored; lists answers with jump-to-edit_ |
 | `thanks` | `title`, `subtitle?`, `cta?`, `visibleIf?`, `redirectUrl?` | — | _not stored; fires `onSubmit`_ |
 
 `Option` is `{ label: string; value: string; description?: string; score?: number }`. `PictureOption` adds `{ src: string; alt?: string }`.
+
+**Options added in ADR-063** (Wave A of the question catalog expansion; BUILD_BRIEF §5 stays the canonical v1 table):
+
+- **"Other: ___"** — `allowOther: true` on single / multi / dropdown / picture choice adds an Other choice (next letter key) with a text box. The typed text is stored in place of an option value; text that names an option is stored as that option. In conditions, `OTHER_VALUE` (exported) means "picked Other". Typed Other scores 0.
+- **Prefill from the link** — `prefillKey` on text, number, date, choice, yes/no, scale and NPS questions, plus `<Form prefill={params}>`. Values are checked against the question and ignored when they don't fit; the respondent still sees and can change them. Consent, files, rankings and grids are never prefilled; `src`, `utm_*` and `embed` are reserved.
+- **Scale styles** — `display: 'stars' | 'emoji' | 'slider'` (drawn faces in theme ink; the slider's face or stars react while dragging). Same `number` answer.
+- **Quantity stepper** — `number` with `display: 'stepper'`: big − / + buttons, hold to repeat, `prefix` / `unit` shown around the value.
+- **Date time / range** — `includeTime` (12-hour entry on month-first forms, 24-hour otherwise) and `range` (From / To).
+
+Stars, faces, the slider, the stepper, date ranges / times and the file field load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
 
 ### Answer piping
 

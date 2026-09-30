@@ -89,4 +89,47 @@ describe('checkSchema', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]!.kind).toBe('dangling_condition');
   });
+
+  it('flags an Other condition on a question without Other (ADR-063)', () => {
+    const qs: Question[] = [
+      { id: 'a', type: 'single_choice', title: 'x', options: [{ label: 'A', value: 'a' }] },
+      {
+        id: 'b',
+        type: 'short_text',
+        title: 'y',
+        visibleIf: { field: 'a', op: 'equals', value: '__other__' },
+      },
+    ];
+    expect(checkSchema(qs).map((i) => i.kind)).toEqual(['other_off']);
+    const withOther = [{ ...qs[0]!, allowOther: true } as Question, qs[1]!];
+    expect(checkSchema(withOther)).toEqual([]);
+  });
+
+  it('flags reserved, malformed and duplicate prefill keys (ADR-063)', () => {
+    const qs: Question[] = [
+      { id: 'a', type: 'short_text', title: 'x', prefillKey: 'name' },
+      { id: 'b', type: 'email', title: 'y', prefillKey: 'NAME' },
+      { id: 'c', type: 'short_text', title: 'z', prefillKey: 'src' },
+      { id: 'd', type: 'short_text', title: 'w', prefillKey: 'first name' },
+      { id: 'e', type: 'short_text', title: 'v', prefillKey: 'ok_key' },
+    ];
+    const issues = checkSchema(qs);
+    expect(issues.map((i) => [i.questionId, i.kind])).toEqual([
+      ['b', 'bad_prefill_key'],
+      ['c', 'bad_prefill_key'],
+      ['d', 'bad_prefill_key'],
+    ]);
+  });
+
+  it('flags a minimum above the maximum', () => {
+    const qs: Question[] = [
+      { id: 'n', type: 'number', title: 'x', min: 10, max: 2 },
+      { id: 'd', type: 'date', title: 'y', min: '2026-12-01', max: '2026-01-01' },
+      { id: 's', type: 'scale', title: 'z', min: 1, max: 5 },
+    ];
+    expect(checkSchema(qs).map((i) => [i.questionId, i.kind])).toEqual([
+      ['n', 'bad_bounds'],
+      ['d', 'bad_bounds'],
+    ]);
+  });
 });

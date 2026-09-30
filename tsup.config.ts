@@ -7,7 +7,8 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
-  splitting: false,
+  // ESM splits on-demand field UIs into their own chunks (ADR-063); CJS stays one file.
+  splitting: true,
   minify: false,
   target: 'es2022',
   external: ['react', 'react-dom', 'react/jsx-runtime'],

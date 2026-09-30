@@ -7,8 +7,11 @@
  * human-readable `message`.
  */
 
-import type { Question } from '@/types/Question.js';
+import type { DateQuestion, Question } from '@/types/Question.js';
 import { isScaleStepValue } from '@/utils/scaleStep.js';
+import { isValidIsoDate, parseDateAnswer, partKey } from './dateValue.js';
+
+export { isValidIsoDate };
 
 export type ValidationError = { code: string; message: string };
 
@@ -20,18 +23,34 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Loose website check — scheme optional, needs a host with a dot. */
 const URL_RE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i;
 
-const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-/** True iff `v` is a real calendar date in ISO `YYYY-MM-DD` form. */
-export function isValidIsoDate(v: string): boolean {
-  const m = ISO_DATE_RE.exec(v);
-  if (!m) return false;
-  const year = Number(m[1]);
-  const month = Number(m[2]);
-  const day = Number(m[3]);
-  if (month < 1 || month > 12 || day < 1) return false;
-  const daysInMonth = new Date(year, month, 0).getDate();
-  return day <= daysInMonth;
+/**
+ * Date answers (ADR-010, ADR-063): the shape must match the question — a time
+ * when `includeTime`, a `start/end` pair when `range` — every date sits inside
+ * `min`/`max`, and a range never ends before it starts.
+ */
+function validateDate(question: DateQuestion, answer: unknown): ValidationError | null {
+  if (typeof answer !== 'string' || answer.length === 0) return null;
+  const parsed = parseDateAnswer(answer);
+  const parts = parsed ? (parsed.end ? [parsed.start, parsed.end] : [parsed.start]) : [];
+  const shapeOk =
+    parsed !== null &&
+    Boolean(parsed.end) === Boolean(question.range) &&
+    parts.every((p) => Boolean(p.time) === Boolean(question.includeTime));
+  if (!shapeOk) {
+    return { code: 'date', message: "That doesn't look like a valid date" };
+  }
+  for (const p of parts) {
+    if (question.min !== undefined && p.date < question.min) {
+      return { code: 'min', message: `Earliest allowed date is ${question.min}` };
+    }
+    if (question.max !== undefined && p.date > question.max) {
+      return { code: 'max', message: `Latest allowed date is ${question.max}` };
+    }
+  }
+  if (parsed!.end && partKey(parsed!.end) < partKey(parsed!.start)) {
+    return { code: 'range_order', message: 'The end can’t be before the start' };
+  }
+  return null;
 }
 
 function isBlankString(v: unknown): boolean {
@@ -115,20 +134,16 @@ export function validate(question: Question, answer: unknown): ValidationResult 
 
     case 'date': {
       if (question.required && isBlankString(answer)) {
-        return { code: 'required', message: 'Please pick a date' };
+        return {
+          code: 'required',
+          message: question.range
+            ? 'Please pick both dates'
+            : question.includeTime
+              ? 'Please pick a date and time'
+              : 'Please pick a date',
+        };
       }
-      if (typeof answer === 'string' && answer.length > 0) {
-        if (!isValidIsoDate(answer)) {
-          return { code: 'date', message: "That doesn't look like a valid date" };
-        }
-        if (question.min !== undefined && answer < question.min) {
-          return { code: 'min', message: `Earliest allowed date is ${question.min}` };
-        }
-        if (question.max !== undefined && answer > question.max) {
-          return { code: 'max', message: `Latest allowed date is ${question.max}` };
-        }
-      }
-      return null;
+      return validateDate(question, answer);
     }
 
     case 'number': {
@@ -136,6 +151,7 @@ export function validate(question: Question, answer: unknown): ValidationResult 
         return { code: 'required', message: 'Please fill this in' };
       }
       if (typeof answer === 'number') {
+        if (!Number.isFinite(answer)) return { code: 'number', message: 'Please enter a number' };
         if (question.min !== undefined && answer < question.min) {
           return { code: 'min', message: `Minimum is ${question.min}` };
         }
@@ -173,11 +189,7 @@ export function validate(question: Question, answer: unknown): ValidationResult 
 
       // Default ON when unset (ADR-032) — set `multiple: false` for single-file.
       if (question.multiple !== false) {
-        const arr = Array.isArray(answer)
-          ? answer
-          : isFileItem(answer)
-            ? [answer]
-            : [];
+        const arr = Array.isArray(answer) ? answer : isFileItem(answer) ? [answer] : [];
         const maxFiles = question.maxFiles ?? 10;
         if (question.required && arr.length === 0) {
           return { code: 'required', message: 'Please choose at least one file' };
@@ -231,9 +243,7 @@ export function validate(question: Question, answer: unknown): ValidationResult 
       const arr = Array.isArray(answer) ? answer : null;
       const values = question.options.map((o) => o.value);
       const isPermutation =
-        arr !== null &&
-        arr.length === values.length &&
-        values.every((v) => arr.includes(v));
+        arr !== null && arr.length === values.length && values.every((v) => arr.includes(v));
       if (!isPermutation) {
         return { code: 'ranking', message: 'Please rank every item' };
       }

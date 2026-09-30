@@ -87,6 +87,14 @@ export type FormProps<S extends Schema = Schema> = {
     answers: S extends Schema<infer Q> ? AnswersOf<Q> : LooseAnswers,
   ) => void;
   hiddenFields?: HiddenFields;
+  /**
+   * Answers from the page link (ADR-063), e.g. the fill page's URL
+   * parameters. Only questions with a matching `prefillKey` are filled, each
+   * value is checked against its question (bad values are ignored), and the
+   * respondent still sees and can change every prefilled answer. Read once,
+   * when the form mounts.
+   */
+  prefill?: Readonly<Record<string, string | undefined>>;
   /** Override the fallback message shown when `onSubmit` rejects. */
   errorMessage?: string;
   /**

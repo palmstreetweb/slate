@@ -25,6 +25,8 @@ export type {
   YesNoQuestion,
   LegalQuestion,
   ScaleQuestion,
+  ScaleDisplay,
+  NumberDisplay,
   NpsQuestion,
   Option,
   PictureOption,

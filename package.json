@@ -37,6 +37,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsup",
+    "size": "node scripts/engine-size.mjs",
     "build:examples": "vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

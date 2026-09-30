@@ -31,6 +31,7 @@ export function NumberField({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const labelId = useId();
+  const unitId = `${labelId}-unit`;
 
   useEffect(() => {
     return focusAfter(inputRef.current);
@@ -65,28 +66,50 @@ export function NumberField({
     }
   };
 
+  const input = (
+    <input
+      ref={inputRef}
+      type="text"
+      inputMode="decimal"
+      pattern="[0-9]*[.]?[0-9]*"
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        if (error) setError(null);
+      }}
+      onKeyDown={handleKey}
+      placeholder={question.placeholder ?? '0'}
+      aria-labelledby={labelId}
+      aria-invalid={Boolean(error)}
+      aria-describedby={question.unit ? unitId : undefined}
+      className={`slate-input${error ? ' slate-input--error' : ''}`}
+    />
+  );
+
   return (
     <div>
       <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
       <div style={{ marginTop: 24 }}>
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="decimal"
-          pattern="[0-9]*[.]?[0-9]*"
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            if (error) setError(null);
-          }}
-          onKeyDown={handleKey}
-          placeholder={question.placeholder ?? '0'}
-          aria-labelledby={labelId}
-          aria-invalid={Boolean(error)}
-          className={`slate-input${error ? ' slate-input--error' : ''}`}
-        />
+        {question.prefix || question.unit ? (
+          // Prefix / unit (ADR-063): display only, the answer stays a number.
+          <div className={`slate-num-wrap${error ? ' slate-num-wrap--error' : ''}`}>
+            {question.prefix ? (
+              <span className="slate-num-affix" aria-hidden="true">
+                {question.prefix}
+              </span>
+            ) : null}
+            {input}
+            {question.unit ? (
+              <span id={unitId} className="slate-num-affix slate-num-affix--unit">
+                {question.unit}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          input
+        )}
         {error && (
           <p className="slate-err" aria-live="polite">
             ! {error}

@@ -65,6 +65,9 @@ export {
 
 export { checkSchema, type SchemaIssue } from './logic/schemaCheck.js';
 
+/** In a condition's value: "picked Other" on a choice question with `allowOther` (ADR-063). */
+export { OTHER_VALUE } from './logic/other.js';
+
 /**
  * Identity helper that captures the literal types of a schema for downstream
  * inference. Wrap your schema in `defineSchema({ ... })` to get strongly-typed
