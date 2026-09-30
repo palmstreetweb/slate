@@ -84,7 +84,17 @@ overall per UTC day — edit `ai_quota_limits()` to change them.
 
 018 revokes anonymous and signed-in EXECUTE on `get_form_by_slug`. After it, a rollback of the SPA to a pre-ADR-061 build breaks public forms until you run the GRANT at the bottom of 018.
 
-021 (ADR-067) adds storage quotas: every object storagesign signs gets a row in `form_uploads` (the server picks its key), each account may keep **1 GiB** of files (claimed plus unclaimed uploads younger than 24 h; `storage_quota_limit()`), a response claims its files in the same transaction as its insert, files of responses and forms deleted for good are deleted from the bucket, and uploads nobody claimed are deleted after 24 h. Numbers live in `storage_quota_limit()`, `storage_pending_limit()`, `storage_global_limit()` and `storage_pending_ttl()` — `create or replace` one to change it. Deploy in one sitting:
+021 (ADR-067) adds storage quotas: every object storagesign signs gets a row in `form_uploads` (the server picks its key), each account may keep **1 GiB** of files (claimed, plus unclaimed uploads for 2 h after signing; `storage_quota_limit()`), one network may hold at most half of that unclaimed (32 MiB for requests without a client IP), a response claims its files in the same transaction as its insert, files of responses and forms deleted for good are deleted from the bucket, and uploads nobody claimed are deleted after 24 h. Numbers live in `storage_quota_limit()`, `storage_pending_limit()`, `storage_global_limit()`, `storage_pending_ttl()`, `storage_pending_count_window()`, `storage_net_share_limit()` and `storage_net_share_noip_limit()` — `create or replace` one to change it. To give one account more room for a big event (and back):
+
+```sql
+insert into public.storage_quota_overrides (owner_id, bytes, note)
+values ('<owner id>', 5::bigint * 1024 * 1024 * 1024, 'Spring fair 2026')   -- 5 GiB
+on conflict (owner_id) do update set bytes = excluded.bytes, note = excluded.note, updated_at = now();
+-- the id: select id, email from neon_auth."user" where email = '…';
+delete from public.storage_quota_overrides where owner_id = '<owner id>';
+```
+
+Deploy in one sitting:
 
 1. Apply 021, then `npx neonctl@latest data-api refresh-schema …` (the studio's storage meter calls `storage_quota_status`). Today's Functions keep working on it.
 2. Redeploy `storagesign`. From now on every upload is recorded; storagesign answers 503 on uploads if 021 is missing.
