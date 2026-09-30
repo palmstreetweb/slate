@@ -19,7 +19,8 @@
  *
  * Wave C (ADR-065) adds swipe cards (picture choice and yes / no), pin the
  * spot, the voice note, location, the photo checklist and the availability
- * grid. The dropdown moved here too, unchanged, for the same reason.
+ * grid. The dropdown, the plain date, number, phone, website, legal consent
+ * and NPS moved here too, unchanged, for the same reason.
  */
 
 'use client';
@@ -70,6 +71,7 @@ export type ExtFieldKey =
   | 'matrix'
   | 'picture-choice'
   | 'dropdown'
+  | 'core-fields'
   | 'swipe'
   | 'image-pin'
   | 'voice-note'
@@ -98,6 +100,7 @@ const LOADERS: Record<ExtChunkKey, () => Promise<{ default: AnyChunk }>> = {
   matrix: () => import('./ext/MatrixExt.js'),
   'picture-choice': () => import('./ext/PictureChoiceExt.js'),
   dropdown: () => import('./ext/DropdownExt.js'),
+  'core-fields': () => import('./ext/CoreFieldsExt.js'),
   swipe: () => import('./ext/SwipeField.js'),
   'image-pin': () => import('./ext/ImagePinField.js'),
   'voice-note': () => import('./ext/VoiceNoteField.js'),
@@ -117,9 +120,14 @@ export function extFieldKey(q: Question): ExtFieldKey | null {
         ? 'scale-styled'
         : null;
     case 'number':
-      return q.display === 'stepper' ? 'number-stepper' : null;
+      return q.display === 'stepper' ? 'number-stepper' : 'core-fields';
     case 'date':
-      return q.range || q.includeTime ? 'date-extended' : null;
+      return q.range || q.includeTime ? 'date-extended' : 'core-fields';
+    case 'phone':
+    case 'url':
+    case 'legal':
+    case 'nps':
+      return 'core-fields';
     case 'contact_info':
       return 'contact-info';
     case 'address':

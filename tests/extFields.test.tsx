@@ -62,11 +62,16 @@ describe('registry', () => {
     expect(extFieldKey({ ...scale, display: 'stars' })).toBe('scale-styled');
     expect(extFieldKey({ ...scale, display: 'emoji' })).toBe('scale-styled');
     expect(extFieldKey({ ...scale, display: 'slider' })).toBe('scale-styled');
-    expect(extFieldKey({ id: 'n', type: 'number', title: 'N' })).toBeNull();
+    expect(extFieldKey({ id: 'n', type: 'number', title: 'N' })).toBe('core-fields');
+    expect(extFieldKey({ id: 'u', type: 'url', title: 'U' })).toBe('core-fields');
     expect(extFieldKey({ id: 'n', type: 'number', title: 'N', display: 'stepper' })).toBe(
       'number-stepper',
     );
-    expect(extFieldKey({ id: 'd', type: 'date', title: 'D' })).toBeNull();
+    // The plain date, phone, legal and NPS load on demand too (ADR-065).
+    expect(extFieldKey({ id: 'd', type: 'date', title: 'D' })).toBe('core-fields');
+    expect(extFieldKey({ id: 'p', type: 'phone', title: 'P' })).toBe('core-fields');
+    expect(extFieldKey({ id: 'l', type: 'legal', title: 'L' })).toBe('core-fields');
+    expect(extFieldKey({ id: 'n', type: 'nps', title: 'N' })).toBe('core-fields');
     expect(extFieldKey({ id: 'd', type: 'date', title: 'D', range: true })).toBe('date-extended');
     expect(extFieldKey({ id: 'd', type: 'date', title: 'D', includeTime: true })).toBe(
       'date-extended',
@@ -300,8 +305,8 @@ describe('number stepper', () => {
   });
 });
 
-describe('plain number with prefix and unit (core field)', () => {
-  it('shows the adornments; the answer stays a number', () => {
+describe('plain number with prefix and unit (on demand since ADR-065)', () => {
+  it('shows the adornments; the answer stays a number', async () => {
     const { setAnswer } = renderField({
       id: 'area',
       type: 'number',
@@ -309,7 +314,7 @@ describe('plain number with prefix and unit (core field)', () => {
       prefix: '~',
       unit: 'sq ft',
     });
-    const box = screen.getByRole('textbox');
+    const box = await screen.findByRole('textbox');
     expect(screen.getByText('sq ft')).toBeInTheDocument();
     expect(box).toHaveAccessibleDescription('sq ft');
     fireEvent.change(box, { target: { value: '1800' } });

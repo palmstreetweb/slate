@@ -125,9 +125,10 @@ describe('question types render', () => {
     expect(container).toMatchSnapshot();
   });
 
-  it('phone', () => {
+  // Phone, the plain date, legal and NPS load on demand (ADR-065): wait for the field.
+  it('phone', async () => {
     const { container } = renderQuestion({ id: 'phone', type: 'phone', title: 'Phone?' });
-    expect(screen.getByRole('textbox')).toHaveAttribute('type', 'tel');
+    expect(await screen.findByRole('textbox')).toHaveAttribute('type', 'tel');
     expect(container).toMatchSnapshot();
   });
 
@@ -198,9 +199,9 @@ describe('question types render', () => {
     expect(container).toMatchSnapshot();
   });
 
-  it('date', () => {
+  it('date', async () => {
     const { container } = renderQuestion({ id: 'when', type: 'date', title: 'When?' });
-    expect(screen.getByLabelText('Month')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Month')).toBeInTheDocument();
     expect(screen.getByLabelText('Day')).toBeInTheDocument();
     expect(screen.getByLabelText('Year')).toBeInTheDocument();
     expect(container).toMatchSnapshot();
@@ -228,21 +229,21 @@ describe('question types render', () => {
     expect(container).toMatchSnapshot();
   });
 
-  it('legal', () => {
+  it('legal', async () => {
     const { container } = renderQuestion({
       id: 'terms',
       type: 'legal',
       title: 'Accept terms?',
       body: 'The fine print.',
     });
-    expect(screen.getByRole('radio', { name: /i accept/i })).toBeInTheDocument();
+    expect(await screen.findByRole('radio', { name: /i accept/i })).toBeInTheDocument();
     expect(screen.getByText('The fine print.')).toBeInTheDocument();
     expect(container).toMatchSnapshot();
   });
 
-  it('nps', () => {
+  it('nps', async () => {
     const { container } = renderQuestion({ id: 'rec', type: 'nps', title: 'Recommend us?' });
-    expect(screen.getAllByRole('radio')).toHaveLength(11);
+    expect(await screen.findAllByRole('radio')).toHaveLength(11);
     expect(screen.getByText('Not at all likely')).toBeInTheDocument();
     expect(screen.getByText('Extremely likely')).toBeInTheDocument();
     expect(container).toMatchSnapshot();

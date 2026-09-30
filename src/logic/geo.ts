@@ -139,10 +139,6 @@ export function locationAnswerCore(
 
 /* ---------- engine-only helpers ---------- */
 
-/** The default privacy line on a location question. */
-export const LOCATION_PRIVACY_DEFAULT =
-  'We only use this to check that you’re in our service area. It’s saved rounded to about 100 m.';
-
 /** True when a location question can say in / out of a radius. */
 export function hasGeoArea(q: { center?: unknown; radius?: unknown; radiusUnit?: unknown }): boolean {
   return geoCenter(q as GeoRecord) !== null && geoRadiusKm(q as GeoRecord) !== null;
@@ -156,22 +152,4 @@ export function locationStatus(
 ): 'in' | 'out' | null {
   const a = locationAnswerCore(q, answer, zipAreas)?.area;
   return a === 'in' || a === 'out' ? a : null;
-}
-
-/** Distance from the center to a stored location, in the question's unit; null when unknown. */
-export function locationDistance(q: GeoRecord, answer: unknown): number | null {
-  const c = geoCenter(q);
-  if (!c || !isGeoRecord(answer)) return null;
-  const lat = roundCoord(answer.lat, 90);
-  const lng = roundCoord(answer.lng, 180);
-  if (lat === null || lng === null) return null;
-  const km = distanceKm(c.lat, c.lng, Number(lat), Number(lng));
-  return q.radiusUnit === 'km' ? km : km / KM_PER_MI;
-}
-
-/** "4.2 mi" / "12 km" — one decimal under 10. */
-export function formatDistance(n: number, unit: unknown): string {
-  const u = unit === 'km' ? 'km' : 'mi';
-  const v = n < 10 ? Math.round(n * 10) / 10 : Math.round(n);
-  return `${v} ${u}`;
 }

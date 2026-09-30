@@ -25,16 +25,10 @@ import { ThanksScreen } from './ThanksScreen.js';
 import { ShortTextField } from './ShortTextField.js';
 import { LongTextField } from './LongTextField.js';
 import { EmailField } from './EmailField.js';
-import { PhoneField } from './PhoneField.js';
-import { UrlField } from './UrlField.js';
-import { NumberField } from './NumberField.js';
-import { DateField } from './DateField.js';
 import { ScaleField } from './ScaleField.js';
-import { NpsField } from './NpsField.js';
 import { SingleChoiceField } from './SingleChoiceField.js';
 import { MultiChoiceField } from './MultiChoiceField.js';
 import { YesNoField } from './YesNoField.js';
-import { LegalField } from './LegalField.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import type { FileUploadMeta } from '@/utils/fileUploadRef.js';
 import { ExtField, extFieldKey } from './lazyFields.js';
@@ -260,65 +254,6 @@ export function QuestionRenderer({
         </>
       );
 
-    case 'phone':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <PhoneField
-            question={question}
-            answers={answers}
-            initialValue={(answers[question.id] as string | undefined) ?? ''}
-            onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advanceWithSound}
-            onType={playTypingSound}
-          />
-        </>
-      );
-
-    case 'url':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <UrlField
-            question={question}
-            answers={answers}
-            initialValue={(answers[question.id] as string | undefined) ?? ''}
-            onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advanceWithSound}
-            onType={playTypingSound}
-          />
-        </>
-      );
-
-    case 'date':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <DateField
-            question={question}
-            answers={answers}
-            initialValue={(answers[question.id] as string | undefined) ?? ''}
-            onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advanceWithSound}
-          />
-        </>
-      );
-
-    case 'number':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <NumberField
-            question={question}
-            answers={answers}
-            initialValue={answers[question.id] as number | undefined}
-            onAnswer={(v) => setAnswer(question.id, v)}
-            onAdvance={advanceWithSound}
-            onType={playTypingSound}
-          />
-        </>
-      );
-
     case 'scale':
       return (
         <>
@@ -377,34 +312,13 @@ export function QuestionRenderer({
         </>
       );
 
-    case 'legal':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <LegalField
-            question={question}
-            answers={answers}
-            selected={answers[question.id] as string | undefined}
-            onSelect={(v) => selectAndAdvance(question.id, v)}
-          />
-        </>
-      );
-
-    case 'nps':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <NpsField
-            question={question}
-            answers={answers}
-            initialValue={answers[question.id] as number | undefined}
-            onAnswer={(v) => selectScaleAndAdvance(question.id, v)}
-          />
-        </>
-      );
-
-    // Always on demand (extFieldKey above); listed so the switch stays total.
     case 'dropdown':
+    case 'url':
+    case 'number':
+    case 'date':
+    case 'phone':
+    case 'legal':
+    case 'nps':
     case 'image_pin':
     case 'voice_note':
     case 'location':

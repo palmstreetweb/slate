@@ -17,15 +17,13 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSPrope
 import type { LocationQuestion } from '@/types/Question.js';
 import { validate } from '@/logic/validation.js';
 import {
-  LOCATION_PRIVACY_DEFAULT,
   PLACE_TYPED_MAX,
   formZipAreas,
-  formatDistance,
   geoCenter,
   geoRadiusKm,
   locationAnswerCore,
-  locationDistance,
 } from '@/logic/geo.js';
+import { LOCATION_PRIVACY_DEFAULT, formatDistance, locationDistance } from '@/logic/geoText.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { shakeInvalid } from '@/utils/motion.js';

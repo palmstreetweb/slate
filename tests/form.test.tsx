@@ -183,7 +183,8 @@ describe('<Form> — dynamic titles', () => {
     await user.click(screen.getByRole('button', { name: /ok/i }));
     expect(await screen.findByText('How many square feet, Caleb?')).toBeInTheDocument();
 
-    await user.type(screen.getByRole('textbox'), '1200');
+    // The number field loads on demand (ADR-065).
+    await user.type(await screen.findByRole('textbox'), '1200');
     await user.click(screen.getByRole('button', { name: /ok/i }));
     expect(await screen.findByText('Caleb, how urgent?')).toBeInTheDocument();
   });

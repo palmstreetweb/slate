@@ -27,12 +27,11 @@ import {
 import {
   distanceKm,
   formZipAreas,
-  formatDistance,
   hasGeoArea,
   locationAnswerCore,
-  locationDistance,
   roundCoord,
 } from '@/logic/geo.js';
+import { formatDistance, locationDistance } from '@/logic/geoText.js';
 import {
   availabilityAnswerCore,
   availabilityGrid,
