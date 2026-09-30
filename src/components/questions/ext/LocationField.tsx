@@ -1,14 +1,16 @@
 /**
  * "Use my location" (ADR-065), loaded on demand. One tap asks the browser for
- * the respondent's position — never on load — and the answer keeps it rounded
- * to 3 decimals (about 100 m), with whether it is inside the owner's radius.
- * The server recomputes that from the published form, so it can't be forged,
- * and conditions can route on it (`IN_AREA_VALUE` / `OUT_OF_AREA_VALUE`).
+ * the respondent's position — never on load — and the answer carries it
+ * rounded to 3 decimals (about 100 m), with whether it is inside the owner's
+ * radius. The server recomputes that from the published form, so it can't be
+ * forged, and conditions can route on it (`IN_AREA_VALUE` / `OUT_OF_AREA_VALUE`).
+ * By default the server then keeps only the verdict (ADR-068).
  *
  * A small radar shows the answer: the service area is the ring, the business
- * the middle, the respondent a dot. The privacy line is always on screen.
- * When location is off or unavailable: type a ZIP code (checked against the
- * form's address service areas) or, without any, the town.
+ * the middle, the respondent a dot. The privacy line — the owner's note and
+ * what is actually saved — is always on screen. When location is off or
+ * unavailable: type a ZIP code (checked against the form's address service
+ * areas) or, without any, the town.
  */
 
 'use client';
@@ -32,7 +34,7 @@ import {
   geoRadiusKm,
   locationAnswerCore,
 } from '@/logic/geo.js';
-import { LOCATION_PRIVACY_DEFAULT, formatDistance, locationDistance } from '@/logic/geoText.js';
+import { formatDistance, locationDistance, locationPrivacyLine } from '@/logic/geoText.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { shakeInvalid } from '@/utils/motion.js';
@@ -339,7 +341,7 @@ export default function LocationField({
           )}
 
           <p id={noteId} className="slate-loc-privacy">
-            {question.privacyNote?.trim() || LOCATION_PRIVACY_DEFAULT}
+            {locationPrivacyLine(question)}
           </p>
         </div>
       </div>

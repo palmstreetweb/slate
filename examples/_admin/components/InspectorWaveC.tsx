@@ -17,7 +17,7 @@ import type {
   YesNoQuestion,
 } from '@/index.js';
 import { PINS_MAX } from '@/logic/pins.js';
-import { LOCATION_PRIVACY_DEFAULT } from '@/logic/geoText.js';
+import { LOCATION_SAVES_VERDICT } from '@/logic/geoText.js';
 import {
   VOICE_SECONDS_MAX,
   VOICE_SECONDS_MIN,
@@ -450,7 +450,7 @@ export function LocationSettings({
           rows={2}
           maxLength={300}
           value={question.privacyNote ?? ''}
-          placeholder={LOCATION_PRIVACY_DEFAULT}
+          placeholder={LOCATION_SAVES_VERDICT}
           onChange={(e) =>
             onChange({ privacyNote: e.target.value || undefined } as Partial<Question>)
           }

@@ -7,7 +7,7 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useRef } from 'react';
 import { Form, defineSchema, OUT_OF_AREA_VALUE } from '@/index.js';
 import type { Question } from '@/index.js';
@@ -480,7 +480,10 @@ describe('location', () => {
   it('asks only on tap; stores rounded coordinates and in / out of the radius', async () => {
     const get = stubGeo({ lat: 34.44123, lng: -119.81234 });
     const { setAnswer, advance } = renderField(q);
-    expect(await screen.findByText(/only use this to check/i)).toBeInTheDocument();
+    // By default only the verdict is saved, and the page says so (ADR-068).
+    expect(
+      await screen.findByText('We only save whether you’re in the service area.'),
+    ).toBeInTheDocument();
     expect(get).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Use my location' }));
     expect(get).toHaveBeenCalledTimes(1);
@@ -488,6 +491,28 @@ describe('location', () => {
     expect(screen.getByText('You’re in our service area.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(advance).toHaveBeenCalled();
+  });
+
+  it('says what is saved: the verdict, or the approximate location when the owner keeps it', async () => {
+    renderField({ ...q, privacyNote: 'We use this to plan the visit' });
+    // The owner's note comes first; what is saved is always said, whatever the note says.
+    const line = await screen.findByText(/^We use this to plan the visit\. We only save whether/);
+    expect(line).toHaveTextContent(
+      'We use this to plan the visit. We only save whether you’re in the service area.',
+    );
+    expect(screen.getByRole('group')).toHaveAccessibleDescription(line.textContent!);
+    cleanup();
+    stubGeo({ lat: 34.44123, lng: -119.81234 });
+    const { setAnswer } = renderField({ ...q, keepLocation: true });
+    expect(
+      await screen.findByText(
+        'Your approximate location (about 110 m) is shared with this business.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/only save whether/)).toBeNull();
+    // Either way the page sends the rounded position, so the server can check the verdict.
+    fireEvent.click(screen.getByRole('button', { name: 'Use my location' }));
+    expect(lastAnswer(setAnswer)).toEqual({ lat: '34.441', lng: '-119.812', area: 'in' });
   });
 
   it('outside the radius says so', async () => {
