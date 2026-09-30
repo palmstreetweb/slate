@@ -343,7 +343,9 @@ describe('Wave C validation', () => {
     const q: Question = { id: 'a', type: 'availability', title: 'T', required: true };
     expect(validate(q, undefined)?.code).toBe('required');
     expect(validate(q, { mon: '09:00-10:00' })).toBeNull();
-    expect(validate(q, { mon: '09:30-10:00' })?.code).toBe('shape');
+    // Shape only in the engine; the grid itself is enforced by the server's re-encode.
+    expect(validate(q, { mon: 'mornings' })?.code).toBe('shape');
+    expect(validate(q, { mon: '' })?.code).toBe('required');
     expect(validate({ ...q, required: false } as Question, {})).toBeNull();
   });
 });
@@ -356,7 +358,7 @@ describe('Wave C piping', () => {
     expect(formatAnswerFor(loc, { lat: '1.000', lng: '2.000' })).toBe('');
     expect(formatAnswerFor(loc, { zip: '93101' })).toBe('93101');
     const week: Question = { id: 'w', type: 'availability', title: 'T', days: ['tue'] };
-    expect(formatAnswerFor(week, { tue: '09:00-11:00' })).toBe('Tue 9–11 AM');
+    expect(formatAnswerFor(week, { tue: '09:00-11:00,14:00-15:00' })).toBe('Tue 09:00–11:00, 14:00–15:00');
     const pin: Question = { id: 'p', type: 'image_pin', title: 'T' };
     expect(formatAnswerFor(pin, { pins: ['0.1,0.1'], notes: ['here'] })).toBe('1 spot: here');
   });

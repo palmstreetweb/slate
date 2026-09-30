@@ -18,7 +18,6 @@ import { formatDateAnswer } from './dateValue.js';
 import { formatAddress } from './address.js';
 import { signaturePathOf, signatureTypedOf } from './signature.js';
 import { formatPins } from './pins.js';
-import { formatAvailability } from './availability.js';
 import { formatPhotoCount, formatVoiceNote } from './media.js';
 
 const PIPE_RE = /\{\{\s*(score|estimate|field:[\w-]+)\s*\}\}/g;
@@ -107,8 +106,16 @@ export function formatAnswerFor(q: Question | undefined, v: unknown): string {
     }
     case 'photo_checklist':
       return formatPhotoCount(q, v);
-    case 'availability':
-      return formatAvailability(q as unknown as Record<string, unknown>, v);
+    case 'availability': {
+      // Compact on purpose (the engine budget): "Mon 09:00–11:30, 14:00–16:00; Wed …".
+      // Responses read the answer in full with `formatAvailability`.
+      if (typeof v !== 'object' || Array.isArray(v)) return formatAnswer(v);
+      const a = v as Record<string, unknown>;
+      return (q.days?.length ? q.days : Object.keys(a))
+        .filter((d) => typeof a[d] === 'string' && a[d] !== '')
+        .map((d) => `${d[0]!.toUpperCase()}${d.slice(1)} ${(a[d] as string).replace(/,/g, ', ').replace(/-/g, '–')}`)
+        .join('; ');
+    }
     default:
       return formatAnswer(v);
   }

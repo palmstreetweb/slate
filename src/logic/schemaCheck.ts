@@ -13,7 +13,6 @@ import { OTHER_VALUE, allowsOther } from './other.js';
 import { canPrefill, isValidPrefillKey } from './prefill.js';
 import { IN_AREA_VALUE, OUT_OF_AREA_VALUE, checksArea, serviceAreaPrefixes } from './address.js';
 import { geoCenter, geoRadiusKm } from './geo.js';
-import { SLOT_MINUTES, WEEKDAY_KEYS, clockMinutes } from './availability.js';
 import { safeImageSrc, PIN_IMAGE_DATA_MAX } from '@/utils/brandLogo.js';
 import { contactShown } from './contact.js';
 import { PRICE_MAX } from './estimate.js';
@@ -181,16 +180,18 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
       });
     }
     if (q.type === 'availability') {
-      const days = q.days ?? [];
-      const start = q.startTime === undefined ? 480 : clockMinutes(q.startTime);
-      const end = q.endTime === undefined ? 1080 : clockMinutes(q.endTime);
+      // Mirrors logic/availability.ts (kept out of the engine's core, ADR-065).
+      const mins = (t: string | undefined, d: number) => {
+        if (t === undefined) return d;
+        const m = /^(\d{2}):(\d{2})$/.exec(t);
+        const v = m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
+        return m && Number(m[2]) < 60 && v <= 1440 ? v : NaN;
+      };
       const slot = q.slotMinutes ?? 60;
       if (
-        days.some((d) => !(WEEKDAY_KEYS as readonly string[]).includes(d)) ||
-        start === null ||
-        end === null ||
-        !(SLOT_MINUTES as readonly number[]).includes(slot) ||
-        end - start < slot
+        (q.days ?? []).some((d) => !'mon tue wed thu fri sat sun'.split(' ').includes(d)) ||
+        ![15, 30, 60, 120].includes(slot) ||
+        !(mins(q.endTime, 1080) - mins(q.startTime, 480) >= slot)
       ) {
         issues.push({
           questionId: q.id,

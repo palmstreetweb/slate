@@ -19,7 +19,6 @@ import {
 } from './signature.js';
 import { PIN_NOTE_MAX, parsePin, pinLimit } from './pins.js';
 import { locationAnswerCore } from './geo.js';
-import { availabilityGrid, decodeAvailability } from './availability.js';
 import {
   VOICE_TYPED_MAX,
   photosTaken,
@@ -36,6 +35,9 @@ export type ValidationResult = ValidationError | null;
 
 /** RFC-lite email regex per brief §5. */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Availability ranges (ADR-065): `HH:MM-HH:MM`, comma separated. */
+const RANGES_RE = /^\d{2}:\d{2}-\d{2}:\d{2}(,\d{2}:\d{2}-\d{2}:\d{2})*$/;
 
 /** Loose website check — scheme optional, needs a host with a dot. */
 const URL_RE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i;
@@ -466,16 +468,19 @@ export function validate(question: Question, answer: unknown): ValidationResult 
     }
 
     case 'availability': {
-      const blank =
-        answer === undefined ||
-        answer === null ||
-        (isRecord(answer) && Object.keys(answer).length === 0);
-      const picked = blank ? 0 : decodeAvailability(availabilityGrid(question), answer).size;
-      if (blank || picked === 0) {
-        if (!blank && isRecord(answer) && Object.values(answer).some((v) => !isBlankString(v))) {
-          return { code: 'shape', message: 'Those times didn’t come through. Paint them again.' };
-        }
+      // Shape only: the grid field writes canonical ranges, and the server
+      // re-encodes every answer against the published grid (ADR-065).
+      const days = isRecord(answer)
+        ? Object.values(answer).filter((v) => !isBlankString(v))
+        : [];
+      if (answer !== undefined && answer !== null && !isRecord(answer)) {
+        return { code: 'shape', message: 'Those times didn’t come through. Paint them again.' };
+      }
+      if (days.length === 0) {
         return question.required ? { code: 'required', message: 'Paint at least one time you’re free' } : null;
+      }
+      if (days.some((v) => typeof v !== 'string' || !RANGES_RE.test(v))) {
+        return { code: 'shape', message: 'Those times didn’t come through. Paint them again.' };
       }
       return null;
     }
