@@ -11,13 +11,18 @@
 --      bound to exactly that Content-Length), the type, when, and the response that claimed it. A row is
 --      'pending' until a response claims it, 'claimed' while that response exists, and 'doomed' once the
 --      response or form is permanently deleted, until the sweep deletes the object and the row.
---   2. The per-owner quota: an owner's claimed bytes plus pending bytes younger than 24 h stay at or
---      under storage_quota_limit() (1 GiB), with at most storage_pending_limit() (5,000) pending uploads.
---      reserve_upload checks and records a sign under a per-owner advisory lock (87123004), so N
---      concurrent signs against a nearly full quota store exactly what fits. storage_global_limit()
---      (100 GiB) caps the whole bucket against a total the sweep gate refreshes (about a minute stale).
---      Doomed bytes stop counting against the owner at once, and count toward the global total until
---      the object is gone.
+--   2. The per-owner quota: an owner's claimed bytes plus pending bytes younger than
+--      storage_pending_count_window() (2 h) stay at or under storage_quota_for(owner) — an override from
+--      storage_quota_overrides, else storage_quota_limit() (1 GiB) — with at most storage_pending_limit()
+--      (5,000) pending uploads. One network's counted pending bytes for an owner stay under
+--      storage_net_share_limit(quota) (half the quota: 512 MiB), requests with no client IP together under
+--      storage_net_share_noip_limit() (32 MiB); the network is a hash of the rate gate's IP key, kept only
+--      while the upload is unclaimed. reserve_upload checks and records a sign under a per-owner advisory
+--      lock (87123004), so N concurrent signs against a nearly full quota or share store exactly what
+--      fits. storage_global_limit() (100 GiB) caps the whole bucket against a total the sweep gate
+--      refreshes (about a minute stale). Doomed bytes stop counting against the owner at once, and count
+--      toward the global total until the object is gone. A pending upload past the 2 h window can still be
+--      claimed until 24 h, but only if the owner has room for it again.
 --   3. Claims. insert_public_submission gains a 6-argument form for the submit Function: every file key
 --      the answers reference must be this form's, minted for that question (or a legacy row with no
 --      question), and pending and younger than 24 h, or already claimed by this same response. Anything
@@ -44,9 +49,11 @@
 --      reference a key with no row at all if it sits under the form's own prefix (claimed with its bytes
 --      unknown until the sweep checks it), so a respondent who loaded the page before the deploy can finish.
 --   8. submissions.submit_key: see 3.
+--   9. storage_quota_overrides: one account's own quota for a big event (the one-liner is at the table).
 --
 -- Nothing is granted to the Data API roles except storage_quota_status (authenticated; it reads only the
--- caller's rows). form_uploads and storage_sweep_state have RLS forced and no Data API grants.
+-- caller's rows). form_uploads, storage_sweep_state and storage_quota_overrides have RLS forced and no Data
+-- API grants.
 -- Advisory lock keys: 87123001 form quota (010), 87123002 AI quota (014) + slug lock (015), 87123003
 -- response cap (019) + sign-up slots (020), 87123004 storage quota (here — one lock per owner).
 begin;
@@ -64,8 +71,25 @@ returns integer language sql immutable as $fn$ select 5000 $fn$; -- uploads awai
 create or replace function public.storage_global_limit()
 returns bigint language sql immutable as $fn$ select 107374182400::bigint $fn$; -- 100 GiB, whole bucket
 
+-- How long an unclaimed upload may still be claimed by a response; the sweep deletes it after this.
 create or replace function public.storage_pending_ttl()
 returns interval language sql immutable as $fn$ select interval '24 hours' $fn$;
+
+-- How long an unclaimed upload counts against its owner's quota, their per-network shares and the bucket
+-- ceiling. A fill with uploads takes minutes; an attacker's uploads stop blocking the owner this long
+-- after the last one.
+create or replace function public.storage_pending_count_window()
+returns interval language sql immutable as $fn$ select interval '2 hours' $fn$;
+
+-- One network's share of an owner's counted unclaimed bytes (the IP key the rate gate uses): half the
+-- owner's quota, so 512 MiB at 1 GiB, and it grows with an override. A full share refuses only that
+-- network.
+create or replace function public.storage_net_share_limit(p_quota bigint)
+returns bigint language sql immutable as $fn$ select greatest(p_quota / 2, 1) $fn$;
+
+-- The share of every request without a client IP together (017's no-IP rule).
+create or replace function public.storage_net_share_noip_limit()
+returns bigint language sql immutable as $fn$ select 33554432::bigint $fn$; -- 32 MiB
 
 -- Fixed the first time 021 runs (re-applying keeps it). Extend or end it early with create or replace.
 do $do$
@@ -106,6 +130,10 @@ create table if not exists public.form_uploads (
   lease_until timestamptz,
   -- When its response or form was permanently deleted.
   doomed_at timestamptz,
+  -- The network a public upload was signed from, while it is unclaimed: 'noip', or a SHA-256 of the
+  -- rate gate's IP key (never the address itself). Cleared when the upload is claimed or doomed.
+  net_key text,
+  constraint form_uploads_net_key check (net_key is null or char_length(net_key) between 1 and 64),
   constraint form_uploads_key_shape check (
     key ~ '^(public|draft)/[A-Za-z0-9_-]{4,64}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[^/]{1,120}$'
   ),
@@ -121,6 +149,10 @@ create table if not exists public.form_uploads (
   constraint form_uploads_claimed check (state <> 'claimed' or submission_id is not null)
 );
 
+-- Columns added after the first draft of 021 (only throwaway branches ever ran that).
+alter table public.form_uploads add column if not exists doomed_at timestamptz;
+alter table public.form_uploads add column if not exists net_key text;
+
 -- The quota sum: an index-only scan over the owner's live rows.
 create index if not exists form_uploads_owner_live_idx
   on public.form_uploads (owner_id, state, created_at) include (bytes) where state <> 'doomed';
@@ -133,6 +165,10 @@ create index if not exists form_uploads_pending_age_idx
   on public.form_uploads (created_at) where state = 'pending';
 create index if not exists form_uploads_unverified_idx
   on public.form_uploads (created_at) where verified_at is null and state <> 'doomed';
+-- The per-network share sum: an index-only scan over one owner's unclaimed rows from one network.
+create index if not exists form_uploads_net_idx
+  on public.form_uploads (owner_id, net_key, created_at) include (bytes)
+  where state = 'pending' and net_key is not null;
 
 alter table public.form_uploads enable row level security;
 alter table public.form_uploads force row level security;
@@ -163,6 +199,41 @@ drop policy if exists storage_sweep_state_owner_role_all on public.storage_sweep
 create policy storage_sweep_state_owner_role_all on public.storage_sweep_state
   for all to neondb_owner using (true) with check (true);
 
+-- One account's own quota, for a big event (or to hold one back). Set by the database owner only:
+--   insert into public.storage_quota_overrides (owner_id, bytes, note)
+--   values ('<owner id>', 5::bigint * 1024 * 1024 * 1024, 'Spring fair 2026')   -- 5 GiB
+--   on conflict (owner_id) do update set bytes = excluded.bytes, note = excluded.note, updated_at = now();
+-- and delete the row to go back to storage_quota_limit(). The studio meter shows the effective limit.
+create table if not exists public.storage_quota_overrides (
+  owner_id text primary key,
+  bytes bigint not null,
+  note text,
+  updated_at timestamptz not null default now(),
+  constraint storage_quota_overrides_bytes check (bytes between 1048576 and 1099511627776), -- 1 MiB..1 TiB
+  constraint storage_quota_overrides_note check (note is null or char_length(note) <= 200)
+);
+
+alter table public.storage_quota_overrides enable row level security;
+alter table public.storage_quota_overrides force row level security;
+revoke all on table public.storage_quota_overrides from public;
+do $$ begin
+  revoke all on table public.storage_quota_overrides from anonymous, authenticated;
+exception when undefined_object then null; end $$;
+drop policy if exists storage_quota_overrides_owner_role_all on public.storage_quota_overrides;
+create policy storage_quota_overrides_owner_role_all on public.storage_quota_overrides
+  for all to neondb_owner using (true) with check (true);
+
+-- An owner's effective quota: their override, else storage_quota_limit().
+create or replace function public.storage_quota_for(p_owner text)
+returns bigint
+language sql stable security definer
+set search_path = public, pg_temp
+as $fn$
+  select coalesce(
+    (select o.bytes from public.storage_quota_overrides o where o.owner_id = p_owner),
+    public.storage_quota_limit());
+$fn$;
+
 -- A retried submit returns the response it already stored (3).
 alter table public.submissions add column if not exists submit_key uuid;
 create unique index if not exists submissions_submit_key_uidx
@@ -171,27 +242,36 @@ create unique index if not exists submissions_submit_key_uidx
 -- ---------------------------------------------------------------------------
 -- 2. Reserve: the quota check and the row, in one statement per sign.
 -- ---------------------------------------------------------------------------
--- Outcomes: ok | quota (the owner's bytes) | pending (too many unclaimed uploads) | global (the bucket
--- ceiling) | exists (a legacy path that is already taken) | legacy_closed (an old page past the grace).
+-- Outcomes: ok | quota (the owner's bytes) | network (this network's share of them) | pending (too many
+-- unclaimed uploads) | global (the bucket ceiling) | exists (a legacy path that is already taken) |
+-- legacy_closed (an old page past the grace).
+-- p_net_key: the network a respondent signs from ('noip', or a hash of the rate gate's IP key); null for
+-- the owner's own studio uploads, which have no share.
 -- sweep_due: this caller claimed the sweep gate and should run one batch (storage_sweep_begin).
+-- (An earlier draft of 021 had no network; drop it so a branch that ran it keeps one version.)
+drop function if exists public.reserve_upload(text, text, text, text, bigint, text, boolean);
 create or replace function public.reserve_upload(
   p_key text, p_owner text, p_form_id text, p_question text, p_bytes bigint, p_type text,
-  p_legacy boolean)
+  p_legacy boolean, p_net_key text)
 returns table (outcome text, used_bytes bigint, max_bytes bigint, sweep_due boolean)
 language plpgsql volatile security definer set search_path = public, pg_temp
 as $fn$
 declare
   v_used bigint;
   v_pending integer;
-  v_max bigint := public.storage_quota_limit();
+  v_net bigint;
+  v_share bigint;
+  v_max bigint;
   v_due boolean := false;
   v_global bigint;
 begin
   if p_key is null or p_owner is null or p_owner = '' or p_form_id is null or p_bytes is null
      or p_bytes < 1 or p_bytes > 1073741824 or p_type is null or p_legacy is null
-     or split_part(p_key, '/', 2) <> p_form_id then
+     or split_part(p_key, '/', 2) <> p_form_id
+     or (p_net_key is not null and char_length(p_net_key) not between 1 and 64) then
     raise exception 'reserve_upload: bad arguments' using errcode = '22023';
   end if;
+  v_max := public.storage_quota_for(p_owner);
 
   if p_legacy and now() >= public.storage_legacy_until() then
     return query select 'legacy_closed'::text, null::bigint, v_max, false;
@@ -202,7 +282,10 @@ begin
   -- SKIP LOCKED, so the other signs at that moment neither wait for the gate nor for the recount.
   update public.storage_sweep_state s
      set next_run_at = now() + interval '55 seconds',
-         global_bytes = (select coalesce(sum(u.bytes), 0) from public.form_uploads u),
+         -- Everything that may be in the bucket, but an unclaimed upload only for its counting window.
+         global_bytes = (select coalesce(sum(u.bytes), 0) from public.form_uploads u
+                          where u.state <> 'pending'
+                             or u.created_at > now() - public.storage_pending_count_window()),
          global_at = now()
    where s.id = (select g.id from public.storage_sweep_state g
                   where g.id = 1 and g.next_run_at <= now()
@@ -210,7 +293,7 @@ begin
   v_due := found;
   select s.global_bytes into v_global from public.storage_sweep_state s where s.id = 1;
 
-  -- One sign at a time per owner: the sum below and the insert are exact under concurrency.
+  -- One sign at a time per owner: the sums below and the insert are exact under concurrency.
   perform pg_advisory_xact_lock(87123004, hashtext(p_owner));
 
   select coalesce(sum(u.bytes), 0)::bigint,
@@ -219,11 +302,25 @@ begin
     from public.form_uploads u
    where u.owner_id = p_owner
      and (u.state = 'claimed'
-          or (u.state = 'pending' and u.created_at > now() - public.storage_pending_ttl()));
+          or (u.state = 'pending'
+              and u.created_at > now() - public.storage_pending_count_window()));
 
   if v_used + p_bytes > v_max then
     return query select 'quota'::text, v_used, v_max, v_due;
     return;
+  end if;
+  -- One network's unclaimed bytes for this owner: a flood from one place can't fill the whole quota.
+  if p_net_key is not null then
+    select coalesce(sum(u.bytes), 0)::bigint into v_net
+      from public.form_uploads u
+     where u.owner_id = p_owner and u.state = 'pending' and u.net_key = p_net_key
+       and u.created_at > now() - public.storage_pending_count_window();
+    v_share := case when p_net_key = 'noip' then public.storage_net_share_noip_limit()
+                    else public.storage_net_share_limit(v_max) end;
+    if v_net + p_bytes > v_share then
+      return query select 'network'::text, v_used, v_max, v_due;
+      return;
+    end if;
   end if;
   if v_pending >= public.storage_pending_limit() then
     return query select 'pending'::text, v_used, v_max, v_due;
@@ -235,10 +332,10 @@ begin
   end if;
 
   insert into public.form_uploads
-    (key, owner_id, form_id, question_id, scope, bytes, content_type, legacy)
+    (key, owner_id, form_id, question_id, scope, bytes, content_type, legacy, net_key)
   values
     (p_key, p_owner, p_form_id, nullif(p_question, ''), split_part(p_key, '/', 1), p_bytes,
-     left(p_type, 255), p_legacy)
+     left(p_type, 255), p_legacy, p_net_key)
   on conflict (key) do nothing;
   if not found then
     return query select 'exists'::text, v_used, v_max, v_due;
@@ -286,7 +383,7 @@ begin
     end if;
   end if;
   update public.form_uploads u
-     set state = 'claimed', submission_id = new.id, claimed_at = now(),
+     set state = 'claimed', submission_id = new.id, claimed_at = now(), net_key = null,
          verified_at = case when u.state = 'doomed' then null else u.verified_at end,
          doomed_at = null
    where u.key in (select public.upload_keys_of(new.answers))
@@ -313,7 +410,7 @@ set search_path = public, pg_temp
 as $fn$
 begin
   update public.form_uploads u
-     set state = 'doomed', lease_until = null, doomed_at = now()
+     set state = 'doomed', lease_until = null, doomed_at = now(), net_key = null
    where u.submission_id = old.id and u.state = 'claimed';
   return null;
 end;
@@ -332,7 +429,7 @@ set search_path = public, pg_temp
 as $fn$
 begin
   update public.form_uploads u
-     set state = 'doomed', lease_until = null, doomed_at = now()
+     set state = 'doomed', lease_until = null, doomed_at = now(), net_key = null
    where u.form_id = old.id and u.state <> 'doomed';
   return null;
 end;
@@ -360,6 +457,8 @@ declare
   v_existing text;
   v_owner text;
   v_bad jsonb;
+  v_aged bigint;
+  v_used bigint;
   r record;
 begin
   if p_id is null or p_form_id is null or p_answers is null or p_meta is null or p_files is null
@@ -419,6 +518,35 @@ begin
         (select jsonb_agg(x) from (select x from jsonb_array_elements(v_bad) x limit 50) t),
         null::text;
       return;
+    end if;
+
+    -- An upload past its counting window (a slow fill, or someone waiting it out) counts again once
+    -- claimed: it may only come back if the owner has room, so claims never push past the quota.
+    -- Upload rows are locked above, then the owner (reserve_upload takes only the owner), then the form.
+    select coalesce(sum(u.bytes), 0) into v_aged
+      from public.form_uploads u
+     where u.key in (select e->>'key' from jsonb_array_elements(p_files) e)
+       and u.state = 'pending'
+       and u.created_at <= now() - public.storage_pending_count_window();
+    if v_aged > 0 then
+      perform pg_advisory_xact_lock(87123004, hashtext(v_owner));
+      select coalesce(sum(u.bytes), 0) into v_used
+        from public.form_uploads u
+       where u.owner_id = v_owner
+         and (u.state = 'claimed'
+              or (u.state = 'pending'
+                  and u.created_at > now() - public.storage_pending_count_window()));
+      if v_used + v_aged > public.storage_quota_for(v_owner) then
+        select jsonb_agg(distinct e->>'question') into v_bad
+          from jsonb_array_elements(p_files) e
+          join public.form_uploads u on u.key = e->>'key'
+         where u.state = 'pending'
+           and u.created_at <= now() - public.storage_pending_count_window();
+        return query select 'bad_files'::text, null::text, null::jsonb, null::jsonb,
+          (select jsonb_agg(x) from (select x from jsonb_array_elements(v_bad) x limit 50) t),
+          null::text;
+        return;
+      end if;
     end if;
   end if;
 
@@ -592,15 +720,18 @@ begin
     return query select 0::bigint, public.storage_quota_limit(), 0::bigint, 0;
     return;
   end if;
+  -- What reserve_upload counts: claimed, plus unclaimed within the counting window ("still uploading"),
+  -- against the effective limit (an override, else the default).
   return query
   select coalesce(sum(u.bytes), 0)::bigint,
-         public.storage_quota_limit(),
+         public.storage_quota_for(uid),
          coalesce(sum(u.bytes) filter (where u.state = 'pending'), 0)::bigint,
          count(*)::integer
     from public.form_uploads u
    where u.owner_id = uid
      and (u.state = 'claimed'
-          or (u.state = 'pending' and u.created_at > now() - public.storage_pending_ttl()));
+          or (u.state = 'pending'
+              and u.created_at > now() - public.storage_pending_count_window()));
 end;
 $fn$;
 
@@ -611,8 +742,12 @@ revoke all on function public.storage_quota_limit() from public;
 revoke all on function public.storage_pending_limit() from public;
 revoke all on function public.storage_global_limit() from public;
 revoke all on function public.storage_pending_ttl() from public;
+revoke all on function public.storage_pending_count_window() from public;
+revoke all on function public.storage_net_share_limit(bigint) from public;
+revoke all on function public.storage_net_share_noip_limit() from public;
+revoke all on function public.storage_quota_for(text) from public;
 revoke all on function public.storage_legacy_until() from public;
-revoke all on function public.reserve_upload(text, text, text, text, bigint, text, boolean) from public;
+revoke all on function public.reserve_upload(text, text, text, text, bigint, text, boolean, text) from public;
 revoke all on function public.upload_keys_of(jsonb) from public;
 revoke all on function public.submissions_claim_uploads() from public;
 revoke all on function public.submissions_doom_uploads() from public;
@@ -626,8 +761,12 @@ do $$ begin
   revoke all on function public.storage_pending_limit() from anonymous, authenticated;
   revoke all on function public.storage_global_limit() from anonymous, authenticated;
   revoke all on function public.storage_pending_ttl() from anonymous, authenticated;
+  revoke all on function public.storage_pending_count_window() from anonymous, authenticated;
+  revoke all on function public.storage_net_share_limit(bigint) from anonymous, authenticated;
+  revoke all on function public.storage_net_share_noip_limit() from anonymous, authenticated;
+  revoke all on function public.storage_quota_for(text) from anonymous, authenticated;
   revoke all on function public.storage_legacy_until() from anonymous, authenticated;
-  revoke all on function public.reserve_upload(text, text, text, text, bigint, text, boolean)
+  revoke all on function public.reserve_upload(text, text, text, text, bigint, text, boolean, text)
     from anonymous, authenticated;
   revoke all on function public.upload_keys_of(jsonb) from anonymous, authenticated;
   revoke all on function public.submissions_claim_uploads() from anonymous, authenticated;
@@ -657,16 +796,21 @@ commit;
 --   drop function if exists public.storage_quota_status();
 --   drop function if exists public.storage_sweep_finish(text[], jsonb, boolean);
 --   drop function if exists public.storage_sweep_begin(integer, text);
---   drop function if exists public.reserve_upload(text, text, text, text, bigint, text, boolean);
+--   drop function if exists public.reserve_upload(text, text, text, text, bigint, text, boolean, text);
 --   drop function if exists public.forms_doom_uploads();
 --   drop function if exists public.submissions_doom_uploads();
 --   drop function if exists public.submissions_claim_uploads();
 --   drop function if exists public.upload_keys_of(jsonb);
 --   drop table if exists public.storage_sweep_state;
 --   drop table if exists public.form_uploads;
+--   drop function if exists public.storage_quota_for(text);
+--   drop table if exists public.storage_quota_overrides;
 --   drop index if exists public.submissions_submit_key_uidx;
 --   alter table public.submissions drop column if exists submit_key;
 --   drop function if exists public.storage_legacy_until();
+--   drop function if exists public.storage_net_share_noip_limit();
+--   drop function if exists public.storage_net_share_limit(bigint);
+--   drop function if exists public.storage_pending_count_window();
 --   drop function if exists public.storage_pending_ttl();
 --   drop function if exists public.storage_global_limit();
 --   drop function if exists public.storage_pending_limit();
