@@ -61,7 +61,9 @@ describe('storage numbers and copy', () => {
     const near = storageBannerCopy(q(900 * MB))!;
     expect(near.title).toBe('File storage is almost full');
     expect(near.body).toMatch(/^900 MB of 1 GB used\./);
-    expect(near.body).toMatch(/Permanently delete responses/);
+    expect(near.body).toMatch(
+      /permanently delete responses you don’t need \(responses in Trash count/,
+    );
     const full = storageBannerCopy(q(GB))!;
     expect(full.title).toBe('File storage is full');
     expect(full.body).toContain('This form can’t accept more files right now.');

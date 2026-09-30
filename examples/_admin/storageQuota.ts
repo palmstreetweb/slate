@@ -53,15 +53,15 @@ export function storageBannerCopy(q: StorageQuota): { title: string; body: strin
   const level = storageLevel(q);
   if (level === 'ok') return null;
   const how =
-    'Permanently delete responses you no longer need (and empty their Trash) to make room — Download their files first if you want to keep them.';
+    'To make room, permanently delete responses you don’t need (responses in Trash count until you empty it). Download any files you want to keep first.';
   if (level === 'full') {
     return {
       title: 'File storage is full',
-      body: `Your forms can’t take new files right now: file uploads, voice notes and photos are turned away with “This form can’t accept more files right now.” ${how}`,
+      body: `Your forms can’t take new files: people who add a file, voice note or photo see “This form can’t accept more files right now.” ${how}`,
     };
   }
   return {
     title: 'File storage is almost full',
-    body: `${storageMeterText(q)} used. When it’s full, your forms stop taking new files until you make room. ${how}`,
+    body: `${storageMeterText(q)} used. When it’s full, your forms stop taking new files. ${how}`,
   };
 }
