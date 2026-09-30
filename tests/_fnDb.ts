@@ -73,6 +73,8 @@ export type UploadRow = {
   submission_id: string | null;
   legacy: boolean;
   verified: boolean;
+  /** The network's share key while unclaimed (respondent uploads only). */
+  net_key: string | null;
 };
 
 export type StorageKnobs = {
@@ -80,6 +82,12 @@ export type StorageKnobs = {
   pendingMax: number;
   globalMax: number;
   ttlMs: number;
+  /** storage_pending_count_window(): how long an unclaimed upload counts. */
+  countMs: number;
+  /** storage_net_share_noip_limit(). The share for a network is half the owner's quota. */
+  noipShare: number;
+  /** storage_quota_overrides, by owner. */
+  overrides: Map<string, number>;
   /** storage_legacy_until() is still ahead. */
   legacyOpen: boolean;
   /** The next reserve claims the sweep gate. */
@@ -91,6 +99,9 @@ const defaultStorage = (): StorageKnobs => ({
   pendingMax: 5000,
   globalMax: 100 * 1024 ** 3,
   ttlMs: 24 * 3600 * 1000,
+  countMs: 2 * 3600 * 1000,
+  noipShare: 32 * 1024 ** 2,
+  overrides: new Map(),
   legacyOpen: true,
   sweepDue: false,
 });
@@ -128,17 +139,31 @@ export function resetFnDb(s: FnDbState): void {
 const KEY_RE =
   /^(public|draft)\/([A-Za-z0-9_-]{4,64})\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[^/]{1,120}$/;
 
-function live(s: FnDbState, u: UploadRow): boolean {
-  const now = s.now ?? Date.now();
-  return u.state === 'claimed' || (u.state === 'pending' && u.created_at > now - s.storage.ttlMs);
+const nowOf = (s: FnDbState) => s.now ?? Date.now();
+
+/** Still claimable: pending and younger than storage_pending_ttl() (24 h). */
+function claimable(s: FnDbState, u: UploadRow): boolean {
+  return u.state === 'pending' && u.created_at > nowOf(s) - s.storage.ttlMs;
 }
 
-/** An owner's claimed + unexpired pending bytes (021 reserve_upload / storage_quota_status). */
+/** Counts against the quota: claimed, or pending within storage_pending_count_window() (2 h). */
+function counted(s: FnDbState, u: UploadRow): boolean {
+  return (
+    u.state === 'claimed' || (u.state === 'pending' && u.created_at > nowOf(s) - s.storage.countMs)
+  );
+}
+
+/** 021 storage_quota_for: the override, else the default. */
+export function quotaFor(s: FnDbState, owner: string): number {
+  return s.storage.overrides.get(owner) ?? s.storage.quota;
+}
+
+/** An owner's counted bytes and pending uploads (021 reserve_upload / storage_quota_status). */
 export function ownerUsage(s: FnDbState, owner: string): { bytes: number; pending: number } {
   let bytes = 0;
   let pending = 0;
   for (const u of s.uploads.values()) {
-    if (u.owner_id !== owner || !live(s, u)) continue;
+    if (u.owner_id !== owner || !counted(s, u)) continue;
     bytes += u.bytes;
     if (u.state === 'pending') pending += 1;
   }
@@ -159,6 +184,7 @@ export function addUpload(s: FnDbState, row: Partial<UploadRow> & { key: string 
     submission_id: null,
     legacy: false,
     verified: false,
+    net_key: null,
     ...row,
   };
   s.uploads.set(u.key, u);
@@ -168,7 +194,7 @@ export function addUpload(s: FnDbState, row: Partial<UploadRow> & { key: string 
 /** The same rules as 021 reserve_upload. */
 function reserveUpload(
   s: FnDbState,
-  [key, owner, formId, question, bytes, type, legacy]: [
+  [key, owner, formId, question, bytes, type, legacy, netKey]: [
     string,
     string,
     string,
@@ -176,20 +202,23 @@ function reserveUpload(
     number,
     string,
     boolean,
+    string | null,
   ],
 ): Record<string, unknown> {
   const m = KEY_RE.exec(key);
   if (!m || !owner || m[2] !== formId || !(bytes >= 1 && bytes <= 1024 ** 3)) {
     throw Object.assign(new Error('reserve_upload: bad arguments'), { code: '22023' });
   }
-  const max = s.storage.quota;
+  const max = quotaFor(s, owner);
   if (legacy && !s.storage.legacyOpen) {
     return { outcome: 'legacy_closed', used_bytes: null, max_bytes: max, sweep_due: false };
   }
   const due = s.storage.sweepDue;
   s.storage.sweepDue = false;
   const { bytes: used, pending } = ownerUsage(s, owner);
-  const global = [...s.uploads.values()].reduce((n, u) => n + u.bytes, 0);
+  const global = [...s.uploads.values()]
+    .filter((u) => u.state !== 'pending' || counted(s, u))
+    .reduce((n, u) => n + u.bytes, 0);
   const refuse = (outcome: string) => ({
     outcome,
     used_bytes: String(used),
@@ -197,6 +226,14 @@ function reserveUpload(
     sweep_due: due,
   });
   if (used + bytes > max) return refuse('quota');
+  if (netKey) {
+    const net = [...s.uploads.values()]
+      .filter((u) => u.owner_id === owner && u.state === 'pending' && u.net_key === netKey)
+      .filter((u) => counted(s, u))
+      .reduce((n, u) => n + u.bytes, 0);
+    const share = netKey === 'noip' ? s.storage.noipShare : Math.max(Math.floor(max / 2), 1);
+    if (net + bytes > share) return refuse('network');
+  }
   if (pending >= s.storage.pendingMax) return refuse('pending');
   if (global + bytes > s.storage.globalMax) return refuse('global');
   if (s.uploads.has(key)) return refuse('exists');
@@ -208,6 +245,7 @@ function reserveUpload(
     bytes,
     content_type: type,
     legacy,
+    net_key: netKey,
   });
   return {
     outcome: 'ok',
@@ -234,9 +272,10 @@ export function uploadKeysOf(answers: unknown): string[] {
 function claimUploads(s: FnDbState, sub: { id: string; form_id: string; answers: unknown }) {
   for (const key of uploadKeysOf(sub.answers)) {
     const u = s.uploads.get(key);
-    if (u && u.form_id === sub.form_id && u.state === 'pending' && live(s, u)) {
+    if (u && u.form_id === sub.form_id && claimable(s, u)) {
       u.state = 'claimed';
       u.submission_id = sub.id;
+      u.net_key = null;
     }
   }
 }
@@ -275,12 +314,24 @@ function insertWithFiles(
       (u
         ? u.form_id === formId &&
           (u.question_id === null || u.question_id === w.question) &&
-          ((u.state === 'pending' && live(s, u)) ||
-            (u.state === 'claimed' && u.submission_id === id))
+          (claimable(s, u) || (u.state === 'claimed' && u.submission_id === id))
         : s.storage.legacyOpen && !!owner && KEY_RE.exec(w.key)?.[2] === formId);
     if (!ok) bad.add(w.question ?? '');
   }
   if (bad.size) return { outcome: 'bad_files', ...none, bad_questions: [...bad], stored_id: null };
+  // Uploads past the counting window come back only if the owner has room for them.
+  const aged = want
+    .map((w) => ({ w, u: w.key ? s.uploads.get(w.key) : undefined }))
+    .filter(({ u }) => u && u.state === 'pending' && !counted(s, u));
+  const agedBytes = aged.reduce((n, { u }) => n + u!.bytes, 0);
+  if (agedBytes > 0 && owner && ownerUsage(s, owner).bytes + agedBytes > quotaFor(s, owner)) {
+    return {
+      outcome: 'bad_files',
+      ...none,
+      bad_questions: [...new Set(aged.map(({ w }) => w.question))],
+      stored_id: null,
+    };
+  }
   const r = insertPublicSubmission(s, [id, formId, answers, meta]);
   if (r.outcome !== 'ok') return { ...none, ...r, bad_questions: null, stored_id: null };
   const sub = s.submissions.find((x) => x.id === id)!;
@@ -333,7 +384,7 @@ function sweepFinish(s: FnDbState, [deleted, heads]: [string[], string, boolean]
   let dropped = 0;
   for (const key of deleted) {
     const u = s.uploads.get(key);
-    if (u && (u.state === 'doomed' || (u.state === 'pending' && !live(s, u)))) {
+    if (u && (u.state === 'doomed' || (u.state === 'pending' && !claimable(s, u)))) {
       s.uploads.delete(key);
       d += 1;
     }

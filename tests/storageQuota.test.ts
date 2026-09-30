@@ -8,6 +8,7 @@ import {
 } from '../neon/functions/storage-sign/uploadPolicy.js';
 import {
   isQuestionId,
+  networkKey,
   mintUploadKey,
   safeUploadName,
 } from '../neon/functions/storage-sign/uploadKey.js';
@@ -160,6 +161,8 @@ describe('storagesign with quotas (ADR-067)', () => {
       scope?: 'public' | 'draft';
       bearer?: string;
       path?: string;
+      /** X-Forwarded-For; '' sends none (the no-IP share). */
+      ip?: string;
     } = {},
   ) =>
     post(
@@ -171,7 +174,10 @@ describe('storagesign with quotas (ADR-067)', () => {
         contentLength: len,
         ...(extra.questionId === null ? {} : { questionId: extra.questionId ?? 'big' }),
       },
-      extra.bearer ? { Authorization: `Bearer ${extra.bearer}` } : {},
+      {
+        ...(extra.bearer ? { Authorization: `Bearer ${extra.bearer}` } : {}),
+        ...(extra.ip !== undefined ? { 'X-Forwarded-For': extra.ip } : {}),
+      },
     );
 
   beforeAll(async () => {
@@ -263,15 +269,92 @@ describe('storagesign with quotas (ADR-067)', () => {
     expect(ownerUsage(db.state, OWNER).bytes).toBe(GB);
   });
 
-  it('pending uploads past 24 h no longer count; claimed ones always do', async () => {
+  it('an unclaimed upload counts for 2 h after signing, then stops; claimed ones always count', async () => {
     setForm();
     db.state.now = Date.parse('2026-10-01T12:00:00Z');
-    addUpload(db.state, {
+    const stale = addUpload(db.state, {
       key: `public/${FORM_ID}/${crypto.randomUUID()}/stale.jpg`,
       bytes: GB,
-      created_at: db.state.now - 25 * 3600 * 1000,
+      created_at: db.state.now - 2 * 3600 * 1000 - 60_000,
     });
     expect((await sign(MB)).status).toBe(200);
+    stale.created_at = db.state.now - 2 * 3600 * 1000 + 60_000;
+    expect((await sign(MB)).status).toBe(507);
+    stale.state = 'claimed';
+    stale.submission_id = 's_1';
+    stale.created_at = db.state.now - 30 * 24 * 3600 * 1000;
+    expect((await sign(MB)).status).toBe(507);
+  });
+
+  describe('a network’s share of the owner’s unclaimed bytes', () => {
+    const HALF = GB / 2;
+
+    it('the row keeps a hash of the network, never the address, and a claim would clear it', async () => {
+      setForm();
+      const res = await sign(MB, { ip: '203.0.113.50' });
+      const key = ((await res.json()) as { key: string }).key;
+      const row = db.state.uploads.get(key)!;
+      expect(row.net_key).toBe(networkKey('203.0.113.50'));
+      expect(row.net_key).toMatch(/^n[0-9a-f]{40}$/);
+      expect(JSON.stringify(row)).not.toContain('203.0.113.50');
+      expect(networkKey('203.0.113.50')).not.toBe(networkKey('203.0.113.51'));
+    });
+
+    it('half the quota per network: full refuses that network only, with the same copy', async () => {
+      setForm();
+      addUpload(db.state, {
+        key: `public/${FORM_ID}/${crypto.randomUUID()}/venue.jpg`,
+        bytes: HALF - MB,
+        net_key: networkKey('198.51.100.20'),
+      });
+      expect((await sign(MB, { ip: '198.51.100.20' })).status).toBe(200);
+      const full = await sign(1, { ip: '198.51.100.20' });
+      expect(full.status).toBe(507);
+      expect(await full.text()).toBe(COPY.respondent);
+      // Another network, and the owner's own studio, still sign.
+      expect((await sign(MB, { ip: '198.51.100.21' })).status).toBe(200);
+      expect(
+        (await sign(MB, { scope: 'draft', bearer: 'owner-jwt', ip: '198.51.100.20' })).status,
+      ).toBe(200);
+      // A share frees up as its uploads are claimed, or age out of the 2 h window.
+      for (const u of db.state.uploads.values()) {
+        if (u.net_key === networkKey('198.51.100.20')) u.created_at -= 2 * 3600 * 1000 + 1000;
+      }
+      expect((await sign(MB, { ip: '198.51.100.20' })).status).toBe(200);
+    });
+
+    it('requests with no client IP share 32 MiB between them', async () => {
+      setForm();
+      const noLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+      for (let i = 0; i < 32; i++) expect((await sign(MB, { ip: '' })).status).toBe(200);
+      expect((await sign(MB, { ip: '' })).status).toBe(507);
+      expect([...db.state.uploads.values()].every((u) => u.net_key === 'noip')).toBe(true);
+      noLog.mockRestore();
+      expect((await sign(MB, { ip: '198.51.100.30' })).status).toBe(200);
+    });
+
+    it('an override raises the owner’s quota, and with it every network’s share', async () => {
+      setForm();
+      addUpload(db.state, {
+        key: `public/${FORM_ID}/${crypto.randomUUID()}/big.bin`,
+        bytes: GB,
+        state: 'claimed',
+        submission_id: 's_1',
+      });
+      expect((await sign(MB, { ip: '198.51.100.40' })).status).toBe(507);
+      db.state.storage.overrides.set(OWNER, 5 * GB);
+      const ok = await sign(MB, { ip: '198.51.100.40' });
+      expect(ok.status).toBe(200);
+      addUpload(db.state, {
+        key: `public/${FORM_ID}/${crypto.randomUUID()}/fair.bin`,
+        bytes: 2 * GB,
+        net_key: networkKey('198.51.100.40'),
+      });
+      // 2 GiB + 1 MiB unclaimed from one network fits the 2.5 GiB share of a 5 GiB override.
+      expect((await sign(MB, { ip: '198.51.100.40' })).status).toBe(200);
+      db.state.storage.overrides.delete(OWNER);
+      expect((await sign(MB, { ip: '198.51.100.41' })).status).toBe(507);
+    });
   });
 
   it('the owner’s own studio upload says how full the account is', async () => {

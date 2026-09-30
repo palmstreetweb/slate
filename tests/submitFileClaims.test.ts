@@ -185,6 +185,28 @@ describe('submit: files are claimed with the response', () => {
     expect(db.state.submissions).toHaveLength(0);
   });
 
+  it('an upload past its 2 h counting window is claimed only if the owner has room for it again', async () => {
+    db.state.now = Date.parse('2026-10-01T12:00:00Z');
+    const slow = upload('docs', {
+      bytes: 300 * 1024 * 1024,
+      created_at: db.state.now - 3 * 3600 * 1000,
+    });
+    // Someone filled the quota meanwhile (a claimed gigabyte minus 100 MiB).
+    const filler = upload('more', {
+      bytes: 1024 ** 3 - 100 * 1024 * 1024,
+      state: 'claimed',
+      submission_id: 's_filler',
+    });
+    const full = await submit({ docs: [ref(slow)] }, crypto.randomUUID());
+    expect(full.status).toBe(400);
+    expect(((await full.json()) as { questions: string[] }).questions).toEqual(['docs']);
+    expect(db.state.uploads.get(slow)?.state).toBe('pending');
+    // With room again, the slow fill goes through and its file counts from now on.
+    db.state.uploads.get(filler)!.bytes = 100;
+    expect((await submit({ docs: [ref(slow)] }, crypto.randomUUID())).status).toBe(200);
+    expect(db.state.uploads.get(slow)?.state).toBe('claimed');
+  });
+
   it('one upload named by two questions is refused', async () => {
     const d = upload(null);
     const res = await submit({ docs: [ref(d)], more: [ref(d)] }, crypto.randomUUID());

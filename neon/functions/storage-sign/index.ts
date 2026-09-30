@@ -18,10 +18,13 @@
  *
  * Storage quotas (ADR-067): the server picks every object key (a fresh uuid
  * under the path's scope and form, the name cleaned), and reserve_upload
- * records it against the form owner's quota — claimed plus unexpired pending
- * bytes at most 1 GiB, under a per-owner lock — before the PUT is signed for
- * exactly that many bytes. A full quota is 507: respondents read "This form
- * can't accept more files right now." (nothing about the owner's usage).
+ * records it against the form owner's quota — claimed bytes plus unclaimed
+ * uploads from the last 2 h, at most 1 GiB (or the owner's override), under a
+ * per-owner lock — and against this network's share of those unclaimed bytes
+ * (half the quota; 32 MiB for requests with no client IP), before the PUT is
+ * signed for exactly that many bytes. A full quota or share is 507:
+ * respondents read "This form can't accept more files right now." (nothing
+ * about the owner's usage).
  * Until storage_legacy_until() an old page's client-chosen path is signed as
  * is, recorded the same way. About once a minute one sign also runs a bounded
  * sweep (sweep.ts): deleted responses' objects, unclaimed uploads past 24 h,
@@ -50,7 +53,7 @@ import { isValidUnlockToken } from './fillLock.js';
 import { clientIp } from './requestIp.js';
 import { verifyUserJwt } from './authJwt.js';
 import { decidePublicUpload, decideQuestionUpload } from './uploadPolicy.js';
-import { isQuestionId, mintUploadKey } from './uploadKey.js';
+import { isQuestionId, mintUploadKey, networkKey } from './uploadKey.js';
 import { runSweep, type SweepObjects } from './sweep.js';
 import { aboutMinutes, charge, intEnv, ipMax, ownerKey, units, type Bucket } from './rateGate.js';
 
@@ -342,6 +345,8 @@ async function reserveAndPresign(
     legacy: boolean;
     maxBytes: number;
     who: 'respondent' | 'owner';
+    /** The network's share key (networkKey), for respondents only; null for the owner's own uploads. */
+    netKey: string | null;
   },
 ) {
   let r: ReserveRow | undefined;
@@ -349,8 +354,8 @@ async function reserveAndPresign(
     r = (
       await pool.query<ReserveRow>(
         `select r.outcome, r.used_bytes, r.max_bytes, r.sweep_due
-           from public.reserve_upload($1, $2, $3, $4, $5, $6, $7) r`,
-        [a.key, a.owner, a.formId, a.questionId, a.len, a.contentType, a.legacy],
+           from public.reserve_upload($1, $2, $3, $4, $5, $6, $7, $8) r`,
+        [a.key, a.owner, a.formId, a.questionId, a.len, a.contentType, a.legacy, a.netKey],
       )
     ).rows[0];
   } catch (err) {
@@ -369,6 +374,9 @@ async function reserveAndPresign(
             : STORAGE_COPY.respondent,
           507,
         );
+      case 'network':
+        // This network's share of the owner's unclaimed uploads (ADR-067): only this network waits.
+        return c.text(STORAGE_COPY.respondent, 507);
       case 'pending':
         return c.text(a.who === 'owner' ? STORAGE_COPY.ownerPending : STORAGE_COPY.respondent, 507);
       case 'global':
@@ -486,6 +494,7 @@ async function ownerPath(
       legacy,
       maxBytes: MAX_BYTES,
       who: 'owner',
+      netKey: null,
     });
   }
 
@@ -710,6 +719,7 @@ app.post(
       legacy,
       maxBytes: decision.maxBytes,
       who: 'respondent',
+      netKey: networkKey(ip),
     });
   },
 );

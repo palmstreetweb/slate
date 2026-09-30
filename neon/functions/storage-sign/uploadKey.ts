@@ -8,7 +8,20 @@
  * client can't pick, guess or reuse a key.
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { NO_IP } from './requestIp.js';
+
+/**
+ * The network an unclaimed public upload counts against (ADR-067's per-network
+ * share): the rate gate's IP key (rightmost X-Forwarded-For, IPv6 by /64) as a
+ * SHA-256, never the address itself, or 'noip' when the request had none — all
+ * of those share one small allowance (017's no-IP rule). The row keeps it only
+ * until the upload is claimed.
+ */
+export function networkKey(ip: string): string {
+  if (ip === NO_IP) return 'noip';
+  return `n${createHash('sha256').update(`slate-upload-network:${ip}`).digest('hex').slice(0, 40)}`;
+}
 
 /** The name part of a key: the characters the page's sanitizeFilename keeps, at most 120. */
 export function safeUploadName(raw: string): string {
