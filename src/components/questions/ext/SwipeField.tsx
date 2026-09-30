@@ -280,7 +280,6 @@ function PictureSwipe({
   useEffect(
     () => focusAfter(done ? okRef.current : deckRef.current),
     // Once per question, and when the deck runs out.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [question.id, done],
   );
 

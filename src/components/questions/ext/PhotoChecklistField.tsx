@@ -13,7 +13,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { PhotoChecklistQuestion } from '@/types/Question.js';
 import { validate } from '@/logic/validation.js';
 import { PHOTO_MAX_BYTES } from '@/logic/media.js';
@@ -61,7 +61,7 @@ export default function PhotoChecklistField({
   onFileUpload,
 }: ExtFieldProps<PhotoChecklistQuestion>) {
   const titleId = useId();
-  const items = question.items ?? [];
+  const items = useMemo(() => question.items ?? [], [question.items]);
   const stored =
     value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)

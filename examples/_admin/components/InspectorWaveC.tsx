@@ -186,24 +186,20 @@ export function ImagePinSettings({ question, onChange }: { question: ImagePinQue
           onChange={(e) => onChange({ imageAlt: e.target.value || undefined } as Partial<Question>)}
         />
       </Field>
-      <Row>
-        <Field label="Most pins">
-          <SlateNumberInput
-            min={1}
-            max={PINS_MAX}
-            value={question.maxPins ?? 3}
-            allowEmpty={false}
-            onChange={(n) => onChange({ maxPins: n } as Partial<Question>)}
-          />
-        </Field>
-        <Field label="Required">
-          <Checkbox
-            checked={Boolean(question.required)}
-            onChange={(v) => onChange({ required: v } as Partial<Question>)}
-            label="At least one pin"
-          />
-        </Field>
-      </Row>
+      <Field label="Most pins">
+        <SlateNumberInput
+          min={1}
+          max={PINS_MAX}
+          value={question.maxPins ?? 3}
+          allowEmpty={false}
+          onChange={(n) => onChange({ maxPins: n } as Partial<Question>)}
+        />
+      </Field>
+      <Checkbox
+        checked={Boolean(question.required)}
+        onChange={(v) => onChange({ required: v } as Partial<Question>)}
+        label="Required (at least one pin)"
+      />
       <Checkbox
         checked={question.notes !== false}
         onChange={(v) => onChange({ notes: v ? undefined : false } as Partial<Question>)}
@@ -456,8 +452,15 @@ export function AvailabilitySettings({
   const end = question.endTime ?? '18:00';
   return (
     <>
-      <Field label="Days">
-        <span className="slate-insp-days" role="group" aria-label="Days on the grid">
+      <div className="slate-inspector-field">
+        <span className="slate-label" id={`${question.id}-days`}>
+          Days
+        </span>
+        <span
+          className="slate-insp-days"
+          role="group"
+          aria-label="Days on the grid"
+        >
           {WEEKDAY_KEYS.map((d) => (
             <button
               key={d}
@@ -470,7 +473,7 @@ export function AvailabilitySettings({
             </button>
           ))}
         </span>
-      </Field>
+      </div>
       <Row>
         <Field label="From">
           <SlateSelect
