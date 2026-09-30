@@ -6,6 +6,7 @@ import {
   storageBannerCopy,
   storageLevel,
   storageMeterText,
+  storagePendingText,
   storagePercent,
   type StorageQuota,
 } from '../examples/_admin/storageQuota.js';
@@ -49,6 +50,12 @@ describe('storage numbers and copy', () => {
     expect(storageLevel({ used: 5, max: 0, pending: 0, files: 0 })).toBe('ok');
   });
 
+  it('"still uploading" only when unfinished uploads count', () => {
+    expect(storagePendingText(q(874 * MB, 12 * MB))).toBe('12 MB still uploading');
+    expect(storagePendingText(q(874 * MB, 3000))).toBe('3 KB still uploading');
+    expect(storagePendingText(q(874 * MB, 0))).toBeNull();
+  });
+
   it('the bar never hides a first file and never passes 100 %', () => {
     expect(storagePercent(q(0))).toBe(0);
     expect(storagePercent(q(1))).toBe(1);
@@ -71,13 +78,23 @@ describe('storage numbers and copy', () => {
 });
 
 describe('StorageMeter and StorageBanner', () => {
-  it('the meter is a labelled meter with the used text', () => {
-    render(<StorageMeter quota={q(120 * MB, 2 * MB)} />);
+  it('the meter is a labelled meter with the used text, and unfinished uploads only when there are some', () => {
+    const { rerender } = render(<StorageMeter quota={q(874 * MB, 12 * MB)} />);
     const m = screen.getByRole('meter', { name: 'File storage' });
+    expect(m).toHaveAttribute('aria-valuetext', '874 MB of 1 GB used, 12 MB still uploading');
+    expect(m).toHaveAttribute('data-level', 'near');
+    expect(m).toHaveTextContent('Storage874 MB of 1 GB· 12 MB still uploading');
+    expect(m.getAttribute('title')).toMatch(/stop counting after 2 hours\.$/);
+    rerender(<StorageMeter quota={q(120 * MB)} />);
     expect(m).toHaveAttribute('aria-valuetext', '120 MB of 1 GB used');
     expect(m).toHaveAttribute('data-level', 'ok');
-    expect(m).toHaveTextContent('Storage120 MB of 1 GB');
-    expect(m.getAttribute('title')).toMatch(/^2 MB is in fills still in progress\./);
+    expect(m).toHaveTextContent(/^Storage120 MB of 1 GB$/);
+    expect(m.textContent).not.toContain('uploading');
+  });
+
+  it('shows the effective limit an override gives', () => {
+    render(<StorageMeter quota={{ used: 1.2 * GB, max: 5 * GB, pending: 0, files: 9 }} />);
+    expect(screen.getByRole('meter')).toHaveTextContent('1.2 GB of 5 GB');
   });
 
   it('the banner is a status when near and an alert when full; nothing with room', () => {

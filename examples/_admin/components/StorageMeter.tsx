@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import {
-  formatStorage,
+  storagePendingText,
   storageBannerCopy,
   storageLevel,
   storageMeterText,
@@ -42,8 +42,7 @@ export function StorageMeter({ quota }: { quota: StorageQuota }) {
   const text = storageMeterText(quota);
   const level = storageLevel(quota);
   const pct = storagePercent(quota);
-  const waiting =
-    quota.pending > 0 ? `${formatStorage(quota.pending)} is in fills still in progress. ` : '';
+  const pending = storagePendingText(quota);
   return (
     <div
       className="slate-storage-meter"
@@ -53,14 +52,19 @@ export function StorageMeter({ quota }: { quota: StorageQuota }) {
       aria-valuemin={0}
       aria-valuemax={quota.max}
       aria-valuenow={Math.min(quota.used, quota.max)}
-      aria-valuetext={`${text} used`}
-      title={`${waiting}Files sent through your forms count here, including responses in Trash and your own test runs.`}
+      aria-valuetext={`${text} used${pending ? `, ${pending}` : ''}`}
+      title={`Files sent through your forms count here, including responses in Trash and your own test runs.${
+        pending
+          ? ' “Still uploading” is files in fills people haven’t sent yet; they stop counting after 2 hours.'
+          : ''
+      }`}
     >
       <span className="slate-storage-meter-label">Storage</span>
       <span className="slate-storage-meter-track" aria-hidden="true">
         <span className="slate-storage-meter-fill" style={{ width: `${pct}%` }} />
       </span>
       <span className="slate-storage-meter-text">{text}</span>
+      {pending ? <span className="slate-storage-meter-pending">· {pending}</span> : null}
     </div>
   );
 }

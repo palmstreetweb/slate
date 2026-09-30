@@ -5,10 +5,11 @@
  */
 
 export type StorageQuota = {
-  /** Claimed bytes plus uploads from the last 24 h that no response has claimed yet. */
+  /** Claimed bytes plus uploads from the last 2 h that no response has claimed yet. */
   used: number;
+  /** The effective limit: the account's override, else the default (021 storage_quota_for). */
   max: number;
-  /** The unclaimed part of `used`: in-progress fills, and files abandoned mid-fill (gone after 24 h). */
+  /** The unclaimed part of `used`: fills in progress (and abandoned ones, for 2 h). */
   pending: number;
   files: number;
 };
@@ -40,6 +41,14 @@ export function storageLevel(q: StorageQuota): StorageLevel {
 /** "120 MB of 1 GB" */
 export function storageMeterText(q: StorageQuota): string {
   return `${formatStorage(q.used)} of ${formatStorage(q.max)}`;
+}
+
+/**
+ * "12 MB still uploading": files from fills in progress (uploaded, not yet
+ * sent with a response), which count for 2 h. Null when there are none.
+ */
+export function storagePendingText(q: StorageQuota): string | null {
+  return q.pending > 0 ? `${formatStorage(q.pending)} still uploading` : null;
 }
 
 /** 0–100, never 0 for a non-empty account, so a first photo shows. */

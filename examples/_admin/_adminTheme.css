@@ -791,6 +791,11 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   font-weight: 500;
 }
 
+/* "· 12 MB still uploading": quieter than the total, and never the warning colour. */
+[data-slate-forms][data-theme-name='slate'] .slate-storage-meter-pending {
+  color: var(--chrome-muted);
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-storage-meter-track {
   position: relative;
   flex: none;
