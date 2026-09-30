@@ -86,12 +86,13 @@ export default function PhotoChecklistField({
     ),
   );
   const alive = useRef(true);
-  useEffect(
-    () => () => {
+  // Set on every mount: StrictMode (and a remount) runs the cleanup in between.
+  useEffect(() => {
+    alive.current = true;
+    return () => {
       alive.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
   useEffect(() => focusAfter(firstRef.current), [question.id]);
 
   const done = items.filter((it) => shots[it.value]?.state === 'done').length;

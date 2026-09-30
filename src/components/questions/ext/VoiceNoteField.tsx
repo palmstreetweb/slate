@@ -40,24 +40,28 @@ type Save = 'idle' | 'saving' | 'saved' | 'error';
 type Clip = { url: string; blob: Blob; seconds: number; peaks: number[] };
 
 /**
- * Recording formats in order of preference. AAC in MP4 plays everywhere, so it
- * wins when a browser names it (Safari / iOS). Otherwise Opus in WebM (Chrome,
- * Edge, Firefox, Android) before a bare `audio/mp4`, whose codec newer Chrome
- * may choose as Opus.
+ * Recording formats in order of preference: Opus in WebM where the browser
+ * records it (Chrome, Edge, Firefox, Android — and it is what they encode
+ * reliably), else AAC in MP4 (Safari and iOS). Newer Chrome also *claims*
+ * AAC in MP4, but its encoder can fail at runtime ("EncodingError"), so WebM
+ * comes first; a format that fails is skipped on the next try.
  */
 export const VOICE_MIME_PREFERENCE = [
-  'audio/mp4;codecs=mp4a.40.2',
   'audio/webm;codecs=opus',
-  'audio/mp4',
   'audio/webm',
+  'audio/mp4;codecs=mp4a.40.2',
+  'audio/mp4',
 ] as const;
 
-/** The first format this browser records, or '' to let it choose. */
+/** Formats that failed on this page (an encoder error or an empty file); skipped next time. */
+const failedMimes = new Set<string>();
+
+/** The first format this browser records (and hasn't failed here), or '' to let it choose. */
 export function pickVoiceMime(): string {
   const MR = (globalThis as { MediaRecorder?: { isTypeSupported?: (t: string) => boolean } })
     .MediaRecorder;
   if (!MR || typeof MR.isTypeSupported !== 'function') return '';
-  return VOICE_MIME_PREFERENCE.find((t) => MR.isTypeSupported!(t)) ?? '';
+  return VOICE_MIME_PREFERENCE.find((t) => !failedMimes.has(t) && MR.isTypeSupported!(t)) ?? '';
 }
 
 /** A file name ending for a recorded type. */
@@ -166,8 +170,10 @@ export default function VoiceNoteField({
     r.ctx = null;
   }, []);
 
-  useEffect(
-    () => () => {
+  // Set on every mount: StrictMode (and a remount) runs the cleanup in between.
+  useEffect(() => {
+    alive.current = true;
+    return () => {
       alive.current = false;
       const r = rec.current;
       if (r && !r.stopped) {
@@ -179,9 +185,8 @@ export default function VoiceNoteField({
         }
       }
       release();
-    },
-    [release],
-  );
+    };
+  }, [release]);
 
   // Object URLs belong to this page; free the ones nothing will play again.
   useEffect(
@@ -318,6 +323,9 @@ export default function VoiceNoteField({
     };
     rec.current = r;
 
+    recorder.onerror = () => {
+      if (mime) failedMimes.add(mime);
+    };
     recorder.ondataavailable = (e: BlobEvent) => {
       if (e.data && e.data.size > 0) r.chunks.push(e.data);
     };
@@ -327,6 +335,8 @@ export default function VoiceNoteField({
       const seconds = Math.max(1, Math.round(Math.min(maxSec * 1000, performance.now() - r.started) / 1000));
       const blob = new Blob(r.chunks, { type: recorder.mimeType || mime || 'audio/webm' });
       if (blob.size === 0) {
+        // This format didn't encode here; "Try again" uses the next one.
+        if (mime) failedMimes.add(mime);
         setBlocked('failed');
         setPhase('blocked');
         return;

@@ -78,6 +78,8 @@ export default function AvailabilityField({
 
   const commit = useCallback(
     (next: Set<string>) => {
+      // Now, not at the next render: a fast drag paints several cells per frame.
+      pickedRef.current = next;
       setPicked(next);
       setError(null);
       const map = new Map<string, Set<number>>();

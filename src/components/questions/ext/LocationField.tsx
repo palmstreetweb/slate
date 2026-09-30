@@ -96,12 +96,13 @@ export default function LocationField({
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const alive = useRef(true);
-  useEffect(
-    () => () => {
+  // Set on every mount: StrictMode (and a remount) runs the cleanup in between.
+  useEffect(() => {
+    alive.current = true;
+    return () => {
       alive.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
   useEffect(
     () => focusAfter(phase === 'manual' || phase === 'off' ? inputRef.current : buttonRef.current),

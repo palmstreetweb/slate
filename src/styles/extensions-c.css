@@ -20,9 +20,20 @@
    Swipe cards
    ============================================================ */
 
+/* The deck, its count, buttons and hint share one column, aligned with the title. */
 [data-slate-forms] .slate-swipe {
   margin-top: 24px;
   outline: none;
+}
+
+[data-slate-forms] .slate-swipe,
+[data-slate-forms] .slate-swipe ~ .slate-swipe-actions,
+[data-slate-forms] .slate-swipe ~ .slate-swipe-hint {
+  width: min(100%, 360px);
+}
+
+[data-slate-forms] .slate-swipe--single {
+  width: min(100%, 420px);
 }
 
 [data-slate-forms] .slate-swipe-count {
@@ -36,16 +47,14 @@
 
 [data-slate-forms] .slate-swipe-deck {
   position: relative;
-  width: min(100%, 360px);
-  height: min(52vh, 440px);
-  min-height: 300px;
-  margin: 0 auto;
+  width: 100%;
+  height: min(48vh, 420px);
+  min-height: 280px;
 }
 
 [data-slate-forms] .slate-swipe-deck--single {
   height: auto;
   min-height: 0;
-  width: min(100%, 420px);
 }
 
 [data-slate-forms] .slate-swipe-card {
@@ -70,8 +79,17 @@
 }
 
 [data-slate-forms] .slate-swipe-card:not(.slate-swipe-card--top) {
-  opacity: calc(1 - var(--slate-swipe-depth, 0) * 0.25);
   box-shadow: 0 6px 16px var(--slate-lift-soft);
+}
+
+/* Cards further down the stack sit in a little shade instead of showing through. */
+[data-slate-forms] .slate-swipe-card:not(.slate-swipe-card--top)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--slate-bg);
+  opacity: calc(var(--slate-swipe-depth, 0) * 0.22);
+  pointer-events: none;
 }
 
 [data-slate-forms] .slate-swipe-card--top {
@@ -1558,9 +1576,7 @@
 
   /* The next card steps up when the top one leaves. */
   [data-slate-forms]:not([data-reduced-motion]) .slate-swipe-card:not(.slate-swipe-card--top) {
-    transition:
-      transform 320ms cubic-bezier(0.2, 1.3, 0.4, 1),
-      opacity 240ms ease-out;
+    transition: transform 320ms cubic-bezier(0.2, 1.3, 0.4, 1);
   }
 
   [data-slate-forms]:not([data-reduced-motion]) .slate-swipe-card--top {

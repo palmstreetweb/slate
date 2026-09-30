@@ -114,11 +114,18 @@ function useSwipeCard(onDecided: (dir: Dir) => void) {
         ],
         { duration: 300, easing: 'cubic-bezier(0.45, 0, 0.9, 0.6)', fill: 'forwards' },
       );
+      // Whichever comes first: the fling ends, or a backstop (a background tab
+      // throttles animations; the decision must never wait on them).
+      let settled = false;
       const finish = () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(backstop);
         park(el, to);
         anim.cancel();
         done();
       };
+      const backstop = window.setTimeout(finish, 420);
       anim.finished.then(finish, finish);
     },
     [onDecided],
