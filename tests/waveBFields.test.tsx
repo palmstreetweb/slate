@@ -5,7 +5,7 @@
  * cards, and the estimate reveal on the Thank You screen.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useRef } from 'react';
@@ -16,6 +16,11 @@ import { FormConfirmRefContext } from '@/hooks/useRegisterFormConfirm.js';
 import { OUT_OF_AREA_VALUE } from '@/logic/address.js';
 import { parseSignaturePath } from '@/logic/signature.js';
 import type { LooseAnswers } from '@/types/Answers.js';
+
+// jsdom has no 2D canvas; the pad paints nothing there (and says so without this).
+beforeAll(() => {
+  HTMLCanvasElement.prototype.getContext = (() => null) as never;
+});
 
 function Harness(props: {
   question: Question;
