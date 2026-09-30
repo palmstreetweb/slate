@@ -13,6 +13,12 @@
    Stars and faces
    ============================================================ */
 
+/* As wide as the icons, so the min / max labels sit under the ends of the row. */
+[data-slate-forms] .slate-scale--icons {
+  width: fit-content;
+  max-width: 100%;
+}
+
 [data-slate-forms] .slate-scale-icons {
   display: flex;
   flex-wrap: wrap;

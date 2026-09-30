@@ -112,7 +112,7 @@ function ScaleIcons({ question, answers, value, onCommit }: ExtFieldProps<ScaleQ
       <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
-      <div className="slate-scale">
+      <div className="slate-scale slate-scale--icons">
         <div
           className={`slate-scale-icons slate-scale-icons--${stars ? 'stars' : 'emoji'}${committedIdx >= 0 ? ' slate-scale-icons--committed' : ''}`}
           role="radiogroup"

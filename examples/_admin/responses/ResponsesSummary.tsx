@@ -424,18 +424,29 @@ const ChartCard = memo(function ChartCard({
           {showAll ? 'Show less' : `Show ${hidden} more`}
         </button>
       ) : null}
-      {total.others && total.others.length > 0 ? <TypedOthers others={total.others} /> : null}
+      {total.others && total.others.length > 0 ? (
+        <TypedOthers
+          others={total.others}
+          label={total.rows.find((r) => r.value === OTHER_VALUE)?.label ?? 'Other'}
+        />
+      ) : null}
     </article>
   );
 });
 
 /** What people typed under "Other" (ADR-063), most common first. */
-function TypedOthers({ others }: { others: ReadonlyArray<{ text: string; count: number }> }) {
+function TypedOthers({
+  others,
+  label,
+}: {
+  others: ReadonlyArray<{ text: string; count: number }>;
+  label: string;
+}) {
   const [all, setAll] = useState(false);
   const shown = all ? others : others.slice(0, 6);
   return (
     <div className="rsp-sum-others">
-      <p className="rsp-sum-others-head">Typed under “Other”</p>
+      <p className="rsp-sum-others-head">Typed under “{label}”</p>
       <ul className="rsp-sum-others-list">
         {shown.map((o) => (
           <li key={o.text} dir="auto">
@@ -590,6 +601,7 @@ const SummaryRow = memo(function SummaryRow({
                     dir="auto"
                   >
                     <span className="rsp-sr">Source: </span>
+                    <span aria-hidden="true">via </span>
                     {cells.source}
                   </span>
                 ) : null}

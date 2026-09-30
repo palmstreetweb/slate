@@ -390,7 +390,8 @@
   }
 }
 
-[data-slate-forms] .slate-picture-other-art {
+/* Two classes: must beat .slate-picture-img's display:block, which comes later. */
+[data-slate-forms] .slate-picture-img.slate-picture-other-art {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -419,6 +420,8 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
+  /* Keeps "$ 25 … per head" reading as one value, not two ends of a long line. */
+  max-width: 440px;
   border-bottom: var(--slate-border-width) solid var(--slate-border-md);
   transition: border-color 180ms ease-out;
 }

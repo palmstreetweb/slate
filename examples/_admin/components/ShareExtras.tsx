@@ -11,7 +11,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { FormRecord, TrackedSource } from '../_formsStore.js';
 import {
   CLOSED_MESSAGE_MAX,
@@ -283,7 +283,7 @@ export function TrackedLinks({
 
   return (
     <section className="slate-share-track" aria-label="Tracked links">
-      <div className="slate-share-track-chips" role="radiogroup" aria-label="Which link">
+      <ChipRow>
         <button
           type="button"
           role="radio"
@@ -318,17 +318,46 @@ export function TrackedLinks({
             ) : null}
           </span>
         ))}
-        <button
-          type="button"
-          className="slate-share-track-add"
-          onClick={() => {
-            setAdding(true);
-            setName('');
-          }}
-        >
-          + Track a flyer
-        </button>
-      </div>
+      </ChipRow>
+      <button
+        type="button"
+        className="slate-share-track-add"
+        onClick={() => {
+          setAdding(true);
+          setName('');
+        }}
+      >
+        + Track a flyer
+      </button>
     </section>
+  );
+}
+
+/** The chips scroll sideways inside the panel; a fade marks the edge that has more. */
+function ChipRow({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const check = () => setMore(el.scrollWidth - el.scrollLeft - el.clientWidth > 1);
+    check();
+    el.addEventListener('scroll', check, { passive: true });
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(check);
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener('scroll', check);
+      ro?.disconnect();
+    };
+  });
+  return (
+    <div
+      ref={ref}
+      className={`slate-share-track-chips${more ? ' slate-share-track-chips--more' : ''}`}
+      role="radiogroup"
+      aria-label="Which link"
+    >
+      {children}
+    </div>
   );
 }

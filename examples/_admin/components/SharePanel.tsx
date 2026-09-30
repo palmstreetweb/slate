@@ -31,6 +31,7 @@ import {
 } from '../_formsStore.js';
 import { countSubmissions, subscribe as subscribeSubmissions } from '../_submissionStore.js';
 import { trackedLinkUrl } from '../trackedLinks.js';
+import { closedReason } from '../formClose.js';
 import { CloseRow, TrackedLinks } from './ShareExtras.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { publicFillUrl } from '../neon/publicApi.js';
@@ -266,6 +267,8 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   if (!open || typeof document === 'undefined') return null;
 
   const liveResponses = countSubmissions(formId);
+  // Closed (ADR-063): the closing row says so in red; a green "Live" beside it would contradict it.
+  const closedNow = closedReason(form, liveResponses) !== null;
 
   const closeRow = form ? (
     <CloseRow
@@ -548,7 +551,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                 </section>
 
                 <div className="slate-share-foot">
-                  {isPublished && !stale && ignite.phase !== 'working' ? (
+                  {isPublished && !stale && !closedNow && ignite.phase !== 'working' ? (
                     <p className={`slate-share-live${ignited ? ' slate-share-live--ignite' : ''}`}>
                       <span className="slate-share-live-dot" aria-hidden />
                       Live

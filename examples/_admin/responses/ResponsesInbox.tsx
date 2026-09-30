@@ -309,6 +309,7 @@ const InboxRow = memo(function InboxRow({
           {source ? (
             <span className="rsp-ib-src" dir="auto">
               <span className="rsp-sr">Source: </span>
+              <span aria-hidden="true">via </span>
               {source}
             </span>
           ) : null}
@@ -918,23 +919,6 @@ export function ResponsesInbox({
                   Unread <span className="rsp-seg-n">{unreadHere.length}</span>
                 </button>
               </div>
-              {withSource ? (
-                <label className="rsp-ib-source">
-                  <span className="rsp-sr">Source</span>
-                  <select
-                    className="rsp-select"
-                    value={sourceFilter ?? ''}
-                    onChange={(e) => setSource(e.target.value || null)}
-                  >
-                    <option value="">All sources</option>
-                    {sources.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label} ({r.count})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
               <button
                 type="button"
                 className="rsp-textbtn"
@@ -952,6 +936,24 @@ export function ResponsesInbox({
             </>
           )}
         </div>
+        {withSource ? (
+          // Its own row: the list column is narrow, and the filters above already fill it.
+          <label className="rsp-ib-source">
+            <span className="rsp-sr">Source</span>
+            <select
+              className="rsp-select"
+              value={sourceFilter ?? ''}
+              onChange={(e) => setSource(e.target.value || null)}
+            >
+              <option value="">All sources</option>
+              {sources.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label} ({r.count})
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </div>
       <p className="rsp-sr" role="status" aria-live="polite">
         {live}

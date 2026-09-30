@@ -1032,13 +1032,13 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-source {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  margin-top: 6px;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-select {
+  width: 100%;
   height: 30px;
-  max-width: 180px;
   padding: 0 26px 0 10px;
   border: 1px solid var(--chrome-line);
   border-radius: 8px;

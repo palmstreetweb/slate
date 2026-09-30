@@ -4742,7 +4742,11 @@ body.slate-editor-resizing * {
   gap: 6px;
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-share-close-cap .slate-input {
+/* Long enough to beat publicChrome's width:100% input rule (its :not(:is()) is specific). */
+[data-slate-forms][data-theme-name='slate']
+  .slate-share-close
+  .slate-share-close-cap
+  > input.slate-input[type='number'] {
   width: 5.5em;
   flex: none;
 }
@@ -4753,7 +4757,28 @@ body.slate-editor-resizing * {
   gap: 14px;
 }
 
+/* Grid/flex children keep their content width unless told otherwise: without this a
+   long row of chips widens the whole panel instead of scrolling sideways. */
+[data-slate-forms][data-theme-name='slate'] .slate-share-track,
+[data-slate-forms][data-theme-name='slate'] .slate-share-close {
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-chips--more {
+  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent);
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-share-track-chips {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   align-items: center;
   gap: 6px;

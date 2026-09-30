@@ -14,8 +14,8 @@ export function Face({ t, className }: { t: number; className?: string }) {
   const y = 66 - mood * 2;
   const bend = mood * 13;
   const mouth = `M${50 - half} ${y} Q50 ${y + bend} ${50 + half} ${y}`;
-  // Brows tilt in when the mood drops; happy eyes close into arcs at the top.
-  const brow = mood < -0.4 ? (-mood - 0.4) * 10 : 0;
+  // Worried brows (inner ends up) at the low end; happy eyes close into arcs at the top.
+  const brow = mood < -0.6 ? (-mood - 0.6) * 14 : 0;
   const beaming = mood > 0.75;
   return (
     <svg
@@ -38,8 +38,8 @@ export function Face({ t, className }: { t: number; className?: string }) {
       )}
       {brow > 0 ? (
         <>
-          <path className="slate-face-line" d={`M28 ${30 - brow} L43 ${30 + brow * 0.4}`} />
-          <path className="slate-face-line" d={`M72 ${30 - brow} L57 ${30 + brow * 0.4}`} />
+          <path className="slate-face-line" d={`M28 ${31 + brow * 0.3} L42 ${31 - brow}`} />
+          <path className="slate-face-line" d={`M72 ${31 + brow * 0.3} L58 ${31 - brow}`} />
         </>
       ) : null}
       <path className="slate-face-line slate-face-mouth" d={mouth} />
