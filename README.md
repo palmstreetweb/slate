@@ -132,16 +132,21 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `single_choice` | `title`, `options: Option[]`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` (option value, or the typed Other text) |
 | `multi_choice` | `title`, `options: Option[]`, `min?`, `max?`, `allowOther?`, `otherLabel?` | min/max selections | `string[]` (plus at most one typed Other text) |
 | `dropdown` | `title`, `options: Option[]`, `placeholder?`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` |
-| `picture_choice` | `title`, `options: PictureOption[]`, `multiple?`, `required?`, `min?`, `max?`, `allowOther?`, `otherLabel?` | required / min-max | `string` or `string[]` |
+| `picture_choice` | `title`, `options: PictureOption[]`, `multiple?`, `required?`, `min?`, `max?`, `allowOther?`, `otherLabel?`, `display?` (`'grid'` \| `'swipe'`) | required / min-max | `string` or `string[]` |
 | `ranking` | `title`, `options: Option[]` | full permutation | `string[]` (ordered) |
 | `matrix` | `title`, `rows: Option[]`, `columns: Option[]`, `multiple?`, `required?` | all rows when required | `Record<row, col \| col[]>` |
-| `yes_no` | `title`, `yesLabel?`, `noLabel?`, `required?` (default `true`) | required | `'yes' \| 'no'` |
+| `yes_no` | `title`, `yesLabel?`, `noLabel?`, `required?` (default `true`), `display?` (`'buttons'` \| `'swipe'`) | required | `'yes' \| 'no'` |
 | `legal` | `title`, `body?`, `acceptLabel?`, `declineLabel?`, `required?` (default `true`) | required | `'accept' \| 'decline'` |
 | `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?`, `display?` (`'numbers'` \| `'stars'` \| `'emoji'` \| `'slider'`), `sliderIcon?` | range | `number` |
 | `nps` | `title`, `minLabel?`, `maxLabel?`, `required?` | 0–10 | `number` |
 | `contact_info` | `title`, `fields?` (`name` / `email` / `phone`: `'required'` \| `'optional'` \| `'off'`; default name + email required, phone optional), `defaultCountry?` | per part: required, email shape, phone parses | `{ name?, email?, phone? }` (phone as E.164) |
 | `address` | `title`, `required?`, `line2?` (default `true`), `country?`, `format?` (`'us'` \| `'international'`), `serviceArea?` (ZIP codes or prefixes) | complete once started; 5-digit ZIP (US) | `{ street, line2?, city, region?, postal, country? }` |
 | `signature` | `title`, `body?`, `required?`, `allowTyped?` (default `true`) | a real stroke, not a dot; or a typed name | `{ path }` (vector strokes, 500 × 200 box) or `{ typed }` |
+| `image_pin` | `title`, `image?` (https or a small `data:image`), `imageAlt?`, `required?`, `maxPins?` (1–10, default 3), `notes?` (default `true`) | pins inside the photo, under the limit | `{ pins: ['x,y', …], notes?, img? }` (0–1 from the top left) |
+| `voice_note` | `title`, `body?`, `required?`, `maxSeconds?` (5–300, default 60), `allowTyped?` (default `true`) | a recording or typed text | `{ audio, sec }` (a stored file) or `{ typed }` |
+| `location` | `title`, `required?`, `center?` (`{ lat, lng }`), `radius?`, `radiusUnit?` (`'mi'` default \| `'km'`), `privacyNote?` | coordinates, a ZIP or a place | `{ lat, lng, area? }` (3 decimals) / `{ zip, area? }` / `{ typed }` |
+| `photo_checklist` | `title`, `items: Option[]`, `required?` (default `true`: every shot) | every shot when required | `{ [itemValue]: fileRef }` |
+| `availability` | `title`, `required?`, `days?` (`'mon'`…`'sun'`, default Mon–Fri), `startTime?` / `endTime?` (`'HH:MM'`, default 08:00–18:00), `slotMinutes?` (15, 30, 60, 120) | at least one slot when required | `{ [day]: 'HH:MM-HH:MM,…' }` |
 | `review` | `title`, `subtitle?`, `cta?`, `visibleIf?` | — | _not stored; lists answers with jump-to-edit_ |
 | `thanks` | `title`, `subtitle?`, `cta?`, `visibleIf?`, `redirectUrl?`, `showEstimate?` | — | _not stored; fires `onSubmit`_ |
 
@@ -161,7 +166,12 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 - **Package cards** — `display: 'cards'` on `single_choice` draws each option as a card with its price, `features` and `badge`. Same answer as the list.
 - **Contact info**, **Address** and **Signature** — the three new types above. Addresses use the browser's autofill tokens (no lookup service). With a `serviceArea`, a condition can test `IN_AREA_VALUE` / `OUT_OF_AREA_VALUE` (exported) to route out-of-area answers to their own ending.
 
-Stars, faces, the slider, the stepper, date ranges / times, the file field, picture choice, ranking, the matrix, package cards, the contact block, the address, the signature pad and the estimate reveal load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
+**Added in ADR-065** (Wave C):
+
+- **Swipe cards** — `display: 'swipe'` on a multi-select `picture_choice` is a card stack: swipe right (or →, or ♥) to like, left to pass; the answer is the list of liked values, as the grid stores it. On `yes_no` it is one "this or that" card holding the question. Letter keys don't pick cards; the buttons and arrow keys always work.
+- **Pin the spot**, **Voice note**, **Location**, **Photo checklist** and **Availability** — the five new types above. The microphone, the camera and the location are asked for only when the respondent taps. A location with a `center` and `radius` can be tested with `IN_AREA_VALUE` / `OUT_OF_AREA_VALUE`, like an address; a ZIP typed instead is checked against the form's address service areas. Voice notes and photos go through `onFileUpload`; without it they can't be stored (a voice note falls back to typing). A server that stores responses should re-derive pins, locations and availability from its own copy of the schema (the Slate submit Function does, so an "inside the area" verdict can't be forged).
+
+Stars, faces, the slider, the stepper, date ranges / times, the file field, picture choice, ranking, the matrix, package cards, the contact block, the address, the signature pad, the estimate reveal, every Wave C UI, and the dropdown, plain date, number, phone, website, consent and NPS fields load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
 
 ### Answer piping
 
