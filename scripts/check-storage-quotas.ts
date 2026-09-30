@@ -31,6 +31,7 @@ import pg from 'pg';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { applyBackfill, loadDbState, planBackfill } from './storageBackfill.js';
+import { networkKey } from '../neon/functions/storage-sign/uploadKey.js';
 
 type App = { request: (path: string, init: RequestInit) => Response | Promise<Response> };
 
@@ -383,10 +384,15 @@ let oldSign: App;
 let oldSubmit: App;
 const sign = () => signApps[0]!;
 
-function post(app: App, body: unknown, ip: string, headers: Record<string, string> = {}) {
+/** ip null: no X-Forwarded-For at all (the no-IP share). */
+function post(app: App, body: unknown, ip: string | null, headers: Record<string, string> = {}) {
   return app.request('/', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip, ...headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(ip === null ? {} : { 'X-Forwarded-For': ip }),
+      ...headers,
+    },
     body: JSON.stringify(body),
   });
 }
@@ -407,7 +413,7 @@ async function signUpload(
     scope?: 'public' | 'draft';
     bearer?: string;
     path?: string;
-    ip?: string;
+    ip?: string | null;
   },
 ): Promise<Signed> {
   const scope = o.scope ?? 'public';
@@ -420,7 +426,7 @@ async function signUpload(
       contentLength: o.size,
       ...(o.questionId === null ? {} : { questionId: o.questionId ?? 'q_big' }),
     },
-    o.ip ?? freshIp(),
+    o.ip === undefined ? freshIp() : o.ip,
     o.bearer ? { Authorization: `Bearer ${o.bearer}` } : {},
   );
   const text = await res.text();
@@ -472,7 +478,7 @@ async function submit(
       meta: meta(),
       ...(o.submitId ? { submitId: o.submitId } : {}),
     },
-    o.ip ?? freshIp(),
+    o.ip === undefined ? freshIp() : o.ip,
   );
   const text = await res.text();
   let body: Record<string, unknown> = {};
@@ -560,7 +566,11 @@ async function grants() {
   const probes = [
     'select * from public.form_uploads limit 1',
     'select * from public.storage_sweep_state',
-    `select * from public.reserve_upload('public/f_s11files0001/${randomUUID()}/x.jpg', 'u', 'f_s11files0001', null, 1, 'image/jpeg', false)`,
+    `select * from public.reserve_upload('public/f_s11files0001/${randomUUID()}/x.jpg', 'u', 'f_s11files0001', null, 1, 'image/jpeg', false, 'noip')`,
+    'select * from public.storage_quota_overrides',
+    `insert into public.storage_quota_overrides (owner_id, bytes) values ('${A}', 5368709120)`,
+    `select public.storage_quota_for('${A}')`,
+    'select public.storage_pending_count_window()',
     `select * from public.insert_public_submission('s_x', 'f_s11files0001', '{}'::jsonb, '{}'::jsonb, '[]'::jsonb, null)`,
     'select * from public.storage_sweep_begin(10)',
     `select * from public.storage_sweep_finish('{}', '[]', false)`,
@@ -814,6 +824,179 @@ async function quotaUnderConcurrency() {
     two.map((r) => r.status).join(','),
   );
   await q(`delete from public.form_uploads where owner_id = $1`, [B]);
+}
+
+/* ---------- the flood hardening: 2 h window, per-network share, no-IP share, overrides ---------- */
+
+const resetOwnerB = async () => {
+  await q(`delete from public.form_uploads where owner_id = $1`, [B]);
+  await q(`delete from public.storage_quota_overrides where owner_id = $1`, [B]);
+};
+const seedB = (
+  bytes: number,
+  o: { state?: 'pending' | 'claimed'; age?: string; net?: string | null } = {},
+) =>
+  q(
+    `insert into public.form_uploads
+       (key, owner_id, form_id, question_id, scope, bytes, content_type, state, submission_id, created_at, net_key)
+     values ($1, $2, $3, 'q_big', 'public', $4, 'image/jpeg', $5, $6, now() - $7::interval, $8)
+     returning key`,
+    [
+      `public/${F.quota}/${randomUUID()}/seed.bin`,
+      B,
+      F.quota,
+      bytes,
+      o.state ?? 'pending',
+      o.state === 'claimed' ? 's_s11seed' : null,
+      o.age ?? '0 seconds',
+      o.net ?? null,
+    ],
+  ).then((r) => (r[0] as { key: string }).key);
+
+async function countingWindow() {
+  await resetOwnerB();
+  const aged = await seedB(GiB - 5 * MiB, { age: '2 hours 1 minute' });
+  const past = await signUpload(sign(), { formId: F.quota, size: 10 * MiB });
+  const st = await quotaStatus(B);
+  await q(
+    `update public.form_uploads set created_at = now() - interval '1 hour 59 minutes' where key = $1`,
+    [aged],
+  );
+  const within = await signUpload(sign(), { formId: F.quota, size: 10 * MiB });
+  check(
+    'an unclaimed upload counts for 2 h: past the window it frees the quota, just inside it still counts',
+    past.status === 200 && Number(st.used_bytes) === 10 * MiB && within.status === 507,
+    `past ${past.status} (meter ${Number(st.used_bytes) / MiB} MiB), inside ${within.status}`,
+  );
+
+  // A slow fill claims an upload older than 2 h only if the owner has room for it again.
+  await resetOwnerB();
+  const slow = await seedB(50 * MiB, { age: '3 hours' });
+  const filler = await seedB(GiB - 20 * MiB, { state: 'claimed' });
+  const refused = await submit(
+    submitApp,
+    { q_big: [`slate-file://storage:${slow}`] },
+    {
+      formId: F.quota,
+      submitId: randomUUID(),
+    },
+  );
+  await q(`update public.form_uploads set bytes = 1000 where key = $1`, [filler]);
+  const room = await submit(
+    submitApp,
+    { q_big: [`slate-file://storage:${slow}`] },
+    { formId: F.quota },
+  );
+  check(
+    'claiming an upload past the window: refused (400) while the owner is full, stored once there is room',
+    refused.status === 400 &&
+      JSON.stringify(refused.body.questions) === '["q_big"]' &&
+      room.status === 200 &&
+      (await row(slow))?.state === 'claimed',
+    `${refused.status} then ${room.status}`,
+  );
+  await resetOwnerB();
+}
+
+async function networkShare() {
+  await resetOwnerB();
+  const venue = '10.67.250.1';
+  // 512 MiB (half the 1 GiB quota) minus 10 MiB already unclaimed from the venue's network.
+  await seedB(512 * MiB - 10 * MiB, { net: networkKey(venue) });
+  const t0 = performance.now();
+  const burst = await Promise.all(
+    Array.from({ length: 50 }, (_, i) =>
+      signUpload(signApps[i % signApps.length]!, { formId: F.quota, size: MiB, ip: venue }),
+    ),
+  );
+  const ms = performance.now() - t0;
+  const ok = burst.filter((r) => r.status === 200);
+  const refused = burst.filter((r) => r.status === 507);
+  const [net] = await q<{ n: string }>(
+    `select coalesce(sum(bytes), 0) as n from public.form_uploads where owner_id = $1 and net_key = $2 and state = 'pending'`,
+    [B, networkKey(venue)],
+  );
+  const neighbour = await signUpload(sign(), { formId: F.quota, size: MiB, ip: '10.67.250.2' });
+  check(
+    '50 parallel signs from one network with 10 MiB of its share left: exactly 10 signed, 40 refused; the next network still signs',
+    ok.length === 10 &&
+      refused.length === 40 &&
+      refused.every((r) => r.text === 'This form can’t accept more files right now.') &&
+      Number(net!.n) === 512 * MiB &&
+      neighbour.status === 200,
+    `ok ${ok.length}, 507 ${refused.length}, share used ${Number(net!.n) / MiB} MiB, other network ${neighbour.status}, ${ms.toFixed(0)} ms`,
+  );
+  const [raw] = await q<{ n: number }>(
+    `select count(*)::int as n from public.form_uploads where owner_id = $1 and (net_key like '%10.67.%' or net_key is null and state = 'pending')`,
+    [B],
+  );
+  // A claim clears the network.
+  const claimedKey = ok[0]!.key!;
+  await putObject(ok[0]!.url!, MiB);
+  const r = await submit(
+    submitApp,
+    { q_big: [`slate-file://storage:${claimedKey}`] },
+    { formId: F.quota },
+  );
+  const after = await row(claimedKey);
+  const [{ net_key: cleared }] = await q<{ net_key: string | null }>(
+    `select net_key from public.form_uploads where key = $1`,
+    [claimedKey],
+  );
+  check(
+    'the network is stored as a hash (no address anywhere), and a claim clears it',
+    raw!.n === 0 && r.status === 200 && after?.state === 'claimed' && cleared === null,
+    `${r.status}`,
+  );
+  await resetOwnerB();
+}
+
+async function noIpShare() {
+  await resetOwnerB();
+  const quiet = console.error;
+  console.error = () => {}; // the Function logs the missing header once a minute
+  const burst = await Promise.all(
+    Array.from({ length: 40 }, (_, i) =>
+      signUpload(signApps[i % signApps.length]!, { formId: F.quota, size: MiB, ip: null }),
+    ),
+  );
+  console.error = quiet;
+  const ok = burst.filter((r) => r.status === 200).length;
+  const [keys] = await q<{ n: number }>(
+    `select count(*)::int as n from public.form_uploads where owner_id = $1 and net_key = 'noip'`,
+    [B],
+  );
+  check(
+    'requests without a client IP share 32 MiB between them: 40 parallel 1 MiB signs, exactly 32 signed',
+    ok === 32 && keys!.n === 32,
+    `ok ${ok}, 507 ${40 - ok}`,
+  );
+  await resetOwnerB();
+}
+
+async function overrides() {
+  await resetOwnerB();
+  await seedB(GiB, { state: 'claimed' });
+  const before = await signUpload(sign(), { formId: F.quota, size: MiB });
+  await q(
+    `insert into public.storage_quota_overrides (owner_id, bytes, note)
+     values ($1, 2::bigint * 1024 * 1024 * 1024, 'harness fair')
+     on conflict (owner_id) do update set bytes = excluded.bytes, note = excluded.note, updated_at = now()`,
+    [B],
+  );
+  const during = await signUpload(sign(), { formId: F.quota, size: MiB });
+  const st = await quotaStatus(B);
+  await q(`delete from public.storage_quota_overrides where owner_id = $1`, [B]);
+  const afterRemoval = await signUpload(sign(), { formId: F.quota, size: MiB });
+  check(
+    'an override raises one owner’s quota (the meter reports it), and removing it restores the default',
+    before.status === 507 &&
+      during.status === 200 &&
+      Number(st.max_bytes) === 2 * GiB &&
+      afterRemoval.status === 507,
+    `${before.status} → ${during.status} (max ${Number(st.max_bytes) / GiB} GiB) → ${afterRemoval.status}`,
+  );
+  await resetOwnerB();
 }
 
 async function sweep() {
@@ -1115,6 +1298,10 @@ async function main() {
     await signing();
     await claims();
     await quotaUnderConcurrency();
+    await countingWindow();
+    await networkShare();
+    await noIpShare();
+    await overrides();
     await sweep();
     await deletes();
     await oldFunctions('with 021 applied', true);
