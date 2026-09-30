@@ -253,7 +253,7 @@ export function patchSubmissionAnswer(
   questionId: string,
   value: unknown,
 ): void {
-  if (useRemote()) {
+  if (isNeonConfigured() && isStoresHydrated()) {
     remote.patchAnswerRemote(submissionId, questionId, value);
     return;
   }

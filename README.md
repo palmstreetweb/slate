@@ -147,10 +147,11 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `location` | `title`, `required?`, `center?` (`{ lat, lng }`), `radius?`, `radiusUnit?` (`'mi'` default \| `'km'`), `privacyNote?` | coordinates, a ZIP or a place | `{ lat, lng, area? }` (3 decimals) / `{ zip, area? }` / `{ typed }` |
 | `photo_checklist` | `title`, `items: Option[]`, `required?` (default `true`: every shot) | every shot when required | `{ [itemValue]: fileRef }` |
 | `availability` | `title`, `required?`, `days?` (`'mon'`…`'sun'`, default Mon–Fri), `startTime?` / `endTime?` (`'HH:MM'`, default 08:00–18:00), `slotMinutes?` (15, 30, 60, 120) | at least one slot when required | `{ [day]: 'HH:MM-HH:MM,…' }` |
+| `signup_slots` | `title`, `body?`, `slots: SignupSlot[]`, `required?` (default `true`), `maxPicks?` (1–50, default 1), `waitlist?`, `showRemaining?` (default `true`) | picks among the slots, at most `maxPicks`; waitlists only with `waitlist` | `{ slots: [value, …], wait?: [value, …] }` |
 | `review` | `title`, `subtitle?`, `cta?`, `visibleIf?` | — | _not stored; lists answers with jump-to-edit_ |
 | `thanks` | `title`, `subtitle?`, `cta?`, `visibleIf?`, `redirectUrl?`, `showEstimate?` | — | _not stored; fires `onSubmit`_ |
 
-`Option` is `{ label: string; value: string; description?: string; score?: number; price?: number; priceMax?: number; features?: string[]; badge?: string }` (prices and card details from ADR-064). `PictureOption` adds `{ src: string; alt?: string }`.
+`Option` is `{ label: string; value: string; description?: string; score?: number; price?: number; priceMax?: number; features?: string[]; badge?: string }` (prices and card details from ADR-064). `PictureOption` adds `{ src: string; alt?: string }`. `SignupSlot` is `{ label: string; value: string; capacity: number; date?: string; start?: string; end?: string; description?: string }` (capacity 1–1,000; `date` ISO `YYYY-MM-DD`, times `HH:MM`).
 
 **Options added in ADR-063** (Wave A of the question catalog expansion; BUILD_BRIEF §5 stays the canonical v1 table):
 
@@ -171,7 +172,11 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 - **Swipe cards** — `display: 'swipe'` on a multi-select `picture_choice` is a card stack: swipe right (or →, or ♥) to like, left to pass; the answer is the list of liked values, as the grid stores it. On `yes_no` it is one "this or that" card holding the question. Letter keys don't pick cards; the buttons and arrow keys always work.
 - **Pin the spot**, **Voice note**, **Location**, **Photo checklist** and **Availability** — the five new types above. The microphone, the camera and the location are asked for only when the respondent taps. A location with a `center` and `radius` can be tested with `IN_AREA_VALUE` / `OUT_OF_AREA_VALUE`, like an address; a ZIP typed instead is checked against the form's address service areas. Voice notes and photos go through `onFileUpload`; without it they can't be stored (a voice note falls back to typing). A server that stores responses should re-derive pins, locations and availability from its own copy of the schema (the Slate submit Function does, so an "inside the area" verdict can't be forged).
 
-Stars, faces, the slider, the stepper, date ranges / times, the file field, picture choice, ranking, the matrix, package cards, the contact block, the address, the signature pad, the estimate reveal, every Wave C UI, and the dropdown, plain date, number, phone, website, consent and NPS fields load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
+**Added in ADR-066** (Wave D):
+
+- **Sign-up slots** — `signup_slots` lists slots with limited spots ("Sat 10–11am, 8 spots", "Bring drinks, 3 spots"); slots with a `date` are grouped by day. Pass live counts with `<Form slotsLeft={{ [questionId]: { [slotValue]: spotsLeft } }}>`: slots show "3 of 8 left" or "Full", and with `waitlist` a full slot can be joined as a waitlist instead. Taking the last spot gets its own moment. Capacity has to be enforced by whatever stores responses — the Slate submit Function takes each spot in the same transaction as the response (migration 020), so a slot never holds more people than its capacity. When a slot fills while someone is answering, reject `onSubmit` with an `Error` that carries `goTo: questionId`: the form returns to that question, shows the message there and keeps every answer. In conditions a slot's value means "took that slot"; `WAITLIST_VALUE` (exported) means "joined a waitlist".
+
+Stars, faces, the slider, the stepper, date ranges / times, the file field, picture choice, ranking, the matrix, package cards, the contact block, the address, the signature pad, the estimate reveal, every Wave C UI, sign-up slots, and the dropdown, plain date, number, phone, website, consent and NPS fields load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
 
 ### Answer piping
 
