@@ -16,7 +16,7 @@ import type {
   PublishedFormPayload,
   SlotsLeftPayload,
 } from '../neon/database.types.js';
-import { mergeSlotsLeft, slotFullMessage } from '../signupSlots.js';
+import { mergeSlotsLeft, slotFullMessage } from '../slotFull.js';
 import { isNeonConfigured } from '../neon/config.js';
 import { hostFileUpload } from '../hostFileUpload.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';

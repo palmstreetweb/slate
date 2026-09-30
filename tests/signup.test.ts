@@ -12,7 +12,6 @@ import { WAITLIST_VALUE, checkSchema } from '@/index.js';
 import { SLOTS_MAX, signupAnswerCore, signupMaxPicks, signupSlotsOf } from '@/logic/signup.js';
 import { signupPicks } from '@/logic/signupAnswer.js';
 import {
-  moveSignupAnswer,
   offeredSlots,
   remainingText,
   slotDayLabel,
@@ -299,15 +298,6 @@ describe('view helpers', () => {
     expect(
       offeredSlots(q({ slots: [...q().slots, { label: 'X', value: 'x', capacity: 0 }] })),
     ).toHaveLength(3);
-  });
-
-  it('moves someone between slots, or off a waitlist', () => {
-    expect(moveSignupAnswer({ slots: ['a', 'b'] }, 'a', 'c')).toEqual({ slots: ['b', 'c'] });
-    expect(moveSignupAnswer({ slots: [], wait: ['a'] }, 'a', 'a')).toEqual({ slots: ['a'] });
-    expect(moveSignupAnswer({ slots: ['b'], wait: ['a', 'c'] }, 'a', 'b')).toEqual({
-      slots: ['b'],
-      wait: ['c'],
-    });
   });
 });
 

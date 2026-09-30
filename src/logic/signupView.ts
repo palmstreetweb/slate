@@ -7,7 +7,7 @@
 
 import type { SignupSlot, SignupSlotsQuestion } from '@/types/Question.js';
 import { isValidIsoDate, isValidTime } from './dateValue.js';
-import { signupPicks, signupSlotsOf } from './signup.js';
+import { signupSlotsOf } from './signup.js';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = [
@@ -111,21 +111,4 @@ export function remainingText(left: number | undefined, capacity: number): strin
   if (left <= 0) return 'Full';
   if (left === 1) return '1 spot left';
   return `${left} of ${capacity} left`;
-}
-
-/**
- * Move a respondent in a sign-up answer (the studio's roster, ADR-066): out of
- * `from` (a slot they hold or wait for) and into `to` as a taken spot, added
- * last. `from === to` takes a waitlisted person into that slot. The
- * database's move_signup_slot() makes the same change.
- */
-export function moveSignupAnswer(
-  v: unknown,
-  from: string,
-  to: string,
-): { slots: string[]; wait?: string[] } {
-  const { slots, wait } = signupPicks(v);
-  const nextSlots = [...slots.filter((s) => s !== from && s !== to), to];
-  const nextWait = wait.filter((s) => s !== from && s !== to);
-  return nextWait.length ? { slots: nextSlots, wait: nextWait } : { slots: nextSlots };
 }

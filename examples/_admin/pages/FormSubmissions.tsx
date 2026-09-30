@@ -22,7 +22,6 @@ import {
   isFormSubmissionsReady,
   listSubmissions,
   listTrashedSubmissions,
-  moveSignupSlot,
   permanentlyDeleteSubmission,
   restoreSubmission,
   restoreSubmissions,
@@ -52,6 +51,7 @@ import { ResponsesSummary } from '../responses/ResponsesSummary.js';
 import { ResponsesSkeleton } from '../responses/ResponsesSkeleton.js';
 import type { ResponsesViewName } from '../responses/types.js';
 import type { MoveSignup } from '../responses/SummaryWaveD.js';
+import { moveSignupSlot } from '../signupMove.js';
 import {
   IconArrowLeft,
   IconDownload,

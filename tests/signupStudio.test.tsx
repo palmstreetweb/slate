@@ -13,7 +13,8 @@ import userEvent from '@testing-library/user-event';
 import type { Question, SignupSlotsQuestion } from '@/index.js';
 import { WAITLIST_VALUE } from '@/index.js';
 import type { StoredSubmission } from '../examples/_admin/_submissionStore.js';
-import { moveSignupSlot, listSubmissions } from '../examples/_admin/_submissionStore.js';
+import { listSubmissions } from '../examples/_admin/_submissionStore.js';
+import { moveSignupAnswer, moveSignupSlot } from '../examples/_admin/signupMove.js';
 import {
   localSlotsLeft,
   mergeSlotsLeft,
@@ -188,6 +189,15 @@ describe('the roster', () => {
 });
 
 describe('moving someone (local mode)', () => {
+  it('the answer after a move (move_signup_slot makes the same change)', () => {
+    expect(moveSignupAnswer({ slots: ['a', 'b'] }, 'a', 'c')).toEqual({ slots: ['b', 'c'] });
+    expect(moveSignupAnswer({ slots: [], wait: ['a'] }, 'a', 'a')).toEqual({ slots: ['a'] });
+    expect(moveSignupAnswer({ slots: ['b'], wait: ['a', 'c'] }, 'a', 'b')).toEqual({
+      slots: ['b'],
+      wait: ['c'],
+    });
+  });
+
   it('moves into a slot with room, refuses a full one unless forced, and knows a stale pick', async () => {
     seed(SUBS);
     const ok = await moveSignupSlot({

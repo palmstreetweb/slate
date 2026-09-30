@@ -292,7 +292,7 @@ $fn$;
 -- 5. The owner moves someone (studio roster).
 -- ---------------------------------------------------------------------------
 -- Out of p_from (a slot they hold or wait for) and into p_to as a taken spot, added last: the engine's
--- moveSignupAnswer (src/logic/signupView.ts). p_from = p_to takes someone off that slot's waitlist.
+-- moveSignupAnswer (examples/_admin/signupMove.ts). p_from = p_to takes someone off that slot's waitlist.
 -- Outcomes: ok | full (p_to is at capacity; p_force overbooks on purpose) | not_found (no such live
 -- response of yours, or they no longer hold p_from) | bad_slot (p_to isn't a published slot).
 create or replace function public.move_signup_slot(

@@ -7,10 +7,6 @@ import type { Answers, Estimate, SubmitMeta } from '@/index.js';
 import { isNeonConfigured } from './neon/env.js';
 import { isStoresHydrated } from './neon/hydrate.js';
 import * as remote from './neon/submissionsRemote.js';
-import { signupPicks } from '@/logic/signupAnswer.js';
-import { moveSignupAnswer } from '@/logic/signupView.js';
-
-export type MoveSignupResult = remote.MoveSignupResult;
 
 const STORAGE_KEY = 'slate-submissions';
 
@@ -248,53 +244,26 @@ export function trashSubmission(submissionId: string): void {
 }
 
 /**
- * Move someone between sign-up slots from the roster (ADR-066): out of `from`
- * (a slot they hold or wait for) and into `to`. Refused when `to` is already
- * at `capacity`, unless `force`. Cloud: 020's move_signup_slot, which checks
- * the published capacity under the form's lock. Local: the same rule over the
- * responses in this browser.
+ * Replace one answer of a response — the roster's move between sign-up slots
+ * (ADR-066, signupMove.ts). Local: written to this browser's store. Cloud:
+ * only the cached row; the database write is move_signup_slot's.
  */
-export async function moveSignupSlot(args: {
-  submissionId: string;
-  questionId: string;
-  from: string;
-  to: string;
-  capacity: number;
-  force?: boolean;
-}): Promise<MoveSignupResult> {
-  if (useRemote()) return remote.moveSignupSlotRemote(args);
-  if (neonNotReady()) {
-    return {
-      ok: false,
-      reason: 'error',
-      message: 'Cloud sync is not ready — try again in a moment.',
-    };
+export function patchSubmissionAnswer(
+  submissionId: string,
+  questionId: string,
+  value: unknown,
+): void {
+  if (useRemote()) {
+    remote.patchAnswerRemote(submissionId, questionId, value);
+    return;
   }
-  const all = read();
-  const sub = all.find((s) => s.id === args.submissionId && isActive(s));
-  const picks = signupPicks(sub?.answers[args.questionId]);
-  if (!sub || !(picks.slots.includes(args.from) || picks.wait.includes(args.from))) {
-    return { ok: false, reason: 'gone', message: 'That response changed or is gone.' };
-  }
-  const taken = all.filter(
-    (s) =>
-      s.formId === sub.formId &&
-      s.id !== sub.id &&
-      isActive(s) &&
-      signupPicks(s.answers[args.questionId]).slots.includes(args.to),
-  ).length;
-  if (taken >= args.capacity && !args.force) {
-    return { ok: false, reason: 'full', taken, capacity: args.capacity };
-  }
-  const moved = moveSignupAnswer(sub.answers[args.questionId], args.from, args.to);
   write(
-    all.map((s) =>
-      s.id === sub.id
-        ? { ...s, answers: { ...s.answers, [args.questionId]: moved } as Answers }
+    read().map((s) =>
+      s.id === submissionId
+        ? { ...s, answers: { ...s.answers, [questionId]: value } as Answers }
         : s,
     ),
   );
-  return { ok: true };
 }
 
 /** @deprecated Use trashSubmission */
