@@ -28,6 +28,7 @@ describe('upload scope (ADR-050)', () => {
     expect(upload.uploadToNeonStorage).toHaveBeenCalledWith(expect.any(File), {
       scope: 'public',
       formId: 'f_someone_else',
+      questionId: 'photo',
     });
   });
 
@@ -37,6 +38,7 @@ describe('upload scope (ADR-050)', () => {
     expect(upload.uploadToNeonStorage).toHaveBeenCalledWith(expect.any(File), {
       scope: 'draft',
       formId: 'f_mine',
+      questionId: 'photo',
     });
   });
 });

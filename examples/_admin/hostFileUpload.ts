@@ -25,7 +25,8 @@ async function uploadToRemote(
     // owner previewing their own form → draft/; everyone else → public/.
     // Only draft/ passes the owner gate server-side, so a stray session can't widen anything.
     const scope = getUploadScope() ?? ((await authHeader()).Authorization ? 'draft' : 'public');
-    return uploadToNeonStorage(file, { scope, formId });
+    // The question sets the size limit, and the server mints the key for it (ADR-067).
+    return uploadToNeonStorage(file, { scope, formId, questionId });
   }
 
   const base = import.meta.env.VITE_UPLOAD_URL?.trim();

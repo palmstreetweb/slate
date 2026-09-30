@@ -53,7 +53,15 @@ function normalizeUploadMime(file: File): string {
   return EXT_MIME[ext] || raw || 'application/octet-stream';
 }
 
+/** A respondent's upload when the form owner's storage is full (ADR-067). The server says the same. */
+export const STORAGE_FULL_COPY = 'This form can’t accept more files right now.';
+
 async function friendlySignError(res: Response): Promise<string> {
+  if (res.status === 507) {
+    // Plain text from storagesign: the respondent sentence, or the owner's own usage (ADR-067).
+    const text = (await res.text().catch(() => '')).trim();
+    return text && text.length <= 300 && !text.startsWith('<') ? text : STORAGE_FULL_COPY;
+  }
   if (res.status === 429) {
     let retryAfter = Number(res.headers.get('Retry-After') || 60);
     try {
@@ -103,9 +111,20 @@ export async function authHeader(): Promise<Record<string, string>> {
   return {};
 }
 
+/** A key storagesign may hand back for this scope and form: the shape every stored ref has. */
+function isKeyFor(key: unknown, scope: string, formId: string): key is string {
+  return (
+    typeof key === 'string' &&
+    key.startsWith(`${scope}/${formId}/`) &&
+    /^(public|draft)\/[A-Za-z0-9_-]{4,64}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[^/]{1,120}$/.test(
+      key,
+    )
+  );
+}
+
 export async function uploadToNeonStorage(
   file: File,
-  opts?: { formId?: string; scope?: 'public' | 'draft' },
+  opts?: { formId?: string; scope?: 'public' | 'draft'; questionId?: string },
 ): Promise<string> {
   if (!isNeonConfigured() || !hasStorageSignUrl()) {
     throw new Error('Neon Object Storage is not configured.');
@@ -115,6 +134,8 @@ export async function uploadToNeonStorage(
     throw new Error('Upload context missing form id.');
   }
   const scope = opts?.scope ?? 'public';
+  // The server picks the real key (ADR-067); this path tells it the scope, form and name,
+  // and is what a storagesign from before ADR-067 signs as is.
   const uploadId = crypto.randomUUID();
   const path = `${scope}/${resolvedFormId}/${uploadId}/${sanitizeFilename(file.name)}`;
 
@@ -136,6 +157,8 @@ export async function uploadToNeonStorage(
         // Locked forms refuse public/ uploads without it (ADR-043).
         unlockToken:
           scope === 'public' ? (readFillUnlockToken(resolvedFormId) ?? undefined) : undefined,
+        // Its own size limit, and the server mints the key for it (ADR-067).
+        questionId: opts?.questionId || undefined,
       }),
     });
   } catch {
@@ -148,7 +171,15 @@ export async function uploadToNeonStorage(
     url,
     method,
     contentType: signedType,
-  } = (await signRes.json()) as { url: string; method?: string; contentType?: string };
+    key,
+  } = (await signRes.json()) as {
+    url: string;
+    method?: string;
+    contentType?: string;
+    key?: unknown;
+  };
+  // Where the object lands: the server's key, or our own path from a storagesign before ADR-067.
+  const stored = isKeyFor(key, scope, resolvedFormId) ? key : path;
   let put: Response;
   try {
     put = await fetch(url, {
@@ -171,10 +202,10 @@ export async function uploadToNeonStorage(
         : `Upload failed (${put.status}).`,
     );
   }
-  const ref = `${SLATE_FILE_REF_PREFIX}${STORAGE_PREFIX}${path}`;
+  const ref = `${SLATE_FILE_REF_PREFIX}${STORAGE_PREFIX}${stored}`;
   // The page already knows what it uploaded: no meta call to show the chip.
   metaCache.set(ref, {
-    name: sanitizeFilename(file.name),
+    name: stored.split('/').pop() || sanitizeFilename(file.name),
     size: file.size,
     mime: signedType || contentType,
   });

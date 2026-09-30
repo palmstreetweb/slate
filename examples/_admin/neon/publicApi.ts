@@ -41,6 +41,31 @@ export class SlotFullError extends Error {
 }
 
 /**
+ * A file in the answers couldn't be kept (ADR-067): it expired (unsent for over
+ * a day), never finished uploading, or isn't this form's. Nothing was stored;
+ * `questions` names where to go back and add it again.
+ */
+export class FilesRejectedError extends Error {
+  readonly questions: ReadonlyArray<string>;
+  constructor(message: string, questions: ReadonlyArray<string>) {
+    super(message);
+    this.name = 'FilesRejectedError';
+    this.questions = questions;
+  }
+}
+
+/** A retry key for one fill (ADR-067): a retried submit returns the response already stored. */
+export function newSubmitId(): string | undefined {
+  try {
+    return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Fresh spots left for a form's sign-up slots (ADR-066): the same throttled
  * lookup as the form itself (ADR-061), with `part=slots` so the schema isn't
  * sent again. Null when there's nothing to update (locked, closed, gone, or
@@ -166,6 +191,8 @@ export async function unlockPublicForm(
 
 export type SubmitResponsePayload = {
   formId: string;
+  /** One per fill, kept across retries (ADR-067). */
+  submitId?: string;
   answers: Answers;
   meta: {
     startedAt: string;
@@ -239,6 +266,27 @@ export async function submitPublicResponse(
         typeof b.error === 'string' && b.error ? b.error : 'This form is closed.',
         closed ?? { reason: res.status === 409 ? 'full' : 'date', message: null },
       );
+    }
+    if (res.status === 400) {
+      // A file that can't be kept (ADR-067): back to its question, every other answer kept.
+      const text = await res.text().catch(() => '');
+      let b: { error?: unknown; reason?: unknown; questions?: unknown } = {};
+      try {
+        b = JSON.parse(text) as typeof b;
+      } catch {
+        // Plain text: shown as sent below.
+      }
+      if (b.reason === 'files') {
+        throw new FilesRejectedError(
+          typeof b.error === 'string' && b.error
+            ? b.error
+            : 'A file you added expired or didn’t finish uploading. Please remove it and add it again.',
+          (Array.isArray(b.questions) ? b.questions : []).filter(
+            (q): q is string => typeof q === 'string',
+          ),
+        );
+      }
+      throw new Error(text || `Submit failed (${res.status})`);
     }
     if (res.status === 429) {
       let retryAfter = Number(res.headers.get('Retry-After') || 60);

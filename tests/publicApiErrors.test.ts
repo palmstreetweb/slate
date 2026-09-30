@@ -8,7 +8,12 @@ vi.mock('../examples/_admin/neon/config.js', () => ({
   getSubmitUrl: () => 'https://submit.invalid',
 }));
 
-import { submitPublicResponse, unlockPublicForm } from '../examples/_admin/neon/publicApi.js';
+import {
+  FilesRejectedError,
+  newSubmitId,
+  submitPublicResponse,
+  unlockPublicForm,
+} from '../examples/_admin/neon/publicApi.js';
 
 const respond = (res: Response) =>
   vi.stubGlobal(
@@ -73,5 +78,33 @@ describe('submitPublicResponse', () => {
       'Too many responses from this network right now. Please wait about 5 minutes, or try from another network (for example mobile data).';
     respond(new Response(JSON.stringify({ error, retryAfterSeconds: 300 }), { status: 429 }));
     await expect(submitPublicResponse(payload)).rejects.toThrow(error);
+  });
+
+  it('sends the fill’s submitId (ADR-067)', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ id: 's_1' })));
+    vi.stubGlobal('fetch', fetch);
+    const submitId = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    await submitPublicResponse({ ...payload, submitId });
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({ formId: 'f_1', submitId });
+  });
+
+  it('a 400 about files is a FilesRejectedError naming the questions; other 400s read as sent', async () => {
+    const error = 'A file you added expired or didn’t finish uploading.';
+    respond(
+      new Response(JSON.stringify({ error, reason: 'files', questions: ['docs', 7] }), {
+        status: 400,
+      }),
+    );
+    const err = await submitPublicResponse(payload).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(FilesRejectedError);
+    expect((err as FilesRejectedError).message).toBe(error);
+    expect((err as FilesRejectedError).questions).toEqual(['docs']);
+    respond(new Response('Missing fields', { status: 400 }));
+    await expect(submitPublicResponse(payload)).rejects.toThrow('Missing fields');
+  });
+
+  it('newSubmitId is a lowercase UUID', () => {
+    expect(newSubmitId()).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   });
 });

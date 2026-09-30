@@ -26,6 +26,7 @@ import {
   getStorageContentBlob,
   getStorageDownloadUrl,
   getStorageUploadMeta,
+  STORAGE_FULL_COPY,
   uploadToNeonStorage,
 } from '../examples/_admin/storageUpload.js';
 import { hostFileUpload } from '../examples/_admin/hostFileUpload.js';
@@ -140,5 +141,58 @@ describe('public uploads (respondent page)', () => {
     await expect(
       uploadToNeonStorage(file(), { scope: 'public', formId: 'f_public1' }),
     ).rejects.toThrow('Couldn’t reach Slate. Check your connection and try again.');
+  });
+});
+
+describe('server-minted keys and full storage (ADR-067)', () => {
+  const KEY = 'public/f_public1/1f8fad5b-d9cb-469f-a165-70867728950e/note.txt';
+  const signReplies = (reply: () => Response) =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        return url === 'https://sign.invalid' ? reply() : new Response(null, { status: 200 });
+      }),
+    );
+
+  it('names the question, and stores the key the server picked', async () => {
+    signReplies(
+      () =>
+        new Response(
+          JSON.stringify({ url: 'https://bucket.invalid/put', method: 'PUT', key: KEY }),
+        ),
+    );
+    const ref = await uploadToNeonStorage(file(), {
+      scope: 'public',
+      formId: 'f_public1',
+      questionId: 'q_docs',
+    });
+    expect(bodyOf(signCalls()[0]!)).toMatchObject({ op: 'upload', questionId: 'q_docs' });
+    expect(ref).toBe(`slate-file://storage:${KEY}`);
+    // The PUT goes to the signed URL; nothing else is fetched.
+    expect(calls.map((c) => c.url)).toEqual(['https://sign.invalid', 'https://bucket.invalid/put']);
+  });
+
+  it('a key for another form, or none (a storagesign from before), keeps the page’s own path', async () => {
+    for (const key of ['public/f_other01/1f8fad5b-d9cb-469f-a165-70867728950e/x.txt', undefined]) {
+      calls = [];
+      signReplies(() => new Response(JSON.stringify({ url: 'https://bucket.invalid/put', key })));
+      const ref = await uploadToNeonStorage(file(), { scope: 'public', formId: 'f_public1' });
+      const asked = (bodyOf(signCalls()[0]!) as unknown as { path: string }).path;
+      expect(ref).toBe(`slate-file://storage:${asked}`);
+    }
+  });
+
+  it('507 shows the server’s sentence; anything odd falls back to the respondent copy', async () => {
+    signReplies(
+      () => new Response('This form can’t accept more files right now.', { status: 507 }),
+    );
+    await expect(
+      uploadToNeonStorage(file(), { scope: 'public', formId: 'f_public1', questionId: 'q' }),
+    ).rejects.toThrow('This form can’t accept more files right now.');
+    signReplies(() => new Response('<html>busy</html>', { status: 507 }));
+    await expect(
+      uploadToNeonStorage(file(), { scope: 'public', formId: 'f_public1', questionId: 'q' }),
+    ).rejects.toThrow(STORAGE_FULL_COPY);
   });
 });

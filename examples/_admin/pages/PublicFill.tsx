@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Form } from '@/index.js';
 import {
+  FilesRejectedError,
   FormClosedError,
   SlotFullError,
   fetchPublishedFormBySlug,
   fetchSlotsLeft,
   metaToPayload,
+  newSubmitId,
   submitPublicResponse,
   unlockPublicForm,
 } from '../neon/publicApi.js';
@@ -96,6 +98,11 @@ export function PublicFill({ slug }: Props) {
   const slotsAt = useRef(0);
   /** Honeypot input (ADR-052). Read at submit, never rendered from state. */
   const trapRef = useRef<HTMLInputElement>(null);
+  /**
+   * This fill's retry key (ADR-067): kept until a submit goes through, so pressing
+   * Retry after a lost reply returns the stored response instead of a duplicate.
+   */
+  const submitIdRef = useRef<string | undefined>(undefined);
   const [embed] = useState(readEmbedMode);
   const embedRef = useEmbedHeight(embed);
   const mode = readSlateMode();
@@ -268,15 +275,24 @@ export function PublicFill({ slug }: Props) {
           // Filled trap = bot. Flag it and let the Function drop it before any
           // DB work (ADR-058); the respondent sees the same thanks screen either way.
           const trapped = Boolean(trapRef.current?.value.trim());
+          submitIdRef.current ??= newSubmitId();
           try {
             await submitPublicResponse({
               formId: form.id,
+              submitId: submitIdRef.current,
               answers,
               meta: trapped
                 ? { ...payloadMeta, hiddenFields: { ...payloadMeta.hiddenFields, _hp: '1' } }
                 : payloadMeta,
             });
+            // Stored: "Submit another" is a new fill with its own key.
+            submitIdRef.current = undefined;
           } catch (err) {
+            // A file expired or never finished uploading (ADR-067): nothing was stored;
+            // back to that question to add it again, every other answer kept.
+            if (err instanceof FilesRejectedError) {
+              throw Object.assign(new Error(err.message), { goTo: err.questions[0] });
+            }
             // Closed while they were filling it in (ADR-063): say so plainly
             // instead of offering a Retry that can't work.
             if (err instanceof FormClosedError) {
