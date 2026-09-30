@@ -4,7 +4,14 @@
  * + the public form lookup (ADR-061, `GET ?op=form&slug=`).
  * Deploy: neon functions deploy submitresponse --src neon/functions/submit-response
  * DATABASE_URL is injected by Neon. Needs migrations 016 (consume_submit_rates,
- * try_fill_password) and 017 (lookup_public_form).
+ * try_fill_password), 017 (lookup_public_form) and 019 (close settings,
+ * insert_public_submission).
+ *
+ * Closed forms (ADR-063): a form past its closing time is refused (410) right
+ * after the gate read, before any charge; a form at its response cap is
+ * refused (409) by the insert itself, which counts under a per-form lock so
+ * the cap is exact. The public lookup reports both, so the page says "closed"
+ * before anyone starts typing.
  *
  * Order (ADR-058): shape checks, honeypot, form lookup and lock, then ONE rate
  * statement that charges every bucket or none and reads the schema only when
@@ -23,7 +30,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { Pool } from 'pg';
 import { fillUnlockToken, isValidUnlockToken } from './fillLock.js';
 import { clientIp } from './requestIp.js';
-import { clampText, clampValue, isSafeKey, keepFileRefs } from './answerShape.js';
+import { clampForQuestion, clampText, isSafeKey, keepFileRefs } from './answerShape.js';
 import { aboutMinutes, charge, intEnv, ipMax, ownerKey, units, type Bucket } from './rateGate.js';
 
 /** Hard caps on what one submission may carry (ADR-046, ADR-058). */
@@ -75,7 +82,24 @@ type GateRow = {
   owner_id: string | null;
   fill_password_hash: string | null;
   has_schema: boolean;
+  /** 019: past `closes_at` by the database clock. */
+  closed: boolean | null;
+  closed_message: string | null;
 };
+
+/** Copy for a closed form (ADR-063). The owner's own message, when set, is sent alongside. */
+export const CLOSED_COPY = {
+  date: 'This form is closed and isn’t taking responses anymore.',
+  full: 'This form has all the responses it can take, so it’s closed now.',
+} as const;
+
+function closedResponse(c: Context, reason: 'date' | 'full', message: string | null) {
+  c.header('Cache-Control', 'no-store');
+  return c.json(
+    { error: CLOSED_COPY[reason], reason, message: message || null },
+    reason === 'date' ? 410 : 409,
+  );
+}
 
 /** 017 lookup_public_form. owner_id and the hash never leave this Function. */
 type LookupRow = {
@@ -87,6 +111,10 @@ type LookupRow = {
   owner_id: string | null;
   fill_password_hash: string | null;
   published_schema: unknown;
+  /** 019, joined in the same statement: past the closing time / at the response cap. */
+  closed_by_date: boolean | null;
+  closed_full: boolean | null;
+  closed_message: string | null;
 };
 
 type TryRow = {
@@ -131,7 +159,7 @@ function sanitizeAnswers(
     const q = byId.get(k);
     if (!q) continue;
     if (n >= MAX_ANSWER_KEYS) break;
-    const c = q.type === 'file_upload' ? keepFileRefs(v, formId, q) : clampValue(v);
+    const c = q.type === 'file_upload' ? keepFileRefs(v, formId, q) : clampForQuestion(q, v);
     if (c === undefined) continue;
     out[k] = c;
     n += 1;
@@ -185,9 +213,25 @@ function noteHoneypot(formId: string): void {
 
 const wrongPassword = (c: Context) => c.json({ error: 'wrong_password' }, 401);
 
+// The close settings (019) ride the same statement: one join on the hit row, and a count only
+// for a form with a cap (an index-only scan on submissions_form_live_idx).
 const LOOKUP_SQL = `select l.outcome, l.retry_after_seconds, l.id, l.name, l.slug, l.owner_id,
-    l.fill_password_hash, l.published_schema
-  from public.lookup_public_form($1, $2, $3, $4) l`;
+    l.fill_password_hash, l.published_schema,
+    (f.closes_at is not null and f.closes_at <= now()) as closed_by_date,
+    case when f.max_responses is not null then
+      (select count(*) from public.submissions s
+        where s.form_id = f.id and s.deleted_at is null) >= f.max_responses
+    end as closed_full,
+    f.closed_message
+  from public.lookup_public_form($1, $2, $3, $4) l
+  left join public.forms f on l.outcome = 'ok' and f.id = l.id`;
+
+/** A looked-up form's closed state, or null while it takes responses. */
+function closedState(r: LookupRow): { reason: 'date' | 'full'; message: string | null } | null {
+  if (r.closed_by_date === true) return { reason: 'date', message: r.closed_message || null };
+  if (r.closed_full === true) return { reason: 'full', message: r.closed_message || null };
+  return null;
+}
 
 /**
  * One statement (017): refuse an IP that is over its miss budget, else read the
@@ -259,12 +303,15 @@ app.get('/', async (c) => {
   const locked = r.fill_password_hash != null;
   if (!locked && !r.published_schema) return notFound(c);
   c.header('Cache-Control', 'no-store');
+  // Closed (ADR-063): the page shows "closed" instead of the form, so no schema goes out.
+  const closed = closedState(r);
   return c.json({
     id: r.id,
     name: r.name,
     slug: r.slug,
     locked,
-    schema: locked ? null : r.published_schema,
+    schema: locked || closed ? null : r.published_schema,
+    ...(closed ? { closed } : {}),
   });
 });
 
@@ -315,6 +362,13 @@ async function handleUnlock(c: Context, body: Record<string, unknown>) {
   if (form.outcome !== 'ok') return wrongPassword(c);
   // The published title, never the live forms.name (017).
   const base = { id: form.id, name: form.name, slug: form.slug };
+
+  // Closed (ADR-063): nothing to unlock. Same answer as the lookup gives.
+  const closed = closedState(form);
+  if (closed) {
+    c.header('Cache-Control', 'no-store');
+    return c.json({ ...base, locked: form.fill_password_hash != null, schema: null, closed });
+  }
 
   // Lock was removed since the gate rendered — just hand over the form.
   if (!form.fill_password_hash) {
@@ -432,7 +486,9 @@ app.post(
       form = (
         await pool.query<GateRow>(
           `select id, status, deleted_at, owner_id, fill_password_hash,
-                  published_schema is not null as has_schema
+                  published_schema is not null as has_schema,
+                  (closes_at is not null and closes_at <= now()) as closed,
+                  closed_message
              from public.forms where id = $1`,
           [formId],
         )
@@ -444,6 +500,9 @@ app.post(
     if (!form || form.deleted_at || form.status !== 'published' || !form.has_schema) {
       return c.text('Form not available', 404);
     }
+
+    // Past its closing time (ADR-063): refused before any charge, like every other gate refusal.
+    if (form.closed === true) return closedResponse(c, 'date', form.closed_message);
 
     // Locked form (ADR-043): no valid unlock token, no submission.
     if (
@@ -489,14 +548,26 @@ app.post(
     const cleanMeta = sanitizeMeta(meta);
 
     const submissionId = `s_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    let stored: { outcome?: unknown; closed_message?: unknown } | undefined;
     try {
-      await pool.query(
-        `insert into public.submissions (id, form_id, answers, meta, received_at)
-         values ($1, $2, $3::jsonb, $4::jsonb, now())`,
-        [submissionId, form.id, JSON.stringify(clean), JSON.stringify(cleanMeta)],
-      );
+      // 019: refuses a closed form, and counts under a per-form lock when a cap is set.
+      stored = (
+        await pool.query(
+          `select i.outcome, i.closed_message
+             from public.insert_public_submission($1, $2, $3::jsonb, $4::jsonb) i`,
+          [submissionId, form.id, JSON.stringify(clean), JSON.stringify(cleanMeta)],
+        )
+      ).rows[0] as typeof stored;
     } catch (err) {
       console.error('[submitresponse] insert failed', err);
+      return c.text('Could not save your response. Please try again.', 500);
+    }
+    const message = typeof stored?.closed_message === 'string' ? stored.closed_message : null;
+    if (stored?.outcome === 'full') return closedResponse(c, 'full', message);
+    if (stored?.outcome === 'closed') return closedResponse(c, 'date', message);
+    if (stored?.outcome === 'gone') return c.text('Form not available', 404);
+    if (stored?.outcome !== 'ok') {
+      console.error('[submitresponse] insert: unexpected outcome', stored?.outcome);
       return c.text('Could not save your response. Please try again.', 500);
     }
 

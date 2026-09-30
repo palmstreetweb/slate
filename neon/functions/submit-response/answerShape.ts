@@ -78,3 +78,64 @@ export function keepFileRefs(
       : 10;
   return refs.length ? refs.slice(0, cap) : undefined;
 }
+
+/** Typed "Other" answers on choice questions (ADR-063). Mirrors src/logic/other.ts OTHER_MAX. */
+export const OTHER_MAX = 500;
+/** The longest date answer the engine writes: `YYYY-MM-DDTHH:MM/YYYY-MM-DDTHH:MM` (ADR-063). */
+const DATE_MAX = 40;
+
+const optionValues = (q: Record<string, unknown>): Set<string> =>
+  new Set(
+    (Array.isArray(q.options) ? q.options : [])
+      .map((o) => (o && typeof o === 'object' ? (o as { value?: unknown }).value : undefined))
+      .filter((v): v is string => typeof v === 'string'),
+  );
+
+/**
+ * Per-type shapes for the question kinds whose answer shape ADR-063 widened
+ * or pinned down. Lenient on purpose — a respondent whose page has an older
+ * published schema must not lose a real answer — so it only trims what the
+ * engine never sends:
+ *   - number / scale / nps: a finite number (numeric text becomes a number);
+ *   - date: a string of at most 40 characters;
+ *   - choices with `allowOther`: typed text (anything that isn't an option
+ *     value) is capped at 500 characters, and a list keeps one typed entry.
+ * Everything else goes through `clampValue` as before.
+ */
+export function clampForQuestion(q: Record<string, unknown>, v: unknown): unknown {
+  switch (q.type) {
+    case 'number':
+    case 'scale':
+    case 'nps': {
+      if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+      if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) return Number(v.trim());
+      return undefined;
+    }
+    case 'date':
+      return typeof v === 'string' && v.length <= DATE_MAX ? v : undefined;
+    case 'single_choice':
+    case 'dropdown':
+    case 'multi_choice':
+    case 'picture_choice': {
+      const c = clampValue(v);
+      if (q.allowOther !== true) return c;
+      const values = optionValues(q);
+      if (typeof c === 'string') return values.has(c) ? c : c.slice(0, OTHER_MAX);
+      if (Array.isArray(c)) {
+        const out: string[] = [];
+        let typed = false;
+        for (const item of c as string[]) {
+          if (values.has(item)) out.push(item);
+          else if (!typed) {
+            typed = true;
+            out.push(item.slice(0, OTHER_MAX));
+          }
+        }
+        return out;
+      }
+      return c;
+    }
+    default:
+      return clampValue(v);
+  }
+}

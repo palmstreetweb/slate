@@ -17,6 +17,10 @@ export type FormRow = {
   owner_id: string | null;
   fill_password_hash: string | null;
   published_schema: unknown;
+  /** 019: close settings. */
+  closes_at?: string | null;
+  max_responses?: number | null;
+  closed_message?: string | null;
 };
 
 export type TryResult = { ok: boolean | null; denied: string | null; retry_after_seconds: number };
@@ -27,7 +31,13 @@ export type FnDbState = {
   /** 017 slug_miss_buckets: per IP key, the window start and the distinct unknown slugs. */
   misses: Map<string, { start: number; slugs: Set<string> }>;
   log: Array<{ sql: string; params: unknown[] }>;
-  submissions: Array<{ id: string; form_id: string; answers: unknown; meta: unknown }>;
+  submissions: Array<{
+    id: string;
+    form_id: string;
+    answers: unknown;
+    meta: unknown;
+    deleted_at?: string | null;
+  }>;
   now: number | null;
   fail: { gate?: boolean; rate?: boolean; insert?: boolean; try?: boolean; schema?: boolean };
   tryFill: ((params: unknown[]) => TryResult) | null;
@@ -151,11 +161,46 @@ export function lookupPublicForm(
       owner_id: f.owner_id,
       fill_password_hash: f.fill_password_hash,
       published_schema: f.fill_password_hash ? null : f.published_schema,
+      // 019's join, as the Function's LOOKUP_SQL computes it.
+      ...closeColumns(s, f),
     };
   }
   if (!live) s.misses.set(ip, { start: now, slugs: new Set([slug]) });
   else if (b!.slugs.size < missMax) b!.slugs.add(slug);
   return { outcome: 'miss', retry_after_seconds: 0, ...empty };
+}
+
+/** Live (not trashed) responses stored for a form. */
+export function liveCount(s: FnDbState, formId: string): number {
+  return s.submissions.filter((x) => x.form_id === formId && !x.deleted_at).length;
+}
+
+function closedByDate(s: FnDbState, f: FormRow): boolean {
+  return f.closes_at != null && Date.parse(f.closes_at) <= (s.now ?? Date.now());
+}
+
+function closeColumns(s: FnDbState, f: FormRow) {
+  return {
+    closed_by_date: closedByDate(s, f),
+    closed_full: f.max_responses != null ? liveCount(s, f.id) >= f.max_responses : null,
+    closed_message: f.closed_message ?? null,
+  };
+}
+
+/** The same rules as 019 insert_public_submission. */
+function insertPublicSubmission(
+  s: FnDbState,
+  [id, formId, answers, meta]: [string, string, string, string],
+): { outcome: string; closed_message: string | null } {
+  const f = s.forms.get(formId);
+  if (!f || f.deleted_at || f.status !== 'published')
+    return { outcome: 'gone', closed_message: null };
+  if (closedByDate(s, f)) return { outcome: 'closed', closed_message: f.closed_message ?? null };
+  if (f.max_responses != null && liveCount(s, formId) >= f.max_responses) {
+    return { outcome: 'full', closed_message: f.closed_message ?? null };
+  }
+  s.submissions.push({ id, form_id: formId, answers: JSON.parse(answers), meta: JSON.parse(meta) });
+  return { outcome: 'ok', closed_message: null };
 }
 
 export function fnDbPool(s: FnDbState) {
@@ -181,11 +226,9 @@ export function fnDbPool(s: FnDbState) {
         const f = s.forms.get(params[4] as string);
         return { rows: [{ ...t, published_schema: t.ok ? (f?.published_schema ?? null) : null }] };
       }
-      if (sql.includes('insert into public.submissions')) {
+      if (sql.includes('insert_public_submission')) {
         if (s.fail.insert) throw new Error('insert failed');
-        const [id, form_id, answers, meta] = params as [string, string, string, string];
-        s.submissions.push({ id, form_id, answers: JSON.parse(answers), meta: JSON.parse(meta) });
-        return { rows: [] };
+        return { rows: [insertPublicSubmission(s, params as [string, string, string, string])] };
       }
       if (sql.includes('lookup_public_form')) {
         if (s.fail.gate) throw new Error('lookup failed');
@@ -209,6 +252,8 @@ export function fnDbPool(s: FnDbState) {
               owner_id: f.owner_id,
               fill_password_hash: f.fill_password_hash,
               has_schema: f.published_schema != null,
+              closed: closedByDate(s, f),
+              closed_message: f.closed_message ?? null,
             },
           ],
         };
