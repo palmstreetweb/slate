@@ -791,9 +791,26 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   font-weight: 500;
 }
 
-/* "· 12 MB still uploading": quieter than the total, and never the warning colour. */
+/* "· 12 MB still uploading": quieter than the total, and never the warning colour. On a phone it
+   gets its own line, without the separator (a line starting with "·" reads as a stray bullet). */
 [data-slate-forms][data-theme-name='slate'] .slate-storage-meter-pending {
   color: var(--chrome-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-storage-meter-pending::before {
+  content: '·';
+  margin-right: 8px;
+}
+
+@media (max-width: 520px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-storage-meter-pending {
+    flex-basis: 100%;
+    margin-top: -2px;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-storage-meter-pending::before {
+    content: none;
+  }
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-storage-meter-track {

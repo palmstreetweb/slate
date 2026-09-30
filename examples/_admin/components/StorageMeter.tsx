@@ -64,7 +64,7 @@ export function StorageMeter({ quota }: { quota: StorageQuota }) {
         <span className="slate-storage-meter-fill" style={{ width: `${pct}%` }} />
       </span>
       <span className="slate-storage-meter-text">{text}</span>
-      {pending ? <span className="slate-storage-meter-pending">· {pending}</span> : null}
+      {pending ? <span className="slate-storage-meter-pending">{pending}</span> : null}
     </div>
   );
 }

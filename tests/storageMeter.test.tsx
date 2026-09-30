@@ -83,7 +83,8 @@ describe('StorageMeter and StorageBanner', () => {
     const m = screen.getByRole('meter', { name: 'File storage' });
     expect(m).toHaveAttribute('aria-valuetext', '874 MB of 1 GB used, 12 MB still uploading');
     expect(m).toHaveAttribute('data-level', 'near');
-    expect(m).toHaveTextContent('Storage874 MB of 1 GB· 12 MB still uploading');
+    // The separator is drawn by CSS (dropped on phones, where the line wraps).
+    expect(m).toHaveTextContent('Storage874 MB of 1 GB12 MB still uploading');
     expect(m.getAttribute('title')).toMatch(/stop counting after 2 hours\.$/);
     rerender(<StorageMeter quota={q(120 * MB)} />);
     expect(m).toHaveAttribute('aria-valuetext', '120 MB of 1 GB used');
