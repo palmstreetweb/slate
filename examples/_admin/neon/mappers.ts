@@ -8,6 +8,8 @@ import type {
   PublishedFormPayload,
 } from './database.types.js';
 import { normalizeAnswers, normalizeMeta } from '../answerShape.js';
+import { fitTrackedSources } from '../trackedLinks.js';
+import { CLOSED_MESSAGE_MAX, MAX_RESPONSES_LIMIT } from '../formClose.js';
 
 export function rowToFormRecord(row: DbFormRow): FormRecord {
   return {
@@ -113,14 +115,32 @@ export function formRecordToRow(
       : {}),
     // 019 (ADR-063): only once a hydrate has read the columns, so a database without
     // them (or a stale Data API cache) keeps saving. Undefined clears.
-    ...(opts.closeColumns
-      ? {
-          closes_at: form.closesAt ?? null,
-          max_responses: form.maxResponses ?? null,
-          closed_message: form.closedMessage ?? null,
-          tracked_sources: form.trackedSources?.length ? form.trackedSources : null,
-        }
-      : {}),
+    ...(opts.closeColumns ? closeColumnsOf(form) : {}),
+  };
+}
+
+/**
+ * The close settings and tracked links as 019's constraints accept them. The studio never
+ * produces anything else, but a restored backup can carry any values, and one bad value
+ * would fail the whole save.
+ */
+function closeColumnsOf(
+  form: FormRecord,
+): Pick<DbFormRow, 'closes_at' | 'max_responses' | 'closed_message' | 'tracked_sources'> {
+  const at = form.closesAt ? Date.parse(form.closesAt) : NaN;
+  const cap = form.maxResponses;
+  const sources = fitTrackedSources(cleanTrackedSources(form.trackedSources));
+  return {
+    closes_at: Number.isFinite(at) ? new Date(at).toISOString() : null,
+    max_responses:
+      typeof cap === 'number' && Number.isInteger(cap) && cap >= 1 && cap <= MAX_RESPONSES_LIMIT
+        ? cap
+        : null,
+    closed_message:
+      typeof form.closedMessage === 'string' && form.closedMessage.trim()
+        ? Array.from(form.closedMessage).slice(0, CLOSED_MESSAGE_MAX).join('')
+        : null,
+    tracked_sources: sources.length ? sources : null,
   };
 }
 

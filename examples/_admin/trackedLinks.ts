@@ -105,6 +105,24 @@ export function sourceLabel(src: string | null, tracked?: ReadonlyArray<TrackedS
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : src;
 }
 
+/**
+ * Room the list may take once stored. 019 caps `forms.tracked_sources` at 8 KiB of jsonb text,
+ * which spaces out every `:` and `,`; this leaves margin for that.
+ */
+export const TRACKED_SOURCES_BYTES = 7_500;
+
+/** Stored size of a list, in UTF-8 bytes of its JSON. */
+function storedBytes(list: ReadonlyArray<TrackedSource>): number {
+  return new TextEncoder().encode(JSON.stringify(list)).length;
+}
+
+/** The longest leading part of `list` that fits in the column (a restore can carry anything). */
+export function fitTrackedSources(list: ReadonlyArray<TrackedSource>): TrackedSource[] {
+  const out = list.slice(0, 50);
+  while (out.length && storedBytes(out) > TRACKED_SOURCES_BYTES) out.pop();
+  return out;
+}
+
 /** Add a tracked link by name. Returns the new list and the entry, or an error for the owner. */
 export function addTrackedSource(
   list: ReadonlyArray<TrackedSource>,
@@ -119,5 +137,9 @@ export function addTrackedSource(
   if (existing) return { list: [...list], entry: existing };
   if (list.length >= 50) return { error: 'That’s 50 tracked links — remove one first.' };
   const entry = { name: trimmed, src, createdAt: now.toISOString() };
-  return { list: [...list, entry], entry };
+  const next = [...list, entry];
+  if (storedBytes(next) > TRACKED_SOURCES_BYTES) {
+    return { error: 'That’s as many tracked links as fit — remove one first.' };
+  }
+  return { list: next, entry };
 }

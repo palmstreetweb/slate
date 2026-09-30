@@ -8,8 +8,10 @@ import { describe, expect, it } from 'vitest';
 import type { Question } from '@/index.js';
 import { OTHER_VALUE } from '@/index.js';
 import {
+  TRACKED_SOURCES_BYTES,
   TRACKING_PARAMS,
   addTrackedSource,
+  fitTrackedSources,
   prefillFromSearch,
   sourceLabel,
   sourceOf,
@@ -31,7 +33,7 @@ import {
   rowToFormRecord,
   slugRowToPublishedForm,
 } from '../examples/_admin/neon/mappers.js';
-import type { FormRecord } from '../examples/_admin/_formsStore.js';
+import type { FormRecord, TrackedSource } from '../examples/_admin/_formsStore.js';
 import type { StoredSubmission } from '../examples/_admin/_submissionStore.js';
 import {
   DIRECT_SOURCE,
@@ -122,6 +124,21 @@ describe('tracked links and prefill from the link', () => {
     }));
     expect(addTrackedSource(full, 'one more')).toEqual({ error: expect.any(String) });
   });
+
+  it('addTrackedSource stops before the list outgrows its column (019: 8 KiB)', () => {
+    let list: TrackedSource[] = [];
+    let refused = false;
+    for (let i = 0; i < 50 && !refused; i += 1) {
+      const r = addTrackedSource(list, `${i} ${'Mailbox flyer on the long street '.repeat(3)}`);
+      if ('error' in r) refused = true;
+      else list = r.list;
+    }
+    expect(refused).toBe(true);
+    expect(new TextEncoder().encode(JSON.stringify(list)).length).toBeLessThanOrEqual(
+      TRACKED_SOURCES_BYTES,
+    );
+    expect(fitTrackedSources([...list, ...list]).length).toBe(list.length);
+  });
 });
 
 describe('close settings', () => {
@@ -208,6 +225,35 @@ describe('019 columns in the store mapping', () => {
       closed_message: null,
       tracked_sources: [{ name: 'A', src: 'a', createdAt: '' }],
     });
+  });
+
+  it('writes only values 019 accepts, whatever a restored backup carries', () => {
+    const rec = {
+      id: 'f_1',
+      name: 'Pool party',
+      slug: '48210377',
+      createdAt: '',
+      updatedAt: '',
+      schema: base.schema as never,
+      closesAt: 'not a date',
+      maxResponses: 0,
+      closedMessage: '😀'.repeat(600),
+      trackedSources: [{ name: 'x'.repeat(200), src: 'Bad Slug' }, 'junk'],
+    } as unknown as FormRecord;
+    const row = formRecordToRow(rec, { closeColumns: true });
+    expect(row).toMatchObject({ closes_at: null, max_responses: null, tracked_sources: null });
+    expect(Array.from(row.closed_message!)).toHaveLength(500);
+    expect(
+      formRecordToRow(
+        { ...rec, maxResponses: 10_001, closesAt: '2026-10-05T01:00:00Z' },
+        {
+          closeColumns: true,
+        },
+      ),
+    ).toMatchObject({ max_responses: null, closes_at: '2026-10-05T01:00:00.000Z' });
+    expect(
+      formRecordToRow({ ...rec, maxResponses: 2.5, closedMessage: '   ' }, { closeColumns: true }),
+    ).toMatchObject({ max_responses: null, closed_message: null });
   });
 
   it('a backup round-trips the new fields', () => {
