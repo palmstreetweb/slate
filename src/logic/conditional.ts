@@ -15,12 +15,15 @@
  *     ZIP with the question's service area (ADR-064); on a location question,
  *     its position with the radius (ADR-065). Passed as `areas` (see
  *     `areaIndex`). No area, or no answer to check yet, matches neither.
+ *   - Sign-up slots (ADR-066): a slot's value means "took that slot";
+ *     `WAITLIST_VALUE` means "joined a waitlist".
  */
 
 import type { Condition } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { OTHER_VALUE, hasOtherAnswer, type OtherIndex } from './other.js';
 import { IN_AREA_VALUE, OUT_OF_AREA_VALUE, type AreaIndex } from './address.js';
+import { WAITLIST_VALUE } from './signupAnswer.js';
 
 type AreaCheck = (answer: unknown) => 'in' | 'out' | null;
 
@@ -48,6 +51,13 @@ function eqLeaf(
   if (target === OTHER_VALUE) return optionValues ? hasOtherAnswer(answer, optionValues) : false;
   if (target === IN_AREA_VALUE) return area ? area(answer) === 'in' : false;
   if (target === OUT_OF_AREA_VALUE) return area ? area(answer) === 'out' : false;
+  // A sign-up answer (ADR-066) is tested by its taken slots, or its waitlists.
+  const s = answer as { slots?: unknown; wait?: unknown } | null;
+  if (s && typeof s === 'object' && Array.isArray(s.slots)) {
+    return target === WAITLIST_VALUE
+      ? Array.isArray(s.wait) && s.wait.length > 0
+      : s.slots.includes(target);
+  }
   const arr = asArray(answer);
   if (arr) return arr.some((x) => x === target);
   return answer === target;

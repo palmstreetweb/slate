@@ -1,0 +1,361 @@
+/* Wave D on-demand field UI (ADR-066): sign-up slots. The component that uses
+   these rules loads on demand; the published stylesheet includes them after
+   extensions-c.css (scripts/bundle-css.mjs).
+
+   Each slot is a `.slate-choice` button, so every theme's choice surface,
+   selection and Swiss inversion carry over; this file only lays out what sits
+   inside it. Wrapper-scoped. Colours come from tokens only (no literals — a
+   test checks). Tap targets are at least 44 px. Motion follows the ADR-059
+   pattern: rules outside the motion block are the static end state; keyframes
+   and transitions run only under `prefers-reduced-motion: no-preference` on a
+   wrapper without `data-reduced-motion`. */
+
+[data-slate-forms] .slate-slots-body {
+  margin-bottom: 0;
+}
+
+[data-slate-forms] .slate-slots-hint {
+  margin: 14px 0 0;
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--slate-muted);
+  text-transform: var(--slate-transform);
+}
+
+[data-slate-forms] .slate-slots {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+  width: min(100%, 600px);
+}
+
+[data-slate-forms] .slate-slot-day {
+  display: grid;
+  gap: 8px;
+}
+
+[data-slate-forms] .slate-slot-day-label {
+  margin: 0 0 2px;
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-has-decoration] .slate-slot-day-label,
+[data-slate-forms][data-has-decoration] .slate-slots-hint {
+  text-shadow:
+    0 0 1px var(--slate-bg),
+    0 0 12px var(--slate-bg);
+}
+
+/* ---------- one slot ---------- */
+
+[data-slate-forms] .slate-slot {
+  position: relative;
+  gap: 14px;
+  padding: 14px 16px;
+  min-height: 60px;
+}
+
+[data-slate-forms] .slate-slot-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+[data-slate-forms] .slate-slot-name {
+  overflow-wrap: anywhere;
+}
+
+[data-slate-forms] .slate-slot-when,
+[data-slate-forms] .slate-slot-desc {
+  font-size: 0.82em;
+  opacity: 0.7;
+}
+
+[data-slate-forms] .slate-slot-side {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+  max-width: 45%;
+  text-align: right;
+}
+
+[data-slate-forms] .slate-slot-status {
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  line-height: 1.3;
+}
+
+[data-slate-forms] .slate-slot-count {
+  font-family: var(--slate-font-mono);
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* How full the slot is: a thin bar, the respondent's own pick included. */
+[data-slate-forms] .slate-slot-meter {
+  display: block;
+  width: 64px;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+
+[data-slate-forms] .slate-slot-meter-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--slate-accent);
+  transform-origin: left center;
+  transform: scaleX(var(--slate-fill, 0));
+}
+
+/* Swiss and mono invert a selected choice (text colour becomes the surface). */
+[data-slate-forms][data-theme-name='swiss']
+  .slate-slot.slate-choice--selected
+  .slate-slot-meter-fill,
+[data-slate-forms][data-theme-name='mono']
+  .slate-slot.slate-choice--selected
+  .slate-slot-meter-fill,
+[data-slate-forms][data-theme-name='swiss'] .slate-slot:hover .slate-slot-meter-fill {
+  background: currentColor;
+}
+
+[data-slate-forms] .slate-slot-tick {
+  width: 62%;
+  height: 62%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- full, waiting, just filled up ---------- */
+
+[data-slate-forms] .slate-slot--full {
+  border-style: dashed;
+}
+
+[data-slate-forms] .slate-slot--full .slate-slot-main,
+[data-slate-forms] .slate-slot--full .slate-choice-badge {
+  opacity: 0.55;
+}
+
+[data-slate-forms] .slate-slot--full .slate-slot-meter-fill {
+  background: currentColor;
+  opacity: 0.45;
+}
+
+[data-slate-forms] .slate-slot[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+[data-slate-forms] .slate-slot[aria-disabled='true']:hover {
+  border-color: var(--slate-border-md);
+  background: transparent;
+}
+
+[data-slate-forms][data-has-decoration] .slate-slot[aria-disabled='true']:hover,
+[data-slate-forms][data-theme-name='mono'] .slate-slot[aria-disabled='true']:hover {
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms][data-theme-name='swiss'][data-theme] .slate-slot[aria-disabled='true']:hover {
+  background: var(--slate-bg-2);
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-slot--waiting {
+  border-style: dashed;
+}
+
+[data-slate-forms] .slate-slot--waiting .slate-slot-main,
+[data-slate-forms] .slate-slot--waiting .slate-choice-badge {
+  opacity: 1;
+}
+
+[data-slate-forms] .slate-slot--conflict,
+[data-slate-forms] .slate-slot--conflict:hover {
+  border-color: var(--slate-error);
+  background: color-mix(in srgb, var(--slate-error) 8%, var(--slate-bg));
+}
+
+[data-slate-forms] .slate-slot--conflict .slate-slot-status {
+  color: var(--slate-error);
+  font-weight: 700;
+}
+
+[data-slate-forms] .slate-slot--conflict .slate-slot-name {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+/* ---------- the last spot ---------- */
+
+[data-slate-forms] .slate-slot--last .slate-slot-status {
+  font-weight: 700;
+}
+
+[data-slate-forms] .slate-slot-stamp {
+  position: absolute;
+  top: -11px;
+  right: 14px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+  font-family: var(--slate-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: rotate(-4deg);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--slate-text) 16%, transparent);
+  pointer-events: none;
+}
+
+[data-slate-forms][data-theme-name='swiss'] .slate-slot-stamp,
+[data-slate-forms][data-theme-name='mono'] .slate-slot-stamp {
+  border-radius: 0;
+  box-shadow: none;
+  border: 2px solid var(--slate-bg);
+}
+
+/* Sparks fly from the stamp, then rest out of sight (the static end state). */
+[data-slate-forms] .slate-slot-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--slate-cf-1);
+  opacity: 0;
+}
+
+[data-slate-forms] .slate-slot-spark:nth-child(4n + 2) {
+  background: var(--slate-cf-2);
+}
+
+[data-slate-forms] .slate-slot-spark:nth-child(4n + 3) {
+  background: var(--slate-cf-3);
+  border-radius: 1px;
+}
+
+[data-slate-forms] .slate-slot-spark:nth-child(4n) {
+  background: var(--slate-cf-4);
+}
+
+@media (max-width: 560px) {
+  [data-slate-forms] .slate-slot {
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  [data-slate-forms] .slate-slot-meter {
+    width: 52px;
+  }
+}
+
+/* ============================================================
+   Motion
+   ============================================================ */
+
+@keyframes slate-d-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes slate-d-stamp {
+  0% {
+    opacity: 0;
+    transform: rotate(-22deg) scale(1.9);
+  }
+  55% {
+    opacity: 1;
+    transform: rotate(-2deg) scale(0.92);
+  }
+  75% {
+    transform: rotate(-5deg) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-4deg) scale(1);
+  }
+}
+
+@keyframes slate-d-spark {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--slate-a)) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--slate-a)) translateY(-38px) scale(0.3);
+  }
+}
+
+@keyframes slate-d-glint {
+  0%,
+  100% {
+    filter: none;
+  }
+  40% {
+    filter: brightness(1.5);
+  }
+}
+
+@keyframes slate-d-shiver {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-slot {
+    animation: slate-d-rise 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(140ms + min(var(--slate-i, 0), 10) * 40ms);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-slot-meter-fill {
+    transition: transform 460ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-slot--grabbed .slate-slot-stamp {
+    animation: slate-d-stamp 520ms cubic-bezier(0.2, 1, 0.3, 1) 120ms both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-slot--grabbed .slate-slot-spark {
+    animation: slate-d-spark 620ms cubic-bezier(0.2, 0.8, 0.3, 1) 300ms both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-slot--grabbed .slate-slot-meter {
+    animation: slate-d-glint 700ms ease-out 200ms both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-slot--conflict .slate-slot-status {
+    animation: slate-d-shiver 280ms ease-in-out 2;
+  }
+}

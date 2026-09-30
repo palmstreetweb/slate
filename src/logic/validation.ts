@@ -26,6 +26,7 @@ import {
   voiceMaxSeconds,
   voiceSecondsOf,
 } from './media.js';
+import { signupPicks } from './signupAnswer.js';
 
 export { isValidIsoDate };
 
@@ -493,6 +494,27 @@ export function validate(question: Question, answer: unknown): ValidationResult 
       }
       if (days.some((v) => typeof v !== 'string' || !RANGES_RE.test(v))) {
         return { code: 'shape', message: 'Those times didn’t come through. Paint them again.' };
+      }
+      return null;
+    }
+
+    case 'signup_slots': {
+      // Picks against the slots listed. Spots left are the server's, and the field
+      // and the server keep the answer canonical (signup.ts, ADR-066).
+      const { slots, wait } = signupPicks(answer);
+      const picks = [...slots, ...wait];
+      if (!picks.length) {
+        return question.required === false
+          ? null
+          : { code: 'required', message: 'Please pick one' };
+      }
+      const max = question.maxPicks ?? 1;
+      if (picks.length > max) return { code: 'max_selections', message: `Pick at most ${max}` };
+      if (
+        (wait.length && !question.waitlist) ||
+        picks.some((v, i) => picks.indexOf(v) !== i || !question.slots?.some((s) => s.value === v))
+      ) {
+        return { code: 'shape', message: 'That one isn’t available. Please pick again.' };
       }
       return null;
     }

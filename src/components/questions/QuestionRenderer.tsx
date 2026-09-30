@@ -76,6 +76,8 @@ export type QuestionRendererProps = {
   estimate?: Estimate | null;
   /** `schema.estimate`: currency, labels, breakdown, disclaimer. */
   estimateSettings?: EstimateSettings;
+  /** Spots left on this question's sign-up slots, by slot value (ADR-066). */
+  slotsLeft?: Readonly<Record<string, number>>;
 };
 
 function StepBadge({ step, total }: { step: number; total: number }) {
@@ -109,6 +111,7 @@ export function QuestionRenderer({
   allQuestions,
   estimate = null,
   estimateSettings,
+  slotsLeft,
 }: QuestionRendererProps) {
   // Resolve {{field:id}} / {{score}} / {{estimate}} piping (and function-style
   // DynamicTitle) once here, so every field component receives ready-to-render copy.
@@ -166,6 +169,7 @@ export function QuestionRenderer({
           resolveFileUploadMeta={resolveFileUploadMeta}
           currency={estimateCurrency(estimateSettings)}
           allQuestions={allQuestions}
+          slotsLeft={slotsLeft}
         />
       </>
     );
@@ -324,6 +328,7 @@ export function QuestionRenderer({
     case 'location':
     case 'photo_checklist':
     case 'availability':
+    case 'signup_slots':
     case 'contact_info':
     case 'address':
     case 'signature':

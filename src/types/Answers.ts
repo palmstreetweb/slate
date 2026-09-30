@@ -34,6 +34,7 @@ import type {
   LocationQuestion,
   PhotoChecklistQuestion,
   AvailabilityQuestion,
+  SignupSlotsQuestion,
 } from './Question.js';
 
 /**
@@ -64,6 +65,7 @@ import type {
  *   - location → { lat, lng, area? } / { zip, area? } / { typed } (ADR-065)
  *   - photo_checklist → { [itemValue]: fileRef } (ADR-065)
  *   - availability → { [day]: 'HH:MM-HH:MM,…' } (ADR-065)
+ *   - signup_slots → { slots: [slotValue, …], wait?: [slotValue, …] } (ADR-066)
  *   - welcome, statement, thanks → never stored
  */
 
@@ -120,6 +122,12 @@ export type PhotoChecklistAnswer = Record<string, string>;
 
 /** An `availability` answer (ADR-065): day → free ranges, `'09:00-11:30,14:00-16:00'`. */
 export type AvailabilityAnswer = Record<string, string>;
+
+/**
+ * A `signup_slots` answer (ADR-066): the slots taken, in the order picked, and
+ * the full slots whose waitlist they joined.
+ */
+export type SignupAnswer = { slots: string[]; wait?: string[] };
 
 export type LooseAnswers = Record<
   string,
@@ -184,22 +192,27 @@ export type AnswerValueOf<Q extends Question> = Q extends ShortTextQuestion
                                         ? PhotoChecklistAnswer
                                         : Q extends AvailabilityQuestion
                                           ? AvailabilityAnswer
-                                          : Q extends RankingQuestion<string, infer TOpts>
-                                            ? Array<OptionValueOf<TOpts>>
-                                            : Q extends PictureChoiceQuestion<string, infer TOpts>
-                                              ? Q extends { multiple: true }
-                                                ? Array<WithOther<Q, OptionValueOf<TOpts>>>
-                                                : WithOther<Q, OptionValueOf<TOpts>>
-                                              : Q extends SingleChoiceQuestion<string, infer TOpts>
-                                                ? WithOther<Q, OptionValueOf<TOpts>>
-                                                : Q extends DropdownQuestion<string, infer TOpts>
+                                          : Q extends SignupSlotsQuestion
+                                            ? SignupAnswer
+                                            : Q extends RankingQuestion<string, infer TOpts>
+                                              ? Array<OptionValueOf<TOpts>>
+                                              : Q extends PictureChoiceQuestion<string, infer TOpts>
+                                                ? Q extends { multiple: true }
+                                                  ? Array<WithOther<Q, OptionValueOf<TOpts>>>
+                                                  : WithOther<Q, OptionValueOf<TOpts>>
+                                                : Q extends SingleChoiceQuestion<
+                                                      string,
+                                                      infer TOpts
+                                                    >
                                                   ? WithOther<Q, OptionValueOf<TOpts>>
-                                                  : Q extends MultiChoiceQuestion<
-                                                        string,
-                                                        infer TOpts
-                                                      >
-                                                    ? Array<WithOther<Q, OptionValueOf<TOpts>>>
-                                                    : never;
+                                                  : Q extends DropdownQuestion<string, infer TOpts>
+                                                    ? WithOther<Q, OptionValueOf<TOpts>>
+                                                    : Q extends MultiChoiceQuestion<
+                                                          string,
+                                                          infer TOpts
+                                                        >
+                                                      ? Array<WithOther<Q, OptionValueOf<TOpts>>>
+                                                      : never;
 
 /**
  * `required: true` on a question means its answer is guaranteed present at
@@ -209,6 +222,7 @@ export type AnswerValueOf<Q extends Question> = Q extends ShortTextQuestion
  */
 type DefaultRequiredQuestion =
   | SingleChoiceQuestion
+  | SignupSlotsQuestion
   | DropdownQuestion
   | YesNoQuestion
   | LegalQuestion;

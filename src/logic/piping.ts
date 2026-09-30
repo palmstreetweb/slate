@@ -19,6 +19,7 @@ import { formatAddress } from './address.js';
 import { signaturePathOf, signatureTypedOf } from './signature.js';
 import { formatPins } from './pins.js';
 import { formatPhotoCount, formatVoiceNote } from './media.js';
+import { signupPicks } from './signupAnswer.js';
 
 const PIPE_RE = /\{\{\s*(score|estimate|field:[\w-]+)\s*\}\}/g;
 
@@ -118,6 +119,15 @@ export function formatAnswerFor(q: Question | undefined, v: unknown): string {
             `${d[0]!.toUpperCase()}${d.slice(1)} ${(a[d] as string).replace(/,/g, ', ').replace(/-/g, '–')}`,
         )
         .join('; ');
+    }
+    case 'signup_slots': {
+      // "Sat 10–11am, Sun 2–3pm (waitlist)" — a slot's label, else its day and time (ADR-066).
+      const { slots, wait } = signupPicks(v);
+      const name = (x: string) => {
+        const s = q.slots.find((o) => o.value === x);
+        return s?.label?.trim() || [s?.date, s?.start].filter(Boolean).join(' ') || x;
+      };
+      return [...slots.map(name), ...wait.map((x) => `${name(x)} (waitlist)`)].join(', ');
     }
     default:
       return formatAnswer(v);

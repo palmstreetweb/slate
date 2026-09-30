@@ -58,8 +58,12 @@ export type UseFormStateApi = {
   next: () => void;
   /** Pop history; otherwise step − 1. */
   back: () => void;
-  /** Direct jump (rare — used for restart from thanks). */
-  goTo: (step: number, direction?: AnimDirection) => void;
+  /**
+   * Direct jump (the review screen's edit links). `rewind` returns to a step
+   * already passed as if by Back: history is cut back to it rather than the
+   * current step pushed (a submit sending the respondent back, ADR-066).
+   */
+  goTo: (step: number, direction?: AnimDirection, rewind?: boolean) => void;
   /** Mark the current transition complete. */
   animationEnd: () => void;
   /** Per ADR-005 — answers payload for `onSubmit` (excludes hidden). */
@@ -93,7 +97,7 @@ type Action =
   | { type: 'set_answer'; id: string; value: SetAnswerValue | SetAnswerUpdater }
   | { type: 'go_next' }
   | { type: 'go_back' }
-  | { type: 'go_to'; step: number; direction: AnimDirection }
+  | { type: 'go_to'; step: number; direction: AnimDirection; rewind?: boolean }
   | { type: 'animation_end' }
   | { type: 'record_visited'; id: string }
   | { type: 'hydrate'; snapshot: ResumeSnapshot }
@@ -164,9 +168,16 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
         const target = Math.max(0, Math.min(a.step, visible.length - 1));
         if (target === s.step) return s;
         const current = visible[Math.min(s.step, visible.length - 1)];
+        const cut = a.rewind ? s.history.lastIndexOf(visible[target]!.id) : -1;
         return {
           ...s,
-          history: current ? [...s.history, current.id] : s.history,
+          history: a.rewind
+            ? cut >= 0
+              ? s.history.slice(0, cut)
+              : s.history
+            : current
+              ? [...s.history, current.id]
+              : s.history,
           step: target,
           direction: a.direction,
           isAnimating: true,
@@ -248,9 +259,12 @@ export function useFormState(schema: Schema, opts: UseFormStateOptions = {}): Us
   const next = useCallback(() => dispatch({ type: 'go_next' }), []);
   const back = useCallback(() => dispatch({ type: 'go_back' }), []);
 
-  const goTo = useCallback((step: number, direction: AnimDirection = 'forward') => {
-    dispatch({ type: 'go_to', step, direction });
-  }, []);
+  const goTo = useCallback(
+    (step: number, direction: AnimDirection = 'forward', rewind?: boolean) => {
+      dispatch({ type: 'go_to', step, direction, rewind });
+    },
+    [],
+  );
 
   const animationEnd = useCallback(() => dispatch({ type: 'animation_end' }), []);
 

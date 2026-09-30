@@ -16,6 +16,7 @@ import { geoCenter, geoRadiusKm } from './geo.js';
 import { safeImageSrc, PIN_IMAGE_DATA_MAX } from '@/utils/brandLogo.js';
 import { contactShown } from './contact.js';
 import { PRICE_MAX } from './estimate.js';
+import { isValidIsoDate, isValidTime } from './dateValue.js';
 
 export type SchemaIssue = {
   /** The question carrying the problem. */
@@ -46,7 +47,11 @@ export type SchemaIssue = {
     /** An availability grid with days, times or a slot length it can't use (ADR-065). */
     | 'bad_grid'
     /** Swipe cards on a picture choice that isn't multi-select (ADR-065). */
-    | 'swipe_single';
+    | 'swipe_single'
+    /** A sign-up question with no slot it can offer (ADR-066). */
+    | 'no_slots'
+    /** A slot without a name, 1–1,000 spots, its own key or a real date and time; or over 50 slots (ADR-066). */
+    | 'bad_slots';
   message: string;
 };
 
@@ -216,6 +221,38 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
         kind: 'swipe_single',
         message: `"${q.id}" uses swipe cards, which need "Allow multiple selections" on`,
       });
+    }
+    if (q.type === 'signup_slots') {
+      // The rule of signupSlotsOf (logic/signup.ts, kept out of the core; a test checks they agree).
+      const keys = new Set<string>();
+      const list = Array.isArray(q.slots) ? q.slots : [];
+      const usable = list.slice(0, 50).filter((x) => {
+        const ok =
+          /^[\w-]{1,64}$/.test(x.value) &&
+          !keys.has(x.value) &&
+          Number.isInteger(x.capacity) &&
+          x.capacity >= 1 &&
+          x.capacity <= 1000;
+        if (ok) keys.add(x.value);
+        return ok;
+      }).length;
+      const bad =
+        usable < list.length ||
+        list.some(
+          (x) =>
+            !(x.label?.trim() || x.date) ||
+            (x.date !== undefined && !isValidIsoDate(x.date)) ||
+            [x.start, x.end].some((t) => t !== undefined && !isValidTime(t)),
+        );
+      if (!usable || bad) {
+        issues.push({
+          questionId: q.id,
+          kind: usable ? 'bad_slots' : 'no_slots',
+          message: usable
+            ? `"${q.id}" has a slot it can't offer: each needs a name, 1–1,000 spots and a real date and time (50 slots at most)`
+            : `"${q.id}" offers no slots — add one with a name and its spots`,
+        });
+      }
     }
     if (q.type === 'contact_info' && contactShown(q).length === 0) {
       issues.push({

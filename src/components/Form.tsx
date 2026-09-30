@@ -11,6 +11,8 @@
  * there — this file doesn't change.
  *
  * onSubmit fires exactly once on entering the `thanks` step (per ADR-005).
+ * A rejection carrying `goTo` returns to that question with its message
+ * shown there and every answer kept (a sign-up slot that filled, ADR-066).
  *
  * Motion (ADR-059): the outgoing question gets its 220ms exit as an inert
  * copy laid over the stage (utils/questionHandoff.ts), and a confirmed
@@ -82,6 +84,7 @@ export function Form<S extends Schema>({
   resolveFileUploadMeta,
   resume = false,
   onPartialChange,
+  slotsLeft,
 }: FormProps<S>) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -145,6 +148,8 @@ export function Form<S extends Schema>({
     'idle',
   );
   const [submitErrorMsg, setSubmitErrorMsg] = useState<string | null>(null);
+  /** A submit sent the respondent back to a question, with this message (ADR-066). */
+  const [notice, setNotice] = useState<{ id: string; text: string } | null>(null);
 
   // Running score (ADR-016) — feeds {{score}} piping and SubmitMeta.
   const score = useMemo(
@@ -340,8 +345,18 @@ export function Form<S extends Schema>({
       })
       .catch((err: unknown) => {
         if (generation !== submitGenRef.current) return;
-        setSubmitStatus('error');
         const msg = err instanceof Error ? err.message : null;
+        // Back to a question (a sign-up slot filled meanwhile): answers kept, submit re-armed.
+        const back = (err as { goTo?: unknown } | null)?.goTo;
+        const idx = state.visible.findIndex((q) => q.id === back);
+        if (idx >= 0) {
+          submittedRef.current = false;
+          setSubmitStatus('idle');
+          setNotice({ id: back as string, text: msg ?? errorMessage });
+          goTo(idx, 'backward', true);
+          return;
+        }
+        setSubmitStatus('error');
         setSubmitErrorMsg(msg ?? errorMessage);
       });
   }, [
@@ -357,7 +372,20 @@ export function Form<S extends Schema>({
     estimate,
     resumeEnabled,
     clearAutosave,
+    state.visible,
+    goTo,
   ]);
+
+  // The notice stays until the respondent moves on from its question.
+  const noticeFor = notice && currentQuestion?.id === notice.id ? notice.text : null;
+  const shownNoticeRef = useRef(false);
+  useEffect(() => {
+    if (noticeFor) shownNoticeRef.current = true;
+    else if (notice && shownNoticeRef.current) {
+      shownNoticeRef.current = false;
+      setNotice(null);
+    }
+  }, [noticeFor, notice]);
 
   // Finale chord (ADR-059) — on a confirmed submit only, and only when the
   // form's sound is on. Keyed on the status flip so it plays once per submit.
@@ -510,6 +538,11 @@ export function Form<S extends Schema>({
               data-direction={state.direction}
               onAnimationEnd={animationEnd}
             >
+              {noticeFor ? (
+                <p className="slate-notice" role="alert">
+                  {noticeFor}
+                </p>
+              ) : null}
               {currentQuestion ? (
                 <QuestionRenderer
                   question={currentQuestion}
@@ -535,6 +568,7 @@ export function Form<S extends Schema>({
                   allQuestions={schema.questions}
                   estimate={estimate}
                   estimateSettings={schema.estimate}
+                  slotsLeft={slotsLeft?.[currentQuestion.id]}
                 />
               ) : null}
             </div>

@@ -86,12 +86,26 @@ export type SubmitMeta = {
 };
 
 /**
+ * Spots left per sign-up slot (ADR-066): question id → slot value → spots
+ * left (0 = full). A host that stores responses passes what its server
+ * reports; slots it doesn't mention show their capacity.
+ */
+export type SlotsLeft = Readonly<Record<string, Readonly<Record<string, number>>>>;
+
+/**
  * Props for the `<Form>` component. Generic over the schema so that consumers
  * get strongly-typed `answers` in their `onSubmit` and `onQuestionChange`
  * callbacks when the schema was built with `defineSchema`.
  */
 export type FormProps<S extends Schema = Schema> = {
   schema: S;
+  /**
+   * Called once on reaching an ending. A rejection shows its message with a
+   * Retry. A rejection whose error carries `goTo` (a question id) instead
+   * returns the respondent to that question with the message shown there and
+   * every answer kept — e.g. a sign-up slot that filled while they were
+   * answering (ADR-066).
+   */
   onSubmit: (
     answers: S extends Schema<infer Q> ? AnswersOf<Q> : LooseAnswers,
     meta: SubmitMeta,
@@ -111,6 +125,12 @@ export type FormProps<S extends Schema = Schema> = {
   prefill?: Readonly<Record<string, string | undefined>>;
   /** Override the fallback message shown when `onSubmit` rejects. */
   errorMessage?: string;
+  /**
+   * Live spots left on sign-up slots (ADR-066). Update it any time (e.g. from
+   * a 409 when a slot filled); a slot the respondent picked that is now full
+   * asks them to pick another.
+   */
+  slotsLeft?: SlotsLeft;
   /**
    * Host-controlled storage for `file_upload` questions (ADR-012). Called
    * with the selected File; the resolved string (URL or identifier) is

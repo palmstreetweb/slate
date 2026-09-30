@@ -21,6 +21,8 @@
  * spot, the voice note, location, the photo checklist and the availability
  * grid. The dropdown, the plain date, number, phone, website, legal consent
  * and NPS moved here too, unchanged, for the same reason.
+ *
+ * Wave D (ADR-066) adds sign-up slots.
  */
 
 'use client';
@@ -56,6 +58,8 @@ export type ExtFieldProps<Q extends Question = Question> = {
   currency?: string;
   /** Every question in the form (a location checks a typed ZIP against the address areas, ADR-065). */
   allQuestions?: ReadonlyArray<Question>;
+  /** Sign-up slots (ADR-066): spots left per slot value, from the host; unknown slots show their capacity. */
+  slotsLeft?: Readonly<Record<string, number>>;
 };
 
 export type ExtFieldKey =
@@ -77,7 +81,8 @@ export type ExtFieldKey =
   | 'voice-note'
   | 'location'
   | 'photo-checklist'
-  | 'availability';
+  | 'availability'
+  | 'signup-slots';
 
 /** Chunks on the same cache that aren't question fields. */
 type ExtChunkKey = ExtFieldKey | 'estimate-reveal';
@@ -107,6 +112,7 @@ const LOADERS: Record<ExtChunkKey, () => Promise<{ default: AnyChunk }>> = {
   location: () => import('./ext/LocationField.js'),
   'photo-checklist': () => import('./ext/PhotoChecklistField.js'),
   availability: () => import('./ext/AvailabilityField.js'),
+  'signup-slots': () => import('./ext/SignupSlotsField.js'),
   'estimate-reveal': () => import('./ext/EstimateReveal.js'),
 };
 
@@ -157,6 +163,8 @@ export function extFieldKey(q: Question): ExtFieldKey | null {
       return 'photo-checklist';
     case 'availability':
       return 'availability';
+    case 'signup_slots':
+      return 'signup-slots';
     default:
       return null;
   }

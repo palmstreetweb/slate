@@ -44,6 +44,8 @@ export type {
   PhotoChecklistQuestion,
   AvailabilityQuestion,
   Weekday,
+  SignupSlotsQuestion,
+  SignupSlot,
   Option,
   PictureOption,
   Condition,
@@ -69,6 +71,7 @@ export type {
   LocationAnswer,
   PhotoChecklistAnswer,
   AvailabilityAnswer,
+  SignupAnswer,
 } from './Answers.js';
 
 export type { Estimate, EstimateLine, EstimateSettings } from './Estimate.js';
@@ -84,4 +87,11 @@ export type {
 
 export type { FormSound, FormSoundId } from './Sound.js';
 
-export type { Schema, FormProps, SubmitMeta, PartialMeta, BrandConfig } from './Schema.js';
+export type {
+  Schema,
+  FormProps,
+  SubmitMeta,
+  PartialMeta,
+  BrandConfig,
+  SlotsLeft,
+} from './Schema.js';

@@ -603,7 +603,8 @@
 
   /* ---- invalid input: the error slides in (the shake is WAAPI) ---- */
 
-  [data-slate-forms]:not([data-reduced-motion]) .slate-err {
+  [data-slate-forms]:not([data-reduced-motion]) .slate-err,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-notice {
     animation: slate-err-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 

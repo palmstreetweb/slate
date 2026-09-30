@@ -25,6 +25,8 @@ const ORDER = [
   'extensions.css',
   // Wave C on-demand field UIs (ADR-065).
   'extensions-c.css',
+  // Wave D: sign-up slots (ADR-066).
+  'extensions-d.css',
   'motion.css',
 ];
 

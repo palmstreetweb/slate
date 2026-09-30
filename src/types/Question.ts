@@ -591,6 +591,53 @@ export type AvailabilityQuestion<TId extends string = string> = IdField<TId> &
     slotMinutes?: number;
   };
 
+/* ---------- Wave D: sign-up slots (ADR-066) ---------- */
+
+/**
+ * One sign-up slot: "Sat 10–11am, 8 spots", "Bring drinks, 3 spots". `value`
+ * is the stable key stored in answers (keep it when the label changes).
+ */
+export type SignupSlot = {
+  label: string;
+  /** Letters, digits, `_` and `-`, up to 64 characters. */
+  value: string;
+  /** Spots, a whole number from 1 to 1,000. */
+  capacity: number;
+  /** Optional day, ISO `YYYY-MM-DD`. Slots on the same day are grouped under it. */
+  date?: string;
+  /** Optional start and end, `HH:MM` (24-hour wall clock, no time zone). */
+  start?: string;
+  end?: string;
+  /** A short line under the label ("Meet at the side gate"). */
+  description?: string;
+};
+
+/**
+ * Sign-up slots with limited spots (ADR-066). Respondents see what's left
+ * (`<Form slotsLeft>`) and take one slot, or up to `maxPicks`. The server
+ * takes the spot in the same transaction as the response, so a slot never
+ * holds more people than its capacity; a slot that fills while someone is
+ * answering sends them back here to pick another. Stored as
+ * `{ slots: [value, …], wait?: [value, …] }` — `wait` is the slots whose
+ * waitlist they joined (only with `waitlist: true`).
+ */
+export type SignupSlotsQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'signup_slots';
+    title: DynamicTitle;
+    /** What it's for, shown under the title. */
+    body?: string;
+    slots: ReadonlyArray<SignupSlot>;
+    /** Defaults to true. */
+    required?: boolean;
+    /** Most slots one person may take (waitlists count), 1–50; default 1. */
+    maxPicks?: number;
+    /** When a slot is full, offer "Join the waitlist"; default false. */
+    waitlist?: boolean;
+    /** Show how many spots are left ("3 of 8 left"); default true. Full slots always say so. */
+    showRemaining?: boolean;
+  };
+
 /* ---------- scale ---------- */
 
 /** How a `scale` question is drawn (ADR-063). The answer is the same number in every style. */
@@ -657,6 +704,7 @@ export type Question =
   | LocationQuestion
   | PhotoChecklistQuestion
   | AvailabilityQuestion
+  | SignupSlotsQuestion
   | ReviewQuestion
   | ThanksQuestion;
 

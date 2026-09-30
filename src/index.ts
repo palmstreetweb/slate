@@ -75,6 +75,12 @@ export { OTHER_VALUE } from './logic/other.js';
 export { IN_AREA_VALUE, OUT_OF_AREA_VALUE } from './logic/address.js';
 
 /**
+ * In a condition's value on a sign-up question: "joined a waitlist" (ADR-066).
+ * A slot's own value means "took that slot".
+ */
+export { WAITLIST_VALUE } from './logic/signupAnswer.js';
+
+/**
  * The instant estimate for a schema and answers (ADR-064) — what the Thank
  * You screen shows and `SubmitMeta.estimate` carries. A server that stores
  * responses can call it on its own copy of the schema instead of trusting
