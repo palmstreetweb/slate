@@ -57,6 +57,9 @@ In the Neon SQL Editor (or `psql` with the pooled connection string), run in ord
 16. `neon/migrations/016_crowd_rate_limits.sql`
 17. `neon/migrations/017_slug_oracle.sql`
 18. `neon/migrations/018_revoke_get_form_by_slug.sql`: **not with the others.** Apply it 24 h after the SPA that loads forms through the Function is live (ADR-061).
+19. `neon/migrations/019_form_close.sql` (ADR-063)
+20. `neon/migrations/020_signup_slots.sql` (ADR-066)
+21. `neon/migrations/021_storage_quotas.sql` (ADR-067): see below — it comes with a backfill and a deploy order.
 
 Then **Data API → Refresh schema cache**. Do this after every migration that adds a column or
 changes a function signature — 012 does both (`forms.fill_locked`, `get_form_by_slug` gains
@@ -80,6 +83,21 @@ overall per UTC day — edit `ai_quota_limits()` to change them.
 017 (ADR-061) closes the slug oracle: `lookup_public_form` (distinct unknown slugs per IP, over budget refuses hits too), `slug_miss_buckets`, and `forms.published_name` (the title as of the last publish, kept by a trigger). `get_form_by_slug` keeps its signature and grants but returns the published title. Apply it BEFORE redeploying `submitresponse`; the new Function answers 503 on form loads and unlocks until it exists. Then refresh the Data API schema cache (`npx neonctl data-api refresh-schema --project-id … --branch production --database neondb`): the studio reads `published_name` to offer Republish after a rename (ADR-061 (h)); on a stale cache it still works without that. Order: 017 → refresh cache → redeploy `submitresponse` → ship the SPA → 24 h later, 018. The file ends with its own rollback SQL.
 
 018 revokes anonymous and signed-in EXECUTE on `get_form_by_slug`. After it, a rollback of the SPA to a pre-ADR-061 build breaks public forms until you run the GRANT at the bottom of 018.
+
+021 (ADR-067) adds storage quotas: every object storagesign signs gets a row in `form_uploads` (the server picks its key), each account may keep **1 GiB** of files (claimed plus unclaimed uploads younger than 24 h; `storage_quota_limit()`), a response claims its files in the same transaction as its insert, files of responses and forms deleted for good are deleted from the bucket, and uploads nobody claimed are deleted after 24 h. Numbers live in `storage_quota_limit()`, `storage_pending_limit()`, `storage_global_limit()` and `storage_pending_ttl()` — `create or replace` one to change it. Deploy in one sitting:
+
+1. Apply 021, then `npx neonctl@latest data-api refresh-schema …` (the studio's storage meter calls `storage_quota_status`). Today's Functions keep working on it.
+2. Redeploy `storagesign`. From now on every upload is recorded; storagesign answers 503 on uploads if 021 is missing.
+3. Wait 10 minutes (the old storagesign's last presigned uploads expire), then register the objects already in the bucket — first a dry run, which prints counts and bytes and writes nothing:
+   ```bash
+   DATABASE_URL=<production neondb_owner> CONFIRM_HOST=<that host> \
+   NEON_PROJECT_ID=<id> NEON_BRANCH=production \
+   npx vite-node scripts/backfill-storage-uploads.ts            # then again with --apply
+   ```
+   Objects no response names are registered as unclaimed, so they are deleted 24 h after `--apply` unless someone submits them; `--orphans=skip` leaves them unregistered (never counted, never deleted). The bucket is only listed, never written.
+4. Redeploy `submitresponse`, then ship the SPA.
+
+Pages loaded before the deploy keep uploading for **72 h after 021 is applied** (`storage_legacy_until()`); the SPA must be live well before then. Rollback: the SPA (optional), `submitresponse`, `storagesign`, then 021's rollback block, then refresh the schema cache. There is no new Function env. `scripts/check-storage-quotas.ts` runs the whole thing against a throwaway branch it creates and deletes.
 
 Anyone can sign up (Google, magic link, or email code). Each account owns its own forms (ADR-036).
 Each account is capped at **50 forms** including Trash (ADR-038); permanent delete frees a slot.

@@ -13,6 +13,7 @@ Follow [`neon/SETUP.md`](./neon/SETUP.md) in full:
 - [ ] Function env: `STORAGE_SIGN_*` / `SUBMIT_RATE_*` / `UNLOCK_RATE_*` / `FORM_LOOKUP_MISS_MAX` (optional; names, defaults and units in `neon/SETUP.md` §5, ADR-058), `authemail`: `RESEND_API_KEY` + `NEON_AUTH_URL`, `storagesign`: `NEON_AUTH_URL`
 - [ ] Apply `016_crowd_rate_limits.sql` before redeploying `submitresponse` and `storagesign` (ADR-058)
 - [ ] Apply `017_slug_oracle.sql` and refresh the Data API schema cache before redeploying `submitresponse`, then ship the SPA; apply `018_revoke_get_form_by_slug.sql` 24 h later (ADR-061)
+- [ ] Storage quotas, in one sitting (ADR-067, `neon/SETUP.md` §4): `021_storage_quotas.sql` → refresh the schema cache → `storagesign` → 10 min → `scripts/backfill-storage-uploads.ts` (dry run, then `--apply`) → `submitresponse` → SPA, all within 72 h of 021
 - [ ] Auth webhooks: `send.otp` + `send.magic_link` → `https://slateforms.vercel.app/api/auth-email` (proxies to `authemail`)
 - [ ] Confirm Neon Auth / Google OAuth allows any account (not org-restricted)
 
