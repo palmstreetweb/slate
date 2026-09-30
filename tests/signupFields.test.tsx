@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { Form, defineSchema } from '@/index.js';
 import type { SignupSlotsQuestion, SlotsLeft } from '@/index.js';
+import { ReducedMotionOverrideContext } from '@/hooks/useReducedMotion.js';
 
 const swim: SignupSlotsQuestion = {
   id: 'swim',
@@ -219,6 +220,23 @@ describe('sign-up slots: picking', () => {
     expect(container.querySelectorAll('.slate-slot-spark')).toHaveLength(8);
     expect(screen.getByText('You got the last spot: Lunch swim.')).toBeInTheDocument();
     await screen.findByRole('heading', { name: 'Anything else?' }, { timeout: 2000 });
+  });
+});
+
+describe('sign-up slots: calm motion (ADR-059)', () => {
+  it('the last spot moves on at the usual beat, its stamp drawn and still', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <ReducedMotionOverrideContext.Provider value={true}>
+        <Form schema={schemaWith(swim)} slotsLeft={LEFT} onSubmit={vi.fn()} />
+      </ReducedMotionOverrideContext.Provider>,
+    );
+    expect(container.querySelector('[data-slate-forms]')).toHaveAttribute('data-reduced-motion');
+    await toSlots(user);
+    await user.click(await screen.findByRole('radio', { name: /^Lunch swim/ }));
+    expect(within(slot(/^Lunch swim/)).getByText('Last spot!')).toBeInTheDocument();
+    // No 1.1 s hold: the usual ~220 ms commit beat.
+    await screen.findByRole('heading', { name: 'Anything else?' }, { timeout: 700 });
   });
 });
 

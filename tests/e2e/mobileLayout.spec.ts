@@ -9,6 +9,90 @@ import { test, expect, type Page } from '@playwright/test';
 
 const WIDTHS = [360, 375, 390, 430];
 
+/** A sign-up form with responses (ADR-066), written straight into the offline stores. */
+function seedSignup() {
+  const id = 'local_e2e_signup';
+  const now = new Date().toISOString();
+  const schema = {
+    id,
+    brand: { name: 'Pool' },
+    theme: 'classic',
+    themeMode: 'light',
+    questions: [
+      { id: 'welcome', type: 'welcome', title: 'Pool party' },
+      { id: 'name', type: 'short_text', title: 'Your name?' },
+      {
+        id: 'swim',
+        type: 'signup_slots',
+        title: 'Pick a time',
+        waitlist: true,
+        slots: [
+          {
+            label: 'Morning swim',
+            value: 's_am',
+            capacity: 2,
+            date: '2026-10-03',
+            start: '10:00',
+            end: '11:00',
+          },
+          {
+            label: 'Late morning with a long name',
+            value: 's_late',
+            capacity: 1,
+            date: '2026-10-03',
+            start: '11:00',
+            end: '12:00',
+            description: 'Meet at the side gate by the palms',
+          },
+          { label: 'Bring drinks', value: 's_drinks', capacity: 3 },
+        ],
+      },
+      { id: 'done', type: 'thanks', title: 'Thanks' },
+    ],
+  };
+  const forms = JSON.parse(localStorage.getItem('slate-forms') ?? '[]').filter(
+    (f: { id: string }) => f.id !== id,
+  );
+  forms.unshift({
+    id,
+    name: 'Pool party',
+    slug: '55667788',
+    createdAt: now,
+    updatedAt: now,
+    schema,
+    publishedSchema: schema,
+    status: 'published',
+  });
+  localStorage.setItem('slate-forms', JSON.stringify(forms));
+  const meta = {
+    startedAt: now,
+    completedAt: now,
+    durationMs: 1000,
+    questionsVisited: [],
+    hiddenFields: {},
+    score: 0,
+  };
+  const subs = [
+    {
+      id: 's_e2e1',
+      formId: id,
+      receivedAt: now,
+      answers: { name: 'Ada Lovelace', swim: { slots: ['s_late'] } },
+      meta,
+    },
+    {
+      id: 's_e2e2',
+      formId: id,
+      receivedAt: now,
+      answers: { name: 'Grace Hopper', swim: { slots: [], wait: ['s_late'] } },
+      meta,
+    },
+  ];
+  localStorage.setItem('slate-submissions', JSON.stringify(subs));
+  localStorage.setItem('slate-responses-view', 'summary');
+  return id;
+}
+
 async function expectFits(page: Page, width: number, label: string) {
   const m = await page.evaluate(() => ({
     inner: window.innerWidth,
@@ -55,6 +139,30 @@ for (const width of WIDTHS) {
       await page.goto(`/forms/${formId}/preview`);
       await expect(page.locator('.slate-preview')).toBeVisible();
       await expectFits(page, width, 'preview');
+    });
+
+    test('sign-up slots: inspector, test run and roster fit (ADR-066)', async ({ page }) => {
+      await page.goto('/');
+      const id = await page.evaluate(seedSignup);
+
+      await page.goto(`/forms/${id}/edit`);
+      await page.getByText('Pick a time', { exact: true }).click();
+      await expect(page.locator('.slate-insp-slots')).toBeVisible();
+      await expectFits(page, width, 'sign-up inspector');
+
+      await page.goto(`/forms/${id}/preview`);
+      await page.getByRole('button', { name: /start/i }).click();
+      await page.getByRole('textbox').fill('Sam');
+      await page.keyboard.press('Enter');
+      await expect(page.locator('.slate-slot').first()).toBeVisible();
+      await expect(page.getByRole('radio', { name: /^Late morning/ })).toHaveAccessibleName(
+        /Full · join the waitlist$/,
+      );
+      await expectFits(page, width, 'sign-up slots');
+
+      await page.goto(`/forms/${id}/submissions`);
+      await expect(page.locator('.rsp-sum-roster')).toBeVisible();
+      await expectFits(page, width, 'sign-up roster');
     });
   });
 }
