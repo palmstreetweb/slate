@@ -4,8 +4,9 @@
  * + the public form lookup (ADR-061, `GET ?op=form&slug=`).
  * Deploy: neon functions deploy submitresponse --src neon/functions/submit-response
  * DATABASE_URL is injected by Neon. Needs migrations 016 (consume_submit_rates,
- * try_fill_password), 017 (lookup_public_form) and 019 (close settings,
- * insert_public_submission).
+ * try_fill_password), 017 (lookup_public_form), 019 (close settings,
+ * insert_public_submission) and 020 (sign-up slots: forms.signup_slots,
+ * signup_left, the slot check in insert_public_submission).
  *
  * Instant estimates (ADR-064): recomputed here from the published schema and
  * the sanitized answers, and stored in meta.estimate; a client value never is.
@@ -14,6 +15,12 @@
  * published question (a location's in / out of the service area is the
  * server's own); voice notes and photo checklists keep this form's own
  * storage refs only.
+ *
+ * Sign-up slots (ADR-066): the insert takes each spot under the same per-form
+ * lock as the response cap (migration 020), so a slot never holds more than
+ * its capacity; a full slot is a 409 with reason 'slot_full', naming the slots
+ * and every slot's spots left, and the page sends the respondent back to pick
+ * again. The public lookup reports spots left (counts only, never who).
  *
  * Closed forms (ADR-063): a form past its closing time is refused (410) right
  * after the gate read, before any charge; a form at its response cap is
@@ -40,6 +47,7 @@ import { fillUnlockToken, isValidUnlockToken } from './fillLock.js';
 import { clientIp } from './requestIp.js';
 import { clampForQuestion, clampText, isSafeKey, keepFileRefs } from './answerShape.js';
 import { computeEstimateCore } from './estimate.js';
+import { signupSlotsOf } from './signup.js';
 import { formZipAreas } from './geo.js';
 import { aboutMinutes, charge, intEnv, ipMax, ownerKey, units, type Bucket } from './rateGate.js';
 
@@ -113,6 +121,41 @@ function closedResponse(c: Context, reason: 'date' | 'full', message: string | n
   );
 }
 
+/**
+ * A sign-up slot filled while the respondent was answering (ADR-066): 409 with
+ * reason 'slot_full', the full slots (question id, slot value and label), and
+ * every slot's spots left, so the page can send them back to pick again with
+ * every other answer kept. Nothing was stored.
+ */
+function slotFullResponse(c: Context, schema: unknown, fullRaw: unknown, leftRaw: unknown) {
+  const questions = (schema as { questions?: unknown } | null)?.questions;
+  const byId = new Map<string, Record<string, unknown>>();
+  if (Array.isArray(questions)) {
+    for (const q of questions) if (isObj(q) && typeof q.id === 'string') byId.set(q.id, q);
+  }
+  const full: Array<{ question: string; slot: string; label: string }> = [];
+  for (const f of Array.isArray(fullRaw) ? fullRaw.slice(0, 50) : []) {
+    if (!isObj(f) || typeof f.question !== 'string' || typeof f.slot !== 'string') continue;
+    const q = byId.get(f.question);
+    const label = (q ? signupSlotsOf(q) : []).find((s) => s.value === f.slot)?.label ?? '';
+    full.push({ question: f.question, slot: f.slot, label });
+  }
+  const named = full.find((f) => f.label)?.label;
+  c.header('Cache-Control', 'no-store');
+  return c.json(
+    {
+      error:
+        full.length === 1 && named
+          ? `${named} just filled up. Please pick another — your other answers are still here.`
+          : 'A spot you picked just filled up. Please pick another — your other answers are still here.',
+      reason: 'slot_full',
+      full,
+      ...(slotsLeftOf(leftRaw) ? { slotsLeft: slotsLeftOf(leftRaw) } : {}),
+    },
+    409,
+  );
+}
+
 /** 017 lookup_public_form. owner_id and the hash never leave this Function. */
 type LookupRow = {
   outcome: 'ok' | 'miss' | 'denied';
@@ -127,6 +170,8 @@ type LookupRow = {
   closed_by_date: boolean | null;
   closed_full: boolean | null;
   closed_message: string | null;
+  /** 020: spots left per sign-up question and slot, or null when the form has none. */
+  slots_left: unknown;
 };
 
 type TryRow = {
@@ -240,9 +285,30 @@ const LOOKUP_SQL = `select l.outcome, l.retry_after_seconds, l.id, l.name, l.slu
       (select count(*) from public.submissions s
         where s.form_id = f.id and s.deleted_at is null) >= f.max_responses
     end as closed_full,
-    f.closed_message
+    f.closed_message,
+    case when f.signup_slots is not null then public.signup_left(f.id, f.signup_slots) end
+      as slots_left
   from public.lookup_public_form($1, $2, $3, $4) l
   left join public.forms f on l.outcome = 'ok' and f.id = l.id`;
+
+/**
+ * Spots left as { questionId: { slotValue: left } } (020's signup_left), checked
+ * before it goes out: whole numbers only. Undefined when the form has no slots.
+ * Counts only — never who took a spot.
+ */
+export function slotsLeftOf(raw: unknown): Record<string, Record<string, number>> | undefined {
+  if (!isObj(raw)) return undefined;
+  const out: Record<string, Record<string, number>> = {};
+  for (const [q, per] of Object.entries(raw).slice(0, 200)) {
+    if (!isSafeKey(q) || !isObj(per)) continue;
+    const row: Record<string, number> = {};
+    for (const [slot, n] of Object.entries(per).slice(0, 50)) {
+      if (isSafeKey(slot) && typeof n === 'number' && Number.isInteger(n) && n >= 0) row[slot] = n;
+    }
+    out[q] = row;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 /** A looked-up form's closed state, or null while it takes responses. */
 function closedState(r: LookupRow): { reason: 'date' | 'full'; message: string | null } | null {
@@ -302,6 +368,8 @@ const notFound = (c: Context) => {
  */
 app.get('/', async (c) => {
   if (c.req.query('op') !== 'form') return c.text('Not found', 404);
+  // `part=slots`: only the spots left (ADR-066), for a page refreshing its counts. Same statement.
+  const slotsOnly = c.req.query('part') === 'slots';
   const slug = (c.req.query('slug') ?? '').trim();
   // 015's slug format: anything else can't be a form. Free, no DB, same 404.
   if (!slug || slug.length > 64 || !SLUG_RE.test(slug)) return notFound(c);
@@ -323,6 +391,16 @@ app.get('/', async (c) => {
   c.header('Cache-Control', 'no-store');
   // Closed (ADR-063): the page shows "closed" instead of the form, so no schema goes out.
   const closed = closedState(r);
+  // Spots left go out with the schema only: never for a locked form before its unlock.
+  const slotsLeft = locked || closed ? undefined : slotsLeftOf(r.slots_left);
+  if (slotsOnly) {
+    return c.json({
+      id: r.id,
+      locked,
+      ...(closed ? { closed } : {}),
+      ...(slotsLeft ? { slotsLeft } : {}),
+    });
+  }
   return c.json({
     id: r.id,
     name: r.name,
@@ -330,6 +408,7 @@ app.get('/', async (c) => {
     locked,
     schema: locked || closed ? null : r.published_schema,
     ...(closed ? { closed } : {}),
+    ...(slotsLeft ? { slotsLeft } : {}),
   });
 });
 
@@ -388,9 +467,13 @@ async function handleUnlock(c: Context, body: Record<string, unknown>) {
     return c.json({ ...base, locked: form.fill_password_hash != null, schema: null, closed });
   }
 
+  // Spots left (ADR-066), from the same statement; sent only alongside the schema.
+  const slotsLeft = slotsLeftOf(form.slots_left);
+  const withSlots = slotsLeft ? { slotsLeft } : {};
+
   // Lock was removed since the gate rendered — just hand over the form.
   if (!form.fill_password_hash) {
-    return c.json({ ...base, locked: false, schema: form.published_schema });
+    return c.json({ ...base, locked: false, schema: form.published_schema, ...withSlots });
   }
   const hash = form.fill_password_hash;
 
@@ -409,7 +492,13 @@ async function handleUnlock(c: Context, body: Record<string, unknown>) {
       return c.text('Temporarily unavailable', 503);
     }
     return schema
-      ? c.json({ ...base, locked: true, schema, unlockToken: fillUnlockToken(form.id, hash) })
+      ? c.json({
+          ...base,
+          locked: true,
+          schema,
+          unlockToken: fillUnlockToken(form.id, hash),
+          ...withSlots,
+        })
       : wrongPassword(c);
   }
   if (!password) return wrongPassword(c);
@@ -455,6 +544,7 @@ async function handleUnlock(c: Context, body: Record<string, unknown>) {
     locked: true,
     schema: r.published_schema,
     unlockToken: fillUnlockToken(form.id, hash),
+    ...withSlots,
   });
 }
 
@@ -570,12 +660,15 @@ app.post(
     if (estimate) cleanMeta.estimate = estimate;
 
     const submissionId = `s_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
-    let stored: { outcome?: unknown; closed_message?: unknown } | undefined;
+    let stored:
+      | { outcome?: unknown; closed_message?: unknown; full_slots?: unknown; slots_left?: unknown }
+      | undefined;
     try {
       // 019: refuses a closed form, and counts under a per-form lock when a cap is set.
+      // 020: under the same lock, takes each sign-up spot or refuses the full ones.
       stored = (
         await pool.query(
-          `select i.outcome, i.closed_message
+          `select i.outcome, i.closed_message, i.full_slots, i.slots_left
              from public.insert_public_submission($1, $2, $3::jsonb, $4::jsonb) i`,
           [submissionId, form.id, JSON.stringify(clean), JSON.stringify(cleanMeta)],
         )
@@ -585,6 +678,9 @@ app.post(
       return c.text('Could not save your response. Please try again.', 500);
     }
     const message = typeof stored?.closed_message === 'string' ? stored.closed_message : null;
+    if (stored?.outcome === 'slot_full') {
+      return slotFullResponse(c, v.schema, stored.full_slots, stored.slots_left);
+    }
     if (stored?.outcome === 'full') return closedResponse(c, 'full', message);
     if (stored?.outcome === 'closed') return closedResponse(c, 'date', message);
     if (stored?.outcome === 'gone') return c.text('Form not available', 404);

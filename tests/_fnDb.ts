@@ -2,9 +2,14 @@
  * In-memory stand-in for the Postgres the public Functions talk to (ADR-058).
  * Emulates 016's consume_submit_rates (all or nothing, longest wait, costs,
  * bad keys refused without a write), 017's lookup_public_form (distinct misses
- * per IP, over budget refuses hits too, published title) and the forms
- * lookups, and logs every statement. Tests mock `pg` with `fnDbPool(state)`.
+ * per IP, over budget refuses hits too, published title), 019's close
+ * settings, 020's sign-up slots (published slots from the schema, claims from
+ * live responses, the slot check in insert_public_submission, signup_left)
+ * and the forms lookups, and logs every statement. Tests mock `pg` with
+ * `fnDbPool(state)`.
  */
+
+import { signupSlotsOf } from '../neon/functions/submit-response/signup.js';
 
 export type FormRow = {
   id: string;
@@ -170,6 +175,47 @@ export function lookupPublicForm(
   return { outcome: 'miss', retry_after_seconds: 0, ...empty };
 }
 
+/** 020 forms.signup_slots: { questionId: { slot: capacity } } from the published schema, or null. */
+export function signupDef(f: FormRow): Record<string, Record<string, number>> | null {
+  const qs = (f.published_schema as { questions?: unknown } | null)?.questions;
+  const out: Record<string, Record<string, number>> = {};
+  for (const q of Array.isArray(qs) ? qs : []) {
+    const r = q as Record<string, unknown>;
+    if (!r || r.type !== 'signup_slots' || typeof r.id !== 'string') continue;
+    const caps = Object.fromEntries(signupSlotsOf(r).map((x) => [x.value, x.capacity]));
+    if (Object.keys(caps).length) out[r.id] = caps;
+    else delete out[r.id];
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** 020 claims: spots taken per question and slot by live responses. */
+export function slotTaken(s: FnDbState, f: FormRow, qid: string, slot: string): number {
+  const def = signupDef(f);
+  if (!def?.[qid] || !(slot in def[qid]!)) return 0;
+  return s.submissions.filter((x) => {
+    if (x.form_id !== f.id || x.deleted_at) return false;
+    const a = (x.answers as Record<string, { slots?: unknown }>)[qid];
+    return Array.isArray(a?.slots) && a!.slots.includes(slot);
+  }).length;
+}
+
+/** 020 signup_left. */
+export function slotsLeft(s: FnDbState, f: FormRow): Record<string, Record<string, number>> | null {
+  const def = signupDef(f);
+  if (!def) return null;
+  const out: Record<string, Record<string, number>> = {};
+  for (const [q, caps] of Object.entries(def)) {
+    out[q] = Object.fromEntries(
+      Object.entries(caps).map(([slot, cap]) => [
+        slot,
+        Math.max(0, cap - slotTaken(s, f, q, slot)),
+      ]),
+    );
+  }
+  return out;
+}
+
 /** Live (not trashed) responses stored for a form. */
 export function liveCount(s: FnDbState, formId: string): number {
   return s.submissions.filter((x) => x.form_id === formId && !x.deleted_at).length;
@@ -184,14 +230,15 @@ function closeColumns(s: FnDbState, f: FormRow) {
     closed_by_date: closedByDate(s, f),
     closed_full: f.max_responses != null ? liveCount(s, f.id) >= f.max_responses : null,
     closed_message: f.closed_message ?? null,
+    slots_left: slotsLeft(s, f),
   };
 }
 
-/** The same rules as 019 insert_public_submission. */
+/** The same rules as 020 insert_public_submission (019's, plus the slot check). */
 function insertPublicSubmission(
   s: FnDbState,
   [id, formId, answers, meta]: [string, string, string, string],
-): { outcome: string; closed_message: string | null } {
+): { outcome: string; closed_message: string | null; full_slots?: unknown; slots_left?: unknown } {
   const f = s.forms.get(formId);
   if (!f || f.deleted_at || f.status !== 'published')
     return { outcome: 'gone', closed_message: null };
@@ -199,7 +246,28 @@ function insertPublicSubmission(
   if (f.max_responses != null && liveCount(s, formId) >= f.max_responses) {
     return { outcome: 'full', closed_message: f.closed_message ?? null };
   }
-  s.submissions.push({ id, form_id: formId, answers: JSON.parse(answers), meta: JSON.parse(meta) });
+  const parsed = JSON.parse(answers) as Record<string, { slots?: unknown }>;
+  const def = signupDef(f);
+  if (def) {
+    const full: Array<{ question: string; slot: string }> = [];
+    for (const [q, caps] of Object.entries(def).sort(([a], [b]) => (a < b ? -1 : 1))) {
+      const picks = parsed[q]?.slots;
+      for (const slot of Array.isArray(picks) ? picks : []) {
+        if (typeof slot === 'string' && slot in caps && slotTaken(s, f, q, slot) >= caps[slot]!) {
+          full.push({ question: q, slot });
+        }
+      }
+    }
+    if (full.length) {
+      return {
+        outcome: 'slot_full',
+        closed_message: null,
+        full_slots: full,
+        slots_left: slotsLeft(s, f),
+      };
+    }
+  }
+  s.submissions.push({ id, form_id: formId, answers: parsed, meta: JSON.parse(meta) });
   return { outcome: 'ok', closed_message: null };
 }
 

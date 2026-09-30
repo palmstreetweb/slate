@@ -7,6 +7,7 @@ import { SIG_TYPED_MAX, parseSignaturePathCore } from './signature.js';
 import { locationAnswerCore } from './geo.js';
 import { pinAnswerCore } from './pins.js';
 import { availabilityAnswerCore } from './availability.js';
+import { signupAnswerCore } from './signup.js';
 
 const MAX_STRING_CHARS = 10_000;
 const MAX_ARRAY_ITEMS = 100;
@@ -229,7 +230,10 @@ export type ClampContext = {
  *     published question by the engine's own shared code (pins in range and
  *     under the limit; coordinates re-rounded and in / out recomputed; slots
  *     re-encoded on the grid);
- *   - voice_note / photo_checklist (ADR-065): this form's own storage refs only.
+ *   - voice_note / photo_checklist (ADR-065): this form's own storage refs only;
+ *   - signup_slots (ADR-066): the engine's canonical answer — published slot
+ *     values only, each once, at most the question's picks, waitlists only when
+ *     it has one. Spots are taken by the insert itself (migration 020).
  * Everything else goes through `clampValue` as before.
  */
 export function clampForQuestion(
@@ -285,6 +289,8 @@ export function clampForQuestion(
       return clampVoice(q, v, ctx.formId);
     case 'photo_checklist':
       return clampPhotos(q, v, ctx.formId);
+    case 'signup_slots':
+      return signupAnswerCore(q, v);
     default:
       return clampValue(v);
   }
