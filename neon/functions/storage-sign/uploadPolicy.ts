@@ -41,7 +41,8 @@ export type PublicUploadDecision =
  * Largest object any file-taking question in `schema` accepts (a file upload,
  * a voice note or a photo checklist), never above
  * `capBytes`. `null` when there is no file question — or no usable schema at all.
- * The sign request doesn't say which question it's for, so the roomiest one wins.
+ * An old page's sign request doesn't say which question it's for, so the
+ * roomiest one wins; a new one names its question (decideQuestionUpload, ADR-067).
  */
 export function fileUploadLimitBytes(schema: unknown, capBytes: number): number | null {
   const questions = (schema as { questions?: unknown } | null | undefined)?.questions;
@@ -49,30 +50,40 @@ export function fileUploadLimitBytes(schema: unknown, capBytes: number): number 
 
   let limit: number | null = null;
   for (const q of questions) {
-    if (!q || typeof q !== 'object') continue;
-    const { type, maxSizeMb, maxSeconds } = q as {
-      type?: unknown;
-      maxSizeMb?: unknown;
-      maxSeconds?: unknown;
-    };
-    let own: number;
-    if (type === 'file_upload') {
-      // Unset or nonsense (0, negative, a string) falls back to the cap, like the client's default.
-      own =
-        typeof maxSizeMb === 'number' && Number.isFinite(maxSizeMb) && maxSizeMb > 0
-          ? Math.max(Math.floor(maxSizeMb * MIB), MIN_QUESTION_LIMIT_BYTES)
-          : capBytes;
-    } else if (type === 'voice_note') {
-      own = voiceMaxBytes(voiceSeconds(maxSeconds));
-    } else if (type === 'photo_checklist') {
-      own = PHOTO_MAX_BYTES;
-    } else {
-      continue;
-    }
-    const bounded = Math.min(own, capBytes);
-    limit = limit === null ? bounded : Math.max(limit, bounded);
+    const own = questionLimitBytes(q, capBytes);
+    if (own === null) continue;
+    limit = limit === null ? own : Math.max(limit, own);
   }
   return limit;
+}
+
+/**
+ * One question's own limit: a file upload's `maxSizeMb`, a voice note's
+ * length, a checklist photo's 12 MB, never above `capBytes`. `null` for
+ * anything that doesn't take files.
+ */
+export function questionLimitBytes(q: unknown, capBytes: number): number | null {
+  if (!q || typeof q !== 'object') return null;
+  const { type, maxSizeMb, maxSeconds } = q as {
+    type?: unknown;
+    maxSizeMb?: unknown;
+    maxSeconds?: unknown;
+  };
+  let own: number;
+  if (type === 'file_upload') {
+    // Unset or nonsense (0, negative, a string) falls back to the cap, like the client's default.
+    own =
+      typeof maxSizeMb === 'number' && Number.isFinite(maxSizeMb) && maxSizeMb > 0
+        ? Math.max(Math.floor(maxSizeMb * MIB), MIN_QUESTION_LIMIT_BYTES)
+        : capBytes;
+  } else if (type === 'voice_note') {
+    own = voiceMaxBytes(voiceSeconds(maxSeconds));
+  } else if (type === 'photo_checklist') {
+    own = PHOTO_MAX_BYTES;
+  } else {
+    return null;
+  }
+  return Math.min(own, capBytes);
 }
 
 /** Decide one public/ upload of `contentLength` bytes against the form's published schema. */
@@ -84,6 +95,32 @@ export function decidePublicUpload(
   const maxBytes = fileUploadLimitBytes(schema, capBytes);
   if (maxBytes === null) return { ok: false, reason: 'no-file-question' };
   // Written as a negation so a NaN on either side refuses instead of signing.
+  if (!(contentLength <= maxBytes)) return { ok: false, reason: 'too-large', maxBytes };
+  return { ok: true, maxBytes };
+}
+
+/**
+ * ADR-067: the sign request names its question, so the limit is that
+ * question's own (ADR-050's deferred alternative). A question that isn't in
+ * the published schema, or doesn't take files, lends nothing — the same answer
+ * as a form with no file question. The last question with the id wins, as in
+ * the submit Function's map.
+ */
+export function decideQuestionUpload(
+  schema: unknown,
+  questionId: string,
+  contentLength: number,
+  capBytes: number,
+): PublicUploadDecision {
+  const questions = (schema as { questions?: unknown } | null | undefined)?.questions;
+  let q: unknown;
+  if (Array.isArray(questions)) {
+    for (const x of questions) {
+      if (x && typeof x === 'object' && (x as { id?: unknown }).id === questionId) q = x;
+    }
+  }
+  const maxBytes = questionLimitBytes(q, capBytes);
+  if (maxBytes === null) return { ok: false, reason: 'no-file-question' };
   if (!(contentLength <= maxBytes)) return { ok: false, reason: 'too-large', maxBytes };
   return { ok: true, maxBytes };
 }

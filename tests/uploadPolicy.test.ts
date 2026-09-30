@@ -239,6 +239,8 @@ describe('storage-sign upload gate (ADR-050, ADR-058)', () => {
       body: typeof body === 'string' ? body : JSON.stringify(body),
     });
 
+  // A fresh uuid per sign, as the page mints one per upload: since ADR-067 the
+  // server records every key, and an old page's path that is already taken is a 409.
   const sign = (
     scope: 'public' | 'draft',
     contentLength: unknown,
@@ -247,7 +249,7 @@ describe('storage-sign upload gate (ADR-050, ADR-058)', () => {
     post(
       {
         op: 'upload',
-        path: `${scope}/${extra.formId ?? FORM_ID}/${UUID}/receipt.pdf`,
+        path: `${scope}/${extra.formId ?? FORM_ID}/${crypto.randomUUID()}/receipt.pdf`,
         contentType: 'application/pdf',
         contentLength,
         unlockToken: extra.unlockToken,
@@ -332,7 +334,9 @@ describe('storage-sign upload gate (ADR-050, ADR-058)', () => {
     expect(formQueries()[0]!.sql).toContain('published_schema is not null');
     expect(rateCalls(db.state)).toHaveLength(1);
     expect(rateCalls(db.state)[0]!.sql).toContain('f.published_schema');
-    expect(db.state.log).toHaveLength(2);
+    // ADR-067: then one statement records the upload against the owner's quota.
+    expect(db.state.log).toHaveLength(3);
+    expect(db.state.log[2]!.sql).toContain('reserve_upload');
   });
 
   it('a published form without a file question is the same 404 as a missing form', async () => {
@@ -455,6 +459,9 @@ describe('storage-sign upload gate (ADR-050, ADR-058)', () => {
   });
 
   it('4,096 photo signs from one IP to one owner pass, the next is 429; another owner still signs', async () => {
+    // The rate limit is the subject here: 4,096 × 450 KB is past the 1 GiB storage quota
+    // (ADR-067), which has its own tests (storageQuota.test.ts).
+    db.state.storage.quota = 4 * 1024 ** 3;
     setForm({ questions: [fileQ()] });
     setForm({ questions: [fileQ()] }, { owner_id: 'u_second' }, 'f_second');
     for (let i = 0; i < 4096; i++) {
@@ -592,7 +599,7 @@ describe('storage-sign upload gate (ADR-050, ADR-058)', () => {
     const voice = (contentType: string, contentLength: number) =>
       post({
         op: 'upload',
-        path: `public/${FORM_ID}/${UUID}/voice-note.webm`,
+        path: `public/${FORM_ID}/${crypto.randomUUID()}/voice-note.webm`,
         contentType,
         contentLength,
       });
