@@ -202,7 +202,9 @@ export default function VoiceNoteField({
       } catch (err) {
         if (!alive.current) return;
         setSave('error');
-        setSaveError(err instanceof Error && err.message ? err.message : 'Couldn’t save the recording.');
+        setSaveError(
+          err instanceof Error && err.message ? err.message : 'Couldn’t save the recording.',
+        );
       }
     },
     [onFileUpload, maxSec, question.id, onAnswer],
@@ -275,9 +277,12 @@ export default function VoiceNoteField({
     let analyser: AnalyserNode | null = null;
     try {
       const AC =
-        window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        window.AudioContext ??
+        (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (AC) {
         ctx = new AC();
+        // iOS starts a context created after the permission prompt suspended.
+        void ctx.resume?.().catch(() => {});
         analyser = ctx.createAnalyser();
         analyser.fftSize = 512;
         ctx.createMediaStreamSource(stream).connect(analyser);
@@ -309,7 +314,10 @@ export default function VoiceNoteField({
     recorder.onstop = () => {
       release();
       if (!alive.current) return;
-      const seconds = Math.max(1, Math.round(Math.min(maxSec * 1000, performance.now() - r.started) / 1000));
+      const seconds = Math.max(
+        1,
+        Math.round(Math.min(maxSec * 1000, performance.now() - r.started) / 1000),
+      );
       const blob = new Blob(r.chunks, { type: recorder.mimeType || mime || 'audio/webm' });
       if (blob.size === 0) {
         // This format didn't encode here; "Try again" uses the next one.
@@ -318,7 +326,12 @@ export default function VoiceNoteField({
         setPhase('blocked');
         return;
       }
-      const c: Clip = { url: URL.createObjectURL(blob), blob, seconds, peaks: downsample(r.levels, BARS_CLIP) };
+      const c: Clip = {
+        url: URL.createObjectURL(blob),
+        blob,
+        seconds,
+        peaks: downsample(r.levels, BARS_CLIP),
+      };
       setClip(c);
       setPlayed(0);
       setPhase('review');
@@ -510,7 +523,11 @@ export default function VoiceNoteField({
                   onClick={togglePlay}
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    {playing ? <path d="M8 5.5v13M16 5.5v13" /> : <path d="M8 5.5 18.5 12 8 18.5z" />}
+                    {playing ? (
+                      <path d="M8 5.5v13M16 5.5v13" />
+                    ) : (
+                      <path d="M8 5.5 18.5 12 8 18.5z" />
+                    )}
                   </svg>
                 </button>
                 <audio
@@ -556,7 +573,12 @@ export default function VoiceNoteField({
                     ? (saveError ?? 'Couldn’t save the recording.')
                     : ''}
               {save === 'saved' ? (
-                <svg className="slate-voice-check" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <svg
+                  className="slate-voice-check"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  focusable="false"
+                >
                   <path d="M5 12.5l4.5 4.5L19 7.5" />
                 </svg>
               ) : null}
@@ -594,14 +616,15 @@ export default function VoiceNoteField({
               disabled={phase === 'asking'}
               onClick={() => (recording ? stop() : void start())}
             >
-              <svg className="slate-voice-ring" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+              <svg
+                className="slate-voice-ring"
+                viewBox="0 0 100 100"
+                aria-hidden="true"
+                focusable="false"
+              >
                 <circle cx="50" cy="50" r="46" pathLength={100} />
               </svg>
-              {recording ? (
-                <span className="slate-voice-stop" aria-hidden="true" />
-              ) : (
-                <MicIcon />
-              )}
+              {recording ? <span className="slate-voice-stop" aria-hidden="true" /> : <MicIcon />}
             </button>
             <div className="slate-voice-status" aria-hidden={!recording}>
               {recording ? (
