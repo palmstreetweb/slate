@@ -1632,10 +1632,18 @@
   grid-column: 1 / -1;
 }
 
+[data-slate-forms][data-theme-name='slate']
+  .slate-rsp
+  .rsp-sum
+  .rsp-roster-group
+  + .rsp-roster-group {
+  margin-top: 8px;
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-roster {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 10px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px 12px;
   margin: 4px 0 8px;
   padding: 0;
   list-style: none;
@@ -1652,7 +1660,7 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-sum .rsp-roster-day {
-  margin: 0 0 2px;
+  margin: 4px 0 6px;
   font-family: var(--rsp-mono);
   font-size: 10.5px;
   font-weight: 500;

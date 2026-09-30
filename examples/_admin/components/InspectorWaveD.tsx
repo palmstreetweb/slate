@@ -134,7 +134,6 @@ function SlotRow({
         <label className="slate-insp-slot-cell">
           <span className="slate-label">Spots</span>
           <SlateNumberInput
-            compact
             value={slot.capacity}
             min={1}
             max={SLOT_CAPACITY_MAX}

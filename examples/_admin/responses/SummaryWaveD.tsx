@@ -151,7 +151,16 @@ export const SignupRosterCard = memo(function SignupRosterCard({
     .filter(Boolean)
     .join(' · ');
 
-  let lastDay = '';
+  // Consecutive slots on the same day share a heading; removed slots come last, under their own.
+  const groups: Array<{ day: string; rows: RosterSlot[] }> = [];
+  for (const r of roster) {
+    const day = r.slot ? slotDayLabel(r.slot.date) : 'No longer on the form';
+    const last = groups[groups.length - 1];
+    if (last && last.day === day) last.rows.push(r);
+    else groups.push({ day, rows: [r] });
+  }
+  let index = -1;
+
   return (
     <article ref={revealRef} className="rsp-sum-chart rsp-sum-roster" aria-labelledby={titleId}>
       <header className="rsp-sum-chart-head">
@@ -165,80 +174,86 @@ export const SignupRosterCard = memo(function SignupRosterCard({
           <span>{meta}</span>
         </span>
       </header>
-      <ol className="rsp-roster">
-        {roster.map((r, i) => {
-          const day = r.slot ? slotDayLabel(r.slot.date) : 'No longer on the form';
-          const showDay = day !== lastDay && (day !== '' || !r.slot);
-          lastDay = day;
-          const time = r.slot && r.slot.label?.trim() ? slotTimeText(r.slot) : '';
-          const fill = r.slot ? Math.min(1, r.taken.length / r.capacity) : 0;
-          const state = !r.slot
-            ? ' is-removed'
-            : r.taken.length > r.capacity
-              ? ' is-over'
-              : r.taken.length === r.capacity
-                ? ' is-full'
-                : '';
-          return (
-            <li key={r.value} className={`rsp-roster-slot${state}`}>
-              {showDay ? <p className="rsp-roster-day">{day}</p> : null}
-              <div className="rsp-roster-head">
-                <span className="rsp-roster-name">
-                  {r.name}
-                  {time ? <span className="rsp-roster-time">{time}</span> : null}
-                </span>
-                <span className="rsp-roster-count">{countText(r)}</span>
-              </div>
-              {r.slot ? (
-                <span
-                  className="rsp-roster-bar"
-                  role="img"
-                  aria-label={`${r.taken.length} of ${r.capacity} spots taken`}
-                >
-                  <i style={{ width: `${fill * 100}%`, '--rsp-i': i } as CSSProperties} />
-                </span>
-              ) : null}
-              {r.taken.length ? (
-                <ol className="rsp-roster-people" aria-label={`Signed up for ${r.name}`}>
-                  {r.taken.map((e) => (
-                    <PersonRow
-                      key={e.sub.id}
-                      entry={e}
-                      row={r}
-                      roster={roster}
-                      question={question}
-                      waiting={false}
-                      place={0}
-                      onMove={onMove}
-                    />
-                  ))}
-                </ol>
-              ) : r.slot ? (
-                <p className="rsp-roster-empty">Nobody yet</p>
-              ) : null}
-              {r.waiting.length ? (
-                <div className="rsp-roster-wait">
-                  <p className="rsp-roster-wait-label">Waitlist · {r.waiting.length}</p>
-                  <ol className="rsp-roster-people" aria-label={`Waitlist for ${r.name}`}>
-                    {r.waiting.map((e, k) => (
-                      <PersonRow
-                        key={e.sub.id}
-                        entry={e}
-                        row={r}
-                        roster={roster}
-                        question={question}
-                        waiting
-                        place={k + 1}
-                        onMove={onMove}
-                      />
-                    ))}
-                  </ol>
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
+      {groups.map((g, gi) => (
+        <section
+          key={`${g.day}-${gi}`}
+          className="rsp-roster-group"
+          aria-label={g.day || undefined}
+        >
+          {g.day ? <h4 className="rsp-roster-day">{g.day}</h4> : null}
+          <ol className="rsp-roster">
+            {g.rows.map((r) => {
+              index += 1;
+              const time = r.slot && r.slot.label?.trim() ? slotTimeText(r.slot) : '';
+              const fill = r.slot ? Math.min(1, r.taken.length / r.capacity) : 0;
+              const state = !r.slot
+                ? ' is-removed'
+                : r.taken.length > r.capacity
+                  ? ' is-over'
+                  : r.taken.length === r.capacity
+                    ? ' is-full'
+                    : '';
+              return (
+                <li key={r.value} className={`rsp-roster-slot${state}`}>
+                  <div className="rsp-roster-head">
+                    <span className="rsp-roster-name">
+                      {r.name}
+                      {time ? <span className="rsp-roster-time">{time}</span> : null}
+                    </span>
+                    <span className="rsp-roster-count">{countText(r)}</span>
+                  </div>
+                  {r.slot ? (
+                    <span
+                      className="rsp-roster-bar"
+                      role="img"
+                      aria-label={`${r.taken.length} of ${r.capacity} spots taken`}
+                    >
+                      <i style={{ width: `${fill * 100}%`, '--rsp-i': index } as CSSProperties} />
+                    </span>
+                  ) : null}
+                  {r.taken.length ? (
+                    <ol className="rsp-roster-people" aria-label={`Signed up for ${r.name}`}>
+                      {r.taken.map((e) => (
+                        <PersonRow
+                          key={e.sub.id}
+                          entry={e}
+                          row={r}
+                          roster={roster}
+                          question={question}
+                          waiting={false}
+                          place={0}
+                          onMove={onMove}
+                        />
+                      ))}
+                    </ol>
+                  ) : r.slot ? (
+                    <p className="rsp-roster-empty">Nobody yet</p>
+                  ) : null}
+                  {r.waiting.length ? (
+                    <div className="rsp-roster-wait">
+                      <p className="rsp-roster-wait-label">Waitlist · {r.waiting.length}</p>
+                      <ol className="rsp-roster-people" aria-label={`Waitlist for ${r.name}`}>
+                        {r.waiting.map((e, k) => (
+                          <PersonRow
+                            key={e.sub.id}
+                            entry={e}
+                            row={r}
+                            roster={roster}
+                            question={question}
+                            waiting
+                            place={k + 1}
+                            onMove={onMove}
+                          />
+                        ))}
+                      </ol>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ))}
     </article>
   );
 });

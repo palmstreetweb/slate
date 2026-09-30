@@ -5075,10 +5075,11 @@ body[data-slate-scale='3'] > [data-slate-forms][data-theme-name='slate'] {
   display: flex;
 }
 
+/* Two by two: spots and day, then start and end — native date and time inputs need the room. */
 [data-slate-forms][data-theme-name='slate'] .slate-insp-slot-grid {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px 6px;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-insp-slot-cell {
@@ -5107,18 +5108,6 @@ body[data-slate-scale='3'] > [data-slate-forms][data-theme-name='slate'] {
 [data-slate-forms][data-theme-name='slate'] .slate-insp-slot-taken.is-over {
   color: var(--slate-error);
   font-weight: 600;
-}
-
-/* The rail is narrow: day on its own row, then spots and times. */
-@media (max-width: 1280px) {
-  [data-slate-forms][data-theme-name='slate'] .slate-insp-slot-grid {
-    grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr);
-  }
-
-  [data-slate-forms][data-theme-name='slate'] .slate-insp-slot-cell--date {
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
 }
 
 @media (max-width: 719px), (pointer: coarse) {

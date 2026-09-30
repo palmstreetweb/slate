@@ -78,6 +78,11 @@
   opacity: 0.7;
 }
 
+/* "11 AM – 12 PM" stays on one line. */
+[data-slate-forms] .slate-slot-when {
+  white-space: nowrap;
+}
+
 [data-slate-forms] .slate-slot-side {
   flex: none;
   display: grid;
@@ -184,8 +189,10 @@
   opacity: 1;
 }
 
-[data-slate-forms] .slate-slot--conflict,
-[data-slate-forms] .slate-slot--conflict:hover {
+/* Specific enough to beat every theme's hover and selected surfaces (Swiss inverts them). */
+[data-slate-forms][data-theme] .slate-choice.slate-slot.slate-slot--conflict,
+[data-slate-forms][data-theme] .slate-choice.slate-slot.slate-slot--conflict:hover {
+  color: var(--slate-text);
   border-color: var(--slate-error);
   background: color-mix(in srgb, var(--slate-error) 8%, var(--slate-bg));
 }
@@ -193,6 +200,10 @@
 [data-slate-forms] .slate-slot--conflict .slate-slot-status {
   color: var(--slate-error);
   font-weight: 700;
+}
+
+[data-slate-forms] .slate-slot--conflict .slate-slot-meter-fill {
+  background: var(--slate-error);
 }
 
 [data-slate-forms] .slate-slot--conflict .slate-slot-name {
@@ -238,9 +249,9 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 -3px;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
   border-radius: 50%;
   background: var(--slate-cf-1);
   opacity: 0;
@@ -267,6 +278,14 @@
 
   [data-slate-forms] .slate-slot-meter {
     width: 52px;
+  }
+
+  [data-slate-forms] .slate-slot-side {
+    max-width: 40%;
+  }
+
+  [data-slate-forms] .slate-slot-status {
+    font-size: 11px;
   }
 }
 
@@ -301,12 +320,16 @@
 
 @keyframes slate-d-spark {
   0% {
+    opacity: 0;
+    transform: rotate(var(--slate-a)) translateY(-6px) scale(0.7);
+  }
+  15%,
+  65% {
     opacity: 1;
-    transform: rotate(var(--slate-a)) translateY(0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: rotate(var(--slate-a)) translateY(-38px) scale(0.3);
+    transform: rotate(var(--slate-a)) translateY(-46px) scale(0.4);
   }
 }
 
@@ -348,7 +371,7 @@
   }
 
   [data-slate-forms]:not([data-reduced-motion]) .slate-slot--grabbed .slate-slot-spark {
-    animation: slate-d-spark 620ms cubic-bezier(0.2, 0.8, 0.3, 1) 300ms both;
+    animation: slate-d-spark 700ms cubic-bezier(0.2, 0.8, 0.3, 1) 280ms both;
   }
 
   [data-slate-forms]:not([data-reduced-motion]) .slate-slot--grabbed .slate-slot-meter {

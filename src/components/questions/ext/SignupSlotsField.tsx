@@ -344,7 +344,8 @@ export default function SignupSlotsField({
                   onClick={() => choose(s)}
                   className={[
                     'slate-choice slate-slot',
-                    st.taken || st.waiting ? 'slate-choice--selected' : '',
+                    // A pick that filled up reads as a problem, not as chosen.
+                    (st.taken && !st.conflict) || st.waiting ? 'slate-choice--selected' : '',
                     isCommitted ? 'slate-choice--committed' : '',
                     st.full && !st.taken ? 'slate-slot--full' : '',
                     st.waiting ? 'slate-slot--waiting' : '',
