@@ -8,7 +8,11 @@
  */
 
 import { GenerateTimeoutError, GenerateValidationError, runGenerateForm } from './runGenerate.js';
-import { generatedFormSchema, type GeneratedForm } from './generateFormSchema.js';
+import {
+  generatedFormSchema,
+  withDraftDefaults,
+  type GeneratedForm,
+} from './generateFormSchema.js';
 import { clientIp, takeRateLimit } from './rateLimit.js';
 import { verifyUserJwt } from './authJwt.js';
 import { callDataApiRpc } from './neonDataApi.js';
@@ -114,7 +118,7 @@ function parsePrevious(raw: unknown): { form?: GeneratedForm; error?: string } {
   if (size > MAX_PREVIOUS_CHARS) {
     return { error: 'Draft is too large to revise. Start a new generate.' };
   }
-  const parsed = generatedFormSchema.safeParse(raw);
+  const parsed = generatedFormSchema.safeParse(withDraftDefaults(raw));
   if (!parsed.success) {
     return { error: 'previous is not a valid draft. Generate a new one.' };
   }

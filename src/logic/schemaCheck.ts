@@ -11,6 +11,14 @@
 import type { Condition, Question } from '@/types/Question.js';
 import { OTHER_VALUE, allowsOther } from './other.js';
 import { canPrefill, isValidPrefillKey } from './prefill.js';
+import {
+  IN_AREA_VALUE,
+  OUT_OF_AREA_VALUE,
+  hasServiceArea,
+  serviceAreaPrefixes,
+} from './address.js';
+import { contactShown } from './contact.js';
+import { PRICE_MAX } from './estimate.js';
 
 export type SchemaIssue = {
   /** The question carrying the problem. */
@@ -25,7 +33,15 @@ export type SchemaIssue = {
     /** A prefill key is malformed, reserved, or used twice (ADR-063). */
     | 'bad_prefill_key'
     /** `min` is above `max` (number, scale, date). */
-    | 'bad_bounds';
+    | 'bad_bounds'
+    /** A price is not a number, too large, or its high end is below its low end (ADR-064). */
+    | 'bad_price'
+    /** A condition asks for in / out of area on an address without a service area (ADR-064). */
+    | 'area_off'
+    /** A service-area entry isn't a ZIP code or prefix (ADR-064). */
+    | 'bad_service_area'
+    /** A contact block with every part turned off (ADR-064). */
+    | 'no_fields';
   message: string;
 };
 
@@ -42,6 +58,25 @@ function otherFields(c: Condition): string[] {
   if (!('value' in c)) return [];
   const values = Array.isArray(c.value) ? c.value : [c.value];
   return values.includes(OTHER_VALUE) ? [c.field] : [];
+}
+
+/** Fields whose leaf condition targets IN_AREA_VALUE / OUT_OF_AREA_VALUE. */
+function areaFields(c: Condition): string[] {
+  if ('all' in c) return c.all.flatMap(areaFields);
+  if ('any' in c) return c.any.flatMap(areaFields);
+  if (!('value' in c)) return [];
+  const values = Array.isArray(c.value) ? c.value : [c.value];
+  return values.includes(IN_AREA_VALUE) || values.includes(OUT_OF_AREA_VALUE) ? [c.field] : [];
+}
+
+/** A price pair is usable: finite, within the cap, and high ≥ low. */
+function badPrice(low: unknown, high: unknown): boolean {
+  if (low === undefined && high === undefined) return false;
+  const ok = (v: unknown) =>
+    typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= PRICE_MAX;
+  if (!ok(low)) return true;
+  if (high === undefined) return false;
+  return !ok(high) || (high as number) < (low as number);
 }
 
 /** Validate a questions list. Returns an empty array when the schema is clean. */
@@ -76,8 +111,59 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
     }
   };
 
+  const checkArea = (q: Question, c: Condition) => {
+    for (const field of areaFields(c)) {
+      const target = byId.get(field);
+      if (target && !hasServiceArea(target)) {
+        issues.push({
+          questionId: q.id,
+          kind: 'area_off',
+          message: `"${q.id}" checks the service area of "${field}", which doesn't list any ZIP codes`,
+        });
+      }
+    }
+  };
+
   const prefillKeys = new Map<string, string>();
   for (const q of questions) {
+    if (
+      (q.type === 'single_choice' ||
+        q.type === 'multi_choice' ||
+        q.type === 'dropdown' ||
+        q.type === 'picture_choice') &&
+      q.options.some((o) => badPrice(o.price, o.priceMax))
+    ) {
+      issues.push({
+        questionId: q.id,
+        kind: 'bad_price',
+        message: `"${q.id}" has a price that isn't a number, is too large, or ends below where it starts`,
+      });
+    }
+    if (q.type === 'number' && badPrice(q.unitPrice, q.unitPriceMax)) {
+      issues.push({
+        questionId: q.id,
+        kind: 'bad_price',
+        message: `"${q.id}" has a price per unit that isn't a number, is too large, or ends below where it starts`,
+      });
+    }
+    if (q.type === 'address' && Array.isArray(q.serviceArea)) {
+      const kept = serviceAreaPrefixes(q.serviceArea).length;
+      const given = q.serviceArea.filter((z) => typeof z === 'string' && z.trim()).length;
+      if (kept < given) {
+        issues.push({
+          questionId: q.id,
+          kind: 'bad_service_area',
+          message: `"${q.id}" lists a service area entry that isn't a ZIP code or prefix`,
+        });
+      }
+    }
+    if (q.type === 'contact_info' && contactShown(q).length === 0) {
+      issues.push({
+        questionId: q.id,
+        kind: 'no_fields',
+        message: `"${q.id}" asks for no contact details — turn on name, email or phone`,
+      });
+    }
     const key = (q as { prefillKey?: string }).prefillKey?.trim();
     if (key && canPrefill(q)) {
       const lower = key.toLowerCase();
@@ -112,6 +198,8 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
   for (const q of questions) {
     if ('visibleIf' in q && q.visibleIf) checkOther(q, q.visibleIf);
     if ('logic' in q && q.logic) for (const rule of q.logic) checkOther(q, rule.if);
+    if ('visibleIf' in q && q.visibleIf) checkArea(q, q.visibleIf);
+    if ('logic' in q && q.logic) for (const rule of q.logic) checkArea(q, rule.if);
     if ('visibleIf' in q && q.visibleIf) {
       for (const field of conditionFields(q.visibleIf)) {
         if (!ids.has(field)) {

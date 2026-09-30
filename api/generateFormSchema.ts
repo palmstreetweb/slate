@@ -26,6 +26,9 @@ export const GENERATED_QUESTION_TYPES = [
   'legal',
   'scale',
   'nps',
+  'contact_info',
+  'address',
+  'signature',
   'review',
 ] as const;
 
@@ -45,6 +48,14 @@ const optionSchema = z.object({
   value: z.string(),
   src: z.string(),
   alt: z.string(),
+});
+
+/** Choice options can carry prices and package-card details (ADR-064). 0 / "" / [] = none. */
+const pricedOptionSchema = optionSchema.extend({
+  price: z.number(),
+  priceMax: z.number(),
+  features: z.array(z.string()),
+  badge: z.string(),
 });
 
 export const generatedQuestionSchema = z.object({
@@ -71,13 +82,20 @@ export const generatedQuestionSchema = z.object({
   declineLabel: z.string(),
   minLabel: z.string(),
   maxLabel: z.string(),
-  options: z.array(optionSchema),
+  options: z.array(pricedOptionSchema),
   rows: z.array(optionSchema),
   columns: z.array(optionSchema),
   /** Choice questions: add "Other" with a text box (ADR-063). */
   allowOther: z.boolean(),
-  /** scale: numbers | stars | emoji | slider. number: stepper. '' = default (ADR-063). */
-  display: z.enum(['', 'numbers', 'stars', 'emoji', 'slider', 'stepper']),
+  /**
+   * scale: numbers | stars | emoji | slider. number: stepper (ADR-063).
+   * single_choice: cards (package cards, ADR-064). '' = default.
+   */
+  display: z.enum(['', 'numbers', 'stars', 'emoji', 'slider', 'stepper', 'cards']),
+  /** number: price per unit for the instant estimate (ADR-064). 0 = none. */
+  unitPrice: z.number(),
+  /** address: ZIP codes or prefixes served, only when the user lists them (ADR-064). */
+  serviceArea: z.array(z.string()),
   /** number: shown after / before the value, e.g. "sq ft", "$" (display only). */
   unit: z.string(),
   prefix: z.string(),
@@ -105,6 +123,13 @@ export const generatedFormSchema = z
       title: z.string().min(1),
       subtitle: z.string(),
       cta: z.string(),
+    }),
+    /** Instant estimate on the thanks screen (ADR-064); show false = none. */
+    estimate: z.object({
+      show: z.boolean(),
+      currency: z.string(),
+      base: z.number(),
+      disclaimer: z.string(),
     }),
   })
   .superRefine((val, ctx) => {
@@ -187,6 +212,36 @@ export const generatedFormSchema = z
     });
   });
 
+/**
+ * A draft from before Wave B (ADR-064) lacks the price, card and estimate
+ * fields; a revise request can still carry one (a tab open across a deploy).
+ * Fill the blanks the model would have written, so it still validates.
+ */
+export function withDraftDefaults(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const form = { ...(raw as Record<string, unknown>) };
+  if (form.estimate === undefined) {
+    form.estimate = { show: false, currency: 'USD', base: 0, disclaimer: '' };
+  }
+  if (Array.isArray(form.questions)) {
+    form.questions = form.questions.map((q: unknown) => {
+      if (q === null || typeof q !== 'object' || Array.isArray(q)) return q;
+      const next = { ...(q as Record<string, unknown>) };
+      if (next.unitPrice === undefined) next.unitPrice = 0;
+      if (next.serviceArea === undefined) next.serviceArea = [];
+      if (Array.isArray(next.options)) {
+        next.options = next.options.map((o: unknown) =>
+          o && typeof o === 'object' && !Array.isArray(o)
+            ? { price: 0, priceMax: 0, features: [], badge: '', ...(o as Record<string, unknown>) }
+            : o,
+        );
+      }
+      return next;
+    });
+  }
+  return form;
+}
+
 export type GeneratedForm = z.infer<typeof generatedFormSchema>;
 export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
 
@@ -224,6 +279,17 @@ Options (leave false / "" unless they clearly help):
 - display on scale: "stars" to rate a visit or service, "emoji" (faces) for how someone feels, "slider" for a wide range like 0–10. Otherwise "".
 - display "stepper" on number for small counts (rooms, windows, people, pets): set min and max; unit ("windows", "sq ft") and prefix ("$") are display only.
 - date: includeTime for appointments or pickups at a time of day; range for spans (a stay, event dates, "available from / to").
+
+Service-business types (use when they fit):
+- contact_info — name, email and phone on ONE screen. For quotes, bookings and leads, prefer it over separate name / email / phone questions. Title like "How can we reach you?"
+- address — a service or property address (street, unit, city, state, ZIP). serviceArea only when the user lists the ZIP codes they serve (e.g. ["93101","93103"], or a prefix "931"); otherwise [].
+- signature — only when the user asks for a signature, authorization or agreement.
+
+Prices and the instant estimate (never invent prices — only use prices the user gave):
+- price on a choice option = its price; priceMax for a range ("$8,000–12,000" → price 8000, priceMax 12000). 0 = no price.
+- unitPrice on a number = price per unit (windows × $450). 0 = none.
+- display "cards" on single_choice for packages or tiers (Basic / Standard / Premium): give each option up to 6 short features and badge "Most popular" on at most one.
+- estimate.show true when the form has prices and the user wants a quote or estimate shown; currency is the ISO code ("USD"); base is a flat fee added to every quote (0 = none); disclaimer is one short line ("Final price after inspection"). Otherwise show false, currency "USD", base 0, disclaimer "".
 
 Branching (showIfField / showIfEquals):
 - Empty strings = always visible.

@@ -10,6 +10,7 @@ import type { Question } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { evaluate } from './conditional.js';
 import { otherIndex, type OtherIndex } from './other.js';
+import { areaIndex, type AreaIndex } from './address.js';
 
 /** Question types that are not answer-bearing. */
 const CHROME_TYPES = new Set(['welcome', 'statement', 'review', 'thanks']);
@@ -25,9 +26,10 @@ function isChrome(q: Question): boolean {
  */
 export function visibleQuestions(all: ReadonlyArray<Question>, answers: LooseAnswers): Question[] {
   const others = otherIndex(all);
+  const areas = areaIndex(all);
   return all.filter((q) => {
     if ('visibleIf' in q && q.visibleIf) {
-      return evaluate(q.visibleIf, answers, others);
+      return evaluate(q.visibleIf, answers, others, areas);
     }
     return true;
   });
@@ -45,10 +47,11 @@ export function resolveJumpTarget(
   visible: ReadonlyArray<Question>,
   answers: LooseAnswers,
   others: OtherIndex = otherIndex(visible),
+  areas: AreaIndex = areaIndex(visible),
 ): number | null {
   if (!('logic' in current) || !current.logic || current.logic.length === 0) return null;
   for (const rule of current.logic) {
-    if (evaluate(rule.if, answers, others)) {
+    if (evaluate(rule.if, answers, others, areas)) {
       const idx = visible.findIndex((q) => q.id === rule.goTo);
       return idx >= 0 ? idx : null;
     }

@@ -1,8 +1,11 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import { Component, Suspense, type CSSProperties, type ReactNode } from 'react';
 import type { ThanksQuestion } from '@/types/Question.js';
+import type { Estimate, EstimateSettings } from '@/types/Estimate.js';
 import { useReducedMotion } from '@/hooks/useReducedMotion.js';
+import { formatEstimate } from '@/logic/estimate.js';
+import { estimateRevealComponent } from './lazyFields.js';
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -12,7 +15,36 @@ type Props = {
   error: string | null;
   onRetry: () => void;
   onRestart: () => void;
+  /** The instant estimate to reveal once the response is received (ADR-064). */
+  estimate?: Estimate | null;
+  estimateSettings?: EstimateSettings;
 };
+
+/** The estimate as one plain line: while the reveal loads, or if it can't. */
+function EstimateText({ estimate, settings }: { estimate: Estimate; settings?: EstimateSettings }) {
+  return (
+    <p className="slate-estimate-plain">
+      {(settings?.label?.trim() || 'Your estimate') + ': '}
+      <strong>{formatEstimate(estimate)}</strong>
+    </p>
+  );
+}
+
+/** A reveal chunk that can't download falls back to the plain line, never a blank. */
+class RevealBoundary extends Component<
+  { fallback: ReactNode; children: ReactNode },
+  { failed: boolean }
+> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  override render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
 
 /**
  * Burst layout for the completion celebration (ADR-059): 14 pieces fanned
@@ -58,13 +90,31 @@ function Confetti() {
   );
 }
 
-export function ThanksScreen({ question, status, error, onRetry, onRestart }: Props) {
+export function ThanksScreen({
+  question,
+  status,
+  error,
+  onRetry,
+  onRestart,
+  estimate,
+  estimateSettings,
+}: Props) {
   const reducedMotion = useReducedMotion();
+  const Reveal = estimateRevealComponent();
 
   return (
     <div className="slate-thanks">
       <h1 className="slate-title">{question.title}</h1>
       {question.subtitle && <p className="slate-subtitle">{question.subtitle}</p>}
+
+      {/* The estimate appears with the confirmation (ADR-064): the owner has it too. */}
+      {status === 'success' && estimate ? (
+        <RevealBoundary fallback={<EstimateText estimate={estimate} settings={estimateSettings} />}>
+          <Suspense fallback={<EstimateText estimate={estimate} settings={estimateSettings} />}>
+            <Reveal estimate={estimate} settings={estimateSettings} />
+          </Suspense>
+        </RevealBoundary>
+      ) : null}
 
       {/* One persistent polite region, so the status change is announced
           (a region created together with its text often isn't). */}

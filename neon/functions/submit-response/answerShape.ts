@@ -3,6 +3,8 @@
  * examples/_admin/answerShape.ts, which re-checks every row on load.
  */
 
+import { SIG_TYPED_MAX, parseSignaturePathCore } from './signature.js';
+
 const MAX_STRING_CHARS = 10_000;
 const MAX_ARRAY_ITEMS = 100;
 
@@ -91,6 +93,55 @@ const optionValues = (q: Record<string, unknown>): Set<string> =>
       .filter((v): v is string => typeof v === 'string'),
   );
 
+/** Contact parts and their caps (ADR-064). Mirrors src/logic/contact.ts CONTACT_MAX. */
+export const CONTACT_PART_MAX: Record<string, number> = { name: 120, email: 254, phone: 40 };
+/** Address parts and their caps (ADR-064). Mirrors src/logic/address.ts ADDRESS_MAX. */
+export const ADDRESS_PART_MAX: Record<string, number> = {
+  street: 200,
+  line2: 120,
+  city: 100,
+  region: 100,
+  postal: 20,
+  country: 80,
+};
+
+/** Known parts only, trimmed, each capped; undefined when nothing is left. */
+function clampParts(
+  v: unknown,
+  limits: Record<string, number>,
+): Record<string, string> | undefined {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, max] of Object.entries(limits)) {
+    const raw = (v as Record<string, unknown>)[key];
+    if (typeof raw !== 'string') continue;
+    const t = raw.trim();
+    if (t) out[key] = t.slice(0, max);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * A signature (ADR-064): `{ path }` only when the path parses exactly as the
+ * engine writes it, or `{ typed }` (a typed name, capped) unless the owner
+ * turned typing off. Anything else is dropped.
+ */
+function clampSignature(
+  q: Record<string, unknown>,
+  v: unknown,
+): Record<string, string> | undefined {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const a = v as Record<string, unknown>;
+  if (typeof a.path === 'string') {
+    return parseSignaturePathCore(a.path) ? { path: a.path } : undefined;
+  }
+  if (typeof a.typed === 'string' && q.allowTyped !== false) {
+    const t = a.typed.trim();
+    return t ? { typed: t.slice(0, SIG_TYPED_MAX) } : undefined;
+  }
+  return undefined;
+}
+
 /**
  * Per-type shapes for the question kinds whose answer shape ADR-063 widened
  * or pinned down. Lenient on purpose — a respondent whose page has an older
@@ -99,7 +150,9 @@ const optionValues = (q: Record<string, unknown>): Set<string> =>
  *   - number / scale / nps: a finite number (numeric text becomes a number);
  *   - date: a string of at most 40 characters;
  *   - choices with `allowOther`: typed text (anything that isn't an option
- *     value) is capped at 500 characters, and a list keeps one typed entry.
+ *     value) is capped at 500 characters, and a list keeps one typed entry;
+ *   - contact_info / address (ADR-064): known parts only, trimmed and capped;
+ *   - signature (ADR-064): a path the engine could have written, or a typed name.
  * Everything else goes through `clampValue` as before.
  */
 export function clampForQuestion(q: Record<string, unknown>, v: unknown): unknown {
@@ -135,6 +188,12 @@ export function clampForQuestion(q: Record<string, unknown>, v: unknown): unknow
       }
       return c;
     }
+    case 'contact_info':
+      return clampParts(v, CONTACT_PART_MAX);
+    case 'address':
+      return clampParts(v, ADDRESS_PART_MAX);
+    case 'signature':
+      return clampSignature(q, v);
     default:
       return clampValue(v);
   }

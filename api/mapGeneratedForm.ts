@@ -32,10 +32,48 @@ function text(value: string, fallback?: string): string | undefined {
   return fallback;
 }
 
-function optionsOf(q: GeneratedQuestion): Option[] {
-  return q.options
+const PRICE_MAX = 10_000_000;
+
+/** A usable price, or undefined (0 means "no price" in drafts). */
+function priceOf(n: unknown): number | undefined {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= PRICE_MAX ? n : undefined;
+}
+
+/** Price, range and card details from a drafted option (ADR-064), only when set. */
+function pricedExtras(
+  o: Partial<GeneratedQuestion['options'][number]>,
+  cards: boolean,
+): Partial<Option> {
+  const out: Partial<Option> = {};
+  const price = priceOf(o.price);
+  if (price !== undefined) {
+    out.price = price;
+    const max = priceOf(o.priceMax);
+    if (max !== undefined && max > price) out.priceMax = max;
+  }
+  if (cards) {
+    const features = (o.features ?? [])
+      .map((f) => f.trim().slice(0, 80))
+      .filter(Boolean)
+      .slice(0, 6);
+    if (features.length) out.features = features;
+    const badge = o.badge?.trim().slice(0, 24);
+    if (badge) out.badge = badge;
+  }
+  return out;
+}
+
+/** Matrix rows / columns: label and value only. */
+function plainOptions(list: ReadonlyArray<{ label: string; value: string }>): Option[] {
+  return list
     .filter((o) => o.label.trim() && o.value.trim())
     .map((o) => ({ label: o.label.trim(), value: o.value.trim() }));
+}
+
+function optionsOf(q: GeneratedQuestion, cards = false): Option[] {
+  return q.options
+    .filter((o) => o.label.trim() && o.value.trim())
+    .map((o) => ({ label: o.label.trim(), value: o.value.trim(), ...pricedExtras(o, cards) }));
 }
 
 function pictureOptionsOf(q: GeneratedQuestion): PictureOption[] {
@@ -46,6 +84,7 @@ function pictureOptionsOf(q: GeneratedQuestion): PictureOption[] {
       value: o.value.trim(),
       src: o.src.trim(),
       alt: text(o.alt, o.label.trim()),
+      ...pricedExtras(o, false),
     }));
 }
 
@@ -107,6 +146,7 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         ...(q.display === 'stepper' ? { display: 'stepper' as const } : {}),
         ...(text(q.unit) ? { unit: text(q.unit)!.slice(0, 24) } : {}),
         ...(text(q.prefix) ? { prefix: text(q.prefix)!.slice(0, 12) } : {}),
+        ...(priceOf(q.unitPrice) !== undefined ? { unitPrice: priceOf(q.unitPrice) } : {}),
         ...vis,
       };
     case 'date':
@@ -138,7 +178,8 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         type: 'single_choice',
         title,
         required,
-        options: optionsOf(q),
+        options: optionsOf(q, q.display === 'cards'),
+        ...(q.display === 'cards' ? { display: 'cards' as const } : {}),
         ...otherOf(q),
         ...vis,
       };
@@ -184,8 +225,8 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         id,
         type: 'matrix',
         title,
-        rows: optionsOf({ ...q, options: q.rows }),
-        columns: optionsOf({ ...q, options: q.columns }),
+        rows: plainOptions(q.rows),
+        columns: plainOptions(q.columns),
         multiple: q.multiple,
         required,
         ...vis,
@@ -236,6 +277,24 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         required,
         ...vis,
       };
+    case 'contact_info':
+      return { id, type: 'contact_info', title, ...vis };
+    case 'address': {
+      const area = (q.serviceArea ?? [])
+        .map((z) => z.trim().toUpperCase())
+        .filter((z) => /^[A-Z0-9 -]{1,12}\*?$/.test(z))
+        .slice(0, 500);
+      return {
+        id,
+        type: 'address',
+        title,
+        required,
+        ...(area.length ? { serviceArea: area } : {}),
+        ...vis,
+      };
+    }
+    case 'signature':
+      return { id, type: 'signature', title, body: text(q.body), required, ...vis };
     case 'review':
       return {
         id,
@@ -281,6 +340,8 @@ function blankQuestion(
     prefix: '',
     includeTime: false,
     range: false,
+    unitPrice: 0,
+    serviceArea: [],
     showIfField: '',
     showIfEquals: '',
     ...partial,
@@ -369,10 +430,29 @@ export function mapGeneratedForm(draft: GeneratedForm): { name: string; schema: 
   const middle = questions.map((q) =>
     mapQuestion(q, idMap.get(q.id) ?? q.id, visibilityOf(q, idMap)),
   );
+  // Instant estimate (ADR-064): only when asked for and something has a price.
+  const priced = middle.some(
+    (q) =>
+      ('options' in q && q.options.some((o) => typeof o.price === 'number')) ||
+      (q.type === 'number' && typeof q.unitPrice === 'number'),
+  );
+  const est = draft.estimate;
+  const showEstimate = Boolean(est?.show) && (priced || priceOf(est?.base) !== undefined);
+  const currency = /^[A-Z]{3}$/.test(est?.currency ?? '') ? est!.currency : 'USD';
   const schema: Schema = {
     brand: { name: draft.title },
     theme: draft.theme,
     themeMode: 'toggle',
+    ...(showEstimate
+      ? {
+          estimate: {
+            ...(currency !== 'USD' ? { currency } : {}),
+            ...(priceOf(est!.base) !== undefined ? { base: priceOf(est!.base) } : {}),
+            ...(text(est!.disclaimer) ? { disclaimer: text(est!.disclaimer)!.slice(0, 200) } : {}),
+            breakdown: true,
+          },
+        }
+      : {}),
     questions: [
       {
         id: 'welcome',
@@ -388,6 +468,7 @@ export function mapGeneratedForm(draft: GeneratedForm): { name: string; schema: 
         title: chrome.thanksTitle,
         subtitle: chrome.thanksSubtitle,
         cta: chrome.thanksCta,
+        ...(showEstimate ? { showEstimate: true } : {}),
       },
     ],
   };

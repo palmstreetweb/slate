@@ -8,6 +8,7 @@ import type { Question } from './Question.js';
 import type { AnswersOf, HiddenFields, LooseAnswers } from './Answers.js';
 import type { ThemeMode, ThemeName } from './Theme.js';
 import type { FormSound } from './Sound.js';
+import type { Estimate, EstimateSettings } from './Estimate.js';
 import type { FileUploadMeta } from '@/utils/fileUploadRef.js';
 
 export type BrandConfig = {
@@ -43,6 +44,13 @@ export type Schema<Q extends ReadonlyArray<Question> = ReadonlyArray<Question>> 
    * key ticks while typing (ADR-034).
    */
   sound?: FormSound | boolean;
+  /**
+   * Instant estimate settings (ADR-064): currency, a base price, and how the
+   * Thank You screen shows it. Prices live on options (`price`, `priceMax`)
+   * and number questions (`unitPrice`); an ending shows the estimate with
+   * `showEstimate`.
+   */
+  estimate?: EstimateSettings;
   questions: Q;
 };
 
@@ -69,6 +77,12 @@ export type SubmitMeta = {
   hiddenFields: HiddenFields;
   /** Total of option-level `score` values for the selected answers (ADR-016). */
   score: number;
+  /**
+   * The instant estimate for these answers (ADR-064), when the schema has
+   * prices. A server that stores responses should recompute it from its own
+   * copy of the schema rather than trust this value.
+   */
+  estimate?: Estimate;
 };
 
 /**

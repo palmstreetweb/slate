@@ -409,9 +409,10 @@ describe('picture choice with Other', () => {
     allowOther: true,
   };
 
-  it('adds an Other tile that opens a box; the typed text commits', () => {
+  // Picture choice loads on demand (ADR-064): wait for the grid.
+  it('adds an Other tile that opens a box; the typed text commits', async () => {
     const { setAnswer } = renderField(q);
-    const tile = screen.getByRole('radio', { name: /other/i });
+    const tile = await screen.findByRole('radio', { name: /other/i });
     expect(tile).toHaveTextContent('C');
     fireEvent.click(tile);
     const box = screen.getByRole('textbox');
@@ -420,9 +421,9 @@ describe('picture choice with Other', () => {
     expect(setAnswer).toHaveBeenCalledWith('style', 'Farmhouse');
   });
 
-  it('multiple mode merges picked tiles with the text', () => {
+  it('multiple mode merges picked tiles with the text', async () => {
     const { setAnswer, advance } = renderField({ ...q, multiple: true } as Question);
-    fireEvent.click(screen.getByRole('checkbox', { name: /modern/i }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /modern/i }));
     fireEvent.click(screen.getByRole('checkbox', { name: /other/i }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Farmhouse' } });
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));

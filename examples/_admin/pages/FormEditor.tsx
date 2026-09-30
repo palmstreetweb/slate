@@ -1090,5 +1090,11 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
         type,
         title: 'How likely are you to recommend us?',
       };
+    case 'contact_info':
+      return { id, type, title: 'How can we reach you?' };
+    case 'address':
+      return { id, type, title: 'What’s the address?', required: true };
+    case 'signature':
+      return { id, type, title: 'Sign here', required: true };
   }
 }

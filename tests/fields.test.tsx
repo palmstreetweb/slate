@@ -551,14 +551,15 @@ describe('phase 3 question types', () => {
     expect(advance).not.toHaveBeenCalled();
   });
 
-  it('picture_choice renders the image grid + snapshot', () => {
+  // Picture choice, ranking and matrix load on demand (ADR-064): wait for the field.
+  it('picture_choice renders the image grid + snapshot', async () => {
     const { container } = renderQuestion({
       id: 'pet',
       type: 'picture_choice',
       title: 'Pick a pet',
       options: pictureOpts,
     });
-    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    expect(await screen.findAllByRole('radio')).toHaveLength(3);
     expect(screen.getByAltText('Cat')).toBeInTheDocument();
     expect(container).toMatchSnapshot();
   });
@@ -571,7 +572,7 @@ describe('phase 3 question types', () => {
       title: 'Pick a pet',
       options: pictureOpts,
     });
-    await user.click(screen.getByRole('radio', { name: /dog/i }));
+    await user.click(await screen.findByRole('radio', { name: /dog/i }));
     expect(setAnswer).toHaveBeenCalledWith('pet', 'dog');
     // Auto-advance fires after a 220ms highlight pause.
     await waitFor(() => expect(advance).toHaveBeenCalled());
@@ -587,7 +588,7 @@ describe('phase 3 question types', () => {
       multiple: true,
       min: 1,
     });
-    await user.click(screen.getByRole('button', { name: /ok/i }));
+    await user.click(await screen.findByRole('button', { name: /ok/i }));
     expect(await screen.findByText(/at least one/i)).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
 
@@ -607,6 +608,7 @@ describe('phase 3 question types', () => {
         { label: 'Gamma', value: 'c' },
       ],
     });
+    await screen.findByRole('button', { name: /move gamma up/i });
     expect(container).toMatchSnapshot();
 
     await user.click(screen.getByRole('button', { name: /move gamma up/i }));
@@ -631,6 +633,7 @@ describe('phase 3 question types', () => {
         { label: 'Great', value: 'great' },
       ],
     });
+    await screen.findByRole('radio', { name: 'Quality: Great' });
     expect(container).toMatchSnapshot();
 
     await user.click(screen.getByRole('radio', { name: 'Quality: Great' }));
@@ -658,7 +661,7 @@ describe('phase 3 question types', () => {
         { label: 'Weekly', value: 'weekly' },
       ],
     });
-    await user.click(screen.getByRole('checkbox', { name: 'Web: Daily' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Web: Daily' }));
     expect(setAnswer).toHaveBeenCalledWith('use', { web: ['daily'] });
     await user.click(screen.getByRole('checkbox', { name: 'Web: Weekly' }));
     expect(setAnswer).toHaveBeenLastCalledWith('use', { web: ['daily', 'weekly'] });

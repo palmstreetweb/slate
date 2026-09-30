@@ -26,6 +26,9 @@ import type {
   MatrixQuestion,
   YesNoQuestion,
   LegalQuestion,
+  ContactInfoQuestion,
+  AddressQuestion,
+  SignatureQuestion,
 } from './Question.js';
 
 /**
@@ -48,6 +51,9 @@ import type {
  *   - legal → 'accept' | 'decline'
  *   - file_upload → File | string, or (File | string)[] when `multiple: true` (ADR-032)
  *   - matrix → Record<rowValue, columnValue | columnValue[]> (see ADR-013)
+ *   - contact_info → { name?, email?, phone? } (ADR-064)
+ *   - address → { street, line2?, city, region?, postal, country? } (ADR-064)
+ *   - signature → { path } (vector strokes) or { typed } (ADR-064)
  *   - welcome, statement, thanks → never stored
  */
 
@@ -59,6 +65,26 @@ export type FileAnswer = FileAnswerItem | FileAnswerItem[];
 
 /** A `matrix` answer — row value → selected column value(s). */
 export type MatrixAnswer = Record<string, string | string[]>;
+
+/** A `contact_info` answer — only the parts that were filled (ADR-064). */
+export type ContactAnswer = { name?: string; email?: string; phone?: string };
+
+/** An `address` answer — only the parts that were filled (ADR-064). */
+export type AddressAnswer = {
+  street?: string;
+  line2?: string;
+  city?: string;
+  region?: string;
+  postal?: string;
+  country?: string;
+};
+
+/**
+ * A `signature` answer (ADR-064): `path` is the drawing as a compact SVG path
+ * in a 500 × 200 box (`M x y l dx dy …`, whole numbers); `typed` is a name
+ * typed instead.
+ */
+export type SignatureAnswer = { path: string } | { typed: string };
 
 export type LooseAnswers = Record<
   string,
@@ -107,19 +133,25 @@ export type AnswerValueOf<Q extends Question> = Q extends ShortTextQuestion
                           : FileAnswerItem
                         : Q extends MatrixQuestion
                           ? MatrixAnswer
-                          : Q extends RankingQuestion<string, infer TOpts>
-                            ? Array<OptionValueOf<TOpts>>
-                            : Q extends PictureChoiceQuestion<string, infer TOpts>
-                              ? Q extends { multiple: true }
-                                ? Array<WithOther<Q, OptionValueOf<TOpts>>>
-                                : WithOther<Q, OptionValueOf<TOpts>>
-                              : Q extends SingleChoiceQuestion<string, infer TOpts>
-                                ? WithOther<Q, OptionValueOf<TOpts>>
-                                : Q extends DropdownQuestion<string, infer TOpts>
-                                  ? WithOther<Q, OptionValueOf<TOpts>>
-                                  : Q extends MultiChoiceQuestion<string, infer TOpts>
-                                    ? Array<WithOther<Q, OptionValueOf<TOpts>>>
-                                    : never;
+                          : Q extends ContactInfoQuestion
+                            ? ContactAnswer
+                            : Q extends AddressQuestion
+                              ? AddressAnswer
+                              : Q extends SignatureQuestion
+                                ? SignatureAnswer
+                                : Q extends RankingQuestion<string, infer TOpts>
+                                  ? Array<OptionValueOf<TOpts>>
+                                  : Q extends PictureChoiceQuestion<string, infer TOpts>
+                                    ? Q extends { multiple: true }
+                                      ? Array<WithOther<Q, OptionValueOf<TOpts>>>
+                                      : WithOther<Q, OptionValueOf<TOpts>>
+                                    : Q extends SingleChoiceQuestion<string, infer TOpts>
+                                      ? WithOther<Q, OptionValueOf<TOpts>>
+                                      : Q extends DropdownQuestion<string, infer TOpts>
+                                        ? WithOther<Q, OptionValueOf<TOpts>>
+                                        : Q extends MultiChoiceQuestion<string, infer TOpts>
+                                          ? Array<WithOther<Q, OptionValueOf<TOpts>>>
+                                          : never;
 
 /**
  * `required: true` on a question means its answer is guaranteed present at

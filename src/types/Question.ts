@@ -13,6 +13,17 @@ export type Option<TValue extends string = string> = {
   description?: string;
   /** Points added to the running score when this option is selected (ADR-016). */
   score?: number;
+  /**
+   * Price for the instant estimate (ADR-064): the exact price, or the low end
+   * of a range when `priceMax` is set. In the form's currency (`schema.estimate`).
+   */
+  price?: number;
+  /** High end of a price range. Omit for a single price. */
+  priceMax?: number;
+  /** Package cards (`display: 'cards'`): short feature lines under the price (ADR-064). */
+  features?: ReadonlyArray<string>;
+  /** Package cards: a small badge on the card, e.g. "Most popular". */
+  badge?: string;
 };
 
 /** Option with an image, for `picture_choice`. */
@@ -109,6 +120,11 @@ export type ThanksQuestion<TId extends string = string> = IdField<TId> & {
   visibleIf?: Condition;
   /** Navigate the page here after a successful submit. */
   redirectUrl?: string;
+  /**
+   * Reveal the instant estimate on this ending (ADR-064), from the prices on
+   * the answers and `schema.estimate`. Shown once the response is received.
+   */
+  showEstimate?: boolean;
 };
 
 /**
@@ -199,6 +215,12 @@ export type NumberQuestion<TId extends string = string> = IdField<TId> &
     prefix?: string;
     /** Shown after the number, e.g. 'sq ft'. Display only. */
     unit?: string;
+    /**
+     * Price per unit for the instant estimate (ADR-064): the answer × this, in
+     * the form's currency. With `unitPriceMax`, a low / high range per unit.
+     */
+    unitPrice?: number;
+    unitPriceMax?: number;
   };
 
 /* ---------- file upload ---------- */
@@ -245,6 +267,9 @@ export type DateQuestion<TId extends string = string> = IdField<TId> &
 
 /* ---------- choice questions ---------- */
 
+/** How a `single_choice` question is drawn (ADR-064). The answer is the same option value. */
+export type ChoiceDisplay = 'list' | 'cards';
+
 export type SingleChoiceQuestion<
   TId extends string = string,
   TOptions extends ReadonlyArray<Option> = ReadonlyArray<Option>,
@@ -257,6 +282,11 @@ export type SingleChoiceQuestion<
     options: TOptions;
     /** Defaults to true. */
     required?: boolean;
+    /**
+     * 'list' (default) is one row per option; 'cards' draws package cards with
+     * the option's price, features and badge (ADR-064).
+     */
+    display?: ChoiceDisplay;
   };
 
 export type MultiChoiceQuestion<
@@ -365,6 +395,78 @@ export type LegalQuestion<TId extends string = string> = IdField<TId> &
     required?: boolean;
   };
 
+/* ---------- contact, address, signature (ADR-064) ---------- */
+
+/** Whether one part of a contact block is asked, and whether it must be filled. */
+export type ContactFieldMode = 'off' | 'optional' | 'required';
+
+/** The parts of a contact block. */
+export type ContactField = 'name' | 'email' | 'phone';
+
+/**
+ * Name, email and phone on one screen, as one question (ADR-064). Stored as
+ * `{ name?, email?, phone? }` — only the parts that were filled. Phone is
+ * stored as E.164 when it parses.
+ */
+export type ContactInfoQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'contact_info';
+    title: DynamicTitle;
+    /**
+     * Which parts show and which are required. Unset parts use the default:
+     * name and email required, phone optional.
+     */
+    fields?: Partial<Record<ContactField, ContactFieldMode>>;
+    /** ISO 3166-1 alpha-2 code for phone numbers typed without one; default 'US'. */
+    defaultCountry?: string;
+  };
+
+/** Address layout: US (State, 5-digit ZIP) or international (region, postal code). */
+export type AddressFormat = 'us' | 'international';
+
+/**
+ * A postal address as one question (ADR-064). Stored as
+ * `{ street, line2?, city, region?, postal, country? }` — only filled parts.
+ * No lookup service: browser autofill fills it.
+ */
+export type AddressQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'address';
+    title: DynamicTitle;
+    required?: boolean;
+    /** Show the apartment / unit line; default true. */
+    line2?: boolean;
+    /** Ask for the country; default false. */
+    country?: boolean;
+    /** Default 'us'. */
+    format?: AddressFormat;
+    /**
+     * ZIP codes or ZIP prefixes the owner serves ('93101', '931'). When set, a
+     * condition can test `IN_AREA_VALUE` / `OUT_OF_AREA_VALUE` on this
+     * question — e.g. to route to an "out of area" ending.
+     */
+    serviceArea?: ReadonlyArray<string>;
+  };
+
+/**
+ * Sign with a finger or mouse (ADR-064). Stored inside the answer as compact
+ * vector strokes, `{ path }` (an SVG path in a 500 × 200 box), or `{ typed }`
+ * when the respondent typed their name instead.
+ */
+export type SignatureQuestion<TId extends string = string> = IdField<TId> &
+  Visibility & {
+    type: 'signature';
+    title: DynamicTitle;
+    /** Consent or agreement copy shown above the pad. */
+    body?: string;
+    required?: boolean;
+    /**
+     * Offer "Type your name instead" (keyboard and screen-reader users can't
+     * draw); default true.
+     */
+    allowTyped?: boolean;
+  };
+
 /* ---------- scale ---------- */
 
 /** How a `scale` question is drawn (ADR-063). The answer is the same number in every style. */
@@ -423,6 +525,9 @@ export type Question =
   | LegalQuestion
   | ScaleQuestion
   | NpsQuestion
+  | ContactInfoQuestion
+  | AddressQuestion
+  | SignatureQuestion
   | ReviewQuestion
   | ThanksQuestion;
 

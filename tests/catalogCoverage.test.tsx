@@ -1,5 +1,5 @@
 /**
- * Question catalog coverage (ADR-063). Every question type must be wired
+ * Question catalog coverage (ADR-063, extended by ADR-064). Every question type must be wired
  * through every surface that knows about types. A new type added in a later
  * wave fails here (and in `SAMPLES`, at compile time) until it is: studio
  * label, palette entry and icon, validation, answer formatting, the server
@@ -72,6 +72,18 @@ const SAMPLES: Record<QuestionType, { q: Question; answer: unknown }> = {
     answer: 4,
   },
   nps: { q: { id: 'x', type: 'nps', title: 'T' }, answer: 9 },
+  contact_info: {
+    q: { id: 'x', type: 'contact_info', title: 'T', fields: { phone: 'required' } },
+    answer: { name: 'Ada Lovelace', email: 'ada@example.com', phone: '+18055550100' },
+  },
+  address: {
+    q: { id: 'x', type: 'address', title: 'T', required: true, serviceArea: ['931'] },
+    answer: { street: '12 Palm St', city: 'Santa Barbara', region: 'CA', postal: '93101' },
+  },
+  signature: {
+    q: { id: 'x', type: 'signature', title: 'T', required: true },
+    answer: { path: 'M10 150l40 -60 40 60 40 -60 40 60' },
+  },
 };
 
 const CHROME = new Set<QuestionType>(['welcome', 'thanks']);
@@ -108,7 +120,7 @@ describe('question catalog coverage (ADR-063)', () => {
     }
   });
 
-  it('portable schemas keep every type and its Wave A options', () => {
+  it('portable schemas keep every type and its Wave A and B options', () => {
     const questions = TYPES.map((t) => ({ ...SAMPLES[t].q, id: t }));
     const out = sanitizeUntrustedSchema({
       brand: { name: 'x' },
@@ -125,5 +137,15 @@ describe('question catalog coverage (ADR-063)', () => {
     expect(byType.number!.display).toBe('stepper');
     expect(byType.scale!.display).toBe('emoji');
     expect(byType.date!.range).toBe(true);
+    // Wave B (ADR-064)
+    expect(byType.contact_info!.fields).toEqual({ phone: 'required' });
+    expect(byType.address!.serviceArea).toEqual(['931']);
+    expect(byType.signature!.required).toBe(true);
+  });
+
+  it('Wave B types load their UI on demand (ADR-064)', () => {
+    expect(extFieldKey(SAMPLES.contact_info.q)).toBe('contact-info');
+    expect(extFieldKey(SAMPLES.address.q)).toBe('address');
+    expect(extFieldKey(SAMPLES.signature.q)).toBe('signature');
   });
 });

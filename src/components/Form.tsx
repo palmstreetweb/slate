@@ -31,6 +31,7 @@ import { useTheme } from '@/hooks/useTheme.js';
 import { useReducedMotion } from '@/hooks/useReducedMotion.js';
 import { progress as progressFn } from '@/logic/progress.js';
 import { computeScore } from '@/logic/scoring.js';
+import { computeEstimate } from '@/logic/estimate.js';
 import { prefillAnswers } from '@/logic/prefill.js';
 import { allowsOther } from '@/logic/other.js';
 import { TopBar } from './chrome/TopBar.js';
@@ -149,6 +150,13 @@ export function Form<S extends Schema>({
   const score = useMemo(
     () => computeScore(schema.questions, state.answers),
     [schema.questions, state.answers],
+  );
+
+  // Instant estimate (ADR-064) — from the answers that will be submitted
+  // (visible questions only), so what the respondent sees is what is sent.
+  const estimate = useMemo(
+    () => computeEstimate(schema, getSubmitAnswers()),
+    [schema, getSubmitAnswers],
   );
 
   /* ---------- sound (ADR-023) — interaction-time, not step-change ---------- */
@@ -305,6 +313,7 @@ export function Form<S extends Schema>({
       questionsVisited: state.questionsVisited,
       hiddenFields: hiddenFields ?? {},
       score,
+      ...(estimate ? { estimate } : {}),
     };
 
     const redirectUrl = currentQuestion.redirectUrl;
@@ -345,6 +354,7 @@ export function Form<S extends Schema>({
     errorMessage,
     submitStatus,
     score,
+    estimate,
     resumeEnabled,
     clearAutosave,
   ]);
@@ -523,6 +533,8 @@ export function Form<S extends Schema>({
                   playInteractionSound={playInteractionSound}
                   playTypingSound={playTypingSound}
                   allQuestions={schema.questions}
+                  estimate={estimate}
+                  estimateSettings={schema.estimate}
                 />
               ) : null}
             </div>

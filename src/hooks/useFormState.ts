@@ -17,6 +17,7 @@ import type { Question } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { resolveJumpTarget, visibleAnswersForSubmit, visibleQuestions } from '@/logic/progress.js';
 import { otherIndex } from '@/logic/other.js';
+import { areaIndex } from '@/logic/address.js';
 
 export type AnimDirection = 'forward' | 'backward';
 
@@ -122,7 +123,13 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
         // overrides the default step+1. Back-nav still works — the jump
         // origin is pushed onto history like any other advance.
         const jump = current
-          ? resolveJumpTarget(current, visible, s.answers, otherIndex(allQuestions))
+          ? resolveJumpTarget(
+              current,
+              visible,
+              s.answers,
+              otherIndex(allQuestions),
+              areaIndex(allQuestions),
+            )
           : null;
         const next =
           jump !== null && jump !== s.step ? jump : Math.min(s.step + 1, visible.length - 1);

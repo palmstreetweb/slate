@@ -1,5 +1,7 @@
 /* On-demand field UIs (ADR-063): styled scales (stars, faces, slider), the
-   number stepper, and date ranges / times. The components that use these
+   number stepper, and date ranges / times — and Wave B (ADR-064): the contact
+   block, the address, the signature pad, package cards and the estimate
+   reveal. The components that use these
    rules load on demand; the published stylesheet includes them after
    questions.css (scripts/bundle-css.mjs).
 
@@ -510,6 +512,488 @@
 }
 
 /* ============================================================
+   Shared (ADR-064)
+   ============================================================ */
+
+/* Visually hidden, still read aloud. */
+[data-slate-forms] .slate-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================
+   Contact block and address — labelled parts on one screen
+   ============================================================ */
+
+[data-slate-forms] .slate-parts {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 22px 18px;
+}
+
+[data-slate-forms] .slate-part {
+  grid-column: span 12;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+[data-slate-forms] .slate-part-label {
+  font-family: var(--slate-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--slate-text);
+  opacity: 0.6;
+}
+
+[data-slate-forms][data-theme-name='classic'] .slate-part-label {
+  font-family: var(--slate-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+[data-slate-forms] .slate-part-optional {
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.75;
+}
+
+/* Parts sit closer together than a single question's field: a shade smaller. */
+[data-slate-forms] .slate-part-input {
+  font-size: clamp(1.15rem, 2.6vw, 1.45rem);
+  padding-bottom: 0.45rem;
+}
+
+[data-slate-forms][data-theme-name='swiss'] .slate-part-input {
+  font-size: clamp(1.2rem, 2.8vw, 1.55rem);
+}
+
+[data-slate-forms] .slate-part-err {
+  margin: 0;
+}
+
+/* City / state / ZIP share a row where there's room. */
+[data-slate-forms] .slate-address .slate-part--city {
+  grid-column: span 6;
+}
+
+[data-slate-forms] .slate-address .slate-part--region,
+[data-slate-forms] .slate-address .slate-part--postal {
+  grid-column: span 3;
+}
+
+@media (max-width: 560px) {
+  [data-slate-forms] .slate-parts {
+    gap: 20px 14px;
+  }
+
+  [data-slate-forms] .slate-address .slate-part--city {
+    grid-column: span 12;
+  }
+
+  [data-slate-forms] .slate-address .slate-part--region,
+  [data-slate-forms] .slate-address .slate-part--postal {
+    grid-column: span 6;
+  }
+}
+
+/* ============================================================
+   Signature pad
+   ============================================================ */
+
+[data-slate-forms] .slate-sig {
+  margin-top: 28px;
+  outline: none;
+}
+
+[data-slate-forms] .slate-sig-body {
+  margin-top: 12px;
+}
+
+[data-slate-forms] .slate-sig-pad {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
+  background: var(--slate-bg-2);
+  overflow: hidden;
+  transition: border-color 150ms;
+}
+
+[data-slate-forms] .slate-sig:focus-visible .slate-sig-pad,
+[data-slate-forms] .slate-sig-pad:focus-within {
+  border-color: var(--slate-accent);
+}
+
+[data-slate-forms] .slate-sig--error .slate-sig-pad {
+  border-color: var(--slate-error);
+}
+
+/* The canvas keeps the stored 5:2 box at every width (logic/signature.ts). */
+[data-slate-forms] .slate-sig-canvas {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 2;
+  color: var(--slate-text);
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The line you sign on: an × and a rule, 72% of the way down. */
+[data-slate-forms] .slate-sig-line {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 72%;
+  border-top: 1.5px solid var(--slate-border-md);
+  pointer-events: none;
+}
+
+[data-slate-forms] .slate-sig-x {
+  position: absolute;
+  left: 0;
+  bottom: 4px;
+  font-family: var(--slate-font-body);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--slate-dim);
+}
+
+[data-slate-forms] .slate-sig-hint {
+  position: absolute;
+  inset: 0 0 38% 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--slate-dim);
+  pointer-events: none;
+  transition: opacity 200ms ease-out;
+}
+
+[data-slate-forms] .slate-sig--inked .slate-sig-hint {
+  opacity: 0;
+}
+
+[data-slate-forms] .slate-sig-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 18px;
+  margin-top: 8px;
+}
+
+[data-slate-forms] .slate-sig-tool {
+  min-height: 44px;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--slate-text);
+  font-family: var(--slate-font-body);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.75;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slate-forms] .slate-sig-tool:hover,
+[data-slate-forms] .slate-sig-tool:focus-visible {
+  opacity: 1;
+}
+
+[data-slate-forms] .slate-sig-tool:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 2px;
+}
+
+[data-slate-forms] .slate-sig-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* A typed signature reads as one: the platform's own script face, no download. */
+[data-slate-forms] .slate-sig-typed {
+  font-family: 'Snell Roundhand', 'Segoe Script', 'Brush Script MT', 'URW Chancery L', cursive;
+  font-size: clamp(1.8rem, 5vw, 2.4rem);
+  font-style: normal;
+  text-transform: none;
+}
+
+/* ============================================================
+   Package cards (single choice, display: 'cards')
+   ============================================================ */
+
+[data-slate-forms] .slate-pkgs {
+  margin-top: 36px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+/* Two cards read best as a pair, not a stretched row. */
+[data-slate-forms] .slate-pkgs--pair {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  max-width: 620px;
+}
+
+/* A card is a .slate-choice (every theme's choice look), laid out as a column. */
+[data-slate-forms] .slate-pkg {
+  position: relative;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 10px;
+  height: 100%;
+  padding: 18px 18px 20px;
+}
+
+[data-slate-forms] .slate-pkg--badged {
+  padding-top: 26px;
+}
+
+[data-slate-forms] .slate-pkg-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+[data-slate-forms] .slate-pkg-name {
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+[data-slate-forms] .slate-pkg-price {
+  font-family: var(--slate-font-display);
+  font-size: clamp(1.2rem, 2.2vw, 1.4rem);
+  font-weight: var(--slate-title-weight, 600);
+  letter-spacing: var(--slate-title-tracking, 0);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Each amount stays whole; a narrow card breaks the range after the dash. */
+[data-slate-forms] .slate-pkg-price > span:not(.slate-pkg-dash) {
+  white-space: nowrap;
+}
+
+[data-slate-forms] .slate-pkg-dash {
+  opacity: 0.5;
+}
+
+[data-slate-forms] .slate-pkg-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-slate-forms] .slate-pkg-desc {
+  font-size: 0.88em;
+  line-height: 1.4;
+  opacity: 0.7;
+}
+
+[data-slate-forms] .slate-pkg-features {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--slate-border);
+}
+
+[data-slate-forms] .slate-pkg-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.86em;
+  line-height: 1.35;
+}
+
+[data-slate-forms] .slate-pkg-feature svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  fill: none;
+  stroke: var(--slate-accent);
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Swiss inverts a picked card; the check follows the text colour there. */
+[data-slate-forms][data-theme-name='swiss'] .slate-choice--selected .slate-pkg-feature svg,
+[data-slate-forms][data-theme-name='swiss'] .slate-pkg:hover .slate-pkg-feature svg {
+  stroke: currentColor;
+}
+
+[data-slate-forms] .slate-pkg-badge {
+  position: absolute;
+  top: 0;
+  right: 16px;
+  transform: translateY(-50%);
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--slate-accent);
+  color: var(--slate-on-accent);
+  font-family: var(--slate-font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='swiss'] .slate-pkg-badge,
+[data-slate-forms][data-theme-name='mono'] .slate-pkg-badge {
+  border-radius: 0;
+  background: var(--slate-text);
+  color: var(--slate-bg);
+}
+
+/* The badge sits on the card's top edge, so the card itself can't clip it. */
+[data-slate-forms] .slate-pkgs .slate-pkg {
+  overflow: visible;
+}
+
+[data-slate-forms] .slate-pkgs + .slate-other-box {
+  padding-left: 0;
+}
+
+[data-slate-forms] .slate-pkg--other {
+  justify-content: center;
+}
+
+@media (max-width: 560px) {
+  [data-slate-forms] .slate-pkgs,
+  [data-slate-forms] .slate-pkgs--pair {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* ============================================================
+   Estimate reveal (Thank You screen)
+   ============================================================ */
+
+[data-slate-forms] .slate-estimate {
+  margin-top: 28px;
+  max-width: 460px;
+  padding: 20px 22px 18px;
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  border-radius: var(--slate-radius);
+  background: var(--slate-bg-2);
+}
+
+[data-slate-forms] .slate-estimate-label {
+  margin: 0;
+  font-family: var(--slate-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--slate-text);
+  opacity: 0.6;
+}
+
+[data-slate-forms] .slate-estimate-total {
+  margin: 6px 0 0;
+  font-family: var(--slate-font-display);
+  font-size: clamp(1.9rem, 6vw, 2.6rem);
+  font-weight: var(--slate-title-weight, 600);
+  letter-spacing: var(--slate-title-tracking, 0);
+  line-height: 1.1;
+  color: var(--slate-text);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms] .slate-estimate-figure {
+  display: inline-flex;
+  flex-wrap: wrap;
+  column-gap: 0.15em;
+}
+
+[data-slate-forms] .slate-estimate-dash {
+  opacity: 0.5;
+}
+
+[data-slate-forms] .slate-estimate-lines {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--slate-border);
+  display: grid;
+  gap: 8px;
+}
+
+[data-slate-forms] .slate-estimate-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--slate-text);
+}
+
+[data-slate-forms] .slate-estimate-line-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  opacity: 0.8;
+}
+
+[data-slate-forms] .slate-estimate-qty {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-slate-forms] .slate-estimate-line-amount {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+[data-slate-forms] .slate-estimate-note {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--slate-text);
+  opacity: 0.6;
+}
+
+[data-slate-forms] .slate-estimate-plain {
+  margin: 24px 0 0;
+  font-size: 1.1rem;
+  color: var(--slate-text);
+}
+
+/* ============================================================
    Motion (ADR-059 pattern)
    ============================================================ */
 
@@ -525,7 +1009,80 @@
   }
 }
 
+@keyframes slate-estimate-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slate-estimate-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slate-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-part,
+  [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-sig {
+    animation: slate-q-child-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(140ms + var(--slate-i, 0) * 45ms);
+  }
+
+  /* Cards: the choice stagger already runs (they are .slate-choice); the
+     commit beat steps the other cards back, as on the list. */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-pkgs .slate-pkg {
+    transition:
+      border-color 150ms,
+      background 150ms,
+      color 150ms,
+      opacity 200ms ease-out,
+      transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion])
+    .slate-pkgs--committed
+    .slate-pkg:not(.slate-pkg--committed) {
+    opacity: 0.4;
+    transform: scale(0.97);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-pkg--committed {
+    animation: slate-choice-select-pop 220ms cubic-bezier(0.34, 1.45, 0.64, 1) both;
+  }
+
+  /* The estimate rises in with the confirmation; its lines follow one by one. */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-estimate {
+    animation: slate-estimate-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-estimate-line {
+    animation: slate-estimate-line-in 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(700ms + var(--slate-i, 0) * 70ms);
+  }
+
+  [data-slate-forms]:not([data-reduced-motion]) .slate-estimate-note {
+    animation: slate-fade-in 400ms ease-out 1000ms both;
+  }
+
   [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-scale-icons,
   [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-slider,
   [data-slate-forms]:not([data-reduced-motion]) .slate-q-enter .slate-stepper,

@@ -6,7 +6,17 @@ import { buildGenerateUserPrompt } from '../api/runGenerate.js';
 import { checkSchema } from '../src/logic/schemaCheck.js';
 import { AI_GOLDEN_PROMPTS } from '../examples/_admin/ai/goldenPrompts.js';
 
-const opt = (label: string, value: string) => ({ label, value, src: '', alt: '' });
+// The model fills every option field; no price / card details = 0, [] and '' (ADR-064).
+const opt = (label: string, value: string) => ({
+  label,
+  value,
+  src: '',
+  alt: '',
+  price: 0,
+  priceMax: 0,
+  features: [] as string[],
+  badge: '',
+});
 
 const validDraft = {
   title: 'Wedding RSVP',
@@ -53,6 +63,7 @@ const validDraft = {
     }),
   ],
   thanks: { title: 'Thank you.', subtitle: 'We can’t wait.', cta: 'Done' },
+  estimate: { show: false, currency: 'USD', base: 0, disclaimer: '' },
 };
 
 describe('Build with AI schema', () => {

@@ -69,6 +69,20 @@ export { checkSchema, type SchemaIssue } from './logic/schemaCheck.js';
 export { OTHER_VALUE } from './logic/other.js';
 
 /**
+ * In a condition's value on an address question with a `serviceArea`: its ZIP
+ * is inside / outside the area (ADR-064).
+ */
+export { IN_AREA_VALUE, OUT_OF_AREA_VALUE } from './logic/address.js';
+
+/**
+ * The instant estimate for a schema and answers (ADR-064) — what the Thank
+ * You screen shows and `SubmitMeta.estimate` carries. A server that stores
+ * responses can call it on its own copy of the schema instead of trusting
+ * the browser's number.
+ */
+export { computeEstimate, formatEstimate } from './logic/estimate.js';
+
+/**
  * Identity helper that captures the literal types of a schema for downstream
  * inference. Wrap your schema in `defineSchema({ ... })` to get strongly-typed
  * `answers` in `<Form onSubmit>`.

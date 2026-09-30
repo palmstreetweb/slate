@@ -10,6 +10,13 @@
 import type { DateQuestion, Question } from '@/types/Question.js';
 import { isScaleStepValue } from '@/utils/scaleStep.js';
 import { isValidIsoDate, parseDateAnswer, partKey } from './dateValue.js';
+import { addressErrors, contactErrors } from './contact.js';
+import {
+  SIG_TYPED_MAX,
+  isRealSignature,
+  parseSignaturePath,
+  signaturePathOf,
+} from './signature.js';
 
 export { isValidIsoDate };
 
@@ -51,6 +58,18 @@ function validateDate(question: DateQuestion, answer: unknown): ValidationError 
     return { code: 'range_order', message: 'The end can’t be before the start' };
   }
   return null;
+}
+
+/** The first message from a per-part check, as a ValidationError. */
+function firstPartError(errors: Record<string, string | undefined>): ValidationError | null {
+  for (const [part, message] of Object.entries(errors)) {
+    if (message) return { code: part, message };
+  }
+  return null;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
 function isBlankString(v: unknown): boolean {
@@ -302,6 +321,54 @@ export function validate(question: Question, answer: unknown): ValidationResult 
         return { code: 'range', message: 'Pick a value between 0 and 10' };
       }
       return null;
+    }
+
+    case 'contact_info': {
+      if (answer !== undefined && answer !== null && !isRecord(answer)) {
+        return { code: 'shape', message: 'Please fill this in' };
+      }
+      return firstPartError(contactErrors(question, answer));
+    }
+
+    case 'address': {
+      if (answer !== undefined && answer !== null && !isRecord(answer)) {
+        return { code: 'shape', message: 'Please fill this in' };
+      }
+      return firstPartError(addressErrors(question, answer));
+    }
+
+    case 'signature': {
+      const blank =
+        answer === undefined ||
+        answer === null ||
+        (isRecord(answer) && Object.keys(answer).length === 0);
+      if (blank) {
+        return question.required ? { code: 'required', message: 'Please sign here' } : null;
+      }
+      if (!isRecord(answer)) return { code: 'shape', message: 'Please sign here' };
+      const path = signaturePathOf(answer);
+      if (path !== null) {
+        const strokes = parseSignaturePath(path);
+        if (!strokes) {
+          return {
+            code: 'shape',
+            message: 'That signature didn’t come through. Clear it and sign again.',
+          };
+        }
+        if (!isRealSignature(strokes)) {
+          return { code: 'too_small', message: 'Please sign with a full stroke, not a dot' };
+        }
+        return null;
+      }
+      if (typeof answer.typed === 'string' && question.allowTyped !== false) {
+        const typed = answer.typed.trim();
+        if (typed.length < 2) return { code: 'typed', message: 'Please type your full name' };
+        if (typed.length > SIG_TYPED_MAX) {
+          return { code: 'too_long', message: `Max ${SIG_TYPED_MAX} characters` };
+        }
+        return null;
+      }
+      return { code: 'shape', message: 'Please sign here' };
     }
 
     case 'multi_choice': {

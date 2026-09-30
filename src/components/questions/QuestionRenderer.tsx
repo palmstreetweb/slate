@@ -13,7 +13,9 @@
 import { useMemo } from 'react';
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
+import type { Estimate, EstimateSettings } from '@/types/Estimate.js';
 import { pipeQuestionCopy } from '@/logic/piping.js';
+import { estimateCurrency, formatEstimate } from '@/logic/estimate.js';
 import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 
 import { WelcomeScreen } from './WelcomeScreen.js';
@@ -36,11 +38,7 @@ import { YesNoField } from './YesNoField.js';
 import { LegalField } from './LegalField.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import type { FileUploadMeta } from '@/utils/fileUploadRef.js';
-import { PictureChoiceField } from './PictureChoiceField.js';
-import { RankingField } from './RankingField.js';
-import { MatrixField } from './MatrixField.js';
 import { ExtField, extFieldKey } from './lazyFields.js';
-import type { MatrixAnswer } from '@/types/Answers.js';
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -78,6 +76,13 @@ export type QuestionRendererProps = {
    * formatted dates (ADR-063). Optional: without it, raw values are piped.
    */
   allQuestions?: ReadonlyArray<Question>;
+  /**
+   * The instant estimate for the current answers (ADR-064), or null when the
+   * form prices nothing. Feeds `{{estimate}}` and the Thank You reveal.
+   */
+  estimate?: Estimate | null;
+  /** `schema.estimate`: currency, labels, breakdown, disclaimer. */
+  estimateSettings?: EstimateSettings;
 };
 
 function StepBadge({ step, total }: { step: number; total: number }) {
@@ -109,12 +114,15 @@ export function QuestionRenderer({
   playInteractionSound,
   playTypingSound,
   allQuestions,
+  estimate = null,
+  estimateSettings,
 }: QuestionRendererProps) {
-  // Resolve {{field:id}} / {{score}} piping (and function-style DynamicTitle)
-  // once here, so every field component receives ready-to-render copy.
+  // Resolve {{field:id}} / {{score}} / {{estimate}} piping (and function-style
+  // DynamicTitle) once here, so every field component receives ready-to-render copy.
+  const estimateText = estimate ? formatEstimate(estimate) : '';
   const question = useMemo(
-    () => pipeQuestionCopy(rawQuestion, answers, score, allQuestions),
-    [rawQuestion, answers, score, allQuestions],
+    () => pipeQuestionCopy(rawQuestion, answers, score, allQuestions, estimateText),
+    [rawQuestion, answers, score, allQuestions, estimateText],
   );
 
   const { schedule: scheduleAutoAdvance } = useAutoAdvanceTimer(rawQuestion.id);
@@ -162,6 +170,7 @@ export function QuestionRenderer({
           ping={ping}
           onFileUpload={onFileUpload}
           resolveFileUploadMeta={resolveFileUploadMeta}
+          currency={estimateCurrency(estimateSettings)}
         />
       </>
     );
@@ -200,6 +209,8 @@ export function QuestionRenderer({
           error={submitError}
           onRetry={onRetrySubmit}
           onRestart={onRestart}
+          estimate={question.showEstimate ? estimate : null}
+          estimateSettings={estimateSettings}
         />
       );
 
@@ -409,54 +420,13 @@ export function QuestionRenderer({
         </>
       );
 
-    case 'picture_choice':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <PictureChoiceField
-            question={question}
-            answers={answers}
-            selected={answers[question.id] as string | string[] | undefined}
-            onSelectSingle={(v) => selectAndAdvance(question.id, v)}
-            onSelectMulti={(vs) => {
-              ping();
-              setAnswer(question.id, vs);
-            }}
-            onAdvance={advanceWithSound}
-            onType={playTypingSound}
-          />
-        </>
-      );
-
+    // Always on demand (extFieldKey above); listed so the switch stays total.
+    case 'contact_info':
+    case 'address':
+    case 'signature':
     case 'ranking':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <RankingField
-            question={question}
-            answers={answers}
-            initialValue={answers[question.id] as string[] | undefined}
-            onAnswer={(order) => setAnswer(question.id, order)}
-            onAdvance={advanceWithSound}
-          />
-        </>
-      );
-
     case 'matrix':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <MatrixField
-            question={question}
-            answers={answers}
-            initialValue={answers[question.id] as MatrixAnswer | undefined}
-            onAnswer={(v) => {
-              ping();
-              setAnswer(question.id, v);
-            }}
-            onAdvance={advanceWithSound}
-          />
-        </>
-      );
+    case 'picture_choice':
+      return null;
   }
 }

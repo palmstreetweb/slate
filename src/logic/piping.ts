@@ -5,6 +5,7 @@
  *
  *   {{field:questionId}}   → the formatted answer for that question
  *   {{score}}              → the running score total (see scoring.ts)
+ *   {{estimate}}           → the instant estimate, "$2,400 – $3,100" (ADR-064)
  *
  * Unknown / unanswered fields resolve to '' so copy degrades gracefully
  * ("Thanks, {{field:name}}!" → "Thanks, !"). Function-style `DynamicTitle`
@@ -14,8 +15,10 @@
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
 import { formatDateAnswer } from './dateValue.js';
+import { formatAddress } from './address.js';
+import { signaturePathOf, signatureTypedOf } from './signature.js';
 
-const PIPE_RE = /\{\{\s*(score|field:[\w-]+)\s*\}\}/g;
+const PIPE_RE = /\{\{\s*(score|estimate|field:[\w-]+)\s*\}\}/g;
 
 /** Human-readable formatting for a piped answer value. */
 export function formatAnswer(v: unknown): string {
@@ -74,6 +77,19 @@ export function formatAnswerFor(q: Question | undefined, v: unknown): string {
     case 'number':
       if (typeof v !== 'number') return formatAnswer(v);
       return `${q.prefix ?? ''}${v}${q.unit ? ` ${q.unit}` : ''}`;
+    case 'contact_info': {
+      if (typeof v !== 'object' || Array.isArray(v)) return formatAnswer(v);
+      const c = v as Record<string, unknown>;
+      return ['name', 'email', 'phone']
+        .map((k) => c[k])
+        .filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+        .map((x) => x.trim())
+        .join(' · ');
+    }
+    case 'address':
+      return formatAddress(v);
+    case 'signature':
+      return signatureTypedOf(v) ?? (signaturePathOf(v) ? 'Signed' : '');
     default:
       return formatAnswer(v);
   }
@@ -89,15 +105,17 @@ export function pipe(
   answers: LooseAnswers,
   score = 0,
   questions?: ReadonlyArray<Question>,
+  estimate = '',
 ): string {
   if (!template.includes('{{')) return template;
   return template.replace(PIPE_RE, (_match, token: string) => {
     if (token === 'score') return String(score);
+    if (token === 'estimate') return estimate;
     const id = token.slice('field:'.length);
-    return formatAnswerFor(
-      questions?.find((q) => q.id === id),
-      answers[id],
-    );
+    const q = questions?.find((item) => item.id === id);
+    // A contact block pipes as the name ("Thanks, Ada!"), else its first part (ADR-064).
+    if (q?.type === 'contact_info') return formatAnswerFor(q, answers[id]).split(' · ')[0] ?? '';
+    return formatAnswerFor(q, answers[id]);
   });
 }
 
@@ -111,15 +129,22 @@ export function pipeQuestionCopy(
   answers: LooseAnswers,
   score = 0,
   questions?: ReadonlyArray<Question>,
+  estimate = '',
 ): Question {
   const out: Record<string, unknown> = { ...q };
   const title = (q as { title: string | ((a: LooseAnswers) => string) }).title;
-  out.title = pipe(typeof title === 'function' ? title(answers) : title, answers, score, questions);
+  out.title = pipe(
+    typeof title === 'function' ? title(answers) : title,
+    answers,
+    score,
+    questions,
+    estimate,
+  );
   if ('subtitle' in q && typeof q.subtitle === 'string') {
-    out.subtitle = pipe(q.subtitle, answers, score, questions);
+    out.subtitle = pipe(q.subtitle, answers, score, questions, estimate);
   }
   if ('body' in q && typeof q.body === 'string') {
-    out.body = pipe(q.body, answers, score, questions);
+    out.body = pipe(q.body, answers, score, questions, estimate);
   }
   return out as unknown as Question;
 }

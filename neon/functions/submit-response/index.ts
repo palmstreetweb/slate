@@ -7,6 +7,9 @@
  * try_fill_password), 017 (lookup_public_form) and 019 (close settings,
  * insert_public_submission).
  *
+ * Instant estimates (ADR-064): recomputed here from the published schema and
+ * the sanitized answers, and stored in meta.estimate; a client value never is.
+ *
  * Closed forms (ADR-063): a form past its closing time is refused (410) right
  * after the gate read, before any charge; a form at its response cap is
  * refused (409) by the insert itself, which counts under a per-form lock so
@@ -31,6 +34,7 @@ import { Pool } from 'pg';
 import { fillUnlockToken, isValidUnlockToken } from './fillLock.js';
 import { clientIp } from './requestIp.js';
 import { clampForQuestion, clampText, isSafeKey, keepFileRefs } from './answerShape.js';
+import { computeEstimateCore } from './estimate.js';
 import { aboutMinutes, charge, intEnv, ipMax, ownerKey, units, type Bucket } from './rateGate.js';
 
 /** Hard caps on what one submission may carry (ADR-046, ADR-058). */
@@ -73,6 +77,8 @@ type SubmitMeta = {
   questionsVisited: string[];
   hiddenFields: Record<string, unknown>;
   score?: number;
+  /** ADR-064: computed here from the published schema, never taken from the request. */
+  estimate?: ReturnType<typeof computeEstimateCore>;
 };
 
 type GateRow = {
@@ -167,6 +173,10 @@ function sanitizeAnswers(
   return out;
 }
 
+/**
+ * Only the fields below survive. In particular a client-sent `estimate` is
+ * dropped: the Function computes its own (ADR-064).
+ */
 function sanitizeMeta(raw: Record<string, unknown>): SubmitMeta {
   const str = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
   const visited = Array.isArray(raw.questionsVisited)
@@ -546,6 +556,10 @@ app.post(
 
     const clean = sanitizeAnswers(answers, v.schema, form.id);
     const cleanMeta = sanitizeMeta(meta);
+    // Instant estimate (ADR-064): the server's own figure, from the published
+    // prices and the answers it kept — what the owner reads can't be forged.
+    const estimate = computeEstimateCore(v.schema, clean);
+    if (estimate) cleanMeta.estimate = estimate;
 
     const submissionId = `s_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
     let stored: { outcome?: unknown; closed_message?: unknown } | undefined;

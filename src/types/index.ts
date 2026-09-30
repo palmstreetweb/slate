@@ -28,6 +28,13 @@ export type {
   ScaleDisplay,
   NumberDisplay,
   NpsQuestion,
+  ContactInfoQuestion,
+  ContactField,
+  ContactFieldMode,
+  AddressQuestion,
+  AddressFormat,
+  SignatureQuestion,
+  ChoiceDisplay,
   Option,
   PictureOption,
   Condition,
@@ -45,7 +52,12 @@ export type {
   HiddenFields,
   FileAnswer,
   MatrixAnswer,
+  ContactAnswer,
+  AddressAnswer,
+  SignatureAnswer,
 } from './Answers.js';
+
+export type { Estimate, EstimateLine, EstimateSettings } from './Estimate.js';
 
 export type {
   Theme,
