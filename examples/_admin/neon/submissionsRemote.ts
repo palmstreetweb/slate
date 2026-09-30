@@ -16,6 +16,7 @@ import type { Answers, SubmitMeta } from '@/index.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import type { DbSubmissionRow } from './database.types.js';
 import { getNeon } from './client.js';
+import { afterPermanentDelete } from './storageQuotaRemote.js';
 import { ensureAuthForDataApi, waitForAuthReady } from './ensureAuth.js';
 import { formatNeonError, isRlsOrAuthError } from './neonError.js';
 import { rowToSubmission, submissionToRow } from './mappers.js';
@@ -523,7 +524,7 @@ export function permanentlyDeleteSubmissionRemoteSync(submissionId: string): voi
       withAuthRetry(
         () => getNeon().from('submissions').delete().eq('id', submissionId),
         'Could not delete response',
-      ),
+      ).then(afterPermanentDelete),
     'Could not delete response',
   );
 }
@@ -540,7 +541,7 @@ export function emptyTrashRemoteSync(formId?: string): void {
         let q = getNeon().from('submissions').delete().not('deleted_at', 'is', null);
         if (formId) q = q.eq('form_id', formId);
         return q;
-      }, 'Could not empty trash'),
+      }, 'Could not empty trash').then(afterPermanentDelete),
     'Could not empty trash',
   );
 }
@@ -555,7 +556,7 @@ export function purgeSubmissionsRemoteSync(formId: string): void {
       withAuthRetry(
         () => getNeon().from('submissions').delete().eq('form_id', formId),
         'Could not purge responses',
-      ),
+      ).then(afterPermanentDelete),
     'Could not purge responses',
   );
 }

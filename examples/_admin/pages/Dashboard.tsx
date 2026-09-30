@@ -54,6 +54,7 @@ import { BuildWithAiModal, SparkleIcon } from '../components/BuildWithAiModal.js
 import { markAiDraft, type GeneratedDraft } from '../ai/client.js';
 import { closedReason, formatCloseTime } from '../formClose.js';
 import { Odometer } from '../delight/Odometer.js';
+import { StorageBanner, StorageMeter, useStorageQuota } from '../components/StorageMeter.js';
 
 export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
@@ -149,6 +150,8 @@ export function Dashboard() {
   const [creating, setCreating] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const quota = getFormQuota();
+  // File storage (ADR-067): null offline and until the database answers.
+  const storage = useStorageQuota();
 
   const showQuotaDialog = async () => {
     const current = getFormQuota();
@@ -372,6 +375,7 @@ export function Dashboard() {
                     quota ? ` · ${quota.used} of ${quota.max}` : ''
                   }${trashed.length > 0 ? ` · ${trashed.length} in trash` : ''}`}
         </p>
+        {storage ? <StorageMeter quota={storage} /> : null}
         <div className="slate-dash-tabs" role="tablist" aria-label="Forms library">
           <button
             type="button"
@@ -393,6 +397,8 @@ export function Dashboard() {
           </button>
         </div>
       </div>
+
+      {storage ? <StorageBanner quota={storage} /> : null}
 
       {view === 'trash' ? (
         trashed.length === 0 ? (

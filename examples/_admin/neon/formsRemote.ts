@@ -6,6 +6,7 @@ import type { Schema } from '@/index.js';
 import type { FormRecord } from '../_formsStore.js';
 import { allocateNumericSlug, slugify } from '../shareUrls.js';
 import { getNeon } from './client.js';
+import { afterPermanentDelete } from './storageQuotaRemote.js';
 import { ensureAuthForDataApi, waitForAuthReady } from './ensureAuth.js';
 import {
   FORM_QUOTA_MAX,
@@ -378,6 +379,8 @@ async function deleteFormRow(formId: string): Promise<void> {
   const neon = getNeon();
   const { error } = await neon.from('forms').delete().eq('id', formId);
   if (error) throw error;
+  // Its files: freed at once, deleted from storage now (ADR-067).
+  afterPermanentDelete();
 }
 
 /** Coalesce rapid editor saves so older in-flight upserts can't overwrite newer ones. */
