@@ -40,6 +40,11 @@ let publishedNameColumn = false;
 let closeColumns = false;
 const listeners = new Set<Listener>();
 
+/** The database has 019's columns, as of the last hydrate (ADR-063). */
+export function hasCloseColumnsRemote(): boolean {
+  return closeColumns;
+}
+
 function notify(): void {
   listeners.forEach((l) => l([...cache]));
 }

@@ -46,10 +46,15 @@ vi.mock('../examples/_admin/neon/ensureAuth.js', () => ({
 
 import { hasUnpublishedChanges, type FormRecord } from '../examples/_admin/_formsStore.js';
 import { formRecordToRow, rowToFormRecord } from '../examples/_admin/neon/mappers.js';
-import { FORM_OWNER_COLUMNS, type DbFormRow } from '../examples/_admin/neon/database.types.js';
+import {
+  FORM_CLOSE_COLUMNS,
+  FORM_OWNER_COLUMNS,
+  type DbFormRow,
+} from '../examples/_admin/neon/database.types.js';
 import {
   clearFormsRemoteCache,
   getFormRemote,
+  hasCloseColumnsRemote,
   hydrateFormsRemote,
   publishFormRemoteSync,
   replaceAllFormsRemoteSync,
@@ -206,6 +211,26 @@ describe('studio round trip (cloud)', () => {
     }
   });
 
+  it('a database without 019 loads, offers no close settings, and never writes them (ADR-063)', async () => {
+    db.columns = new Set(
+      FORM_OWNER_COLUMNS.split(',').filter((c) => !FORM_CLOSE_COLUMNS.includes(c as never)),
+    );
+    db.rows = [row()];
+    await hydrateFormsRemote({ soft: true });
+    expect(getFormRemote('f_1')).not.toBeNull();
+    expect(hasCloseColumnsRemote()).toBe(false);
+    updateFormRemoteSync('f_1', { maxResponses: 20 });
+    await vi.waitFor(() => expect(db.upsert).toHaveBeenCalled());
+    for (const [written] of db.upsert.mock.calls) {
+      expect(written).not.toHaveProperty('max_responses');
+      expect(written).not.toHaveProperty('tracked_sources');
+    }
+
+    db.columns = null;
+    await hydrateFormsRemote({ soft: true });
+    expect(hasCloseColumnsRemote()).toBe(true);
+  });
+
   it('a backup restore mirrors the insert trigger: published rows go live under their own name', () => {
     replaceAllFormsRemoteSync([{ ...live, name: 'Restored', publishedName: 'Old title' }]);
     expect(getFormRemote('f_1')?.publishedName).toBe('Restored');
@@ -244,6 +269,7 @@ describe('Share panel offers Republish after a rename', () => {
         subscribe: () => () => {},
         hasUnpublishedChanges: real.hasUnpublishedChanges,
         setFormFillPassword: vi.fn(),
+        supportsCloseSettings: () => true,
       };
     });
     vi.doMock('../examples/_admin/neon/env.js', () => ({ isNeonConfigured: () => true }));

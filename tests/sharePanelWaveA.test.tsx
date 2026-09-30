@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   updates: [] as Array<Record<string, unknown>>,
   count: 0,
   qrUrls: [] as string[],
+  closeSettings: true,
 }));
 
 vi.mock('../examples/_admin/_formsStore.js', () => ({
@@ -23,6 +24,7 @@ vi.mock('../examples/_admin/_formsStore.js', () => ({
   subscribe: () => () => {},
   hasUnpublishedChanges: () => false,
   setFormFillPassword: vi.fn(),
+  supportsCloseSettings: () => state.closeSettings,
   updateForm: (_id: string, patch: Record<string, unknown>) => {
     state.updates.push(patch);
     state.form = { ...state.form, ...patch };
@@ -78,6 +80,17 @@ beforeEach(() => {
   state.updates = [];
   state.count = 0;
   state.qrUrls = [];
+  state.closeSettings = true;
+});
+
+describe('before migration 019', () => {
+  it('offers neither closing nor tracked links (they would vanish on reload)', () => {
+    state.closeSettings = false;
+    open();
+    expect(screen.queryByRole('region', { name: 'Closing' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /track a flyer/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Share URL')).toHaveValue('slate.test/forms/48210377');
+  });
 });
 
 describe('tracked links', () => {

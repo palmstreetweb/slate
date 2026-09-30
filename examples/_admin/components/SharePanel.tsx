@@ -27,6 +27,7 @@ import {
   subscribe,
   hasUnpublishedChanges,
   setFormFillPassword,
+  supportsCloseSettings,
   updateForm,
 } from '../_formsStore.js';
 import { countSubmissions, subscribe as subscribeSubmissions } from '../_submissionStore.js';
@@ -270,21 +271,30 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   // Closed (ADR-063): the closing row says so in red; a green "Live" beside it would contradict it.
   const closedNow = closedReason(form, liveResponses) !== null;
 
-  const closeRow = form ? (
-    <CloseRow
-      form={form}
-      liveResponses={liveResponses}
-      onSave={(patch, note) => {
-        const [, ok] = updateForm(formId, patch);
-        if (ok)
-          toast.push({ title: note.title, detail: note.detail, tone: 'success', sound: 'success' });
-        return ok;
-      }}
-    />
-  ) : null;
+  // Both need 019's columns in the cloud; without them a setting would vanish on reload.
+  const closeSettings = supportsCloseSettings();
+
+  const closeRow =
+    form && closeSettings ? (
+      <CloseRow
+        form={form}
+        liveResponses={liveResponses}
+        onSave={(patch, note) => {
+          const [, ok] = updateForm(formId, patch);
+          if (ok)
+            toast.push({
+              title: note.title,
+              detail: note.detail,
+              tone: 'success',
+              sound: 'success',
+            });
+          return ok;
+        }}
+      />
+    ) : null;
 
   const trackedRow =
-    form && trackBase ? (
+    form && trackBase && closeSettings ? (
       <TrackedLinks
         sources={form.trackedSources ?? []}
         selected={trackedUrl ? trackSrc : null}

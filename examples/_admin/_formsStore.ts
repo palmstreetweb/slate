@@ -92,6 +92,15 @@ function neonNotReady(): boolean {
   return isNeonConfigured() && !isStoresHydrated();
 }
 
+/**
+ * Closing and tracked links can be offered (ADR-063). Local mode keeps them on the record.
+ * In the cloud they need migration 019's columns, so they only show once a hydrate has read
+ * them: a database without 019 never shows a setting it would silently drop or not enforce.
+ */
+export function supportsCloseSettings(): boolean {
+  return !isNeonConfigured() || (isStoresHydrated() && remote.hasCloseColumnsRemote());
+}
+
 function read(): FormRecord[] {
   if (typeof window === 'undefined') return [];
   try {
