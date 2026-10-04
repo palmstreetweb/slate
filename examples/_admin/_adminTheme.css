@@ -4542,6 +4542,11 @@ body.slate-editor-resizing * {
   }
 }
 
+/* The refresh arrow points counter-clockwise, so it turns that way. */
+[data-slate-forms][data-theme-name='slate'] .slate-spin--ccw {
+  animation-direction: reverse;
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-inbox-btn {
   position: relative;
 }
