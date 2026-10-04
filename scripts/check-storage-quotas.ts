@@ -40,6 +40,8 @@ const PROD_ENDPOINT = process.env.PROD_ENDPOINT || 'ep-misty-snow-ax9wxjvf';
 const OLD_REF = process.env.OLD_REF || '9843d6a';
 const ROOT = resolve('.');
 const GiB = 1024 ** 3;
+/** storage_quota_limit(), read from the branch once 021 is applied. */
+let QUOTA = 0;
 const MiB = 1024 ** 2;
 
 /* ---------- the throwaway branch ---------- */
@@ -755,12 +757,8 @@ async function claims() {
 }
 
 async function quotaUnderConcurrency() {
-  // Owner B: 1 GiB minus exactly 10 MiB already used (one claimed row).
-  await q(
-    `insert into public.form_uploads (key, owner_id, form_id, question_id, scope, bytes, content_type, state, submission_id, verified_at)
-     values ($1, $2, $3, 'q_big', 'public', $4, 'image/jpeg', 'claimed', 's_s11seed', now())`,
-    [`public/${F.quota}/${randomUUID()}/seed.bin`, B, F.quota, GiB - 10 * MiB],
-  );
+  // Owner B: the quota minus exactly 10 MiB already used (claimed rows).
+  await seedB(QUOTA - 10 * MiB, { state: 'claimed' });
   const t0 = performance.now();
   const results50 = await Promise.all(
     Array.from({ length: 50 }, (_, i) =>
@@ -777,8 +775,8 @@ async function quotaUnderConcurrency() {
   const used = await usage(B);
   check(
     '50 parallel signs (10 isolates) against 10 MiB left: exactly 10 signed, 40 refused (507)',
-    ok === 10 && full.length === 40 && used === GiB,
-    `ok ${ok}, 507 ${full.length}, used ${used === GiB ? '= 1 GiB' : used}, ${ms.toFixed(0)} ms`,
+    ok === 10 && full.length === 40 && used === QUOTA,
+    `ok ${ok}, 507 ${full.length}, used ${used === QUOTA ? `= the quota (${QUOTA / GiB} GiB)` : used}, ${ms.toFixed(0)} ms`,
   );
   check(
     'respondents read the plain sentence, nothing about the owner’s usage',
@@ -795,9 +793,11 @@ async function quotaUnderConcurrency() {
   check(
     'the owner’s own studio upload says how full; storage_quota_status shows the owner their bytes',
     owner.status === 507 &&
-      owner.text.startsWith('Your Slate file storage is full (1 GB of 1 GB)') &&
-      Number(st.used_bytes) === GiB &&
-      Number(st.max_bytes) === GiB,
+      owner.text.startsWith(
+        `Your Slate file storage is full (${QUOTA / GiB} GB of ${QUOTA / GiB} GB)`,
+      ) &&
+      Number(st.used_bytes) === QUOTA &&
+      Number(st.max_bytes) === QUOTA,
     owner.text.slice(0, 60),
   );
   const stA = await quotaStatus(A);
@@ -832,34 +832,41 @@ const resetOwnerB = async () => {
   await q(`delete from public.form_uploads where owner_id = $1`, [B]);
   await q(`delete from public.storage_quota_overrides where owner_id = $1`, [B]);
 };
-const seedB = (
+/** Seeds `bytes` for owner B, in rows of at most 1 GiB (021's per-upload cap). Returns their keys. */
+async function seedB(
   bytes: number,
   o: { state?: 'pending' | 'claimed'; age?: string; net?: string | null } = {},
-) =>
-  q(
-    `insert into public.form_uploads
-       (key, owner_id, form_id, question_id, scope, bytes, content_type, state, submission_id, created_at, net_key)
-     values ($1, $2, $3, 'q_big', 'public', $4, 'image/jpeg', $5, $6, now() - $7::interval, $8)
-     returning key`,
-    [
-      `public/${F.quota}/${randomUUID()}/seed.bin`,
-      B,
-      F.quota,
-      bytes,
-      o.state ?? 'pending',
-      o.state === 'claimed' ? 's_s11seed' : null,
-      o.age ?? '0 seconds',
-      o.net ?? null,
-    ],
-  ).then((r) => (r[0] as { key: string }).key);
+): Promise<string[]> {
+  const keys: string[] = [];
+  for (let left = bytes; left > 0; left -= GiB) {
+    const r = await q<{ key: string }>(
+      `insert into public.form_uploads
+         (key, owner_id, form_id, question_id, scope, bytes, content_type, state, submission_id, created_at, net_key)
+       values ($1, $2, $3, 'q_big', 'public', $4, 'image/jpeg', $5, $6, now() - $7::interval, $8)
+       returning key`,
+      [
+        `public/${F.quota}/${randomUUID()}/seed.bin`,
+        B,
+        F.quota,
+        Math.min(left, GiB),
+        o.state ?? 'pending',
+        o.state === 'claimed' ? 's_s11seed' : null,
+        o.age ?? '0 seconds',
+        o.net ?? null,
+      ],
+    );
+    keys.push(r[0]!.key);
+  }
+  return keys;
+}
 
 async function countingWindow() {
   await resetOwnerB();
-  const aged = await seedB(GiB - 5 * MiB, { age: '2 hours 1 minute' });
+  const aged = await seedB(QUOTA - 5 * MiB, { age: '2 hours 1 minute' });
   const past = await signUpload(sign(), { formId: F.quota, size: 10 * MiB });
   const st = await quotaStatus(B);
   await q(
-    `update public.form_uploads set created_at = now() - interval '1 hour 59 minutes' where key = $1`,
+    `update public.form_uploads set created_at = now() - interval '1 hour 59 minutes' where key = any($1)`,
     [aged],
   );
   const within = await signUpload(sign(), { formId: F.quota, size: 10 * MiB });
@@ -871,8 +878,8 @@ async function countingWindow() {
 
   // A slow fill claims an upload older than 2 h only if the owner has room for it again.
   await resetOwnerB();
-  const slow = await seedB(50 * MiB, { age: '3 hours' });
-  const filler = await seedB(GiB - 20 * MiB, { state: 'claimed' });
+  const [slow] = await seedB(50 * MiB, { age: '3 hours' });
+  const filler = await seedB(QUOTA - 20 * MiB, { state: 'claimed' });
   const refused = await submit(
     submitApp,
     { q_big: [`slate-file://storage:${slow}`] },
@@ -881,7 +888,7 @@ async function countingWindow() {
       submitId: randomUUID(),
     },
   );
-  await q(`update public.form_uploads set bytes = 1000 where key = $1`, [filler]);
+  await q(`update public.form_uploads set bytes = 1000 where key = any($1)`, [filler]);
   const room = await submit(
     submitApp,
     { q_big: [`slate-file://storage:${slow}`] },
@@ -901,8 +908,8 @@ async function countingWindow() {
 async function networkShare() {
   await resetOwnerB();
   const venue = '10.67.250.1';
-  // 512 MiB (half the 1 GiB quota) minus 10 MiB already unclaimed from the venue's network.
-  await seedB(512 * MiB - 10 * MiB, { net: networkKey(venue) });
+  // Half the quota (the network's share) minus 10 MiB already unclaimed from the venue's network.
+  await seedB(QUOTA / 2 - 10 * MiB, { net: networkKey(venue) });
   const t0 = performance.now();
   const burst = await Promise.all(
     Array.from({ length: 50 }, (_, i) =>
@@ -922,7 +929,7 @@ async function networkShare() {
     ok.length === 10 &&
       refused.length === 40 &&
       refused.every((r) => r.text === 'This form can’t accept more files right now.') &&
-      Number(net!.n) === 512 * MiB &&
+      Number(net!.n) === QUOTA / 2 &&
       neighbour.status === 200,
     `ok ${ok.length}, 507 ${refused.length}, share used ${Number(net!.n) / MiB} MiB, other network ${neighbour.status}, ${ms.toFixed(0)} ms`,
   );
@@ -976,13 +983,13 @@ async function noIpShare() {
 
 async function overrides() {
   await resetOwnerB();
-  await seedB(GiB, { state: 'claimed' });
+  await seedB(QUOTA, { state: 'claimed' });
   const before = await signUpload(sign(), { formId: F.quota, size: MiB });
   await q(
     `insert into public.storage_quota_overrides (owner_id, bytes, note)
-     values ($1, 2::bigint * 1024 * 1024 * 1024, 'harness fair')
+     values ($1, $2, 'harness fair')
      on conflict (owner_id) do update set bytes = excluded.bytes, note = excluded.note, updated_at = now()`,
-    [B],
+    [B, 2 * QUOTA],
   );
   const during = await signUpload(sign(), { formId: F.quota, size: MiB });
   const st = await quotaStatus(B);
@@ -992,7 +999,7 @@ async function overrides() {
     'an override raises one owner’s quota (the meter reports it), and removing it restores the default',
     before.status === 507 &&
       during.status === 200 &&
-      Number(st.max_bytes) === 2 * GiB &&
+      Number(st.max_bytes) === 2 * QUOTA &&
       afterRemoval.status === 507,
     `${before.status} → ${during.status} (max ${Number(st.max_bytes) / GiB} GiB) → ${afterRemoval.status}`,
   );
@@ -1277,6 +1284,10 @@ async function main() {
     console.log('[harness] applying 021');
     await db.query(migrationSql());
     await migration();
+    QUOTA = Number(
+      (await q<{ n: string }>(`select public.storage_quota_limit()::text as n`))[0]!.n,
+    );
+    console.log(`[harness] storage_quota_limit() = ${QUOTA} bytes (${QUOTA / GiB} GiB)`);
     await cleanup();
     await seed();
 
