@@ -3,7 +3,8 @@
  * The submit Function and Wave C (ADR-065): per-type clamps for pins,
  * locations, availability, voice notes and photo checklists, and the real
  * Hono app storing them — a location's in / out of the area is always the
- * server's own verdict, from the published center and radius.
+ * server's own verdict, from the published center and radius, and by default
+ * it is all that is stored of a location (ADR-068).
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -44,6 +45,16 @@ const schema = {
       radiusUnit: 'mi',
     },
     { id: 'zipOnly', type: 'location', title: 'ZIP?' },
+    // The owner kept the approximate location (ADR-068): stored as ADR-065 did.
+    {
+      id: 'kept',
+      type: 'location',
+      title: 'Where exactly?',
+      center: { lat: 34.4208, lng: -119.6982 },
+      radius: 25,
+      keepLocation: true,
+    },
+    { id: 'keptZip', type: 'location', title: 'ZIP?', keepLocation: true },
     { id: 'addr', type: 'address', title: 'Address', serviceArea: ['931'] },
     { id: 'when', type: 'availability', title: 'When?', days: ['mon', 'tue'], slotMinutes: 30 },
     { id: 'story', type: 'voice_note', title: 'Tell us', maxSeconds: 30 },
@@ -134,21 +145,43 @@ describe('clampForQuestion: Wave C shapes', () => {
     expect(clampForQuestion(byId.leak!, '0.5,0.5')).toBeUndefined();
   });
 
-  it('location: rounded, and in / out recomputed from the published radius', () => {
+  it('location: in / out recomputed from the published radius, then only the verdict kept', () => {
     expect(
       clampForQuestion(byId.where!, { lat: 34.0522, lng: -118.2437, area: 'in' }, { zipAreas: [] }),
-    ).toEqual({ lat: '34.052', lng: '-118.244', area: 'out' });
+    ).toEqual({ area: 'out', via: 'gps' });
     expect(
       clampForQuestion(byId.where!, { lat: '34.44123456', lng: '-119.81', area: 'out' }),
-    ).toEqual({ lat: '34.441', lng: '-119.810', area: 'in' });
+    ).toEqual({ area: 'in', via: 'gps' });
     expect(clampForQuestion(byId.zipOnly!, { zip: '93105' }, { zipAreas: ['931'] })).toEqual({
-      zip: '93105',
       area: 'in',
+      via: 'zip',
     });
     expect(clampForQuestion(byId.zipOnly!, { typed: 'Goleta', area: 'in' })).toEqual({
       typed: 'Goleta',
     });
     expect(clampForQuestion(byId.where!, { lat: 'north', lng: 1 })).toBeUndefined();
+    // A verdict with nothing to check it against is not an answer.
+    expect(clampForQuestion(byId.where!, { area: 'in', via: 'gps' })).toBeUndefined();
+  });
+
+  it('location with keepLocation: rounded coordinates, the ZIP or the place, as before', () => {
+    expect(
+      clampForQuestion(byId.kept!, { lat: 34.0522, lng: -118.2437, area: 'in' }, { zipAreas: [] }),
+    ).toEqual({ lat: '34.052', lng: '-118.244', area: 'out' });
+    expect(
+      clampForQuestion(byId.kept!, { lat: '34.44123456', lng: '-119.81', area: 'out' }),
+    ).toEqual({ lat: '34.441', lng: '-119.810', area: 'in' });
+    expect(clampForQuestion(byId.keptZip!, { zip: '93105' }, { zipAreas: ['931'] })).toEqual({
+      zip: '93105',
+      area: 'in',
+    });
+    expect(clampForQuestion(byId.keptZip!, { typed: 'Goleta', area: 'in' })).toEqual({
+      typed: 'Goleta',
+    });
+    // Only a real `true` keeps it.
+    expect(
+      clampForQuestion({ ...byId.kept!, keepLocation: 'yes' }, { lat: 34.44, lng: -119.81 }),
+    ).toEqual({ area: 'in', via: 'gps' });
   });
 
   it('availability: re-encoded on the published grid', () => {
@@ -206,6 +239,8 @@ describe('submit: Wave C answers as stored', () => {
       leak: { pins: ['0.5,0.5'], notes: ['leak'] },
       where: { lat: 34.0522, lng: -118.2437, area: 'in' },
       zipOnly: { zip: '90210', area: 'in' },
+      kept: { lat: 34.0522, lng: -118.2437, area: 'in' },
+      keptZip: { zip: '93105-1234' },
       when: { mon: '09:00-10:00' },
       story: { audio: ref(FORM, 'voice.m4a'), sec: '12' },
       // An item the question doesn't publish is dropped, not refused.
@@ -215,14 +250,32 @@ describe('submit: Wave C answers as stored', () => {
     expect(res.status).toBe(200);
     expect(stored().answers).toEqual({
       leak: { pins: ['0.5,0.5'], notes: ['leak'], img: imageKey(PHOTO) },
-      where: { lat: '34.052', lng: '-118.244', area: 'out' },
-      // Checked against the published address's ZIP list.
-      zipOnly: { zip: '90210', area: 'out' },
+      // Only the verdict (ADR-068): no coordinates, no distance, no ZIP.
+      where: { area: 'out', via: 'gps' },
+      // Checked against the published address's ZIP list, then dropped.
+      zipOnly: { area: 'out', via: 'zip' },
+      // The owner kept the approximate location.
+      kept: { lat: '34.052', lng: '-118.244', area: 'out' },
+      keptZip: { zip: '931051234', area: 'in' },
       when: { mon: '09:00-10:00' },
       story: { audio: ref(FORM, 'voice.m4a'), sec: '12' },
       shots: { front: ref() },
       likes: [],
     });
+  });
+
+  it('by default nothing of the position reaches the stored row (ADR-068)', async () => {
+    await submit({
+      where: { lat: 34.052235, lng: -118.243683, area: 'in' },
+      zipOnly: { zip: '90210' },
+    });
+    const row = JSON.stringify(db.state.submissions[0]);
+    expect(row).not.toMatch(/34\.05|118\.24|90210|"lat":|"lng":|"zip":/);
+    expect(stored().answers.where).toEqual({ area: 'out', via: 'gps' });
+    // A verdict sent without the position it came from is dropped, never trusted.
+    await submit({ where: { area: 'in', via: 'gps' } });
+    const wheres = db.state.submissions.map((s) => (s as { answers: { where?: unknown } }).answers);
+    expect(wheres.filter((a) => a.where !== undefined)).toHaveLength(1);
   });
 
   it('drops a Wave C answer that is nothing but junk, keeping the rest', async () => {

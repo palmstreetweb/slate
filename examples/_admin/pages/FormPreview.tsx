@@ -9,6 +9,7 @@ import {
   subscribe as subscribeSubmissions,
 } from '../_submissionStore.js';
 import { localSlotsLeft, slotFullMessage } from '../signupSlots.js';
+import { asStoredAnswers } from '../storedAnswers.js';
 import { navigate } from '../_router.js';
 import { AdminShell } from '../shell/AdminShell.js';
 import { IconChart } from '../mobile/PhoneChrome.js';
@@ -145,7 +146,8 @@ export function FormPreview({ formId }: Props) {
                 goTo: full[0]!.question,
               });
             }
-            addSubmission(formId, answers, meta);
+            // As the submit Function stores it: a location keeps only its verdict (ADR-068).
+            addSubmission(formId, asStoredAnswers(form.schema.questions, answers), meta);
           }}
         />
       </div>

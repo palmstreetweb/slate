@@ -17,7 +17,8 @@ import type {
   YesNoQuestion,
 } from '@/index.js';
 import { PINS_MAX } from '@/logic/pins.js';
-import { LOCATION_PRIVACY_DEFAULT } from '@/logic/geoText.js';
+import { LOCATION_SAVES_APPROX, LOCATION_SAVES_VERDICT } from '@/logic/geoText.js';
+import { formZipAreas, hasGeoArea } from '@/logic/geo.js';
 import {
   VOICE_SECONDS_MAX,
   VOICE_SECONDS_MIN,
@@ -299,17 +300,24 @@ export function parseLatLng(text: string): { lat: number; lng: number } | null {
   return { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5 };
 }
 
-/** Location: the business location, the radius, the privacy line, and an out-of-area ending. */
+/**
+ * Location: the business location, the radius, what is kept (ADR-068: only in / out of the
+ * area unless the owner keeps the approximate location), the privacy line, and an
+ * out-of-area ending.
+ */
 export function LocationSettings({
   question,
   onChange,
   onAddOutOfAreaEnding,
   hasOutOfAreaRoute,
+  form = [],
 }: {
   question: LocationQuestion;
   onChange: Patch;
   onAddOutOfAreaEnding?: () => void;
   hasOutOfAreaRoute: boolean;
+  /** Every question: a ZIP typed instead is checked against the address questions' lists. */
+  form?: ReadonlyArray<Question>;
 }) {
   const fmt = (c: LocationQuestion['center']) => (c ? `${c.lat}, ${c.lng}` : '');
   const [text, setText] = useState(fmt(question.center));
@@ -322,6 +330,9 @@ export function LocationSettings({
   const parsed = text.trim() ? parseLatLng(text) : null;
   const ready =
     Boolean(question.center) && typeof question.radius === 'number' && question.radius > 0;
+  const keep = question.keepLocation === true;
+  // Verdict-only with nothing to check against stores little more than "they answered".
+  const checkable = hasGeoArea(question) || formZipAreas(form).length > 0;
 
   const useMine = () => {
     const geo = typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
@@ -444,13 +455,32 @@ export function LocationSettings({
           )
         ) : null}
       </CollapsibleSection>
-      <Field label="Privacy line" hint="Always shown under the button. Say what you do with it.">
+      <Checkbox
+        checked={keep}
+        onChange={(v) => onChange({ keepLocation: v ? true : undefined } as Partial<Question>)}
+        label="Keep Approximate Location (About 110 m)"
+      />
+      <p className="slate-help">
+        {keep
+          ? 'Responses get the rounded coordinates (or the ZIP or town typed) and a map link. Respondents are told it’s shared with you.'
+          : 'Off: Responses only say inside or outside the area, and whether it was checked with their location or a ZIP. A town they type is kept as written; where they are isn’t saved.'}
+      </p>
+      {!keep && !checkable ? (
+        <p className="slate-help" style={{ color: 'var(--slate-warn)' }}>
+          With no service area there’s nothing to check, so only “shared their location” is saved.
+          Set a service area above, or keep the approximate location.
+        </p>
+      ) : null}
+      <Field
+        label="Privacy line"
+        hint={`Optional: say what you use it for. Always followed by “${keep ? LOCATION_SAVES_APPROX : LOCATION_SAVES_VERDICT}”`}
+      >
         <textarea
           className="slate-textarea"
           rows={2}
           maxLength={300}
           value={question.privacyNote ?? ''}
-          placeholder={LOCATION_PRIVACY_DEFAULT}
+          placeholder="We use this to plan the visit."
           onChange={(e) =>
             onChange({ privacyNote: e.target.value || undefined } as Partial<Question>)
           }

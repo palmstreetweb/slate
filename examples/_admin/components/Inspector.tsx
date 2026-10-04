@@ -457,6 +457,7 @@ export function Inspector({
           <LocationSettings
             question={question}
             onChange={onChange}
+            form={allQuestions}
             hasOutOfAreaRoute={routesOutOfArea(allQuestions, question.id)}
             onAddOutOfAreaEnding={
               onAddOutOfAreaEnding ? () => onAddOutOfAreaEnding(question.id) : undefined

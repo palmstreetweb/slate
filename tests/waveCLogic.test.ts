@@ -29,6 +29,7 @@ import {
   formZipAreas,
   hasGeoArea,
   locationAnswerCore,
+  locationStoredCore,
   roundCoord,
 } from '@/logic/geo.js';
 import { formatDistance, locationDistance } from '@/logic/geoText.js';
@@ -232,6 +233,67 @@ describe('location and the service-area radius', () => {
   });
 });
 
+describe('what a location stores (ADR-068)', () => {
+  const sb = { lat: 34.4208, lng: -119.6982 };
+  const q = { type: 'location', center: sb, radius: 10, radiusUnit: 'mi' };
+  const kept = { ...q, keepLocation: true };
+
+  it('by default only the verdict and how it was given: no coordinates, ZIP or place', () => {
+    expect(locationStoredCore(q, { lat: 34.44, lng: -119.81 }, [])).toEqual({
+      area: 'in',
+      via: 'gps',
+    });
+    expect(locationStoredCore(q, { zip: '93101' }, ['931'])).toEqual({ area: 'in', via: 'zip' });
+    expect(locationStoredCore(q, { zip: '90210' }, ['931'])).toEqual({ area: 'out', via: 'zip' });
+    expect(locationStoredCore(q, { typed: 'Goleta' }, ['931'])).toEqual({ typed: 'Goleta' });
+    // Nothing to check against: that they answered, and how.
+    expect(locationStoredCore({ type: 'location' }, { lat: 1, lng: 2 }, [])).toEqual({
+      via: 'gps',
+    });
+    expect(locationStoredCore(q, { zip: '93101' }, [])).toEqual({ via: 'zip' });
+  });
+
+  it('a forged verdict is still the server’s own, and a verdict alone is nothing', () => {
+    // Los Angeles claiming "in".
+    expect(locationStoredCore(q, { lat: 34.0522, lng: -118.2437, area: 'in' }, [])).toEqual({
+      area: 'out',
+      via: 'gps',
+    });
+    expect(locationStoredCore(q, { area: 'in', via: 'gps' }, [])).toBeUndefined();
+    expect(locationStoredCore(q, { area: 'in' }, [])).toBeUndefined();
+    expect(locationStoredCore(q, 'in', [])).toBeUndefined();
+  });
+
+  it('keepLocation: true stores the answer as ADR-065 did; anything else is verdict-only', () => {
+    expect(locationStoredCore(kept, { lat: 34.44123, lng: -119.81234, area: 'out' }, [])).toEqual({
+      lat: '34.441',
+      lng: '-119.812',
+      area: 'in',
+    });
+    expect(locationStoredCore(kept, { zip: '93101' }, ['931'])).toEqual({
+      zip: '93101',
+      area: 'in',
+    });
+    expect(locationStoredCore(kept, { typed: ' Goleta ' }, [])).toEqual({ typed: 'Goleta' });
+    for (const keepLocation of ['true', 1, false, null, {}]) {
+      expect(locationStoredCore({ ...q, keepLocation }, { lat: 34.44, lng: -119.81 }, [])).toEqual({
+        area: 'in',
+        via: 'gps',
+      });
+    }
+  });
+
+  it('never stores a digit of the position by default', () => {
+    for (let i = 0; i < 200; i++) {
+      const lat = -80 + Math.random() * 160;
+      const lng = -170 + Math.random() * 340;
+      const stored = JSON.stringify(locationStoredCore(q, { lat, lng }, []));
+      expect(stored).not.toMatch(/\d/);
+      expect(Object.keys(JSON.parse(stored) as object).sort()).toEqual(['area', 'via']);
+    }
+  });
+});
+
 /* ---------- availability ---------- */
 
 describe('availability grid', () => {
@@ -395,6 +457,9 @@ describe('Wave C piping', () => {
     );
     expect(formatAnswerFor(loc, { lat: '1.000', lng: '2.000' })).toBe('');
     expect(formatAnswerFor(loc, { zip: '93101' })).toBe('93101');
+    // A stored verdict-only answer (ADR-068) reads the same way.
+    expect(formatAnswerFor(loc, { area: 'out', via: 'zip' })).toBe('outside the service area');
+    expect(formatAnswerFor(loc, { via: 'typed' })).toBe('');
     const week: Question = { id: 'w', type: 'availability', title: 'T', days: ['tue'] };
     expect(formatAnswerFor(week, { tue: '09:00-11:00,14:00-15:00' })).toBe(
       'Tue 09:00–11:00, 14:00–15:00',

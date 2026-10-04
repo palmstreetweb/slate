@@ -1091,14 +1091,16 @@
   color: var(--slate-muted);
 }
 
-[data-slate-forms] .slate-loc-privacy::before {
-  content: '';
+[data-slate-forms] .slate-loc-privacy-icon {
   flex: none;
   width: 14px;
   height: 14px;
-  margin-top: 2px;
-  border: 1.5px solid currentColor;
-  border-radius: 3px 3px 7px 7px;
+  margin-top: 3px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 @media (max-width: 560px) {
