@@ -146,8 +146,8 @@ export function locationAnswerCore(
  * here; then, unless the owner turned on `keepLocation` (only `true` counts;
  * a schema without it is verdict-only), only the verdict and how it was
  * given are kept: `{ area?, via: 'gps' | 'zip' | 'typed' }`. No coordinates,
- * no distance (a distance to the one published center draws a circle), no
- * ZIP and no typed place. A verdict sent without the position it came from
+ * no distance (a distance to the one published center draws a circle) and no
+ * ZIP. A place typed as words (no ZIP check) is kept as written: `{ typed }`. A verdict sent without the position it came from
  * is nothing (`locationAnswerCore` never reads a client `area`).
  */
 export function locationStoredCore(
@@ -157,6 +157,9 @@ export function locationStoredCore(
 ): Record<string, string> | undefined {
   const a = locationAnswerCore(q, v, zipAreas);
   if (!a || q.keepLocation === true) return a;
+  // A place they typed themselves (not a ZIP we can check) is kept as written:
+  // it's what they chose to share, and without it the owner learns nothing.
+  if (a.typed) return { typed: a.typed };
   const via = a.lat ? 'gps' : a.zip ? 'zip' : 'typed';
   return a.area ? { area: a.area, via } : { via };
 }

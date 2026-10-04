@@ -157,7 +157,7 @@ describe('clampForQuestion: Wave C shapes', () => {
       via: 'zip',
     });
     expect(clampForQuestion(byId.zipOnly!, { typed: 'Goleta', area: 'in' })).toEqual({
-      via: 'typed',
+      typed: 'Goleta',
     });
     expect(clampForQuestion(byId.where!, { lat: 'north', lng: 1 })).toBeUndefined();
     // A verdict with nothing to check it against is not an answer.

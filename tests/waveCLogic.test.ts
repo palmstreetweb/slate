@@ -245,7 +245,7 @@ describe('what a location stores (ADR-068)', () => {
     });
     expect(locationStoredCore(q, { zip: '93101' }, ['931'])).toEqual({ area: 'in', via: 'zip' });
     expect(locationStoredCore(q, { zip: '90210' }, ['931'])).toEqual({ area: 'out', via: 'zip' });
-    expect(locationStoredCore(q, { typed: 'Goleta' }, ['931'])).toEqual({ via: 'typed' });
+    expect(locationStoredCore(q, { typed: 'Goleta' }, ['931'])).toEqual({ typed: 'Goleta' });
     // Nothing to check against: that they answered, and how.
     expect(locationStoredCore({ type: 'location' }, { lat: 1, lng: 2 }, [])).toEqual({
       via: 'gps',

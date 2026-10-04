@@ -463,7 +463,7 @@ export function LocationSettings({
       <p className="slate-help">
         {keep
           ? 'Responses get the rounded coordinates (or the ZIP or town typed) and a map link. Respondents are told it’s shared with you.'
-          : 'Off: Responses only say inside or outside the area, and whether it was checked with their location or a ZIP. Where they are isn’t saved.'}
+          : 'Off: Responses only say inside or outside the area, and whether it was checked with their location or a ZIP. A town they type is kept as written; where they are isn’t saved.'}
       </p>
       {!keep && !checkable ? (
         <p className="slate-help" style={{ color: 'var(--slate-warn)' }}>

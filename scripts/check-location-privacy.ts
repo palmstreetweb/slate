@@ -346,13 +346,13 @@ async function scenarios() {
     );
   }
 
-  // Default: a typed place can't be checked; only that one was typed is kept.
+  // Default: a typed place can't be checked; it's kept as written (Caleb, 2026-10-03).
   {
     await submit(F.verdict, '10.68.3.1', { where: { typed: 'Goleta, near the pier' } });
     const r = await latest(F.verdict);
     check(
-      'default: a typed place is stored { via: typed }, the text dropped',
-      same(r.answers.where, { via: 'typed' }) && !POSITION.test(r.whole),
+      'default: a typed place is kept as written { typed }, nothing else',
+      same(r.answers.where, { typed: 'Goleta, near the pier' }),
       JSON.stringify(r.answers.where),
     );
   }

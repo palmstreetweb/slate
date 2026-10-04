@@ -10,6 +10,8 @@ type GeoRecord = Record<string, unknown>;
 
 /** What a location question saves, by default (ADR-068): the verdict only. */
 export const LOCATION_SAVES_VERDICT = 'We only save whether you’re in the service area.';
+/** While typing, without the opt-in: a typed place is kept as written (ADR-068). */
+export const LOCATION_SAVES_TYPED = 'We save what you type here, not your exact location.';
 /** What it saves when the owner keeps the approximate location (ADR-068). */
 export const LOCATION_SAVES_APPROX =
   'Your approximate location (about 110 m) is shared with this business.';
@@ -18,9 +20,17 @@ export const LOCATION_SAVES_APPROX =
  * The privacy line under the button: the owner's own note, if any, then what
  * is actually saved — always shown, so no note can promise less than is kept.
  */
-export function locationPrivacyLine(q: { privacyNote?: unknown; keepLocation?: unknown }): string {
+export function locationPrivacyLine(
+  q: { privacyNote?: unknown; keepLocation?: unknown },
+  typing = false,
+): string {
   const note = typeof q.privacyNote === 'string' ? q.privacyNote.trim() : '';
-  const saves = q.keepLocation === true ? LOCATION_SAVES_APPROX : LOCATION_SAVES_VERDICT;
+  const saves =
+    q.keepLocation === true
+      ? LOCATION_SAVES_APPROX
+      : typing
+        ? LOCATION_SAVES_TYPED
+        : LOCATION_SAVES_VERDICT;
   if (!note) return saves;
   return `${note}${/[.!?…]["”’)]?$/.test(note) ? '' : '.'} ${saves}`;
 }

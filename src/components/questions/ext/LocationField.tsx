@@ -352,7 +352,7 @@ export default function LocationField({
 
           <p id={noteId} className="slate-loc-privacy">
             <LockIcon />
-            <span>{locationPrivacyLine(question)}</span>
+            <span>{locationPrivacyLine(question, typing)}</span>
           </p>
         </div>
       </div>

@@ -1189,7 +1189,7 @@ Decision:
    - **Coordinates**: the point of the change.
    - **Distance**: never stored as such (Responses derived it from the coordinates), and not stored now either: a distance to the one published center draws a circle around the business; with the radius it narrows a respondent to a ring.
    - **ZIP**: coarse, but still where someone lives; used for the check, then dropped. Kept only with the opt-in.
-   - **A typed place**: can't be checked (no geocoding, ADR-065), and it is at least as much location as a ZIP, so the same rule: `{ via: 'typed' }`, the text kept only with the opt-in. *Judgment call:* on a form with no address ZIP list, "type your town" is the fallback when location is off, so a verdict-only question then tells the owner only that a place was typed. The alternative (keep typed text by default because the respondent chose the words) is recorded below; the inspector says what the owner gets.
+   - **A typed place**: can't be checked (no geocoding, ADR-065). Kept as written by default, `{ typed }` (Caleb, 2026-10-03): the respondent chose the words, and on a form with no address ZIP list it's the only answer when location is off. While typing, the privacy line says "We save what you type here, not your exact location." (overstating what a checked ZIP keeps, the safe direction).
    - A location question with neither a radius nor a ZIP list stores only `{ via }`; the inspector warns.
 3. **`keepLocation: true` stores what ADR-065 stored**, unchanged (rounded coordinates / ZIP / place, with `area`). Only a real `true` counts; a published schema **without the key — every form published under ADR-065 — is verdict-only**, the safer default. The portable reader keeps the key only when it is `true`; Build with AI never sets it.
 4. **The respondent is told what is saved, always.** Under the button: "We only save whether you're in the service area." or, with the opt-in, "Your approximate location (about 110 m) is shared with this business." The owner's `privacyNote` is now their own note placed *before* that sentence (a period added when missing); it no longer replaces it, so no note can promise less than is kept. The sentence lives in `geoText.ts` (the on-demand LocationField chunk). The radar, the result line and the on-device distance ("About 6.6 mi away") are unchanged: they are computed on the respondent's phone.
@@ -1212,7 +1212,7 @@ Verified:
 Alternatives:
 - Reducing in the browser (send only the verdict). Rejected: the server could no longer check it, and "in the area" could be forged again (ADR-065 §7).
 - Keeping a coarser trace by default (distance band, ZIP, a hash of the position). Rejected: each still locates a person near a known point; the verdict is what owners route and read on.
-- Keeping a typed place by default (it's the respondent's own words, and the only answer when a form has no ZIP list). Considered; rejected for consistency with the ZIP and with the sentence on screen. Easy to flip in `locationStoredCore` if Caleb prefers it.
+- Dropping a typed place by default (`{ via: 'typed' }`, as first built). Rejected by Caleb on 2026-10-03: the owner then learns nothing on forms without a ZIP list.
 - An account-wide setting. Rejected: per question matches the other options, and it is what the respondent is told on that question.
 - Rewriting stored rows. Not needed (production has none); if old coordinates ever exist, a one-off `UPDATE` applying the same rule is the cleanup, proposed and never run without Caleb.
 Consequences / risks:

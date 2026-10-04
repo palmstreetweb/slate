@@ -515,6 +515,15 @@ describe('location', () => {
     expect(lastAnswer(setAnswer)).toEqual({ lat: '34.441', lng: '-119.812', area: 'in' });
   });
 
+  it('while typing, says the typed place is saved as written', async () => {
+    renderField(q);
+    await screen.findByText('We only save whether you’re in the service area.');
+    fireEvent.click(screen.getByRole('button', { name: 'Type it instead' }));
+    expect(
+      await screen.findByText('We save what you type here, not your exact location.'),
+    ).toBeInTheDocument();
+  });
+
   it('outside the radius says so', async () => {
     stubGeo({ lat: 34.0522, lng: -118.2437 });
     const { setAnswer } = renderField(q);

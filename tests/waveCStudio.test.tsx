@@ -797,7 +797,7 @@ describe('locations stored as a verdict only (ADR-068)', () => {
     const { onChange } = renderInspector(loc);
     const box = screen.getByRole('checkbox', { name: 'Keep Approximate Location (About 110 m)' });
     expect(box).not.toBeChecked();
-    expect(screen.getByText(/Where they are isn’t saved/)).toBeInTheDocument();
+    expect(screen.getByText(/A town they type is kept as written; where they are isn’t saved/)).toBeInTheDocument();
     expect(
       screen.getByText(/Always followed by “We only save whether you’re in the service area\.”/),
     ).toBeInTheDocument();
