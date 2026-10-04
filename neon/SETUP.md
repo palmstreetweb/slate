@@ -84,7 +84,7 @@ overall per UTC day — edit `ai_quota_limits()` to change them.
 
 018 revokes anonymous and signed-in EXECUTE on `get_form_by_slug`. After it, a rollback of the SPA to a pre-ADR-061 build breaks public forms until you run the GRANT at the bottom of 018.
 
-021 (ADR-067) adds storage quotas: every object storagesign signs gets a row in `form_uploads` (the server picks its key), each account may keep **1 GiB** of files (claimed, plus unclaimed uploads for 2 h after signing; `storage_quota_limit()`), one network may hold at most half of that unclaimed (32 MiB for requests without a client IP), a response claims its files in the same transaction as its insert, files of responses and forms deleted for good are deleted from the bucket, and uploads nobody claimed are deleted after 24 h. Numbers live in `storage_quota_limit()`, `storage_pending_limit()`, `storage_global_limit()`, `storage_pending_ttl()`, `storage_pending_count_window()`, `storage_net_share_limit()` and `storage_net_share_noip_limit()` — `create or replace` one to change it. To give one account more room for a big event (and back):
+021 (ADR-067) adds storage quotas: every object storagesign signs gets a row in `form_uploads` (the server picks its key), each account may keep **2 GiB** of files (claimed, plus unclaimed uploads for 2 h after signing; `storage_quota_limit()`), one network may hold at most half of that (1 GiB) unclaimed (32 MiB for requests without a client IP), a response claims its files in the same transaction as its insert, files of responses and forms deleted for good are deleted from the bucket, and uploads nobody claimed are deleted after 24 h. Numbers live in `storage_quota_limit()`, `storage_pending_limit()`, `storage_global_limit()`, `storage_pending_ttl()`, `storage_pending_count_window()`, `storage_net_share_limit()` and `storage_net_share_noip_limit()` — `create or replace` one to change it. To give one account more room for a big event (and back):
 
 ```sql
 insert into public.storage_quota_overrides (owner_id, bytes, note)
@@ -104,7 +104,7 @@ Deploy in one sitting:
    NEON_PROJECT_ID=<id> NEON_BRANCH=production \
    npx vite-node scripts/backfill-storage-uploads.ts            # then again with --apply
    ```
-   Objects no response names are registered as unclaimed, so they are deleted 24 h after `--apply` unless someone submits them; `--orphans=skip` leaves them unregistered (never counted, never deleted). The bucket is only listed, never written.
+   Objects no response names are registered as unclaimed (`--orphans=register`, the default and the call made on 2026-10-03), so they are deleted 24 h after `--apply` unless someone submits them; `--orphans=skip` leaves them unregistered (never counted, never deleted). The bucket is only listed, never written.
 4. Redeploy `submitresponse`, then ship the SPA.
 
 Pages loaded before the deploy keep uploading for **72 h after 021 is applied** (`storage_legacy_until()`); the SPA must be live well before then. Rollback: the SPA (optional), `submitresponse`, `storagesign`, then 021's rollback block, then refresh the schema cache. There is no new Function env. `scripts/check-storage-quotas.ts` runs the whole thing against a throwaway branch it creates and deletes.
