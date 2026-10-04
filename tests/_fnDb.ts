@@ -95,7 +95,7 @@ export type StorageKnobs = {
 };
 
 const defaultStorage = (): StorageKnobs => ({
-  quota: 1024 ** 3,
+  quota: 2 * 1024 ** 3,
   pendingMax: 5000,
   globalMax: 100 * 1024 ** 3,
   ttlMs: 24 * 3600 * 1000,

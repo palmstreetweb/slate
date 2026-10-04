@@ -19,6 +19,8 @@ import { runSweep } from '../neon/functions/storage-sign/sweep.js';
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
+/** 021 storage_quota_limit(): 2 GiB per account (Caleb, 2026-10-03). */
+const QUOTA = 2 * GB;
 const CAP = 32 * MB;
 const FORM_ID = 'f_quota01';
 const OWNER = 'u_owner';
@@ -256,7 +258,7 @@ describe('storagesign with quotas (ADR-067)', () => {
     setForm();
     addUpload(db.state, {
       key: `public/${FORM_ID}/${crypto.randomUUID()}/old.jpg`,
-      bytes: GB - 1000,
+      bytes: QUOTA - 1000,
       state: 'claimed',
       submission_id: 's_1',
     });
@@ -266,7 +268,7 @@ describe('storagesign with quotas (ADR-067)', () => {
     const text = await res.text();
     expect(text).toBe(COPY.respondent);
     expect(text).not.toMatch(/\d/);
-    expect(ownerUsage(db.state, OWNER).bytes).toBe(GB);
+    expect(ownerUsage(db.state, OWNER).bytes).toBe(QUOTA);
   });
 
   it('an unclaimed upload counts for 2 h after signing, then stops; claimed ones always count', async () => {
@@ -274,7 +276,7 @@ describe('storagesign with quotas (ADR-067)', () => {
     db.state.now = Date.parse('2026-10-01T12:00:00Z');
     const stale = addUpload(db.state, {
       key: `public/${FORM_ID}/${crypto.randomUUID()}/stale.jpg`,
-      bytes: GB,
+      bytes: QUOTA,
       created_at: db.state.now - 2 * 3600 * 1000 - 60_000,
     });
     expect((await sign(MB)).status).toBe(200);
@@ -287,7 +289,7 @@ describe('storagesign with quotas (ADR-067)', () => {
   });
 
   describe('a network’s share of the owner’s unclaimed bytes', () => {
-    const HALF = GB / 2;
+    const HALF = QUOTA / 2;
 
     it('the row keeps a hash of the network, never the address, and a claim would clear it', async () => {
       setForm();
@@ -337,7 +339,7 @@ describe('storagesign with quotas (ADR-067)', () => {
       setForm();
       addUpload(db.state, {
         key: `public/${FORM_ID}/${crypto.randomUUID()}/big.bin`,
-        bytes: GB,
+        bytes: QUOTA,
         state: 'claimed',
         submission_id: 's_1',
       });
@@ -361,14 +363,14 @@ describe('storagesign with quotas (ADR-067)', () => {
     setForm();
     addUpload(db.state, {
       key: `draft/${FORM_ID}/${crypto.randomUUID()}/big.mov`,
-      bytes: GB - 10,
+      bytes: QUOTA - 10,
       state: 'claimed',
       submission_id: 's_1',
     });
     const res = await sign(MB, { scope: 'draft', bearer: 'owner-jwt' });
     expect(res.status).toBe(507);
     expect(await res.text()).toBe(
-      'Your Slate file storage is full (1 GB of 1 GB). Permanently delete responses you no longer need to make room.',
+      'Your Slate file storage is full (2 GB of 2 GB). Permanently delete responses you no longer need to make room.',
     );
   });
 

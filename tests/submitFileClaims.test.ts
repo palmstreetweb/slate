@@ -191,7 +191,8 @@ describe('submit: files are claimed with the response', () => {
       bytes: 300 * 1024 * 1024,
       created_at: db.state.now - 3 * 3600 * 1000,
     });
-    // Someone filled the quota meanwhile (a claimed gigabyte minus 100 MiB).
+    // Someone filled the 2 GiB quota meanwhile (claimed files: 1 GiB, then 1 GiB minus 100 MiB).
+    upload('more', { bytes: 1024 ** 3, state: 'claimed', submission_id: 's_filler0' });
     const filler = upload('more', {
       bytes: 1024 ** 3 - 100 * 1024 * 1024,
       state: 'claimed',

@@ -459,8 +459,8 @@ describe('storage-sign upload gate (ADR-050, ADR-058)', () => {
   });
 
   it('4,096 photo signs from one IP to one owner pass, the next is 429; another owner still signs', async () => {
-    // The rate limit is the subject here: 4,096 × 450 KB is past the 1 GiB storage quota
-    // (ADR-067), which has its own tests (storageQuota.test.ts).
+    // The rate limit is the subject here: 4,096 × 450 KB from one network is past its share
+    // (half the 2 GiB storage quota, ADR-067), which has its own tests (storageQuota.test.ts).
     db.state.storage.quota = 4 * 1024 ** 3;
     setForm({ questions: [fileQ()] });
     setForm({ questions: [fileQ()] }, { owner_id: 'u_second' }, 'f_second');

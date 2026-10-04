@@ -13,9 +13,9 @@
 --      response or form is permanently deleted, until the sweep deletes the object and the row.
 --   2. The per-owner quota: an owner's claimed bytes plus pending bytes younger than
 --      storage_pending_count_window() (2 h) stay at or under storage_quota_for(owner) — an override from
---      storage_quota_overrides, else storage_quota_limit() (1 GiB) — with at most storage_pending_limit()
+--      storage_quota_overrides, else storage_quota_limit() (2 GiB) — with at most storage_pending_limit()
 --      (5,000) pending uploads. One network's counted pending bytes for an owner stay under
---      storage_net_share_limit(quota) (half the quota: 512 MiB), requests with no client IP together under
+--      storage_net_share_limit(quota) (half the quota: 1 GiB), requests with no client IP together under
 --      storage_net_share_noip_limit() (32 MiB); the network is a hash of the rate gate's IP key, kept only
 --      while the upload is unclaimed. reserve_upload checks and records a sign under a per-owner advisory
 --      lock (87123004), so N concurrent signs against a nearly full quota or share store exactly what
@@ -63,7 +63,7 @@ set local lock_timeout = '5s';
 -- Numbers. Change one here (create or replace), then nothing else: every check reads these.
 -- ---------------------------------------------------------------------------
 create or replace function public.storage_quota_limit()
-returns bigint language sql immutable as $fn$ select 1073741824::bigint $fn$; -- 1 GiB per account
+returns bigint language sql immutable as $fn$ select 2147483648::bigint $fn$; -- 2 GiB per account
 
 create or replace function public.storage_pending_limit()
 returns integer language sql immutable as $fn$ select 5000 $fn$; -- uploads awaiting a response, per account
@@ -82,7 +82,7 @@ create or replace function public.storage_pending_count_window()
 returns interval language sql immutable as $fn$ select interval '2 hours' $fn$;
 
 -- One network's share of an owner's counted unclaimed bytes (the IP key the rate gate uses): half the
--- owner's quota, so 512 MiB at 1 GiB, and it grows with an override. A full share refuses only that
+-- owner's quota, so 1 GiB at 2 GiB, and it grows with an override. A full share refuses only that
 -- network.
 create or replace function public.storage_net_share_limit(p_quota bigint)
 returns bigint language sql immutable as $fn$ select greatest(p_quota / 2, 1) $fn$;

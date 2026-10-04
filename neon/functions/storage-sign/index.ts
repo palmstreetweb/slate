@@ -19,7 +19,7 @@
  * Storage quotas (ADR-067): the server picks every object key (a fresh uuid
  * under the path's scope and form, the name cleaned), and reserve_upload
  * records it against the form owner's quota — claimed bytes plus unclaimed
- * uploads from the last 2 h, at most 1 GiB (or the owner's override), under a
+ * uploads from the last 2 h, at most 2 GiB (or the owner's override), under a
  * per-owner lock — and against this network's share of those unclaimed bytes
  * (half the quota; 32 MiB for requests with no client IP), before the PUT is
  * signed for exactly that many bytes. A full quota or share is 507:
