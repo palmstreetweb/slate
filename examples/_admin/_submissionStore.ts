@@ -43,6 +43,10 @@ function neonNotReady(): boolean {
   return isNeonConfigured() && !isStoresHydrated();
 }
 
+/** What a respondent reads when a cloud form's portable link can't store answers. */
+export const PREVIEW_LINK_MESSAGE =
+  'This is a preview link, so it can’t take answers. Ask whoever sent it for the published link.';
+
 /** Portable / offline share links are never cloud forms. */
 function isLocalOnlyFormId(formId: string): boolean {
   return formId.startsWith('portable_') || formId.startsWith('local_');
@@ -123,7 +127,8 @@ export function addSubmission(
     return remote.addSubmissionRemoteSync(formId, answers, meta);
   }
   if (neonNotReady() && !isLocalOnlyFormId(formId)) {
-    throw new Error('Cloud sync is not ready — try again in a moment.');
+    // In practice a portable link to a cloud form (QA COPY-05): it can't send answers.
+    throw new Error(PREVIEW_LINK_MESSAGE);
   }
   const sub: StoredSubmission = {
     id: makeId(),

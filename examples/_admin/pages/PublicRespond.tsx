@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { Form } from '@/index.js';
 import { decodePortableSchema } from '../portableShare.js';
 import { sanitizeUntrustedSchema } from '../sanitizeUntrustedSchema.js';
-import { addSubmission } from '../_submissionStore.js';
+import { addSubmission, PREVIEW_LINK_MESSAGE } from '../_submissionStore.js';
+import { isNeonConfigured } from '../neon/config.js';
 import { asStoredAnswers } from '../storedAnswers.js';
 import { navigate } from '../_router.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
@@ -41,6 +42,22 @@ export function PublicRespond({ token }: Props) {
 
   const { schema, formId, name } = payload;
   const submissionFormId = formId ?? `portable_${token.slice(0, 12)}`;
+
+  // A cloud form's portable link can never send answers (QA COPY-05): say so
+  // before anyone fills it in, instead of failing at the end.
+  if (isNeonConfigured() && !/^(portable|local)_/.test(submissionFormId)) {
+    return (
+      <div data-slate-forms="" data-theme-name="slate" data-theme={mode} className="slate-app">
+        <div
+          className="slate-empty"
+          role="status"
+          style={{ minHeight: '100vh', display: 'grid', placeContent: 'center', padding: 24 }}
+        >
+          <p style={{ margin: 0, maxWidth: 420 }}>{PREVIEW_LINK_MESSAGE}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="slate-public-respond" style={{ minHeight: '100vh' }}>
