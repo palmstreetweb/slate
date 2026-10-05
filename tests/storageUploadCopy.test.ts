@@ -82,6 +82,16 @@ describe('sign refusals', () => {
     expect(await failure()).toBe(UPLOAD_COPY.tooBig);
   });
 
+  it('401: a respondent is asked for the password, an owner to sign in again', async () => {
+    server(() => new Response(JSON.stringify({ error: 'locked' }), { status: 401 }));
+    expect(await failure()).toBe(UPLOAD_COPY.locked);
+    server(() => new Response('Unauthorized', { status: 401 }));
+    const owner = await uploadToNeonStorage(file(), { ...opts, scope: 'draft' }).catch(
+      (e: unknown) => (e as Error).message,
+    );
+    expect(owner).toBe(UPLOAD_COPY.signedOut);
+  });
+
   it('404 says the form isn’t taking responses', async () => {
     server(() => new Response('Form not available', { status: 404 }));
     expect(await failure()).toBe(FORM_UNAVAILABLE);

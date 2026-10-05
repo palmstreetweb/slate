@@ -24,6 +24,8 @@ export const UPLOAD_COPY = {
   empty: FILE_EMPTY,
   tooBig: 'That file is too big to upload.',
   locked: 'This form is locked. Reload the page and enter the password.',
+  /** An owner's upload (draft scope) whose sign-in lapsed. */
+  signedOut: 'You’ve been signed out. Reload the page and sign in again.',
 } as const;
 
 /** storagesign's own plain sentences (STORAGE_COPY there) that are safe to show as sent. */
@@ -76,7 +78,7 @@ function normalizeUploadMime(file: File): string {
 /** A respondent's upload when the form owner's storage is full (ADR-067). The server says the same. */
 export const STORAGE_FULL_COPY = 'This form can’t accept more files right now.';
 
-async function friendlySignError(res: Response): Promise<string> {
+async function friendlySignError(res: Response, scope: 'public' | 'draft'): Promise<string> {
   const text = (await res.text().catch(() => '')).trim();
   if (res.status === 507) {
     // Plain text from storagesign: the respondent sentence, or the owner's own usage (ADR-067).
@@ -101,7 +103,7 @@ async function friendlySignError(res: Response): Promise<string> {
     return mb ? tooBigMessage(Number(mb)) : UPLOAD_COPY.tooBig;
   }
   if (res.status === 404) return FORM_UNAVAILABLE;
-  if (res.status === 401) return UPLOAD_COPY.locked;
+  if (res.status === 401) return scope === 'draft' ? UPLOAD_COPY.signedOut : UPLOAD_COPY.locked;
   // storagesign's own sentences for a stale page (400) and a lost race (409) read well as sent.
   if (SERVER_SENTENCES.has(text)) return text;
   console.error('[slate] upload sign failed', res.status, text.slice(0, 200));
@@ -194,7 +196,7 @@ export async function uploadToNeonStorage(
     throw new Error(UPLOAD_COPY.offline);
   }
   if (!signRes.ok) {
-    throw new Error(await friendlySignError(signRes));
+    throw new Error(await friendlySignError(signRes, scope));
   }
   const signed = (await signRes.json().catch(() => null)) as {
     url?: unknown;
