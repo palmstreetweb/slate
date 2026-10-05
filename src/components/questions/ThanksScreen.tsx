@@ -101,11 +101,13 @@ export function ThanksScreen({
 }: Props) {
   const reducedMotion = useReducedMotion();
   const Reveal = estimateRevealComponent();
+  // Nothing was saved: never "Thanks, all done" above the reason why (GAPV-X1).
+  const failed = status === 'error';
 
   return (
     <div className="slate-thanks">
-      <h1 className="slate-title">{question.title}</h1>
-      {question.subtitle && <p className="slate-subtitle">{question.subtitle}</p>}
+      <h1 className="slate-title">{failed ? 'Not sent yet.' : question.title}</h1>
+      {!failed && question.subtitle && <p className="slate-subtitle">{question.subtitle}</p>}
 
       {/* The estimate appears with the confirmation (ADR-064): the owner has it too. */}
       {status === 'success' && estimate ? (
@@ -141,10 +143,10 @@ export function ThanksScreen({
           </div>
         )}
 
-        {status === 'error' && <p className="slate-err">{error ?? 'Something went wrong.'}</p>}
+        {failed && <p className="slate-err">{error ?? 'Something went wrong.'}</p>}
       </div>
 
-      {status === 'error' && (
+      {failed && (
         <button type="button" className="slate-ok-btn" onClick={onRetry}>
           Retry
         </button>

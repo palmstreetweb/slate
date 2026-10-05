@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Form } from '@/index.js';
+import type { Answers } from '@/index.js';
 import {
   FilesRejectedError,
   FormClosedError,
   SlotFullError,
+  TooLongError,
   fetchPublishedFormBySlug,
   fetchSlotsLeft,
   metaToPayload,
@@ -31,6 +33,7 @@ import { FormClosedScreen } from '../components/FormClosedScreen.js';
 import { prefillFromSearch, trackingFromSearch } from '../trackedLinks.js';
 import { clearFillUnlockToken, readFillUnlockToken, writeFillUnlockToken } from '../fillUnlock.js';
 import { routeSearchParams } from '../_router.js';
+import { FORM_UNAVAILABLE, SEND_TOO_LONG_HERE } from '../fillCopy.js';
 
 type Props = { slug: string };
 
@@ -39,6 +42,24 @@ type LockedForm = Extract<PublishedFormPayload, { locked: true }>;
 
 /** Spots-left counts older than this are refreshed when someone reaches a sign-up question. */
 const SLOTS_STALE_MS = 30_000;
+
+/**
+ * The question holding the biggest answer, for a submit that was too long
+ * (413, GAP-07): the respondent goes back there to shorten it. Text answers
+ * get "this answer is too long"; anything else keeps the general sentence.
+ */
+export function longestAnswer(answers: Answers): { id: string; text: boolean } | null {
+  let best: { id: string; text: boolean } | null = null;
+  let size = 0;
+  for (const [id, value] of Object.entries(answers)) {
+    const n = JSON.stringify(value ?? '').length;
+    if (n > size) {
+      size = n;
+      best = { id, text: typeof value === 'string' };
+    }
+  }
+  return best;
+}
 
 /** `?embed=1` — we're inside a host site's iframe (ADR-054). */
 function readEmbedMode(): boolean {
@@ -82,7 +103,10 @@ function useEmbedHeight(enabled: boolean) {
 
 export function PublicFill({ slug }: Props) {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  /** Why the form isn't showing, and whether loading again can help (COPY-X3). */
+  const [error, setError] = useState<{ text: string; retry: boolean } | null>(null);
+  /** Bumped by "Try again" on the load error: runs the load once more. */
+  const [attempt, setAttempt] = useState(0);
   const [form, setForm] = useState<OpenForm | null>(null);
   /** Locked and not yet unlocked in this tab (ADR-043). */
   const [gate, setGate] = useState<LockedForm | null>(null);
@@ -111,7 +135,7 @@ export function PublicFill({ slug }: Props) {
 
   useEffect(() => {
     if (!isNeonConfigured()) {
-      setError('This form is not available right now.');
+      setError({ text: FORM_UNAVAILABLE, retry: false });
       setLoading(false);
       return;
     }
@@ -128,7 +152,7 @@ export function PublicFill({ slug }: Props) {
         const payload = await fetchPublishedFormBySlug(slug);
         if (cancelled) return;
         if (!payload) {
-          setError('This form is not available. It may have been closed.');
+          setError({ text: FORM_UNAVAILABLE, retry: false });
         } else if (payload.closed) {
           setClosed({ name: payload.name, info: payload.closed, duringFill: false });
         } else if (!payload.locked) {
@@ -149,7 +173,9 @@ export function PublicFill({ slug }: Props) {
         }
       } catch (err: unknown) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Could not load this form.');
+        // publicForm.ts throws only plain sentences; "not available" can't be helped by a retry.
+        const text = err instanceof Error && err.message ? err.message : FORM_UNAVAILABLE;
+        setError({ text, retry: text !== FORM_UNAVAILABLE });
       }
       if (!cancelled) setLoading(false);
     })();
@@ -157,7 +183,15 @@ export function PublicFill({ slug }: Props) {
       cancelled = true;
       clearUploadContext();
     };
-  }, [slug]);
+  }, [slug, attempt]);
+
+  /**
+   * The schema as `<Form>` gets it: with the form's id, so the answers are
+   * kept in this tab across a reload, back / forward, or the phone discarding
+   * the tab (GAP-05, ADR-017 addendum) — and the "Try again" on a part that
+   * didn't load (a page reload) keeps them too.
+   */
+  const fillSchema = useMemo(() => (form ? { ...form.schema, id: form.id } : null), [form]);
 
   const onUnlock = useCallback(
     async (password: string): Promise<string | null> => {
@@ -236,7 +270,7 @@ export function PublicFill({ slug }: Props) {
     );
   }
 
-  if (error || !form) {
+  if (error || !form || !fillSchema) {
     // Anonymous scanners land here — no studio links.
     return (
       <div
@@ -248,9 +282,25 @@ export function PublicFill({ slug }: Props) {
         className={`slate-app${embedClass}`}
       >
         <main className="slate-fill-gate">
-          <p className="slate-fill-gate-notice" role="status">
-            {error ?? 'This form is not available.'}
-          </p>
+          <div className="slate-fill-gate-card">
+            <p className="slate-fill-gate-notice" role="status" style={{ justifySelf: 'center' }}>
+              {error?.text ?? FORM_UNAVAILABLE}
+            </p>
+            {/* In-app browsers (a QR scan, a social app) hide reload: give them a way back. */}
+            {error?.retry ? (
+              <button
+                type="button"
+                className="slate-btn slate-btn--primary slate-fill-gate-submit"
+                onClick={() => {
+                  setError(null);
+                  setLoading(true);
+                  setAttempt((n) => n + 1);
+                }}
+              >
+                Try again
+              </button>
+            ) : null}
+          </div>
         </main>
       </div>
     );
@@ -263,7 +313,8 @@ export function PublicFill({ slug }: Props) {
       style={{ minHeight: '100vh' }}
     >
       <Form
-        schema={form.schema}
+        schema={fillSchema}
+        resume="tab"
         hiddenFields={extras.tracking}
         prefill={extras.prefill}
         onFileUpload={hostFileUpload}
@@ -292,6 +343,16 @@ export function PublicFill({ slug }: Props) {
             // back to that question to add it again, every other answer kept.
             if (err instanceof FilesRejectedError) {
               throw Object.assign(new Error(err.message), { goTo: err.questions[0] });
+            }
+            // Too long to send (413, GAP-07): Retry would send the same thing again,
+            // so back to the biggest answer to shorten it, every other answer kept.
+            if (err instanceof TooLongError) {
+              const longest = longestAnswer(answers as Answers);
+              if (longest) {
+                throw Object.assign(new Error(longest.text ? SEND_TOO_LONG_HERE : err.message), {
+                  goTo: longest.id,
+                });
+              }
             }
             // Closed while they were filling it in (ADR-063): say so plainly
             // instead of offering a Retry that can't work.

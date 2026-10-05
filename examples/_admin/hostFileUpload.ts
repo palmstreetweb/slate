@@ -8,7 +8,7 @@ import { createFileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import { saveLocalUpload } from './localFileStore.js';
 import { hasStorageSignUrl, isNeonConfigured } from './neon/config.js';
-import { authHeader, uploadToNeonStorage } from './storageUpload.js';
+import { UPLOAD_COPY, authHeader, uploadToNeonStorage } from './storageUpload.js';
 import { getUploadFormId, getUploadScope } from './uploadContext.js';
 
 async function uploadToRemote(
@@ -38,16 +38,23 @@ async function uploadToRemote(
   fd.append('file', file, file.name);
   fd.append('questionId', questionId);
 
-  const res = await fetch(base, { method: 'POST', body: fd });
+  let res: Response;
+  try {
+    res = await fetch(base, { method: 'POST', body: fd });
+  } catch {
+    throw new Error(UPLOAD_COPY.offline);
+  }
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `Upload failed (${res.status})`);
+    // Never the upload server's own text (QA pass, COPY-03): the console has it.
+    console.error('[slate] upload failed', res.status, (await res.text().catch(() => '')).slice(0, 200));
+    throw new Error(UPLOAD_COPY.later);
   }
 
-  const data = (await res.json()) as { url?: string; key?: string };
-  const out = data.url ?? data.key;
+  const data = (await res.json().catch(() => null)) as { url?: string; key?: string } | null;
+  const out = data?.url ?? data?.key;
   if (!out || typeof out !== 'string') {
-    throw new Error('Upload response missing url or key.');
+    console.error('[slate] upload: the reply had no url or key');
+    throw new Error(UPLOAD_COPY.later);
   }
   return out;
 }

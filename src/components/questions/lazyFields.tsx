@@ -8,7 +8,7 @@
  * `<Form>` calls `preloadExtFields(schema.questions)` on mount, so a chunk
  * usually lands while the respondent is still on the welcome screen. Until it
  * does, the question shows its title and a quiet placeholder of the same
- * height; if it can't load (offline), a Retry button — never a blank form.
+ * height; if it can't load (offline), a Try again button — never a blank form.
  *
  * Adding a UI: give it a key, a loader and a line in `extFieldKey`.
  *
@@ -27,7 +27,7 @@
 
 'use client';
 
-import { Component, Suspense, lazy, useState, type ComponentType, type ReactNode } from 'react';
+import { Component, Suspense, lazy, type ComponentType, type ReactNode } from 'react';
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
@@ -212,14 +212,20 @@ export function preloadExtFields(questions: ReadonlyArray<Question>): void {
   }
   keys.forEach((key) => {
     load(key).catch(() => {
-      /* the field shows its own Retry */
+      /* the field shows its own Try again */
     });
   });
 }
 
-type BoundaryProps = { title: string; onRetry: () => void; children: ReactNode };
+type BoundaryProps = { title: string; children: ReactNode };
 
-/** A chunk that fails to download shows Retry instead of unmounting the form. */
+/**
+ * A chunk that fails to download shows "Try again" instead of unmounting the
+ * form. Browsers remember a module that failed to download and refuse it again
+ * without asking the network, so an in-page retry can't work: "Try again"
+ * reloads the page (the respondent's own tap, never automatic). A host that
+ * passes `resume` keeps the answers across it (GAP-06).
+ */
 class ExtFieldBoundary extends Component<BoundaryProps, { failed: boolean }> {
   override state = { failed: false };
 
@@ -233,11 +239,11 @@ class ExtFieldBoundary extends Component<BoundaryProps, { failed: boolean }> {
       <div>
         <h1 className="slate-title">{this.props.title}</h1>
         <p className="slate-err" role="alert">
-          ! This question didn’t load. Check your connection.
+          ! This question didn’t load. Check your connection, then tap Try again.
         </p>
         <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={this.props.onRetry}>
-            Retry
+          <button type="button" className="slate-ok-btn" onClick={() => location.reload()}>
+            Try again
           </button>
         </div>
       </div>
@@ -255,20 +261,12 @@ function Loading({ title }: { title: string }) {
   );
 }
 
-/** Render the on-demand UI for `extKey`, with a loading state and a Retry. */
+/** Render the on-demand UI for `extKey`, with a loading state and a way to try again. */
 export function ExtField({ extKey, ...props }: ExtFieldProps & { extKey: ExtFieldKey }) {
-  const [attempt, setAttempt] = useState(0);
   const title = typeof props.question.title === 'string' ? props.question.title : '';
   const Field = componentFor(extKey);
   return (
-    <ExtFieldBoundary
-      key={attempt}
-      title={title}
-      onRetry={() => {
-        components.delete(extKey);
-        setAttempt((n) => n + 1);
-      }}
-    >
+    <ExtFieldBoundary title={title}>
       <Suspense fallback={<Loading title={title} />}>
         <Field {...props} />
       </Suspense>

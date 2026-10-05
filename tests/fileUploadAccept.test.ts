@@ -34,7 +34,35 @@ describe('fileUploadAccept', () => {
       'not a recognized image',
     );
     expect(formatFileUploadError(new Error(''))).toBe(
-      'Could not attach that file — try again or pick a different one.',
+      'We couldn’t add that file. Try again, or pick a different one.',
+    );
+  });
+
+  it('never shows a browser’s technical text (MEDIA-06)', () => {
+    const quota = new Error('The quota has been exceeded.');
+    quota.name = 'QuotaExceededError';
+    const fallback = 'We couldn’t add that file. Try again, or pick a different one.';
+    expect(formatFileUploadError(quota)).toBe(fallback);
+    expect(formatFileUploadError(new TypeError('x is not a function'))).toBe(fallback);
+    expect(formatFileUploadError('boom')).toBe(fallback);
+  });
+
+  it('only real network failures say “check your connection” (COPY-03)', () => {
+    const offline = 'We couldn’t upload that. Check your connection and try again.';
+    expect(formatFileUploadError(new TypeError('Failed to fetch'))).toBe(offline);
+    expect(formatFileUploadError(new TypeError('Load failed'))).toBe(offline);
+    // A host sentence that merely contains "upload failed" is not a network error.
+    expect(formatFileUploadError(new Error('That upload didn’t go through. Upload failed.'))).toBe(
+      'That upload didn’t go through. Upload failed.',
+    );
+  });
+
+  it('one “too big” sentence with the limit (COPY-14)', () => {
+    expect(formatFileUploadError(new Error('That file is too big. The limit is 32 MB.'), 5)).toBe(
+      'That file is too big. The limit is 5 MB.',
+    );
+    expect(formatFileUploadError(new Error('That file is too big. The limit is 32 MB.'))).toBe(
+      'That file is too big. The limit is 32 MB.',
     );
   });
 });

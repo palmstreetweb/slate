@@ -4,13 +4,33 @@
  */
 
 import { SLATE_FILE_REF_PREFIX } from '@/utils/fileUploadRef.js';
+import { tooBigMessage } from '@/utils/fileUploadAccept.js';
 import { hasStorageSignUrl, getStorageSignUrl, isNeonConfigured } from './neon/config.js';
 import { getUploadFormId, getUploadScope } from './uploadContext.js';
 import { readFillUnlockToken } from './fillUnlock.js';
+import { FILE_EMPTY, FORM_UNAVAILABLE, readableOr, uploadRateLimited } from './fillCopy.js';
 
 const STORAGE_PREFIX = 'storage:';
 
-const OFFLINE = 'Couldn’t reach Slate. Check your connection and try again.';
+/**
+ * Upload failures in plain words (QA pass, COPY-03): no status codes, and never
+ * a response body — storagesign's labels ("Sign failed", "Invalid path shape")
+ * or object storage's XML. Those go to the console.
+ */
+export const UPLOAD_COPY = {
+  offline: 'We couldn’t upload that. Check your connection and try again.',
+  later: 'We couldn’t upload that just now. Try again in a moment.',
+  put: 'That upload didn’t go through. Try again.',
+  empty: FILE_EMPTY,
+  tooBig: 'That file is too big to upload.',
+  locked: 'This form is locked. Reload the page and enter the password.',
+} as const;
+
+/** storagesign's own plain sentences (STORAGE_COPY there) that are safe to show as sent. */
+const SERVER_SENTENCES = new Set([
+  'This page is out of date. Reload it to add files.',
+  'That upload didn’t go through. Please try again.',
+]);
 
 /**
  * Respondent pages never read stored files: storagesign serves them only to the
@@ -57,28 +77,35 @@ function normalizeUploadMime(file: File): string {
 export const STORAGE_FULL_COPY = 'This form can’t accept more files right now.';
 
 async function friendlySignError(res: Response): Promise<string> {
+  const text = (await res.text().catch(() => '')).trim();
   if (res.status === 507) {
     // Plain text from storagesign: the respondent sentence, or the owner's own usage (ADR-067).
-    const text = (await res.text().catch(() => '')).trim();
-    return text && text.length <= 300 && !text.startsWith('<') ? text : STORAGE_FULL_COPY;
+    return readableOr(text, STORAGE_FULL_COPY);
   }
   if (res.status === 429) {
-    let retryAfter = Number(res.headers.get('Retry-After') || 60);
+    type RateBody = { error?: unknown; retryAfterSeconds?: unknown } | null;
+    let body: RateBody = null;
     try {
-      const body = (await res.json()) as { error?: string; retryAfterSeconds?: number };
-      if (body.retryAfterSeconds) retryAfter = body.retryAfterSeconds;
-      return (
-        body.error || `Too many uploads. Please wait about ${retryAfter} seconds and try again.`
-      );
+      body = JSON.parse(text) as RateBody;
     } catch {
-      return `Too many uploads. Please wait about ${retryAfter} seconds and try again.`;
+      // A platform 429 without storagesign's JSON.
     }
+    const wait = Number(body?.retryAfterSeconds) || Number(res.headers.get('Retry-After')) || 60;
+    return typeof body?.error === 'string' && body.error.startsWith('Too many')
+      ? body.error
+      : uploadRateLimited(wait);
   }
-  if (res.status === 413) return 'That file is too large.';
-  if (res.status === 404) return 'This form is not accepting uploads.';
-  if (res.status === 401) return 'This form is locked. Reload the page and enter the password.';
-  const text = await res.text().catch(() => '');
-  return text || `Sign failed (${res.status})`;
+  if (res.status === 413) {
+    // storagesign names the question's limit: "File too large (max 5 MB)".
+    const mb = /max ([\d.]+) MB/.exec(text)?.[1];
+    return mb ? tooBigMessage(Number(mb)) : UPLOAD_COPY.tooBig;
+  }
+  if (res.status === 404) return FORM_UNAVAILABLE;
+  if (res.status === 401) return UPLOAD_COPY.locked;
+  // storagesign's own sentences for a stale page (400) and a lost race (409) read well as sent.
+  if (SERVER_SENTENCES.has(text)) return text;
+  console.error('[slate] upload sign failed', res.status, text.slice(0, 200));
+  return UPLOAD_COPY.later;
 }
 
 export function isStorageUploadRef(ref: string): boolean {
@@ -133,6 +160,8 @@ export async function uploadToNeonStorage(
   if (!resolvedFormId) {
     throw new Error('Upload context missing form id.');
   }
+  // Nothing to store, and storagesign would refuse it with "Missing or invalid contentLength".
+  if (file.size === 0) throw new Error(UPLOAD_COPY.empty);
   const scope = opts?.scope ?? 'public';
   // The server picks the real key (ADR-067); this path tells it the scope, form and name,
   // and is what a storagesign from before ADR-067 signs as is.
@@ -162,22 +191,23 @@ export async function uploadToNeonStorage(
       }),
     });
   } catch {
-    throw new Error(OFFLINE);
+    throw new Error(UPLOAD_COPY.offline);
   }
   if (!signRes.ok) {
     throw new Error(await friendlySignError(signRes));
   }
-  const {
-    url,
-    method,
-    contentType: signedType,
-    key,
-  } = (await signRes.json()) as {
-    url: string;
+  const signed = (await signRes.json().catch(() => null)) as {
+    url?: unknown;
     method?: string;
     contentType?: string;
     key?: unknown;
-  };
+  } | null;
+  if (!signed || typeof signed.url !== 'string') {
+    // A 200 that isn't storagesign's (a captive portal page): it never got there.
+    console.error('[slate] upload sign: the reply was not storagesign’s');
+    throw new Error(UPLOAD_COPY.offline);
+  }
+  const { url, method, contentType: signedType, key } = signed;
   // Where the object lands: the server's key, or our own path from a storagesign before ADR-067.
   const stored = isKeyFor(key, scope, resolvedFormId) ? key : path;
   let put: Response;
@@ -192,15 +222,12 @@ export async function uploadToNeonStorage(
       body: file,
     });
   } catch {
-    throw new Error('Could not reach file storage — check your connection and try again.');
+    throw new Error(UPLOAD_COPY.offline);
   }
   if (!put.ok) {
-    const detail = await put.text().catch(() => '');
-    throw new Error(
-      detail
-        ? `Upload failed (${put.status}): ${detail.slice(0, 120)}`
-        : `Upload failed (${put.status}).`,
-    );
+    // Object storage answers in XML (RequestTimeTooSkewed, SignatureDoesNotMatch…): log it only.
+    console.error('[slate] upload put failed', put.status, (await put.text().catch(() => '')).slice(0, 200));
+    throw new Error(UPLOAD_COPY.put);
   }
   const ref = `${SLATE_FILE_REF_PREFIX}${STORAGE_PREFIX}${stored}`;
   // The page already knows what it uploaded: no meta call to show the chip.

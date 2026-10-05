@@ -148,8 +148,12 @@ export type FormProps<S extends Schema = Schema> = {
    * `localStorage` under `slate-forms-resume:<schema.id>`, a "resume where
    * you left off?" prompt appears on remount, and the save is cleared on
    * successful submit. Requires `schema.id`.
+   *
+   * `'tab'` keeps the save in `sessionStorage` instead: it survives a reload,
+   * back / forward and a phone discarding the tab, but never reaches another
+   * tab or a later visit — for shared devices (ADR-017 addendum).
    */
-  resume?: boolean;
+  resume?: boolean | 'tab';
   /**
    * Fires whenever an answer changes — abandonment capture for hosts that
    * want partial responses. Receives the same visibility-filtered answers

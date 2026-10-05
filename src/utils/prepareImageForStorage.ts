@@ -5,7 +5,8 @@
  * Ported from 805 Sealcoating `lib/prepare-image-for-storage.ts`.
  */
 
-import { convertHeicToJpegFile } from './heicToJpeg.js';
+import { convertHeicToJpegFile, jpgName } from './heicToJpeg.js';
+import { tooBigMessage } from './fileUploadAccept.js';
 import {
   SLATE_IMAGE_TYPE_HINT,
   isHeicLike,
@@ -20,7 +21,6 @@ const PROFILES = {
   default: {
     maxEdge: 1920,
     maxBytes: 450_000,
-    outName: 'photo.jpg' as const,
     qualityStart: 0.75,
   },
   /**
@@ -30,7 +30,6 @@ const PROFILES = {
   pin: {
     maxEdge: 1200,
     maxBytes: 110_000,
-    outName: 'pin.jpg' as const,
     qualityStart: 0.72,
   },
 } as const;
@@ -53,7 +52,7 @@ export async function prepareImageForStorage(
     throw new Error(`That file is not a recognized image. ${SLATE_IMAGE_TYPE_HINT}`);
   }
   if (typed.size > INPUT_CAP_BYTES) {
-    throw new Error('Image is too large. Try one under 32MB.');
+    throw new Error(tooBigMessage(32));
   }
   if (typed.type === 'image/svg+xml') {
     throw new Error(`SVG images are not supported. ${SLATE_IMAGE_TYPE_HINT}`);
@@ -64,7 +63,10 @@ export async function prepareImageForStorage(
     source = await convertHeicToJpegFile(typed);
   }
 
-  const { maxEdge, maxBytes, outName, qualityStart } = PROFILES[profile];
+  const { maxEdge, maxBytes, qualityStart } = PROFILES[profile];
+  // The photo keeps its own name as a JPEG — IMG_2041.HEIC → IMG_2041.jpg —
+  // so the respondent's chip and the owner's Responses tell photos apart (MEDIA-18).
+  const outName = profile === 'pin' ? 'pin.jpg' : jpgName(file.name);
   const bitmap = await tryLoadBitmap(source);
   if (!bitmap) {
     throw new Error(

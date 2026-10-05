@@ -50,18 +50,20 @@ describe('unlockPublicForm 429', () => {
   it('uses retryAfterSeconds from the body when the header is hidden', async () => {
     respond(new Response(JSON.stringify({ retryAfterSeconds: 3600 }), { status: 429 }));
     const r = await unlockPublicForm('crew', { password: 'x' });
-    expect(r).toMatchObject({ message: 'Too many tries. Please wait about 60 minutes.' });
+    expect(r).toMatchObject({ message: 'Too many tries from this network. Try again in about an hour.' });
   });
 
   it('a non-JSON body with no header says about 1 minute', async () => {
     respond(new Response('nope', { status: 429 }));
     const r = await unlockPublicForm('crew', { password: 'x' });
-    expect(r).toMatchObject({ message: 'Too many tries. Please wait about 1 minute.' });
+    expect(r).toMatchObject({
+      message: 'Too many tries from this network. Try again in about 1 minute.',
+    });
   });
 });
 
 describe('submitPublicResponse', () => {
-  it('a network failure throws the Couldn’t reach Slate copy', async () => {
+  it('a network failure says the answers weren’t sent, and that they’re still here', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
@@ -69,7 +71,7 @@ describe('submitPublicResponse', () => {
       }),
     );
     await expect(submitPublicResponse(payload)).rejects.toThrow(
-      'Couldn’t reach Slate. Check your connection and press Retry — your answers are still here.',
+      'Your answers weren’t sent. Check your connection and press Retry — your answers are still here.',
     );
   });
 
@@ -89,7 +91,7 @@ describe('submitPublicResponse', () => {
     expect(JSON.parse(String(init.body))).toMatchObject({ formId: 'f_1', submitId });
   });
 
-  it('a 400 about files is a FilesRejectedError naming the questions; other 400s read as sent', async () => {
+  it('a 400 about files is a FilesRejectedError naming the questions; other 400s never show their text', async () => {
     const error = 'A file you added expired or didn’t finish uploading.';
     respond(
       new Response(JSON.stringify({ error, reason: 'files', questions: ['docs', 7] }), {
@@ -100,8 +102,11 @@ describe('submitPublicResponse', () => {
     expect(err).toBeInstanceOf(FilesRejectedError);
     expect((err as FilesRejectedError).message).toBe(error);
     expect((err as FilesRejectedError).questions).toEqual(['docs']);
+    // COPY-02: the Function's 'Missing fields' is for developers, not respondents.
     respond(new Response('Missing fields', { status: 400 }));
-    await expect(submitPublicResponse(payload)).rejects.toThrow('Missing fields');
+    await expect(submitPublicResponse(payload)).rejects.toThrow(
+      'We couldn’t send your answers just now. Press Retry in a moment — your answers are still here.',
+    );
   });
 
   it('newSubmitId is a lowercase UUID', () => {
