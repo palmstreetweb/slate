@@ -180,7 +180,9 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
       expect(screen.queryByRole('button', { name: 'Skip' })).toBeNull();
       await enter();
       expect(
-        screen.getByText(q.type === 'scale' && q.display ? 'Please pick a rating' : 'Please pick a number'),
+        screen.getByText(
+          q.type === 'scale' && q.display ? 'Please pick a rating' : 'Please pick a number',
+        ),
       ).toBeInTheDocument();
       expect(advance).not.toHaveBeenCalled();
       unmount();

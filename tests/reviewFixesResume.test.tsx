@@ -50,7 +50,8 @@ async function answerBoth(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('radio', { name: /large/i }));
 }
 
-const metaOf = (fn: ReturnType<typeof vi.fn>, call: number) => fn.mock.calls[call]![1] as SubmitMeta;
+const metaOf = (fn: ReturnType<typeof vi.fn>, call: number) =>
+  fn.mock.calls[call]![1] as SubmitMeta;
 
 describe('one fill id across a reload (ENG-03, SEC-1)', () => {
   it('a submit whose reply was lost, then a reload and Resume, sends the same fill again', async () => {

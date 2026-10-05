@@ -90,7 +90,10 @@ describe('Skip on Enter waits a moment on picture choice, swipe yes / no and pac
       'single picture choice',
       { id: 'p', type: 'picture_choice', title: 'Lunch?', options: OPTIONS, required: false },
     ],
-    ['swipe yes / no', { id: 'y', type: 'yes_no', title: 'Pets?', display: 'swipe', required: false }],
+    [
+      'swipe yes / no',
+      { id: 'y', type: 'yes_no', title: 'Pets?', display: 'swipe', required: false },
+    ],
     [
       'package cards',
       {
@@ -126,9 +129,9 @@ describe('a held Enter never confirms a typed box (ENG-07)', () => {
     ['stepper', { id: 's', type: 'number', title: 'Guests?', display: 'stepper' }, '2'],
   ] as const)('%s', async (_, q, text) => {
     const { advance } = renderLive(q as Question);
-    const box = await screen.findByRole(q.type === 'number' && 'display' in q ? 'spinbutton' : 'textbox').catch(
-      () => screen.findAllByRole('textbox').then((all) => all[0]!),
-    );
+    const box = await screen
+      .findByRole(q.type === 'number' && 'display' in q ? 'spinbutton' : 'textbox')
+      .catch(() => screen.findAllByRole('textbox').then((all) => all[0]!));
     fireEvent.change(box, { target: { value: text } });
     fireEvent.keyDown(box, { key: 'Enter', repeat: true });
     await act(async () => {});
