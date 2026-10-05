@@ -88,6 +88,26 @@ function pictureOptionsOf(q: GeneratedQuestion): PictureOption[] {
     }));
 }
 
+/**
+ * Pick limits a respondent can meet (QA 2026-10, CH-04 / CH-08): whole numbers,
+ * Min at least 1 when the draft says required and never above the choices
+ * (counting "Other"), Max (0 = none) kept only when it is at least Min and below
+ * the number of choices.
+ */
+function pickLimits(
+  q: GeneratedQuestion,
+  choices: number,
+  required: boolean,
+): { min?: number; max?: number } {
+  const whole = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : 0);
+  const min = Math.min(Math.max(whole(q.min), required ? 1 : 0), choices);
+  const max = whole(q.max);
+  return {
+    ...(min > 0 ? { min } : {}),
+    ...(max >= Math.max(1, min) && max < choices ? { max } : {}),
+  };
+}
+
 /** `allowOther` only when the model set it (ADR-063). */
 function otherOf(q: GeneratedQuestion): { allowOther?: true } {
   return q.allowOther ? { allowOther: true } : {};
@@ -183,17 +203,18 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         ...otherOf(q),
         ...vis,
       };
-    case 'multi_choice':
+    case 'multi_choice': {
+      const options = optionsOf(q);
       return {
         id,
         type: 'multi_choice',
         title,
-        options: optionsOf(q),
-        min: q.min,
-        max: q.max || undefined,
+        options,
+        ...pickLimits(q, options.length + (q.allowOther ? 1 : 0), required),
         ...otherOf(q),
         ...vis,
       };
+    }
     case 'dropdown':
       return {
         id,
@@ -205,21 +226,27 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         ...otherOf(q),
         ...vis,
       };
-    case 'picture_choice':
+    case 'picture_choice': {
+      const options = pictureOptionsOf(q);
+      const swipe = q.display === 'swipe';
+      // Swipe cards store the liked list, so they turn on multi-select (ADR-065).
+      const multiple = swipe ? true : q.multiple;
       return {
         id,
         type: 'picture_choice',
         title,
-        options: pictureOptionsOf(q),
-        // Swipe cards store the liked list, so they turn on multi-select (ADR-065).
-        multiple: q.display === 'swipe' ? true : q.multiple,
-        ...(q.display === 'swipe' ? { display: 'swipe' as const } : {}),
+        options,
+        multiple,
+        ...(swipe ? { display: 'swipe' as const } : {}),
         required,
-        min: q.min,
-        max: q.max || undefined,
+        // Swipe cards: liking none is an answer, so "required" doesn't force a like.
+        ...(multiple
+          ? pickLimits(q, options.length + (q.allowOther && !swipe ? 1 : 0), required && !swipe)
+          : {}),
         ...otherOf(q),
         ...vis,
       };
+    }
     case 'ranking':
       return { id, type: 'ranking', title, options: optionsOf(q), ...vis };
     case 'matrix':
