@@ -68,7 +68,7 @@ describe('BackupPanel', () => {
     expect(document.body.textContent).not.toMatch(/JSON|localStorage/);
     await user.click(screen.getByRole('button', { name: 'Import backup' }));
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog.textContent).toContain('with 1 form and 0 responses from');
+    expect(dialog.textContent).toContain('with the 1 form and 0 responses in the backup from');
     expect(dialog.textContent).not.toMatch(/\(s\)/);
     await user.click(within(dialog).getByRole('button', { name: 'Import' }));
     expect(state.replaceAllForms.mock.calls[0]![0][0].schema.theme).toBe('midnight');
@@ -99,6 +99,7 @@ describe('BackupPanel', () => {
     state.raw = 'not json';
     await user.click(screen.getByRole('button', { name: 'Import backup' }));
     const refused = await screen.findByRole('alertdialog');
-    expect(refused.textContent).toContain('It isn’t a Slate backup.');
+    expect(refused.textContent).toContain('That isn’t a Slate backup');
+    expect(refused.textContent).toContain('Choose a file you saved with Export backup.');
   });
 });

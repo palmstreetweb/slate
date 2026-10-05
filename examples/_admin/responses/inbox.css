@@ -9,7 +9,9 @@
 
 /* ---------- panel ---------- */
 
+/* Positioned too: nothing absolute inside the panel can escape its clip. */
 [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib {
+  position: relative;
   display: grid;
   grid-template-columns: clamp(284px, 32%, 356px) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -484,7 +486,11 @@
   white-space: nowrap;
 }
 
+/* Positioned, so the reader's screen-reader-only text ("No answer", .rsp-sr is
+   absolute) stays inside this scroller. Without it those spans were placed
+   against the studio wrapper and stretched the page ~1,900 px into blank. */
 [data-slate-forms][data-theme-name='slate'] .slate-rsp .rsp-ib-scroll {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;

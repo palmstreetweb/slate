@@ -4,6 +4,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { InboxProps, SummaryProps } from '../examples/_admin/responses/types.js';
 import type * as SubmissionStore from '../examples/_admin/_submissionStore.js';
+import type * as Router from '../examples/_admin/_router.js';
 
 const state = vi.hoisted(() => ({
   form: null as Record<string, unknown> | null,
@@ -15,7 +16,12 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../examples/_admin/neon/env.js', () => ({ isNeonConfigured: () => false }));
 vi.mock('../examples/_admin/uiSounds.js', () => ({ playUiSound: vi.fn() }));
-vi.mock('../examples/_admin/_router.js', () => ({ navigate: state.navigate }));
+// The confirm dialog follows the route (it closes when the page changes), so
+// keep the real route hooks and replace only navigation.
+vi.mock('../examples/_admin/_router.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof Router>()),
+  navigate: state.navigate,
+}));
 vi.mock('../examples/_admin/_formsStore.js', () => ({
   getForm: () => state.form,
   subscribe: () => () => {},

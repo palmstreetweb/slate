@@ -30,7 +30,9 @@
   --slate-accent-lo: rgb(226 59 45 / 0.08);
   --slate-error: #c8421a;
   --slate-success: #2f7d32;
-  --slate-warn: #b07900;
+  /* Inspector warnings are 12–13 px text: ≥ 4.5:1 on the panel and, on
+     phones, on the page behind it (4.84:1 on --chrome-bg). */
+  --slate-warn: #975a06;
   color-scheme: light;
 
   --text: var(--slate-text);
@@ -102,7 +104,7 @@
   --slate-accent-lo: rgb(24 24 27 / 0.06);
   --slate-error: #b91c1c;
   --slate-success: #15803d;
-  --slate-warn: #a16207;
+  --slate-warn: #975a06;
   color-scheme: light;
 
   --text: var(--slate-text);
@@ -174,7 +176,7 @@
   --slate-accent-lo: rgb(37 99 235 / 0.08);
   --slate-error: #dc2626;
   --slate-success: #16a34a;
-  --slate-warn: #ca8a04;
+  --slate-warn: #975a06;
   color-scheme: light;
 
   --text: var(--slate-text);

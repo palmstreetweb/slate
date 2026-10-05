@@ -112,6 +112,7 @@ export function Outline({
     landedId,
     didDragRef,
     beginPointerDrag,
+    beginTouchHold,
   } = useOutlineDrag(schema.questions, onMove);
 
   const toggleChecked = (id: string) => {
@@ -419,6 +420,20 @@ export function Outline({
                               '.slate-outline-row',
                             ) as HTMLButtonElement | null;
                             if (!row) return;
+                            // Phones: a swipe that starts here scrolls; a short hold lifts.
+                            if (phone && e.pointerType !== 'mouse') {
+                              if (!canDrag || e.button !== 0) return;
+                              beginTouchHold(
+                                q.id,
+                                i,
+                                e.clientX,
+                                e.clientY,
+                                row,
+                                e.pointerId,
+                                e.currentTarget,
+                              );
+                              return;
+                            }
                             startReorder(e, row);
                           }}
                         >
@@ -442,9 +457,14 @@ export function Outline({
                           else onSelect(q.id);
                         }}
                         onPointerDown={(e) => {
-                          if (!canDrag) return;
                           // Phones scroll with a finger on the list; the grip drags.
-                          if (phone && e.pointerType !== 'mouse') return;
+                          // A new tap is its own: a card lifted from a grip earlier
+                          // must not swallow this row's click.
+                          if (phone && e.pointerType !== 'mouse') {
+                            didDragRef.current = false;
+                            return;
+                          }
+                          if (!canDrag) return;
                           startReorder(e, e.currentTarget);
                         }}
                       >

@@ -12,7 +12,7 @@ import {
 } from '../dataBackup.js';
 import { safeThemeName } from '../sanitizeUntrustedSchema.js';
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const count =(n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export function BackupPanel() {
   const confirm = useConfirm();
@@ -36,16 +36,18 @@ export function BackupPanel() {
     const backup = parseBackup(raw);
     if (!backup) {
       await confirm({
-        title: 'Couldn’t import that file',
-        message: 'It isn’t a Slate backup. Pick a file you exported from Slate.',
+        title: 'That isn’t a Slate backup',
+        message: 'Choose a file you saved with Export backup.',
         confirmLabel: 'OK',
         danger: false,
       });
       return;
     }
+    const saved = new Date(backup.exportedAt);
+    const when = Number.isNaN(saved.getTime()) ? '' : ` from ${saved.toLocaleString()}`;
     const ok = await confirm({
       title: 'Import backup?',
-      message: `Replace all forms and responses in this browser with ${plural(backup.forms.length, 'form', 'forms')} and ${plural(backup.submissions.length, 'response', 'responses')} from ${new Date(backup.exportedAt).toLocaleString()}?`,
+      message: `This replaces every form and response in this browser with the ${count(backup.forms.length, 'form', 'forms')} and ${count(backup.submissions.length, 'response', 'responses')} in the backup${when}.`,
       confirmLabel: 'Import',
       danger: true,
     });
@@ -60,9 +62,9 @@ export function BackupPanel() {
     refreshCounts();
     if (!persisted) {
       await confirm({
-        title: 'Import incomplete',
+        title: 'Forms weren’t imported',
         message:
-          'Your responses came back, but the forms couldn’t be saved. This browser may be out of space: delete old forms or responses, then import again.',
+          'The responses were imported, but the forms couldn’t be saved. This browser may be out of space: delete forms or responses you don’t need, then import again.',
         confirmLabel: 'OK',
         danger: false,
       });
@@ -73,8 +75,8 @@ export function BackupPanel() {
     <section className="slate-settings-section">
       <h2 className="slate-settings-heading">Backup</h2>
       <p className="slate-settings-copy">
-        Forms and responses save in this browser only. Export a backup now and then, and restore it
-        if you switch browsers or clear this browser’s data.
+        Forms and responses are saved in this browser only. Export a backup now and then, and import
+        it if you switch browsers or clear this site’s data.
       </p>
       <dl className="slate-settings-stats">
         <div>
