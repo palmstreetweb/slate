@@ -271,7 +271,10 @@ async function buildDisplayPreview(
       };
     } catch (err) {
       if (sourceRevoke) URL.revokeObjectURL(sourceUrl);
-      throw err instanceof Error ? err : new Error('Could not convert HEIC for preview.');
+      // The converter's own words are for the person picking a photo (COPY-15);
+      // the owner gets theirs.
+      console.warn('[slate] HEIC preview failed', err);
+      throw new Error('This browser can’t show this iPhone photo. Download the file to view it.');
     }
   }
 

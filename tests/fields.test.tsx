@@ -510,7 +510,8 @@ describe('phase 3 question types', () => {
     fireEvent.change(container.querySelector('input[type="file"]')!, {
       target: { files: [big] },
     });
-    expect(screen.getByText(/too large/i)).toBeInTheDocument();
+    // One "too big" sentence that names the file and the limit (COPY-14, MEDIA-10).
+    expect(screen.getByText(/big\.bin is too big\. The limit is 1 MB\./)).toBeInTheDocument();
     expect(setAnswer).not.toHaveBeenCalled();
   });
 

@@ -33,9 +33,33 @@ import { resolveTitle } from '../_resolveTitle.js';
 import '@/styles/extensions.css';
 import '@/styles/extensions-c.css';
 
-type Shot = { state: 'uploading' | 'done' | 'error'; thumb?: string; error?: string; ref?: string };
+type Shot = {
+  state: 'uploading' | 'done' | 'error';
+  thumb?: string;
+  error?: string;
+  ref?: string;
+  /** A retake that failed: the earlier photo is kept, and this says why (MEDIA-09). */
+  note?: string;
+};
 
 const MIB = 1024 * 1024;
+
+/**
+ * A photo by its type or its name (HEIC often arrives with no type). Inline,
+ * not the core's imageFileTypes: a field importing a core util splits a core
+ * chunk and costs engine bytes (AGENTS.md).
+ */
+const isPhoto = (file: File) =>
+  file.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif|avif)$/i.test(file.name);
+
+/**
+ * The host's own sentence (a plain Error), or plain words — never a browser's
+ * or a server's technical text (MEDIA-06).
+ */
+const plainError = (err: unknown) =>
+  err instanceof Error && err.name === 'Error' && err.message && err.message.length < 180
+    ? err.message
+    : 'That photo didn’t upload. Try again.';
 
 /** Thumbnails from this session, by stored ref, so Back and forward keep them. */
 const thumbs = new Map<string, string>();
@@ -85,6 +109,8 @@ export default function PhotoChecklistField({
   });
   const [error, setError] = useState<string | null>(null);
   const [said, setSaid] = useState('');
+  const shotsRef = useRef(shots);
+  shotsRef.current = shots;
   const pending = useRef<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
@@ -118,15 +144,32 @@ export default function PhotoChecklistField({
   const upload = useCallback(
     async (item: string, file: File) => {
       const label = items.find((i) => i.value === item)?.label ?? 'Photo';
-      if (!onFileUpload) {
+      // A retake that fails keeps the photo already taken, and says so (MEDIA-09):
+      // the count, the row and what is sent never disagree.
+      const before = shotsRef.current[item];
+      const kept = before?.state === 'done' && before.ref ? before : null;
+      const fail = (message: string, thumb?: string) =>
         setShots((s) => ({
           ...s,
-          [item]: { state: 'error', error: 'Photos can’t be saved on this form.' },
+          [item]: kept
+            ? { ...kept, note: `${message} We kept your earlier photo.` }
+            : { state: 'error', thumb, error: message },
         }));
+      if (!onFileUpload) {
+        fail('Photos can’t be saved on this form.');
+        return;
+      }
+      // The picker's "All files" lets anything through (MEDIA-08).
+      if (!isPhoto(file) || file.type === 'image/svg+xml') {
+        fail('That file isn’t a photo. Take or choose a photo.');
+        return;
+      }
+      if (file.size === 0) {
+        fail('That photo is empty. Take or choose another one.');
         return;
       }
       if (file.size > PHOTO_MAX_BYTES * 3) {
-        setShots((s) => ({ ...s, [item]: { state: 'error', error: 'That photo is too large.' } }));
+        fail('That photo is too big. Try a different one.');
         return;
       }
       const thumb = URL.createObjectURL(file);
@@ -144,15 +187,9 @@ export default function PhotoChecklistField({
         setSaid(`${label}: added.`);
       } catch (err) {
         if (!alive.current) return;
-        setShots((s) => ({
-          ...s,
-          [item]: {
-            state: 'error',
-            thumb,
-            error:
-              err instanceof Error && err.message ? err.message : 'Couldn’t upload that photo.',
-          },
-        }));
+        // The host's own sentence, or plain words — never a browser's or a server's text (MEDIA-06).
+        fail(plainError(err), kept ? undefined : thumb);
+        if (kept) URL.revokeObjectURL(thumb);
         setSaid(`${label}: upload failed.`);
       }
     },
@@ -252,9 +289,9 @@ export default function PhotoChecklistField({
                   {it.description ? (
                     <span className="slate-shot-desc">{it.description}</span>
                   ) : null}
-                  {state === 'error' ? (
+                  {state === 'error' || shot?.note ? (
                     <span className="slate-shot-err" role="alert">
-                      {shot?.error}
+                      {shot?.error ?? shot?.note}
                     </span>
                   ) : state === 'uploading' ? (
                     <span className="slate-shot-desc">Uploading…</span>
