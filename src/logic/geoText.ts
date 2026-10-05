@@ -14,7 +14,8 @@ export const LOCATION_SAVES_VERDICT = 'We only save whether you’re in the serv
  * The same default when there is nothing to check against (no radius, no ZIP
  * list): only `{ via }` is kept (ADR-068 §2), so there is no "service area".
  */
-export const LOCATION_SAVES_SHARED = 'We only save that you shared your location, not where you are.';
+export const LOCATION_SAVES_SHARED =
+  'We only save that you shared your location, not where you are.';
 /** While typing, without the opt-in: a typed place is kept as written (ADR-068). */
 export const LOCATION_SAVES_TYPED = 'We save what you type here, not your exact location.';
 /** What it saves when the owner keeps the approximate location (ADR-068). */

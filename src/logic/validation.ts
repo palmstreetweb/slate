@@ -151,7 +151,12 @@ export function validate(question: Question, answer: unknown): ValidationResult 
         if (answer.length > max) {
           return { code: 'too_long', message: `Keep it to ${max} characters or fewer` };
         }
-        if (question.type === 'short_text' && question.pattern && answer && !question.pattern.test(answer)) {
+        if (
+          question.type === 'short_text' &&
+          question.pattern &&
+          answer &&
+          !question.pattern.test(answer)
+        ) {
           return {
             code: 'pattern',
             message: question.patternError ?? 'Please check the format',

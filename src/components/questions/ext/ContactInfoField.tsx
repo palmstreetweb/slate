@@ -84,7 +84,10 @@ export default function ContactInfoField({
         try {
           const lib = await loadPhoneLib();
           country = phoneCountry(question.defaultCountry, (c) => lib.isSupportedCountry(c));
-          const parsed = lib.parsePhoneNumberFromString(trimmed.phone, country as Libphonenumber.CountryCode);
+          const parsed = lib.parsePhoneNumberFromString(
+            trimmed.phone,
+            country as Libphonenumber.CountryCode,
+          );
           if (parsed?.isValid()) trimmed.phone = parsed.number;
           else found.phone = phoneProblem(country);
         } catch (err) {

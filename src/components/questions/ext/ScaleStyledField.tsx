@@ -58,7 +58,13 @@ export default function ScaleStyledField(props: ExtFieldProps<ScaleQuestion>) {
 
 /* ---------- stars and faces ---------- */
 
-function ScaleIcons({ question, answers, value, onCommit, onAdvance }: ExtFieldProps<ScaleQuestion>) {
+function ScaleIcons({
+  question,
+  answers,
+  value,
+  onCommit,
+  onAdvance,
+}: ExtFieldProps<ScaleQuestion>) {
   const labelId = useId();
   const errId = `${labelId}-err`;
   const stars = question.display === 'stars';

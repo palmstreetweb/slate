@@ -55,7 +55,8 @@ export default function NumberStepperField({
   const decimals = decimalsOf(step);
   // Bounds set the wrong way round are ignored (as validate() does), so the
   // buttons never lock and nobody is asked for a number they can't give.
-  const inverted = question.min !== undefined && question.max !== undefined && question.min > question.max;
+  const inverted =
+    question.min !== undefined && question.max !== undefined && question.min > question.max;
   const min = inverted ? undefined : question.min;
   const max = inverted ? undefined : question.max;
   const { prefix, unit } = question;

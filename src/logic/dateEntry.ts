@@ -84,7 +84,8 @@ export function boxOrder(format: DateFormat): Array<keyof DateBoxes> {
 export function splitTypedDate(raw: string, format: DateFormat): DateBoxes | null {
   let g = raw.match(/\d+/g);
   // Eight digits with no separators ("10032026") read as the form's order.
-  if (g?.length === 1 && g[0]!.length === 8) g = [g[0]!.slice(0, 2), g[0]!.slice(2, 4), g[0]!.slice(4)];
+  if (g?.length === 1 && g[0]!.length === 8)
+    g = [g[0]!.slice(0, 2), g[0]!.slice(2, 4), g[0]!.slice(4)];
   if (!g || g.length !== 3 || g.some((x) => x.length > 4)) return null;
   if (g[0]!.length === 4) return { year: g[0]!, month: g[1]!.slice(0, 2), day: g[2]!.slice(0, 2) };
   const [first, second] = boxOrder(format);

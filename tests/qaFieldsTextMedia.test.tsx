@@ -561,7 +561,12 @@ describe('phone numbers (F13, F22)', () => {
   });
 
   it('the contact block says the same about too few digits', async () => {
-    renderField({ id: 'c', type: 'contact_info', title: 'How do we reach you?', fields: { phone: 'required' } });
+    renderField({
+      id: 'c',
+      type: 'contact_info',
+      title: 'How do we reach you?',
+      fields: { phone: 'required' },
+    });
     fireEvent.change(await screen.findByRole('textbox', { name: /^name/i }), {
       target: { value: 'Ada' },
     });
@@ -591,7 +596,16 @@ describe('signature (F23, SCROLL-12)', () => {
   const sig: Question = { id: 's', type: 'signature', title: 'Sign here', required: true };
   const fakeRect = (el: HTMLElement) => {
     el.getBoundingClientRect = () =>
-      ({ left: 0, top: 0, width: 500, height: 200, right: 500, bottom: 200, x: 0, y: 0 }) as DOMRect;
+      ({
+        left: 0,
+        top: 0,
+        width: 500,
+        height: 200,
+        right: 500,
+        bottom: 200,
+        x: 0,
+        y: 0,
+      }) as DOMRect;
   };
 
   it('typed mode, left blank, asks for the name', async () => {
@@ -624,7 +638,9 @@ describe('signature (F23, SCROLL-12)', () => {
       configurable: true,
       get: () => ({ scrollBy }),
     });
-    const spy = { mockRestore: () => delete (document as { scrollingElement?: unknown }).scrollingElement };
+    const spy = {
+      mockRestore: () => delete (document as { scrollingElement?: unknown }).scrollingElement,
+    };
     try {
       const touch = { pointerId: 2, pointerType: 'touch', button: 0 };
       fireEvent.pointerDown(canvas, { ...touch, clientX: 250, clientY: 150 });
@@ -646,7 +662,12 @@ describe('signature (F23, SCROLL-12)', () => {
 });
 
 describe('location (MEDIA-15)', () => {
-  const loc: Question = { id: 'where', type: 'location', title: 'Where is the job?', required: true };
+  const loc: Question = {
+    id: 'where',
+    type: 'location',
+    title: 'Where is the job?',
+    required: true,
+  };
 
   it('with no service area, the privacy line doesn’t promise a verdict', async () => {
     renderField(loc);
@@ -658,7 +679,9 @@ describe('location (MEDIA-15)', () => {
   it('the required message points at what is on screen', async () => {
     renderField(loc);
     fireEvent.click(await screen.findByRole('button', { name: /ok/i }));
-    expect(screen.getByText('! Please share your location, or type it instead')).toBeInTheDocument();
+    expect(
+      screen.getByText('! Please share your location, or type it instead'),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Type it instead' }));
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(screen.getByText('! Please type your town or ZIP code')).toBeInTheDocument();

@@ -104,7 +104,8 @@ describe('phone keyboard (GAP-04)', () => {
       width: 375,
       height: 667,
       addEventListener: (_: string, fn: () => void) => listeners.push(fn),
-      removeEventListener: (_: string, fn: () => void) => listeners.splice(listeners.indexOf(fn), 1),
+      removeEventListener: (_: string, fn: () => void) =>
+        listeners.splice(listeners.indexOf(fn), 1),
     };
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: vv });
     return { vv, fire: () => listeners.forEach((fn) => fn()), listeners };
