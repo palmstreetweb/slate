@@ -3,6 +3,7 @@
  * (QA COPY-07 / S19). File problems have their own message and no Retry.
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as AiClient from '../examples/_admin/ai/client.js';
 
@@ -14,6 +15,8 @@ vi.mock('../examples/_admin/ai/client.js', async (importOriginal) => ({
 vi.mock('../examples/_admin/uiSounds.js', () => ({ playUiSound: () => {} }));
 
 import { GenerateRequestError } from '../examples/_admin/ai/client.js';
+import { generatedFormSchema } from '../api/generateFormSchema.js';
+import { blankGeneratedQuestion, mapGeneratedForm } from '../api/mapGeneratedForm.js';
 import {
   AI_PROMPT_MAX,
   AI_REVISE_MAX,
@@ -106,6 +109,86 @@ describe('Build with AI errors', () => {
       'That PDF is too big. Pick one under 3 MB.',
     );
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+});
+
+describe('Open in editor', () => {
+  function draft() {
+    const form = generatedFormSchema.parse({
+      title: 'RSVP',
+      description: 'Who is coming.',
+      theme: 'editorial',
+      welcome: { title: 'Welcome.', subtitle: '', cta: 'Start' },
+      questions: ['name', 'email', 'notes'].map((id) =>
+        blankGeneratedQuestion({ id, type: 'short_text', title: `${id}?` }),
+      ),
+      thanks: { title: 'Thanks.', subtitle: '', cta: 'Done' },
+      estimate: { show: false, currency: 'USD', base: 0, disclaimer: '' },
+    });
+    return { ...mapGeneratedForm(form), form, sourcePrompt: 'RSVP' };
+  }
+
+  async function toReview() {
+    requestGeneratedForm.mockResolvedValueOnce(draft());
+    await generateWith('RSVP');
+    expect(await screen.findByText('Here’s a draft.', {}, { timeout: 3000 })).toBeInTheDocument();
+  }
+
+  it('a save that didn’t land says so plainly, and Open in editor is the retry', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(
+      <BuildWithAiModal
+        open
+        onClose={() => {}}
+        onReady={async () => {
+          throw new Error('The cloud did not save the generated draft.');
+        }}
+      />,
+    );
+    await toReview();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Open in editor' }));
+    });
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'Couldn’t save the draft. Check your connection, then press Open in editor again.',
+    );
+    expect(alert).not.toHaveTextContent(/cloud/);
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
+  it('the form-limit path closes the modal; reopening shows no stale error', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    function Host() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            reopen
+          </button>
+          <BuildWithAiModal
+            open={open}
+            onClose={() => setOpen(false)}
+            onReady={async () => {
+              setOpen(false);
+              await new Promise((r) => setTimeout(r, 0));
+              throw new Error('Form limit reached.');
+            }}
+          />
+        </>
+      );
+    }
+    render(<Host />);
+    await toReview();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Open in editor' }));
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'reopen' }));
+    });
+    expect(screen.getByText('Describe your perfect form')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
 

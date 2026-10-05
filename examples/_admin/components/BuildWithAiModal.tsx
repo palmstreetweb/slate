@@ -98,6 +98,11 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
   const dropLandedTimer = useRef<number>(0);
 
   const busy = phase === 'generating' || phase === 'opening';
+  /** The form-limit dialog closes this modal before onReady throws; don't reopen onto that error. */
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   useFocusTrap(panelRef, open, () => {
     if (!busy) onClose();
@@ -263,9 +268,10 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
     try {
       await onReady(draft);
     } catch (err) {
-      // The form limit has its own dialog (Dashboard); anything else is a save
-      // that didn't land. "Open in editor" stays as the way to try again.
+      // The form limit has its own dialog (Dashboard), which closes this modal;
+      // anything else is a save that didn't land, and "Open in editor" retries.
       console.error('[slate] Build with AI draft not saved', err);
+      if (!openRef.current) return;
       setError({
         message: 'Couldn’t save the draft. Check your connection, then press Open in editor again.',
         retryable: false,
