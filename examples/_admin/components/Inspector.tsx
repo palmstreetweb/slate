@@ -369,13 +369,12 @@ export function Inspector({
           <>
             <Field label="Max Length (Characters)" hint="Leave empty, or 0, for no limit.">
               <SlateNumberInput
-                integer
                 value={question.maxLength}
                 placeholder="No limit"
-                // 0 or less is no limit, never a limit of 1 (R18).
+                // Below 1 (0, -5, 0.5) is no limit, never a limit of 1; 2.7 is 2 (R18).
                 onChange={(n) =>
                   onChange({
-                    maxLength: n !== undefined && n >= 1 ? n : undefined,
+                    maxLength: n !== undefined && n >= 1 ? Math.floor(n) : undefined,
                   } as Partial<Question>)
                 }
               />

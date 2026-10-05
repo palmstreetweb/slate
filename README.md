@@ -137,7 +137,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `matrix` | `title`, `rows: Option[]`, `columns: Option[]`, `multiple?`, `required?` | all rows when required | `Record<row, col \| col[]>` |
 | `yes_no` | `title`, `yesLabel?`, `noLabel?`, `required?` (default `true`), `display?` (`'buttons'` \| `'swipe'`) | required | `'yes' \| 'no'` |
 | `legal` | `title`, `body?`, `acceptLabel?`, `declineLabel?`, `required?` (default `true`) | required | `'accept' \| 'decline'` |
-| `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?`, `display?` (`'numbers'` \| `'stars'` \| `'emoji'` \| `'slider'`), `sliderIcon?` | range (min and max set the wrong way round read in order; the cells draw at most 21 points) | `number` |
+| `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?`, `display?` (`'numbers'` \| `'stars'` \| `'emoji'` \| `'slider'`), `sliderIcon?` | range (min and max set the wrong way round read in order; the cells draw at most 101 points, in wrapped rows) | `number` |
 | `nps` | `title`, `minLabel?`, `maxLabel?`, `required?` | 0–10 | `number` |
 | `contact_info` | `title`, `fields?` (`name` / `email` / `phone`: `'required'` \| `'optional'` \| `'off'`; default name + email required, phone optional), `defaultCountry?` | per part: required, email shape, phone parses | `{ name?, email?, phone? }` (phone as E.164) |
 | `address` | `title`, `required?`, `line2?` (default `true`), `country?`, `format?` (`'us'` \| `'international'`), `serviceArea?` (ZIP codes or prefixes) | complete once started; 5-digit ZIP (US) | `{ street, line2?, city, region?, postal, country? }` |

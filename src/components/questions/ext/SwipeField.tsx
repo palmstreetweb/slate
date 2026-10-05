@@ -436,7 +436,7 @@ function PictureSwipe({
                     >
                       <img
                         className="slate-swipe-img"
-                        src={opt.src}
+                        src={opt.src || undefined}
                         alt={top ? (opt.alt ?? opt.label) : ''}
                         draggable={false}
                         referrerPolicy="no-referrer"
@@ -514,7 +514,12 @@ function PictureSwipe({
                     onClick={() => unlike(o.value)}
                     aria-label={`Let ${o.label} go`}
                   >
-                    <img src={o.src} alt="" referrerPolicy="no-referrer" draggable={false} />
+                    <img
+                      src={o.src || undefined}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      draggable={false}
+                    />
                     <span>{o.label}</span>
                   </button>
                 </li>

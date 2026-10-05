@@ -231,7 +231,11 @@ export function PictureChoiceField({
               }}
               className={`slate-picture${isSelected ? ' slate-picture--selected' : ''}${isCommitted ? ' slate-picture--committed' : ''}`}
             >
-              <img src={opt.src} alt={opt.alt ?? opt.label} className="slate-picture-img" />
+              <img
+                src={opt.src || undefined}
+                alt={opt.alt ?? opt.label}
+                className="slate-picture-img"
+              />
               <span className="slate-picture-caption">
                 <ChoiceBadge letter={CHOICE_LETTERS[i] ?? ''} committed={isCommitted} />
                 <span>{opt.label}</span>

@@ -510,6 +510,25 @@ describe('a grid whose column headers can’t fit their words stacks (R7)', () =
   });
 });
 
+describe('a picture option with no link (QA coverage)', () => {
+  it('draws no broken src, and React has nothing to warn about', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderLive({
+      id: 'p',
+      type: 'picture_choice',
+      title: 'Which look?',
+      options: [
+        { label: 'Modern', value: 'a', src: '' },
+        { label: 'Rustic', value: 'b', src: 'https://x.test/b.jpg' },
+      ],
+    } as Question);
+    const imgs = await screen.findAllByRole('img');
+    expect(imgs[0]).not.toHaveAttribute('src');
+    expect(imgs[1]).toHaveAttribute('src', 'https://x.test/b.jpg');
+    expect(JSON.stringify(error.mock.calls)).not.toMatch(/empty string/);
+  });
+});
+
 /* ---------- swipe ---------- */
 
 describe('a swipe card still flying when Back is pressed decides nothing (EXTRA-1)', () => {

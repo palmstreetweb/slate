@@ -74,6 +74,10 @@
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+  /* Brought into view over a phone keyboard or under an error (GAP-04), OK
+     clears what floats over the page's foot: iOS Safari's address bar sits
+     just above the keyboard (checked on an iPhone 17 Pro simulator, iOS 26). */
+  scroll-margin-bottom: 64px;
 }
 
 [data-slate-forms] .slate-ok-btn {
