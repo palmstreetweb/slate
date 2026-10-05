@@ -15,6 +15,7 @@ import {
 } from '@/utils/fileUploadRef.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import { formatFileUploadError, resolveFileInputAccept } from '@/utils/fileUploadAccept.js';
+import { inferFileMimeType } from '@/utils/fileMimeTypes.js';
 import { isHeicLike, isLikelyImageFile } from '@/utils/imageFileTypes.js';
 import { convertHeicToJpegFile } from '@/utils/heicToJpeg.js';
 import { shouldOptimizeImage } from '@/utils/prepareFileForUpload.js';
@@ -93,6 +94,61 @@ function dragHasFiles(e: DragEvent | React.DragEvent): boolean {
   return Array.from(types as ArrayLike<string>).includes('Files');
 }
 
+/** The owner's `accept` list, lower-cased: `.pdf`, `image/*`, `application/pdf`. */
+function acceptTokens(accept: string | undefined): string[] {
+  return (accept ?? '')
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Does the file fit the owner's file types? The picker filters by itself, but
+ * a drop or the picker's "All files" doesn't (MEDIA-08).
+ */
+export function matchesAccept(file: File, accept: string | undefined): boolean {
+  const tokens = acceptTokens(accept);
+  if (!tokens.length) return true;
+  const name = file.name.toLowerCase();
+  const type = (inferFileMimeType(file) ?? '').toLowerCase();
+  return tokens.some((t) =>
+    t.startsWith('.')
+      ? name.endsWith(t)
+      : t === 'image/*'
+        ? isLikelyImageFile(file)
+        : t.endsWith('/*')
+          ? type.startsWith(t.slice(0, -1))
+          : type === t,
+  );
+}
+
+const KIND: Record<string, string> = {
+  'image/*': 'photos',
+  'video/*': 'videos',
+  'audio/*': 'audio files',
+  'application/pdf': 'PDFs',
+};
+
+/** What the owner's file types are, in words: "photos", "PDFs", "DOCX or XLSX files". */
+export function acceptLabel(accept: string | undefined): string | null {
+  const words = new Set<string>();
+  const exts: string[] = [];
+  for (const t of acceptTokens(accept)) {
+    if (KIND[t]) words.add(KIND[t]);
+    else if (/^\.(jpe?g|png|gif|webp|heic|heif)$/.test(t)) words.add('photos');
+    else if (t === '.pdf') words.add('PDFs');
+    else if (t.startsWith('.')) exts.push(t.slice(1).toUpperCase());
+    else return null;
+  }
+  if (exts.length) words.add(`${exts.join(' or ')} files`);
+  return words.size ? [...words].join(' or ') : null;
+}
+
+/** "notes.txt" for one file, "2 files" for more. */
+function nameOrCount(files: File[]): string {
+  return files.length === 1 ? files[0]!.name : `${files.length} files`;
+}
+
 export function FileUploadField({
   question,
   answers,
@@ -103,7 +159,15 @@ export function FileUploadField({
   resolveFileUploadMeta,
 }: Props) {
   const multiple = question.multiple !== false;
-  const maxFiles = question.maxFiles ?? 10;
+  // Settings a respondent can't meet are ignored, never shown ("max -1 MB", "0/2.5 files").
+  const maxFiles =
+    typeof question.maxFiles === 'number' && question.maxFiles >= 1
+      ? Math.floor(question.maxFiles)
+      : 10;
+  const maxMb =
+    typeof question.maxSizeMb === 'number' && question.maxSizeMb > 0
+      ? question.maxSizeMb
+      : undefined;
   const [items, setItems] = useState<FileAnswerItem[]>(() =>
     asItemList(initialValue, multiple),
   );
@@ -253,19 +317,56 @@ export function FileUploadField({
     const current = itemsRef.current;
     const room = multiple ? Math.max(0, maxFiles - current.length - pending.length) : 1;
     if (multiple && room === 0) {
-      setError(`Attach at most ${maxFiles} file${maxFiles === 1 ? '' : 's'}.`);
+      setError(
+        `You can attach up to ${maxFiles} file${maxFiles === 1 ? '' : 's'}. Remove one to add another.`,
+      );
       return;
     }
 
-    const batch = multiple ? list.slice(0, room) : list.slice(0, 1);
-    for (const file of batch) {
-      if (question.maxSizeMb !== undefined && file.size > question.maxSizeMb * 1024 * 1024) {
-        setError(`That file is too large — max ${question.maxSizeMb} MB.`);
-        return;
-      }
+    // Each file is checked on its own: the ones that fit are added, and the
+    // rest are named with the reason (MEDIA-08, MEDIA-10, GAP-22).
+    const wrongType: File[] = [];
+    const empty: File[] = [];
+    const tooBig: File[] = [];
+    const fits: File[] = [];
+    for (const file of list) {
+      if (!matchesAccept(file, question.accept)) wrongType.push(file);
+      else if (file.size === 0) empty.push(file);
+      // Photos are made smaller before they upload, so their size is checked after (MEDIA-11).
+      else if (
+        maxMb !== undefined &&
+        file.size > maxMb * 1024 * 1024 &&
+        !(onFileUpload && shouldOptimizeImage(file))
+      ) {
+        tooBig.push(file);
+      } else fits.push(file);
     }
-
-    setError(null);
+    const batch = fits.slice(0, room);
+    const extra = fits.slice(room);
+    const kinds = acceptLabel(question.accept);
+    const notes = [
+      wrongType.length
+        ? kinds
+          ? `${nameOrCount(wrongType)} can’t be added — this question takes ${kinds} only.`
+          : `${nameOrCount(wrongType)} can’t be added — it isn’t a type of file this question takes.`
+        : '',
+      empty.length
+        ? `${nameOrCount(empty)} ${empty.length === 1 ? 'is' : 'are'} empty, so ${empty.length === 1 ? 'it wasn’t' : 'they weren’t'} added.`
+        : '',
+      tooBig.length
+        ? `${nameOrCount(tooBig)} ${tooBig.length === 1 ? 'is' : 'are'} too big. The limit is ${maxMb} MB.`
+        : '',
+      extra.length
+        ? `You can attach up to ${multiple ? maxFiles : 1} file${multiple && maxFiles !== 1 ? 's' : ''}, so ${nameOrCount(extra)} ${extra.length === 1 ? 'wasn’t' : 'weren’t'} added.`
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    setError(notes || null);
+    if (batch.length === 0) {
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
 
     if (onFileUpload) {
       const nextPending: PendingFile[] = batch.map((file) => ({
@@ -305,10 +406,8 @@ export function FileUploadField({
           setPending((prev) =>
             prev.map((p) => (p.id === entry.id ? { ...p, phase: entry.phase } : p)),
           );
-          // onFileUpload → prepareFileForUpload converts HEIC → photo.jpg, then stores.
-          const ref = await onFileUpload(entry.file, question.id, {
-            maxSizeMb: question.maxSizeMb,
-          });
+          // onFileUpload → prepareFileForUpload makes photos smaller JPEGs (same name), then stores.
+          const ref = await onFileUpload(entry.file, question.id, { maxSizeMb: maxMb });
           uploaded.push(ref);
           const live = pendingRef.current.find((p) => p.id === entry.id);
           const previewUrl = live?.previewUrl ?? entry.previewUrl;
@@ -332,7 +431,7 @@ export function FileUploadField({
         if (uploaded.length > 0) {
           commit(multiple ? [...current, ...uploaded] : uploaded);
         }
-        setError(formatFileUploadError(err, question.maxSizeMb));
+        setError([notes, formatFileUploadError(err, maxMb)].filter(Boolean).join(' '));
         setPending((prev) => {
           for (const p of prev) {
             if (p.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(p.previewUrl);
@@ -602,9 +701,7 @@ export function FileUploadField({
           >
             OK <span aria-hidden>✓</span>
           </button>
-          {question.maxSizeMb !== undefined && (
-            <span className="slate-hint">max {question.maxSizeMb} MB</span>
-          )}
+          {maxMb !== undefined && <span className="slate-hint">max {maxMb} MB</span>}
           {multiple && (
             <span className="slate-hint">
               {totalShown}/{maxFiles} files

@@ -2,9 +2,12 @@
  * Save-and-resume (ADR-017).
  *
  * Persists in-progress sessions to `localStorage` under
- * `slate-forms-resume:<formId>`. On mount, a previously saved session (if any)
- * is surfaced so the Form can offer a "resume where you left off?" prompt.
- * The save is cleared on successful submit or when the user declines.
+ * `slate-forms-resume:<formId>` — or, with `tab`, to `sessionStorage`: this
+ * tab only, surviving a reload or back / forward but never reaching another
+ * tab or a later visit (ADR-017 addendum). On mount, a previously saved
+ * session (if any) is surfaced so the Form can offer a "resume where you left
+ * off?" prompt. The save is cleared on successful submit or when the user
+ * declines.
  *
  * `File` answers can't be serialized — they're stripped from the snapshot
  * (the question will simply be unanswered after resuming).
@@ -24,9 +27,12 @@ function storageKey(formId: string): string {
   return `${KEY_PREFIX}${formId}`;
 }
 
-function readSession(formId: string): SavedSession | null {
+/** This tab's storage, or the browser's. */
+const store = (tab?: boolean): Storage => (tab ? window.sessionStorage : window.localStorage);
+
+function readSession(formId: string, tab?: boolean): SavedSession | null {
   try {
-    const raw = window.localStorage.getItem(storageKey(formId));
+    const raw = store(tab).getItem(storageKey(formId));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (
@@ -62,6 +68,8 @@ function serializableAnswers(answers: LooseAnswers): LooseAnswers {
 type Opts = {
   /** Off unless the host opted in AND provided a form id. */
   enabled: boolean;
+  /** Keep the save in this tab only (`sessionStorage`). */
+  tab?: boolean;
   formId: string;
   answers: LooseAnswers;
   step: number;
@@ -79,10 +87,10 @@ type Api = {
   clear: () => void;
 };
 
-export function useAutosave({ enabled, formId, answers, step, visitedIds }: Opts): Api {
+export function useAutosave({ enabled, tab, formId, answers, step, visitedIds }: Opts): Api {
   const [savedSession, setSavedSession] = useState<ResumeSnapshot | null>(() => {
     if (!enabled || typeof window === 'undefined') return null;
-    return readSession(formId);
+    return readSession(formId, tab);
   });
 
   // While the resume prompt is open we must not overwrite the saved session
@@ -99,19 +107,19 @@ export function useAutosave({ enabled, formId, answers, step, visitedIds }: Opts
         visitedIds,
         savedAt: new Date().toISOString(),
       };
-      window.localStorage.setItem(storageKey(formId), JSON.stringify(session));
+      store(tab).setItem(storageKey(formId), JSON.stringify(session));
     } catch {
       // Storage full / blocked — autosave silently degrades.
     }
-  }, [enabled, formId, answers, step, visitedIds]);
+  }, [enabled, tab, formId, answers, step, visitedIds]);
 
   const clear = useCallback(() => {
     try {
-      window.localStorage.removeItem(storageKey(formId));
+      store(tab).removeItem(storageKey(formId));
     } catch {
       // ignored
     }
-  }, [formId]);
+  }, [tab, formId]);
 
   const acceptSaved = useCallback(() => {
     holdWrites.current = false;

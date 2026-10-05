@@ -13,28 +13,21 @@
 import type { PublishedFormPayload } from './database.types.js';
 import { getSubmitUrl } from './config.js';
 import { slugRowToPublishedForm } from './mappers.js';
+import { FORM_UNAVAILABLE, LOAD_LATER, LOAD_OFFLINE, aboutWait } from '../fillCopy.js';
 
 const inflight = new Map<string, Promise<PublishedFormPayload | null>>();
-
-const UNAVAILABLE = 'This form is not available right now.';
-const RETRY_LATER = 'Could not load this form. Please try again in a moment.';
 
 function lookupUrl(slug: string): string {
   let base: string;
   try {
     base = getSubmitUrl();
   } catch {
-    throw new Error(UNAVAILABLE);
+    throw new Error(FORM_UNAVAILABLE);
   }
   const u = new URL(base);
   u.searchParams.set('op', 'form');
   u.searchParams.set('slug', slug);
   return u.href;
-}
-
-function minutes(seconds: number): string {
-  const m = Math.max(1, Math.ceil(seconds / 60));
-  return `about ${m} minute${m === 1 ? '' : 's'}`;
 }
 
 type Row = Parameters<typeof slugRowToPublishedForm>[0];
@@ -57,8 +50,8 @@ async function fetchBySlug(slug: string): Promise<PublishedFormPayload | null> {
     // answers Cache-Control: no-store, so a republish shows on the next load.
     res = await fetch(lookupUrl(slug), { credentials: 'omit' });
   } catch (err) {
-    if (err instanceof Error && err.message === UNAVAILABLE) throw err;
-    throw new Error('Could not load this form. Check your connection and try again.');
+    if (err instanceof Error && err.message === FORM_UNAVAILABLE) throw err;
+    throw new Error(LOAD_OFFLINE);
   }
   if (res.status === 404) return null;
   if (res.status === 429) {
@@ -71,12 +64,18 @@ async function fetchBySlug(slug: string): Promise<PublishedFormPayload | null> {
     throw new Error(
       typeof b.error === 'string' && b.error.startsWith('Too many')
         ? b.error
-        : `Too many form links were opened from this network just now. Please try again in ${minutes(wait)}, or switch to mobile data.`,
+        : `Too many form links were opened from this network just now. Try again in ${aboutWait(wait)}, or switch to mobile data.`,
     );
   }
-  if (!res.ok) throw new Error(RETRY_LATER);
+  if (!res.ok) {
+    console.error('[slate] form load failed', res.status);
+    throw new Error(LOAD_LATER);
+  }
   const body: unknown = await res.json().catch(() => null);
-  if (!isRow(body)) throw new Error(RETRY_LATER);
+  if (!isRow(body)) {
+    console.error('[slate] form load: the reply was not a form');
+    throw new Error(LOAD_LATER);
+  }
   return slugRowToPublishedForm(body);
 }
 

@@ -98,7 +98,7 @@ describe('public form fetch: one simple GET to the Function (ADR-048, ADR-061)',
   it('a failure is not memoized — the next call retries', async () => {
     fetchMock.mockImplementationOnce(async () => new Response('', { status: 503 }));
     const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
-    await expect(loadPublishedForm('12345678')).rejects.toThrow(/Could not load/);
+    await expect(loadPublishedForm('12345678')).rejects.toThrow(/couldn’t load this form/);
     expect((await loadPublishedForm('12345678'))?.id).toBe('f_1');
   });
 
@@ -109,14 +109,14 @@ describe('public form fetch: one simple GET to the Function (ADR-048, ADR-061)',
     const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
     await expect(loadPublishedForm('12345678')).rejects.toThrow(/Check your connection/);
     fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify([row])));
-    await expect(loadPublishedForm('12345678')).rejects.toThrow(/try again in a moment/);
+    await expect(loadPublishedForm('12345678')).rejects.toThrow(/Try again in a moment/);
   });
 
   it('no submit URL configured: not available, and nothing is fetched', async () => {
     cfg.submitUrl = null;
     const { loadPublishedForm } = await import('../examples/_admin/neon/publicForm.js');
     await expect(loadPublishedForm('12345678')).rejects.toThrow(
-      'This form is not available right now.',
+      'This form isn’t taking responses right now.',
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });

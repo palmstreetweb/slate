@@ -9,8 +9,17 @@ import { pinAnswerCore } from './pins.js';
 import { availabilityAnswerCore } from './availability.js';
 import { signupAnswerCore } from './signup.js';
 
-const MAX_STRING_CHARS = 10_000;
+/**
+ * Longest text kept, in characters. As long as the whole body may be (64 KiB,
+ * index.ts), so no answer the page accepted is cut short in silence: a body
+ * over the cap is a 413, and the page takes the respondent back to their
+ * longest answer to shorten it (GAP-14). It was 10,000, which cut a long
+ * answer without telling anyone.
+ */
+const MAX_STRING_CHARS = 64 * 1024;
 const MAX_ARRAY_ITEMS = 100;
+/** Rows kept on a matrix: the published rows only, at most this many (GAP-14). */
+const MATRIX_ROWS_MAX = 100;
 
 /**
  * Clamp one answer to a shape the studio renders (audit H1):
@@ -158,8 +167,7 @@ function ownRef(v: unknown, formId: string | undefined): string | undefined {
 
 /**
  * A voice note (ADR-065): `{ audio, sec? }` with this form's own storage ref
- * and a whole number of seconds up to the question's cap, or `{ typed }`
- * unless the owner turned typing off.
+ * and a whole number of seconds up to the question's cap, or `{ typed }`.
  */
 function clampVoice(
   q: Record<string, unknown>,
@@ -179,7 +187,10 @@ function clampVoice(
       ? { audio, sec: String(Math.min(sec, cap)) }
       : { audio };
   }
-  if (typeof a.typed === 'string' && q.allowTyped !== false) {
+  // Typed text is kept even when the owner turned typing off: the page offers
+  // it only when the microphone is blocked or missing, so nobody is stuck on a
+  // required voice note (MEDIA-17).
+  if (typeof a.typed === 'string') {
     const t = a.typed.trim();
     return t ? { typed: t.slice(0, VOICE_TYPED_MAX) } : undefined;
   }
@@ -207,6 +218,69 @@ function clampPhotos(
   return Object.keys(out).length ? out : undefined;
 }
 
+/** A whole number from a schema setting, or null when it isn't a finite number. */
+function wholeOrNull(v: unknown, round: (n: number) => number): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? round(v) : null;
+}
+
+/**
+ * A choice answer (CH-16), the way the engine can send it: published option
+ * values only, each once, plus at most one typed "Other" (capped) when the
+ * question allows it; one value on a single pick. A multi pick is capped at
+ * `max` with the engine's own clamp, so nobody is ever trapped: the smallest
+ * number of picks is never more than there are choices (counting Other), and
+ * a `max` below that is ignored. Lenient on `min` — a short list is kept,
+ * never refused (an older page's answer is never lost for it).
+ */
+function clampChoice(q: Record<string, unknown>, v: unknown): string | string[] | undefined {
+  if (v == null) return undefined;
+  const values = optionValues(q);
+  const other = q.allowOther === true;
+  const many = q.type === 'multi_choice' || (q.type === 'picture_choice' && q.multiple === true);
+  const out: string[] = [];
+  let typed = false;
+  for (const item of Array.isArray(v) ? v.slice(0, MAX_ARRAY_ITEMS) : [v]) {
+    const t = clampText(item);
+    if (t === undefined) continue;
+    if (values.has(t)) {
+      if (!out.includes(t)) out.push(t);
+    } else if (other && !typed && t.trim()) {
+      typed = true;
+      out.push(t.slice(0, OTHER_MAX));
+    }
+  }
+  if (!many) return out[0];
+  const choices = values.size + (other ? 1 : 0);
+  const min = Math.min(Math.max(0, wholeOrNull(q.min, Math.ceil) ?? 0), choices);
+  const max = wholeOrNull(q.max, Math.floor);
+  return max !== null && max >= 1 && max >= min ? out.slice(0, max) : out;
+}
+
+/**
+ * A matrix (GAP-14): the published rows only (at most 100), each holding the
+ * published column values — one, or a list when the question takes several.
+ * The generic clamp kept the first 20 entries of any object, so rows 21 and
+ * on were dropped without a word.
+ */
+function clampMatrix(
+  q: Record<string, unknown>,
+  v: unknown,
+): Record<string, string | string[]> | undefined {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const rows = [...optionValues({ options: q.rows })].filter(isSafeKey);
+  const columns = optionValues({ options: q.columns });
+  const out: Record<string, string | string[]> = {};
+  for (const row of rows.slice(0, MATRIX_ROWS_MAX)) {
+    const cell = (v as Record<string, unknown>)[row];
+    const picked = [
+      ...new Set((Array.isArray(cell) ? cell : [cell]).filter((c) => columns.has(c as string))),
+    ] as string[];
+    if (!picked.length) continue;
+    out[row] = q.multiple === true ? picked : picked[0]!;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** What `clampForQuestion` needs to know about the form beyond the question itself. */
 export type ClampContext = {
   /** The form's id: file-like answers keep only its own storage refs. */
@@ -222,8 +296,10 @@ export type ClampContext = {
  * engine never sends:
  *   - number / scale / nps: a finite number (numeric text becomes a number);
  *   - date: a string of at most 40 characters;
- *   - choices with `allowOther`: typed text (anything that isn't an option
- *     value) is capped at 500 characters, and a list keeps one typed entry;
+ *   - choices (CH-16): option values only, each once; with `allowOther`, one
+ *     typed entry capped at 500 characters; one value on a single pick; a
+ *     multi pick capped at its `max` with the engine's clamp (never on `min`);
+ *   - matrix (GAP-14): the published rows and column values only;
  *   - contact_info / address (ADR-064): known parts only, trimmed and capped;
  *   - signature (ADR-064): a path the engine could have written, or a typed name;
  *   - image_pin / location / availability (ADR-065): re-derived from the
@@ -255,25 +331,10 @@ export function clampForQuestion(
     case 'single_choice':
     case 'dropdown':
     case 'multi_choice':
-    case 'picture_choice': {
-      const c = clampValue(v);
-      if (q.allowOther !== true) return c;
-      const values = optionValues(q);
-      if (typeof c === 'string') return values.has(c) ? c : c.slice(0, OTHER_MAX);
-      if (Array.isArray(c)) {
-        const out: string[] = [];
-        let typed = false;
-        for (const item of c as string[]) {
-          if (values.has(item)) out.push(item);
-          else if (!typed) {
-            typed = true;
-            out.push(item.slice(0, OTHER_MAX));
-          }
-        }
-        return out;
-      }
-      return c;
-    }
+    case 'picture_choice':
+      return clampChoice(q, v);
+    case 'matrix':
+      return clampMatrix(q, v);
     case 'contact_info':
       return clampParts(v, CONTACT_PART_MAX);
     case 'address':

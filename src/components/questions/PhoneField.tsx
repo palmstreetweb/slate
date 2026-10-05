@@ -102,6 +102,14 @@ export function PhoneField({
       setError(null);
       onAnswer(parsed.number);
       onAdvance();
+    } catch (err) {
+      // Anything else that fails in the check: keep the number as typed, like
+      // the contact block, rather than trap them on a question they answered
+      // (X2, COPY-12).
+      console.error('[slate] phone check failed', err);
+      setError(null);
+      onAnswer(value.trim());
+      onAdvance();
     } finally {
       submittingRef.current = false;
     }

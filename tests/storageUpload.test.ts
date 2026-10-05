@@ -140,7 +140,7 @@ describe('public uploads (respondent page)', () => {
     );
     await expect(
       uploadToNeonStorage(file(), { scope: 'public', formId: 'f_public1' }),
-    ).rejects.toThrow('Couldn’t reach Slate. Check your connection and try again.');
+    ).rejects.toThrow('We couldn’t upload that. Check your connection and try again.');
   });
 });
 

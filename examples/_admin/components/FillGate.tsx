@@ -6,6 +6,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { GATE_OFFLINE, WRONG_PASSWORD } from '../fillCopy.js';
 
 type Props = {
   formName: string;
@@ -29,11 +30,19 @@ export function FillGate({ formName, onUnlock }: Props) {
     if (busy || !password) return;
     setBusy(true);
     setError(null);
-    const message = await onUnlock(password);
+    let message: string | null;
+    try {
+      message = await onUnlock(password);
+    } catch (err) {
+      // Never stuck on "Checking…" (COPY-11): whatever went wrong, say so and let them retry.
+      console.error('[slate] unlock failed', err);
+      message = GATE_OFFLINE;
+    }
     if (message === null) return; // parent swaps in the form
     setBusy(false);
     setError(message);
-    setPassword('');
+    // A wrong password is cleared for the next try; after a network blip it stays.
+    if (message === WRONG_PASSWORD) setPassword('');
     inputRef.current?.focus();
   };
 

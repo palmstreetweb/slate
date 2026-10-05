@@ -104,7 +104,11 @@ function coerce(q: Question, text: string): LooseAnswers[string] {
         }
       }
       if (!many) return picked[0] ?? other;
-      const all = other !== undefined ? [...picked, other] : picked;
+      // More picks than the question takes: keep the first ones, not none (GAP-23).
+      const all = (other !== undefined ? [...picked, other] : picked).slice(
+        0,
+        (q as { max?: number }).max,
+      );
       return all.length ? all : undefined;
     }
     default:

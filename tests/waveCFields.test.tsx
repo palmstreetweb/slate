@@ -440,17 +440,23 @@ describe('voice note', () => {
     expect(advance).toHaveBeenCalled();
   });
 
-  it('no recorder and typing off: a clear message, and required still holds', async () => {
+  // MEDIA-17: with typing off, a missing recorder used to be a dead end on a
+  // required question. Typing is now offered when the mic can't be used.
+  it('no recorder and typing off: a clear message, required still holds, and typing gets them through', async () => {
     stubMic('none');
-    const { advance } = renderField({ ...q, allowTyped: false } as Question);
+    const { setAnswer, advance } = renderField({ ...q, allowTyped: false } as Question);
     await act(async () => {
       fireEvent.click(await screen.findByRole('button', { name: 'Start recording' }));
     });
     expect(await screen.findByText(/can’t record audio here/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Type instead' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(screen.getByText(/please record a voice note/i)).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Type instead' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'No mic on this laptop' } });
+    fireEvent.click(screen.getByRole('button', { name: /ok/i }));
+    expect(lastAnswer(setAnswer)).toEqual({ typed: 'No mic on this laptop' });
+    expect(advance).toHaveBeenCalled();
   });
 
   it('prefers Opus in WebM, then AAC; a format that failed is skipped', () => {

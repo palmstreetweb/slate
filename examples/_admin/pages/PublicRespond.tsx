@@ -1,56 +1,103 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Form } from '@/index.js';
 import { decodePortableSchema } from '../portableShare.js';
 import { sanitizeUntrustedSchema } from '../sanitizeUntrustedSchema.js';
 import { addSubmission } from '../_submissionStore.js';
 import { asStoredAnswers } from '../storedAnswers.js';
-import { navigate } from '../_router.js';
+import { routeSearchParams } from '../_router.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
 import { localHostFileUpload } from '../hostFileUpload.js';
+import { deleteLocalUploads, localRefsIn } from '../localFileStore.js';
+import { isNeonConfigured } from '../neon/config.js';
 import { readSlateMode } from '../slateMode.js';
+import { prefillFromSearch } from '../trackedLinks.js';
+import { LINK_BROKEN, LINK_PREVIEW_ONLY } from '../fillCopy.js';
 
 type Props = { token: string };
+
+/**
+ * Prefill on a portable link (GAP-23): the same `?key=value` parameters as the
+ * public link, minus `d` — the link's own schema.
+ */
+function readPrefill(): Record<string, string> {
+  const params = routeSearchParams();
+  params.delete('d');
+  return prefillFromSearch(params);
+}
+
+/**
+ * An id for a link minted without one: a hash of the whole token. (Its first
+ * characters are the same for every link — the encoded `{"v":1,"schema"` —
+ * so they can't tell two links apart, and the tab's saved answers would mix.)
+ */
+export function tokenId(token: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < token.length; i++) h = Math.imul(h ^ token.charCodeAt(i), 0x01000193);
+  return `portable_${(h >>> 0).toString(36)}`;
+}
+
+/** A respondent screen with one line and no studio chrome (COPY-13, F27). */
+function Notice({ text }: { text: string }) {
+  return (
+    <div
+      data-slate-forms=""
+      data-theme-name="slate"
+      data-theme={readSlateMode()}
+      className="slate-app"
+    >
+      <main className="slate-fill-gate">
+        <p className="slate-fill-gate-notice" role="status">
+          {text}
+        </p>
+      </main>
+    </div>
+  );
+}
 
 export function PublicRespond({ token }: Props) {
   const payload = useMemo(() => {
     const decoded = decodePortableSchema(token);
+    if (!decoded) return null;
     // Anyone can mint this link — treat the schema as hostile (ADR-046).
-    return decoded ? { ...decoded, schema: sanitizeUntrustedSchema(decoded.schema) } : null;
+    const schema = sanitizeUntrustedSchema(decoded.schema);
+    const formId = decoded.formId ?? tokenId(token);
+    // With an id, answers survive a reload or back / forward in this tab only (GAP-05).
+    return { ...decoded, formId, schema: { ...schema, id: formId } };
   }, [token]);
-  const mode = readSlateMode();
+  const [prefill] = useState(readPrefill);
+  /**
+   * Files this page saved on the device. On a successful submit, the ones the
+   * response doesn't keep (removed, retaken, re-recorded) are deleted (MEDIA-19).
+   */
+  const saved = useRef(new Set<string>());
 
-  if (!payload) {
-    return (
-      <div data-slate-forms="" data-theme-name="slate" data-theme={mode} className="slate-app">
-        <div
-          className="slate-empty"
-          style={{ minHeight: '100vh', display: 'grid', placeContent: 'center' }}
-        >
-          <p style={{ margin: '0 0 12px' }}>This share link is invalid or expired.</p>
-          <button
-            type="button"
-            className="slate-btn slate-btn--primary"
-            onClick={() => navigate('/')}
-          >
-            Back to dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Portable links never expire: one that can't be read was cut short or mistyped.
+  if (!payload) return <Notice text={LINK_BROKEN} />;
+  // On the live site a portable link can never reach the owner (it is the
+  // unpublished preview's link): say so before anyone types (GAPV-X2).
+  if (isNeonConfigured()) return <Notice text={LINK_PREVIEW_ONLY} />;
 
   const { schema, formId, name } = payload;
-  const submissionFormId = formId ?? `portable_${token.slice(0, 12)}`;
 
   return (
     <div className="slate-public-respond" style={{ minHeight: '100vh' }}>
       <Form
         schema={schema}
-        onFileUpload={localHostFileUpload}
+        resume="tab"
+        prefill={prefill}
+        onFileUpload={async (file, questionId, ctx) => {
+          const ref = await localHostFileUpload(file, questionId, ctx);
+          saved.current.add(ref);
+          return ref;
+        }}
         resolveFileUploadMeta={resolveUploadMeta}
         onSubmit={async (answers, meta) => {
           // No server here: store what the submit Function would (ADR-068).
-          addSubmission(submissionFormId, asStoredAnswers(schema.questions, answers), meta);
+          addSubmission(formId, asStoredAnswers(schema.questions, answers), meta);
+          const kept = localRefsIn(answers);
+          const unused = [...saved.current].filter((ref) => !kept.has(ref));
+          saved.current = new Set();
+          void deleteLocalUploads(unused);
         }}
       />
       {name ? (

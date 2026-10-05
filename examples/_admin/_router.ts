@@ -73,9 +73,9 @@ export function matchRoute(path: string): Route {
   if (path === '/forms/new') return { name: 'editor', formId: null };
 
   if (path === '/r') {
-    const token = routeSearchParams().get('d')?.trim();
-    if (token) return { name: 'respond', token };
-    return { name: 'notfound', path };
+    // A link cut short before `d` is still a respondent's link: the portable
+    // page says it's broken, with no studio sign-in or dashboard (F27).
+    return { name: 'respond', token: routeSearchParams().get('d')?.trim() ?? '' };
   }
 
   const submissionsMatch = /^\/forms\/([^/]+)\/submissions$/.exec(path);

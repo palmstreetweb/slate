@@ -1,5 +1,10 @@
 /**
  * Public fill API — published forms + anonymous submit (ADR-029).
+ *
+ * Respondents only ever read the plain sentences in `fillCopy.ts` or the
+ * Function's own copy (closed, slot full, files, rate limits). A response body
+ * from anything else — a proxy's HTML page, a platform's JSON, a bare status —
+ * is logged to the console and never shown (QA pass, COPY-02).
  */
 
 import type { Answers, SubmitMeta } from '@/index.js';
@@ -9,6 +14,42 @@ import { loadPublishedForm } from './publicForm.js';
 import type { FormClosedInfo, PublishedFormPayload, SlotsLeftPayload } from './database.types.js';
 import { closedInfoOf, slotsLeftOf } from './mappers.js';
 import { clearFillUnlockToken, readFillUnlockToken } from '../fillUnlock.js';
+import {
+  FORM_UNAVAILABLE,
+  GATE_LATER,
+  GATE_OFFLINE,
+  SEND_LATER,
+  SEND_OFFLINE,
+  SEND_TOO_LONG,
+  WRONG_PASSWORD,
+  gateRateLimited,
+  sendRateLimited,
+} from '../fillCopy.js';
+
+/** The Function's own 404 text on submit: the form was unpublished or deleted. */
+const SUBMIT_GONE = 'Form not available';
+
+/** The first 200 characters of a response body, for the console only. */
+async function bodySnippet(res: Response): Promise<string> {
+  const text = await res.text().catch(() => '');
+  return text.slice(0, 200);
+}
+
+/** The wait a 429 asks for: the body's `retryAfterSeconds`, else the header, else a minute. */
+function retryAfterOf(res: Response, body: { retryAfterSeconds?: unknown } | null): number {
+  return Number(body?.retryAfterSeconds) || Number(res.headers.get('Retry-After')) || 60;
+}
+
+/**
+ * 413 (QA pass, GAP-07): the response is over the size limit. Nothing was
+ * stored; the page sends the respondent back to their longest answer.
+ */
+export class TooLongError extends Error {
+  constructor() {
+    super(SEND_TOO_LONG);
+    this.name = 'TooLongError';
+  }
+}
 
 /** The form closed (410: past its closing time, 409: at its cap) — ADR-063. */
 export class FormClosedError extends Error {
@@ -114,47 +155,36 @@ export async function unlockPublicForm(
       body: JSON.stringify({ op: 'unlock', slug, ...proof }),
     });
   } catch {
-    return {
-      ok: false,
-      reason: 'unavailable',
-      message: 'Could not connect. Check your connection and try again.',
-    };
+    return { ok: false, reason: 'unavailable', message: GATE_OFFLINE };
   }
   if (res.status === 401) {
-    return {
-      ok: false,
-      reason: 'wrong_password',
-      message: 'That password didn’t match. Try again.',
-    };
+    return { ok: false, reason: 'wrong_password', message: WRONG_PASSWORD };
   }
   if (res.status === 429) {
     // The server's copy says what to do (wait, or check the password); show it as sent.
-    const b = (await res.json().catch(() => ({}))) as {
+    const b = (await res.json().catch(() => null)) as {
       error?: unknown;
       retryAfterSeconds?: unknown;
-    };
-    const retryAfter = Number(b.retryAfterSeconds) || Number(res.headers.get('Retry-After')) || 60;
-    const minutes = Math.max(1, Math.ceil(retryAfter / 60));
+    } | null;
     return {
       ok: false,
       reason: 'rate_limited',
       message:
-        typeof b.error === 'string' && b.error.startsWith('Too many')
+        typeof b?.error === 'string' && b.error.startsWith('Too many')
           ? b.error
-          : `Too many tries. Please wait about ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+          : gateRateLimited(retryAfterOf(res, b)),
     };
   }
   if (!res.ok) {
+    console.error('[slate] unlock failed', res.status, await bodySnippet(res));
     return {
       ok: false,
       reason: 'unavailable',
-      message:
-        res.status === 404
-          ? 'This form is no longer available.'
-          : 'Something went wrong. Please try again in a moment.',
+      message: res.status === 404 ? FORM_UNAVAILABLE : GATE_LATER,
     };
   }
-  const body = (await res.json()) as {
+  // A captive portal or an edge error page can answer 200 with HTML (COPY-11).
+  const body = (await res.json().catch(() => null)) as {
     id?: string;
     name?: string;
     slug?: string;
@@ -162,17 +192,17 @@ export async function unlockPublicForm(
     unlockToken?: string;
     closed?: unknown;
     slotsLeft?: unknown;
-  };
+  } | null;
+  if (!body || typeof body !== 'object') {
+    console.error('[slate] unlock: the reply was not JSON');
+    return { ok: false, reason: 'unavailable', message: GATE_OFFLINE };
+  }
   const closed = closedInfoOf(body.closed);
   if (closed) {
     return { ok: false, reason: 'closed', message: 'This form is closed.', closed };
   }
   if (!body.id || !body.name || !body.slug || !body.schema) {
-    return {
-      ok: false,
-      reason: 'unavailable',
-      message: 'Something went wrong. Please try again in a moment.',
-    };
+    return { ok: false, reason: 'unavailable', message: GATE_LATER };
   }
   const slotsLeft = slotsLeftOf(body.slotsLeft);
   return {
@@ -221,9 +251,7 @@ export async function submitPublicResponse(
     });
   } catch {
     // Offline, or a platform 429 without CORS headers: not "Failed to fetch".
-    throw new Error(
-      'Couldn’t reach Slate. Check your connection and press Retry — your answers are still here.',
-    );
+    throw new Error(SEND_OFFLINE);
   }
   if (!res.ok) {
     if (res.status === 401) {
@@ -267,16 +295,16 @@ export async function submitPublicResponse(
         closed ?? { reason: res.status === 409 ? 'full' : 'date', message: null },
       );
     }
+    const text = await res.text().catch(() => '');
     if (res.status === 400) {
       // A file that can't be kept (ADR-067): back to its question, every other answer kept.
-      const text = await res.text().catch(() => '');
       let b: { error?: unknown; reason?: unknown; questions?: unknown } = {};
       try {
         b = JSON.parse(text) as typeof b;
       } catch {
-        // Plain text: shown as sent below.
+        // Plain text: not ours to show (below).
       }
-      if (b.reason === 'files') {
+      if (b && b.reason === 'files') {
         throw new FilesRejectedError(
           typeof b.error === 'string' && b.error
             ? b.error
@@ -286,28 +314,38 @@ export async function submitPublicResponse(
           ),
         );
       }
-      throw new Error(text || `Submit failed (${res.status})`);
     }
+    // Unpublished or deleted while they were answering: the closed screen, no Retry.
+    if (res.status === 404 && text.trim() === SUBMIT_GONE) {
+      throw new FormClosedError('This form is closed.', { reason: 'date', message: null });
+    }
+    // Over the body cap (ADR-058): Retry would send the same thing again.
+    if (res.status === 413) throw new TooLongError();
     if (res.status === 429) {
-      let retryAfter = Number(res.headers.get('Retry-After') || 60);
+      type RateBody = { error?: unknown; retryAfterSeconds?: unknown } | null;
+      let b: RateBody = null;
       try {
-        const body = (await res.json()) as { error?: string; retryAfterSeconds?: number };
-        if (body.retryAfterSeconds) retryAfter = body.retryAfterSeconds;
-        throw new Error(
-          body.error ||
-            `Too many submissions. Please wait about ${retryAfter} seconds and try again.`,
-        );
-      } catch (err) {
-        if (err instanceof Error && err.message.startsWith('Too many')) throw err;
-        throw new Error(
-          `Too many submissions. Please wait about ${retryAfter} seconds and try again.`,
-        );
+        b = JSON.parse(text) as RateBody;
+      } catch {
+        // A platform 429 without the Function's JSON.
       }
+      throw new Error(
+        typeof b?.error === 'string' && b.error.startsWith('Too many')
+          ? b.error
+          : sendRateLimited(retryAfterOf(res, b)),
+      );
     }
-    const text = await res.text();
-    throw new Error(text || `Submit failed (${res.status})`);
+    // A 5xx, a proxy's HTML page, an empty body or an unexpected 400: never shown.
+    console.error('[slate] submit failed', res.status, text.slice(0, 200));
+    throw new Error(SEND_LATER);
   }
-  return (await res.json()) as { id: string };
+  const body = (await res.json().catch(() => null)) as { id?: unknown } | null;
+  if (!body || typeof body.id !== 'string') {
+    // A 200 that isn't the Function's reply (a captive portal page): it never got there.
+    console.error('[slate] submit: the reply was not the Function’s');
+    throw new Error(SEND_OFFLINE);
+  }
+  return { id: body.id };
 }
 
 export function metaToPayload(meta: SubmitMeta): SubmitResponsePayload['meta'] {

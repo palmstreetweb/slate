@@ -89,6 +89,12 @@ function escapeHtmlAttr(raw: string): string {
  * Paste-anywhere iframe for a published form (ADR-054). `?embed=1` drops the
  * page's footer line and posts `{ type: 'slate:height', height }` to the host
  * page so its own script can size the frame. The form name is only a title.
+ *
+ * The frame is most of the screen tall (85% of the viewport, at least 560 px;
+ * `svh` where the browser knows it, so a phone's toolbar doesn't hide the
+ * bottom): the form is one question at a time and fills its frame, so on a
+ * phone it reads like the form's own page instead of a 560 px box scrolling
+ * inside the host page (GAP-25, ADR-054 addendum).
  */
 export function buildEmbedSnippet(
   publicUrl: string,
@@ -105,7 +111,7 @@ export function buildEmbedSnippet(
     ...(questions.some((q) => q.type === 'location') ? ['geolocation'] : []),
   ];
   const allowAttr = allow.length ? ` allow="${allow.join('; ')}"` : '';
-  return `<iframe src="${src}" title="${title}"${allowAttr} style="width:100%;min-height:560px;border:0" loading="lazy"></iframe>`;
+  return `<iframe src="${src}" title="${title}"${allowAttr} style="width:100%;height:85vh;height:85svh;min-height:560px;border:0" loading="lazy"></iframe>`;
 }
 
 /** Hash-route preview — schema from localStorage on this device only. */

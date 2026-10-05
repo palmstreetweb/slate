@@ -49,6 +49,16 @@ function extensionFor(type: string): string {
   return 'audio';
 }
 
+/**
+ * The host's own sentence (a plain Error), or plain words — never a browser's
+ * or a server's technical text (MEDIA-06). Inline, not the core's helper: a
+ * field importing a core util splits a core chunk and costs engine bytes.
+ */
+const plainError = (err: unknown) =>
+  err instanceof Error && err.name === 'Error' && err.message && err.message.length < 180
+    ? err.message
+    : 'Your recording didn’t save. Try again.';
+
 const BARS_LIVE = 28;
 const BARS_CLIP = 48;
 const MIB = 1024 * 1024;
@@ -95,8 +105,10 @@ export default function VoiceNoteField({
   const seededTyped = voiceTypedOf(value);
   const cached = seededRef ? (clips.get(seededRef) ?? null) : null;
 
+  // Typed text is shown again even with typing off: it was typed because the
+  // microphone was blocked or missing (MEDIA-17).
   const [phase, setPhase] = useState<Phase>(
-    seededTyped !== null && allowTyped ? 'typed' : seededRef ? 'review' : 'idle',
+    seededTyped !== null ? 'typed' : seededRef ? 'review' : 'idle',
   );
   const [blocked, setBlocked] = useState<'denied' | 'unsupported' | 'nomic' | 'failed'>('denied');
   const [clip, setClip] = useState<Clip | null>(cached);
@@ -185,7 +197,7 @@ export default function VoiceNoteField({
       const cap = voiceMaxBytes(maxSec);
       if (file.size > cap) {
         setSave('error');
-        setSaveError('That recording is too large. Try a shorter one.');
+        setSaveError('That recording is too big. Try a shorter one.');
         return;
       }
       setSave('saving');
@@ -197,14 +209,14 @@ export default function VoiceNoteField({
         setSavedRef(ref);
         setSavedSec(c.seconds);
         setSave('saved');
+        setError(null);
         setSaid('Recording saved.');
         onAnswer({ audio: ref, sec: String(c.seconds) });
       } catch (err) {
         if (!alive.current) return;
         setSave('error');
-        setSaveError(
-          err instanceof Error && err.message ? err.message : 'Couldn’t save the recording.',
-        );
+        // The host's own sentence, or plain words — never a browser's or a server's text (MEDIA-06).
+        setSaveError(plainError(err));
       }
     },
     [onFileUpload, maxSec, question.id, onAnswer],
@@ -214,6 +226,8 @@ export default function VoiceNoteField({
     const r = rec.current;
     if (!r || r.stopped) return;
     r.stopped = true;
+    // "Stop the recording first" no longer applies (MEDIA-12).
+    setError(null);
     setElapsed(Math.min(maxSec * 1000, performance.now() - r.started));
     try {
       r.recorder.stop();
@@ -422,6 +436,16 @@ export default function VoiceNoteField({
       setError('Still saving your recording…');
       return;
     }
+    // They did record — it just didn't save. Say that, not "please record" (MEDIA-12).
+    if (phase === 'review' && save === 'error' && clip) {
+      setError(
+        allowTyped
+          ? 'Your recording didn’t save. Tap Retry, or type your answer instead.'
+          : 'Your recording didn’t save. Tap Retry.',
+      );
+      shakeInvalid(rootRef.current);
+      return;
+    }
     const answer: Record<string, string> | undefined =
       phase === 'typed'
         ? typed.trim()
@@ -430,7 +454,9 @@ export default function VoiceNoteField({
         : savedRef
           ? { audio: savedRef, sec: String(savedSec ?? 0) }
           : undefined;
-    const err = validate(question, answer);
+    // Typing is always allowed once offered: with the owner's typing off, only
+    // a blocked or missing microphone leads here (MEDIA-17).
+    const err = validate(phase === 'typed' ? { ...question, allowTyped: true } : question, answer);
     if (err) {
       setError(err.message);
       shakeInvalid(phase === 'typed' ? typedRef.current : rootRef.current);
@@ -439,7 +465,7 @@ export default function VoiceNoteField({
     setError(null);
     onAnswer(answer);
     onAdvance();
-  }, [phase, save, typed, savedRef, savedSec, question, onAnswer, onAdvance]);
+  }, [phase, save, clip, allowTyped, typed, savedRef, savedSec, question, onAnswer, onAdvance]);
 
   useRegisterFormConfirm(submit);
 
@@ -496,14 +522,13 @@ export default function VoiceNoteField({
                 : blocked === 'unsupported'
                   ? 'This browser can’t record audio here.'
                   : 'The recording didn’t work. Please try again.'}
-            {allowTyped ? ' You can type your answer instead.' : ''}
+            {/* Always a way through, even with typing off (MEDIA-17): nobody is stuck. */}
+            {' You can type your answer instead.'}
           </p>
           <div className="slate-voice-row">
-            {allowTyped ? (
-              <button type="button" className="slate-voice-btn" onClick={toTyped}>
-                Type instead
-              </button>
-            ) : null}
+            <button type="button" className="slate-voice-btn" onClick={toTyped}>
+              Type instead
+            </button>
             {blocked !== 'unsupported' ? (
               <button type="button" className="slate-voice-link" onClick={() => void start()}>
                 Try again

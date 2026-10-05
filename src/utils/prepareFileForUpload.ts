@@ -6,8 +6,10 @@
 import { withInferredFileMime } from './fileMimeTypes.js';
 import { isHeicLike, withInferredImageMime } from './imageFileTypes.js';
 import { prepareImageForStorage } from './prepareImageForStorage.js';
+import { tooBigMessage } from './fileUploadAccept.js';
 
-const NON_IMAGE_CAP_BYTES = 32 * 1024 * 1024;
+/** The largest file without a per-question limit, in megabytes. */
+const NON_IMAGE_CAP_MB = 32;
 
 const OPTIMIZE_EXT = new Set([
   '.jpg',
@@ -61,14 +63,9 @@ export async function prepareFileForUpload(
       return await prepareImageForStorage(normalized);
     } catch (err) {
       // HEIC that we can't decode must not be stored as a fake "image" —
-      // Responses Preview would then fail the same way. Surface the error.
-      if (isHeicLike(withInferredImageMime(normalized))) {
-        throw err instanceof Error
-          ? err
-          : new Error(
-              'Could not read this HEIC/HEIF photo. Export as JPG from Photos and try again.',
-            );
-      }
+      // Responses Preview would then fail the same way. Surface the error
+      // (convertHeicToJpegFile's own words for the person picking it).
+      if (isHeicLike(withInferredImageMime(normalized))) throw err;
       // Other exotic rasters — store the original instead of failing the form.
       return passThrough(normalized, opts);
     }
@@ -78,13 +75,7 @@ export async function prepareFileForUpload(
 }
 
 function passThrough(file: File, opts: PrepareFileOptions): File {
-  const cap = opts.maxSizeMb !== undefined ? opts.maxSizeMb * 1024 * 1024 : NON_IMAGE_CAP_BYTES;
-  if (file.size > cap) {
-    throw new Error(
-      opts.maxSizeMb !== undefined
-        ? `File is too big — max ${opts.maxSizeMb} MB`
-        : 'File is too large. Try one under 32MB.',
-    );
-  }
+  const mb = opts.maxSizeMb ?? NON_IMAGE_CAP_MB;
+  if (file.size > mb * 1024 * 1024) throw new Error(tooBigMessage(mb));
   return file;
 }

@@ -79,7 +79,7 @@ export default function QuotePage() {
 | `hiddenFields` | `Record<string, unknown>` |  | Passed through to `meta.hiddenFields`. Never rendered. |
 | `errorMessage` | `string` |  | Fallback shown when `onSubmit` rejects (default: "Something went wrong submitting your form. Please try again."). |
 | `onFileUpload` | `(file, questionId) => Promise<string>` |  | Host-controlled storage for `file_upload` questions. Resolved string is stored as the answer; omit it to receive raw `File` objects in `onSubmit`. See `DECISIONS.md` ADR-012. |
-| `resume` | `boolean` |  | Save-and-resume (ADR-017). Autosaves progress to `localStorage` under `slate-forms-resume:<schema.id>`, prompts to resume on remount, clears on submit. Requires `schema.id`. |
+| `resume` | `boolean \| 'tab'` |  | Save-and-resume (ADR-017). Autosaves progress to `localStorage` under `slate-forms-resume:<schema.id>`, prompts to resume on remount, clears on submit. `'tab'` uses `sessionStorage` instead: it survives a reload in the same tab, never another tab or visit. Requires `schema.id`. |
 | `onPartialChange` | `(answers, meta) => void` |  | Fires on every answer change with the visibility-filtered answers — abandonment capture. `meta` carries `startedAt`, `lastQuestionId`, `questionsVisited`, `hiddenFields`, `score`. |
 
 ### `defineSchema(schema)`

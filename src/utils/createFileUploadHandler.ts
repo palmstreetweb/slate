@@ -28,15 +28,9 @@ export function createFileUploadHandler(opts: CreateFileUploadHandlerOptions): F
     try {
       prepared = await prepareFileForUpload(file, { maxSizeMb });
     } catch (err) {
-      if (isFileSizeError(err)) throw err;
-      // Never store raw HEIC/HEIF — browsers can't preview it and Responses breaks.
-      if (isHeicLike(withInferredImageMime(file))) {
-        throw err instanceof Error
-          ? err
-          : new Error(
-              'Could not convert this HEIC photo to JPG. Export as JPG from Photos and try again.',
-            );
-      }
+      // Too big, or HEIC/HEIF we couldn't convert — never store raw HEIC:
+      // browsers can't preview it and Responses breaks. The error has the words.
+      if (isFileSizeError(err) || isHeicLike(withInferredImageMime(file))) throw err;
       // Other exotic rasters — store the original instead of failing the form.
       prepared = file;
     }

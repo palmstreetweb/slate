@@ -16,10 +16,13 @@ import {
   withInferredImageMime,
 } from './imageFileTypes.js';
 
+/** A picked photo's own name as a JPEG: IMG_2041.HEIC → IMG_2041.jpg (or photo.jpg). */
+export function jpgName(sourceName: string): string {
+  return `${sourceName.replace(/\.[^.]*$/, '').replace(/\.+$/u, '') || 'photo'}.jpg`;
+}
+
 function jpegFileFromBlob(blob: Blob, sourceName: string): File {
-  const base =
-    sourceName.replace(/\.(heic|heif)$/i, '').replace(/\.+$/u, '') || 'photo';
-  return new File([blob], `${base}.jpg`, {
+  return new File([blob], jpgName(sourceName), {
     type: 'image/jpeg',
     lastModified: Date.now(),
   });
@@ -126,7 +129,10 @@ async function tryHeic2Any(file: File): Promise<File | null> {
 }
 
 /**
- * @throws If conversion fails or lib cannot run in this environment
+ * @throws If conversion fails or lib cannot run in this environment, with
+ * words for the person picking the photo (QA pass, MEDIA-16): no format
+ * names, and nothing about downloading — the owner's Responses viewer says
+ * its own line.
  */
 export async function convertHeicToJpegFile(file: File): Promise<File> {
   const typed = withInferredImageMime(file);
@@ -140,9 +146,7 @@ export async function convertHeicToJpegFile(file: File): Promise<File> {
   const legacy = await tryHeic2Any(typed);
   if (legacy) return legacy;
 
-  throw new Error(
-    'Could not read this HEIC/HEIF photo in the browser. Download the file, or re-upload after exporting as JPG from Photos.',
-  );
+  throw new Error('We couldn’t open this iPhone photo. Try another, or save it as a JPG first.');
 }
 
 /** Use after a file pick: pass through normal images, convert HEIC for previews & canvas. */

@@ -138,6 +138,7 @@ export function Form<S extends Schema>({
   const resumeEnabled = Boolean(resume && schema.id);
   const autosave = useAutosave({
     enabled: resumeEnabled,
+    tab: resume === 'tab',
     formId: schema.id ?? '',
     answers: state.answers,
     step: state.step,

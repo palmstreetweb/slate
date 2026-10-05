@@ -96,8 +96,11 @@ describe('submit Function clamps answers to renderable shapes', () => {
     expect(clampValue(Number.NaN)).toBeUndefined();
   });
 
-  it('clamps long strings', () => {
-    expect((clampValue('x'.repeat(20_000)) as string).length).toBe(10_000);
+  it('clamps long strings at the body cap, never shorter (GAP-14)', () => {
+    // A 20,000-character answer fits in the 64 KiB body, so it is kept whole
+    // (it used to be cut to 10,000 without a word to anyone).
+    expect((clampValue('x'.repeat(20_000)) as string).length).toBe(20_000);
+    expect((clampValue('x'.repeat(70_000)) as string).length).toBe(64 * 1024);
   });
 });
 
