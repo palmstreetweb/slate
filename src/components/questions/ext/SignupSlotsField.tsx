@@ -140,14 +140,9 @@ export default function SignupSlotsField({
   );
 
   const conflicts = slots.filter((s) => stateOf(s).conflict);
-  // Every spot gone and no waitlist: nothing can be picked, so nothing is asked for.
-  const allFull =
-    !waitlist &&
-    slots.length > 0 &&
-    slots.every((s) => {
-      const st = stateOf(s);
-      return st.full && !st.taken;
-    });
+  // Every spot gone and no waitlist: nothing can be picked, so nothing is asked
+  // for. A pick of this respondent's that filled up meanwhile counts as gone too.
+  const allFull = !waitlist && slots.length > 0 && slots.every((s) => stateOf(s).full);
 
   const clearAdvance = () => {
     if (advanceTimer.current !== null) {
@@ -245,8 +240,10 @@ export default function SignupSlotsField({
   const submit = useCallback(() => {
     clearAdvance();
     setNote(null);
-    if (allFull && !picks.slots.length && !picks.wait.length) {
-      // Nothing left to pick: the rest of the form can still be sent.
+    if (allFull) {
+      // Nothing left to pick: the rest of the form can still be sent. A pick
+      // that filled up meanwhile can't be kept (the server would refuse it).
+      if (picks.slots.length) onAnswer(undefined);
       setError(null);
       onAdvance();
       return;
@@ -267,7 +264,7 @@ export default function SignupSlotsField({
     }
     setError(null);
     onAdvance();
-  }, [conflicts, picks.slots, picks.wait, question, waitlist, onAdvance, allFull]);
+  }, [conflicts, picks.slots, picks.wait, question, waitlist, onAdvance, onAnswer, allFull]);
 
   useRegisterFormConfirm(submit);
 

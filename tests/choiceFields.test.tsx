@@ -27,11 +27,13 @@ function Live({
   initial = {},
   advance,
   onSet,
+  slotsLeft,
 }: {
   question: Question;
   initial?: LooseAnswers;
   advance: () => void;
   onSet?: (id: string, v: unknown) => void;
+  slotsLeft?: Record<string, number>;
 }) {
   const [answers, setAnswers] = useState<LooseAnswers>(initial);
   const confirmRef = useRef<(() => void) | null>(null);
@@ -45,10 +47,13 @@ function Live({
             answers={answers}
             setAnswer={(id, v) => {
               onSet?.(id, v);
-              setAnswers((cur) => ({
-                ...cur,
-                [id]: typeof v === 'function' ? (v as (p: unknown) => unknown)(cur[id]) : v,
-              }));
+              setAnswers(
+                (cur) =>
+                  ({
+                    ...cur,
+                    [id]: typeof v === 'function' ? (v as (p: unknown) => unknown)(cur[id]) : v,
+                  }) as LooseAnswers,
+              );
             }}
             advance={advance}
             stepNumber={1}
@@ -58,6 +63,7 @@ function Live({
             onRetrySubmit={vi.fn()}
             onRestart={vi.fn()}
             allQuestions={[question]}
+            slotsLeft={slotsLeft}
           />
         </div>
         <button type="button" data-testid="confirm" onClick={() => confirmRef.current?.()} />
@@ -66,11 +72,21 @@ function Live({
   );
 }
 
-function renderLive(question: Question, initial: LooseAnswers = {}) {
+function renderLive(
+  question: Question,
+  initial: LooseAnswers = {},
+  slotsLeft?: Record<string, number>,
+) {
   const advance = vi.fn();
   const onSet = vi.fn();
   const utils = render(
-    <Live question={question} initial={initial} advance={advance} onSet={onSet} />,
+    <Live
+      question={question}
+      initial={initial}
+      advance={advance}
+      onSet={onSet}
+      slotsLeft={slotsLeft}
+    />,
   );
   return { ...utils, advance, onSet };
 }
@@ -349,6 +365,20 @@ describe('sign-up slots (MEDIA-07, GAP-16)', () => {
     // A tap that works clears it.
     await user.click(screen.getByRole('checkbox', { name: /^Noon/ }));
     expect(note).not.toBeInTheDocument();
+  });
+
+  it('a pick that filled up while every other spot went too: OK drops it and moves on', async () => {
+    const { advance, onSet } = renderLive(
+      swim,
+      { swim: { slots: ['s_am'] } },
+      { s_am: 0, s_noon: 0, s_pm: 0 },
+    );
+    expect(
+      await screen.findByText('Sorry, every spot is taken. You can still send the rest.'),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('confirm'));
+    expect(onSet).toHaveBeenLastCalledWith('swim', undefined);
+    expect(advance).toHaveBeenCalled();
   });
 
   it('the key hint lists every key, and the full-slot message sits under that slot', async () => {
