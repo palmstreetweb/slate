@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { Question } from '@/index.js';
-import { checkSchema } from '@/index.js';
+import { OTHER_VALUE, checkSchema } from '@/index.js';
 import { issuesHeading, ownerIssues, publishBlockedCopy } from '../examples/_admin/editorIssues.js';
 
 const welcome: Question = { id: 'welcome', type: 'welcome', title: 'Hi' };
@@ -91,11 +91,16 @@ describe('plain sentences', () => {
       expect(t).not.toMatch(DEV_WORDS);
       expect(t).not.toMatch(/where_s_|qty|\bhidden\b/);
     }
+    // Only what's missing: the radius is set, the location isn't (copy QA).
     expect(texts).toContain(
-      '“Where’s the job?” needs your business location and a distance to check the service area.',
+      '“Where’s the job?” needs your business location to check the service area, or clear the distance.',
     );
     expect(texts).toContain(
-      '“Where’s the problem?” needs a photo to mark. Upload one or paste an https link.',
+      '“Where’s the problem?” needs a photo to mark. Upload one, or paste a link to a photo.',
+    );
+    // The grid says which setting can't work (copy QA): a 45-minute slot isn't one it offers.
+    expect(texts).toContain(
+      '“Free when?” has a slot length the grid can’t use. Pick one under Each slot.',
     );
     expect(texts).toContain(
       '“Details?” has a “when to show” rule that uses a deleted question. Change or remove that rule.',
@@ -250,26 +255,91 @@ describe('headings and the publish message', () => {
 describe('the studio’s settings checks join the list (integration of w1a + w1b)', () => {
   const four = [1, 2, 3, 4].map((n) => ({ label: `Choice ${n}`, value: `c${n}` }));
 
-  it('a pick count nobody can meet and a redirect with no https:// hold Publish back', () => {
+  it('a pick count nobody can meet holds Publish back; a redirect missing https:// is a heads-up', () => {
     const issues = ownerIssues([
       welcome,
       { id: 'services', type: 'multi_choice', title: 'Which services?', options: four, min: 6 },
       { id: 'extras', type: 'multi_choice', title: 'Any extras?', options: four, max: 9 },
       { id: 'done', type: 'thanks', title: 'Thanks', redirectUrl: 'example.com/thanks' },
     ] as Question[]);
+    // The engine opens example.com/thanks as https (R23): nobody is sent nowhere.
     expect(issues.map((i) => [i.questionId, i.kind, i.blocking])).toEqual([
       ['services', 'pick_range', true],
-      ['done', 'bad_redirect', true],
       ['extras', 'pick_max_high', false],
+      ['done', 'bad_redirect', false],
     ]);
     for (const i of issues) {
       expect(i.text).toMatch(/^“[^”]+”/);
       expect(i.text).not.toMatch(DEV_WORDS);
     }
+    expect(issues.find((i) => i.kind === 'bad_redirect')!.text).toBe(
+      '“Thanks” sends people to “example.com/thanks”, which opens as https://example.com/thanks. Open it and press “Fix” to save it that way.',
+    );
     expect(publishBlockedCopy(issues.filter((i) => i.blocking)).lines).toEqual([
       '“Which services?” asks for at least 6 picks but has only 4 choices.',
-      '“Thanks” sends people to “example.com/thanks”, which needs https:// in front. Open it and press “Fix”.',
     ]);
+  });
+
+  it('turning Other off while a rule tests Other is said once (R25)', () => {
+    const issues = ownerIssues([
+      welcome,
+      { id: 'heard', type: 'single_choice', title: 'How did you hear?', options: four },
+      {
+        id: 'more',
+        type: 'long_text',
+        title: 'Tell us more',
+        visibleIf: { field: 'heard', op: 'equals', value: OTHER_VALUE },
+      },
+      done,
+    ] as Question[]);
+    const about = issues.filter((i) => i.questionId === 'more');
+    expect(about.map((i) => i.kind)).toEqual(['other_off']);
+  });
+
+  it('a price, a grid and a sign-up slot name what to fix (copy QA)', () => {
+    const texts = textOf([
+      welcome,
+      {
+        id: 'pkg',
+        type: 'single_choice',
+        title: 'Pick one',
+        options: [
+          { label: 'Basic', value: 'b', price: 100 },
+          { label: 'Gold', value: 'g', price: 500, priceMax: 300 },
+        ],
+      },
+      {
+        id: 'grid',
+        type: 'availability',
+        title: 'When are you free?',
+        startTime: '17:00',
+        endTime: '09:00',
+      },
+      {
+        id: 'su',
+        type: 'signup_slots',
+        title: 'Pick a time that works for you',
+        slots: [
+          { label: 'Morning', value: 's1', capacity: 5 },
+          { label: '', value: 's2', capacity: 5 },
+        ],
+      },
+      {
+        id: 'shots',
+        type: 'photo_checklist',
+        title: 'Snap a few photos for us',
+        items: [{ label: '', value: 'p1' }],
+      },
+      done,
+    ] as Question[]);
+    expect(texts).toContain(
+      '“Pick one”: fix the price on “Gold”. The high end has to be at least the low price.',
+    );
+    expect(texts).toContain('“When are you free?”: “Until” has to be after “From”.');
+    expect(texts).toContain('“Pick a time that works for you”: give “Slot 2” a name or a day.');
+    expect(texts).toContain(
+      '“Snap a few photos for us” has photos to take with no names. Name each one, so people know what to shoot.',
+    );
   });
 
   it('a skip to itself, an empty checklist and an empty contact block are heads-ups, not blockers', () => {

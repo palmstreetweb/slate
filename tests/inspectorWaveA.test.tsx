@@ -66,10 +66,19 @@ describe('Inspector — Wave A options', () => {
     expect(onChange).toHaveBeenLastCalledWith({ prefillKey: 'first_name' });
   });
 
-  it('prefill: warns on a reserved or duplicate link name', () => {
+  it('prefill: warns on a reserved or duplicate link name, in plain words', () => {
     const q: Question = { id: 'q1', type: 'short_text', title: 'Name', prefillKey: 'src' };
     renderInspector(q);
-    expect(screen.getByText(/not src, embed or utm/i)).toBeInTheDocument();
+    expect(
+      screen.getByText('The link already uses this name for itself. Pick another.'),
+    ).toBeInTheDocument();
+    // The section's summary names the link name, never URL syntax ("?src=").
+    expect(screen.queryByText(/\?src=/)).toBeNull();
+  });
+
+  it('prefill: a name with a space or symbol says which characters work', () => {
+    renderInspector({ id: 'q1', type: 'short_text', title: 'Name', prefillKey: 'your name!' });
+    expect(screen.getByText('Use only letters, numbers, - and _.')).toBeInTheDocument();
   });
 
   it('consent and files have no prefill setting', () => {

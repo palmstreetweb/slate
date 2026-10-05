@@ -518,7 +518,8 @@ function enqueueFormInsert(form: FormRecord): void {
         emitPersistOk('form');
       } catch (err) {
         dropOptimisticForm(form.id);
-        reportFormFailure(err, 'save', 'Couldn’t create that form');
+        // A one-off to repeat, not an edit left unsaved: "Check your connection and try again." (R27)
+        reportFormFailure(err, 'delete', 'Couldn’t create that form');
         throw err;
       }
     })
@@ -861,18 +862,20 @@ export function restoreFormRemoteSync(formId: string): boolean {
 }
 
 export function restoreAllFormsRemoteSync(): boolean {
-  const toRestore: FormRecord[] = [];
+  const toRestore: Array<{ before: FormRecord; next: FormRecord }> = [];
   const updated = read().map((f) => {
     if (!isTrashed(f)) return f;
     const { deletedAt: _r, ...rest } = f;
     const next = { ...rest, updatedAt: new Date().toISOString() };
-    toRestore.push(next);
+    toRestore.push({ before: f, next });
     return next;
   });
   cache = updated;
   notify();
-  for (const f of toRestore) {
-    enqueueFormUpsert(f);
+  // Each one that doesn't reach the server goes back to the trash, and the toast
+  // says what failed (R27): Trash never looks empty while the server disagrees.
+  for (const { before, next } of toRestore) {
+    enqueueFormUpsert(next, () => rollbackForm(before, next), 'Couldn’t restore those forms');
   }
   return true;
 }

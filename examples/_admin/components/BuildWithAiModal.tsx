@@ -150,9 +150,10 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
           prompt: text,
           previous: revising ? draft?.form : undefined,
           instruction: revising ? note : undefined,
-          document: fromPdf && file
-            ? { filename: file.name, mime: file.mime, base64: file.base64 }
-            : undefined,
+          document:
+            fromPdf && file
+              ? { filename: file.name, mime: file.mime, base64: file.base64 }
+              : undefined,
         });
         if (fromPdf) {
           const remaining = 3000 - (Date.now() - started);
@@ -181,7 +182,10 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
           setError({ message: err.message, retryable: err.retryable });
         } else {
           console.error('[slate] Build with AI failed', err);
-          setError({ message: 'Something went wrong building your form. Try again.', retryable: true });
+          setError({
+            message: 'Something went wrong building your form. Try again.',
+            retryable: true,
+          });
         }
         setPhase(draft ? 'review' : 'compose');
       } finally {
@@ -191,28 +195,31 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
     [draft, prompt, file],
   );
 
-  const takeFile = useCallback(async (picked: File | undefined) => {
-    if (!picked || busy) return;
-    const name = picked.name || 'document';
-    const ext = name.split('.').pop()?.toLowerCase() ?? '';
-    if (picked.size > MAX_FILE_BYTES) {
-      setFileError('That PDF is too big. Pick one under 3 MB.');
-      return;
-    }
-    if (ext === 'pdf' || picked.type === 'application/pdf') {
-      const bytes = new Uint8Array(await picked.arrayBuffer());
-      let binary = '';
-      const chunk = 0x8000;
-      for (let i = 0; i < bytes.length; i += chunk) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  const takeFile = useCallback(
+    async (picked: File | undefined) => {
+      if (!picked || busy) return;
+      const name = picked.name || 'document';
+      const ext = name.split('.').pop()?.toLowerCase() ?? '';
+      if (picked.size > MAX_FILE_BYTES) {
+        setFileError('That PDF is too big. Pick one under 3 MB.');
+        return;
       }
-      setFile({ name, mime: 'application/pdf', base64: btoa(binary) });
-      setFileError(null);
-      setError(null);
-      return;
-    }
-    setFileError('Only PDFs work here for now. Save it as a PDF and try again.');
-  }, [busy]);
+      if (ext === 'pdf' || picked.type === 'application/pdf') {
+        const bytes = new Uint8Array(await picked.arrayBuffer());
+        let binary = '';
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        }
+        setFile({ name, mime: 'application/pdf', base64: btoa(binary) });
+        setFileError(null);
+        setError(null);
+        return;
+      }
+      setFileError('Only PDFs work here for now. Save it as a PDF and try again.');
+    },
+    [busy],
+  );
 
   useEffect(() => {
     if (!open || busy || phase === 'review' || phase === 'opening') {
@@ -289,12 +296,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
   const middle = draft?.form.questions ?? [];
 
   return createPortal(
-    <div
-      data-slate-forms=""
-      data-theme-name="slate"
-      data-admin-ui={uiTheme}
-      data-theme={mode}
-    >
+    <div data-slate-forms="" data-theme-name="slate" data-admin-ui={uiTheme} data-theme={mode}>
       <div
         className="slate-dialog-backdrop"
         role="presentation"
@@ -329,7 +331,9 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                   value={prompt}
                   disabled={busy}
                   maxLength={AI_PROMPT_MAX}
-                  aria-describedby={prompt.length >= AI_PROMPT_COUNT_FROM ? 'slate-ai-count' : undefined}
+                  aria-describedby={
+                    prompt.length >= AI_PROMPT_COUNT_FROM ? 'slate-ai-count' : undefined
+                  }
                   placeholder="Type what this form should ask…"
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => {
@@ -424,9 +428,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                   <ol className="slate-ai-review-list">
                     {middle.map((q) => (
                       <li key={q.id}>
-                        <span className="slate-ai-review-type">
-                          {TYPE_LABEL[q.type] ?? q.type}
-                        </span>
+                        <span className="slate-ai-review-type">{TYPE_LABEL[q.type] ?? q.type}</span>
                         <span className="slate-ai-review-title">{q.title}</span>
                         {q.showIfField && q.showIfEquals ? (
                           <span className="slate-ai-review-if">
@@ -548,11 +550,16 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
             ) : null}
           </div>
           <p className="slate-ai-hint">
-            {phase === 'generating'
-              ? (draft?.name ?? 'Writing questions…')
-              : reviewing
-                ? '⌘+Enter revises, or opens the editor if the box is empty'
-                : '⌘+Enter to generate · drop a PDF anywhere'}
+            {phase === 'generating' ? (
+              (draft?.name ?? 'Writing questions…')
+            ) : (
+              // Keyboard and drag-and-drop words only where there's a keyboard (copy QA).
+              <span className="slate-ai-keys">
+                {reviewing
+                  ? '⌘+Enter revises, or opens the editor if the box is empty'
+                  : '⌘+Enter to generate · drop a PDF anywhere'}
+              </span>
+            )}
           </p>
         </div>
       </div>

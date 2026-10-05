@@ -27,11 +27,16 @@ import {
 import type { StoredSubmission } from '../_submissionStore.js';
 import type { TrackedSource } from '../_formsStore.js';
 import {
+  REMOVED_OPTION,
   formatAnswerForQuestion,
   formatRelativeAge,
+  isRemovedOptionValue,
   locationAreaOf,
   titleOf,
 } from '../responsesFormat.js';
+
+/** The Summary's one row for answers whose option was deleted since (copy QA). */
+const REMOVED_ROW = '\u0000removed';
 import { sourceLabel, sourceOf } from '../trackedLinks.js';
 import type {
   AnswerFilter,
@@ -691,7 +696,11 @@ export function questionDistribution(
     if (withOther) {
       const { picked, other } = splitOther(options, raw);
       for (const v of picked) counts.set(v, (counts.get(v) ?? 0) + 1);
-      if (other) {
+      if (other && isRemovedOptionValue(other)) {
+        // An option deleted after it was picked, not typed text (copy QA).
+        if (!counts.has(REMOVED_ROW)) extra.push(REMOVED_ROW);
+        counts.set(REMOVED_ROW, (counts.get(REMOVED_ROW) ?? 0) + 1);
+      } else if (other) {
         counts.set(OTHER_VALUE, (counts.get(OTHER_VALUE) ?? 0) + 1);
         const key = other.trim().toLowerCase();
         const hit = typed.get(key);
@@ -700,14 +709,21 @@ export function questionDistribution(
       }
       continue;
     }
-    for (const v of vals) {
+    for (const raw of vals) {
+      // Without Other, a value the list doesn't have is an option deleted since:
+      // one "Removed option" row, never its stored code (copy QA).
+      const v = order.has(raw) ? raw : REMOVED_ROW;
       if (!order.has(v) && !counts.has(v)) extra.push(v);
       counts.set(v, (counts.get(v) ?? 0) + 1);
     }
   }
   const all: Array<ChoiceOption & { i: number }> = [
     ...options.map((o, i) => ({ ...o, i })),
-    ...extra.map((v, j) => ({ value: v, label: v, i: options.length + j })),
+    ...extra.map((v, j) => ({
+      value: v,
+      label: v === REMOVED_ROW ? REMOVED_OPTION : v,
+      i: options.length + j,
+    })),
     ...(withOther
       ? [{ value: OTHER_VALUE, label: otherLabelOf(question), i: options.length + extra.length }]
       : []),

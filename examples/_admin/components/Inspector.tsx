@@ -26,8 +26,13 @@ import { GuardNote } from './inspectorGuards.js';
 import {
   FILE_COUNT_MAX,
   FILE_SIZE_MAX_MB,
+  SCALE_CELLS_MAX,
   SCALE_POINTS_MAX,
+  SLIDER_STOPS_MAX,
   choiceCount,
+  pictureLinkProblem,
+  readableAccept,
+  unreadableAccept,
   hasSameValues,
   isSwipe,
   newOptionLabel,
@@ -138,7 +143,8 @@ export function Inspector({
         {'title' in question && typeof question.title === 'function' && (
           <Field label="Title (Dynamic Function)">
             <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
-              This title is a function — edit the schema in code to change it, or replace with a static string.
+              This title changes with the answers, so it’s set in the form’s code and can’t be
+              edited here.
             </p>
           </Field>
         )}
@@ -263,9 +269,7 @@ export function Inspector({
                 { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
               ]}
               aria-label="Date format"
-              onChange={(format) =>
-                onChange({ format } as Partial<Question>)
-              }
+              onChange={(format) => onChange({ format } as Partial<Question>)}
             />
           </Field>
         )}
@@ -363,25 +367,40 @@ export function Inspector({
 
         {(question.type === 'short_text' || question.type === 'long_text') && (
           <>
-            <Field label="Max Length (Characters)" hint="Leave empty for no limit.">
+            <Field label="Max Length (Characters)" hint="Leave empty, or 0, for no limit.">
               <SlateNumberInput
-                min={1}
                 integer
                 value={question.maxLength}
                 placeholder="No limit"
-                onChange={(n) => onChange({ maxLength: n } as Partial<Question>)}
+                // 0 or less is no limit, never a limit of 1 (R18).
+                onChange={(n) =>
+                  onChange({
+                    maxLength: n !== undefined && n >= 1 ? n : undefined,
+                  } as Partial<Question>)
+                }
               />
             </Field>
             {question.maxLength !== undefined &&
             !(Number.isInteger(question.maxLength) && question.maxLength >= 1) ? (
               <GuardNote
-                action={{
-                  label: 'Clear it',
-                  onClick: () => onChange({ maxLength: undefined } as Partial<Question>),
-                }}
+                action={
+                  question.maxLength >= 1
+                    ? {
+                        label: `Use ${Math.floor(question.maxLength)}`,
+                        onClick: () =>
+                          onChange({
+                            maxLength: Math.floor(question.maxLength!),
+                          } as Partial<Question>),
+                      }
+                    : {
+                        label: 'Clear it',
+                        onClick: () => onChange({ maxLength: undefined } as Partial<Question>),
+                      }
+                }
               >
-                With {String(question.maxLength)}, nobody could type an answer. Use a whole number, 1
-                or more, or leave it empty.
+                {question.maxLength >= 1
+                  ? `Answers can be up to ${Math.floor(question.maxLength)} characters: a limit is a whole number.`
+                  : `${String(question.maxLength)} means no limit.`}
               </GuardNote>
             ) : null}
           </>
@@ -506,7 +525,9 @@ export function Inspector({
         )}
 
         {/* Wave C (ADR-065) */}
-        {question.type === 'image_pin' && <ImagePinSettings question={question} onChange={onChange} />}
+        {question.type === 'image_pin' && (
+          <ImagePinSettings question={question} onChange={onChange} />
+        )}
 
         {question.type === 'voice_note' && (
           <VoiceNoteSettings question={question} onChange={onChange} />
@@ -669,11 +690,12 @@ export function Inspector({
             <Row>
               <Field
                 label="Accept"
-                hint="Leave blank for any type. Optional filter, e.g. image/*,.pdf"
+                hint="Leave empty for any file. To limit it, list file endings: pdf, jpg, png."
               >
                 <input
                   className="slate-input"
                   value={question.accept ?? ''}
+                  placeholder="Any file"
                   onChange={(e) =>
                     onChange({ accept: e.target.value || undefined } as Partial<Question>)
                   }
@@ -699,9 +721,10 @@ export function Inspector({
               >
                 {question.maxSizeMb > FILE_SIZE_MAX_MB
                   ? `Uploads stop at ${FILE_SIZE_MAX_MB} MB, whatever this says.`
-                  : `With ${String(question.maxSizeMb)} MB, nobody could attach a file.`}
+                  : `${String(question.maxSizeMb)} MB means the usual ${FILE_SIZE_MAX_MB} MB limit.`}
               </GuardNote>
             ) : null}
+            <AcceptGuard question={question} onChange={onChange} />
             {question.multiple !== false && (
               <>
                 <Field label="Max Files">
@@ -722,7 +745,9 @@ export function Inspector({
                       onClick: () => onChange({ maxFiles: 10 } as Partial<Question>),
                     }}
                   >
-                    Max Files has to be a whole number, 1 or more.
+                    {question.maxFiles >= 1
+                      ? `This counts as ${Math.floor(question.maxFiles)} files: a limit is a whole number.`
+                      : `${String(question.maxFiles)} counts as 10, the usual limit.`}
                   </GuardNote>
                 ) : null}
               </>
@@ -747,7 +772,9 @@ export function Inspector({
               ]}
               aria-label="Choice style"
               onChange={(display) =>
-                onChange({ display: display === 'cards' ? 'cards' : undefined } as Partial<Question>)
+                onChange({
+                  display: display === 'cards' ? 'cards' : undefined,
+                } as Partial<Question>)
               }
             />
           </Field>
@@ -839,9 +866,7 @@ export function Inspector({
           </>
         )}
 
-        {question.type === 'multi_choice' && (
-          <PickLimits question={question} onChange={onChange} />
-        )}
+        {question.type === 'multi_choice' && <PickLimits question={question} onChange={onChange} />}
 
         {question.type === 'thanks' && <RedirectSetting question={question} onChange={onChange} />}
 
@@ -883,26 +908,28 @@ export function Inspector({
           </>
         )}
 
-        {question.type !== 'welcome' && question.type !== 'thanks' && question.type !== 'review' && (
-          <CollapsibleSection
-            label="Skip ahead"
-            hint="After they answer, jump to another question. First matching rule wins; otherwise they go to the next question in order."
-            summary={
-              skipRuleCount(question) > 0
-                ? `${skipRuleCount(question)} skip ${skipRuleCount(question) === 1 ? 'rule' : 'rules'}`
-                : 'Next question in order'
-            }
-            defaultOpen={skipRuleCount(question) > 0}
-            questionId={question.id}
-          >
-            <JumpRulesEditor
-              rules={('logic' in question ? question.logic : undefined) ?? []}
-              onChange={(logic) => onChange({ logic } as Partial<Question>)}
-              questions={allQuestions}
-              currentId={question.id}
-            />
-          </CollapsibleSection>
-        )}
+        {question.type !== 'welcome' &&
+          question.type !== 'thanks' &&
+          question.type !== 'review' && (
+            <CollapsibleSection
+              label="Skip ahead"
+              hint="After they answer, jump to another question. First matching rule wins; otherwise they go to the next question in order."
+              summary={
+                skipRuleCount(question) > 0
+                  ? `${skipRuleCount(question)} skip ${skipRuleCount(question) === 1 ? 'rule' : 'rules'}`
+                  : 'Next question in order'
+              }
+              defaultOpen={skipRuleCount(question) > 0}
+              questionId={question.id}
+            >
+              <JumpRulesEditor
+                rules={('logic' in question ? question.logic : undefined) ?? []}
+                onChange={(logic) => onChange({ logic } as Partial<Question>)}
+                questions={allQuestions}
+                currentId={question.id}
+              />
+            </CollapsibleSection>
+          )}
 
         {canDelete && (
           <>
@@ -975,7 +1002,9 @@ function PickLimits({ question, onChange }: { question: MultiPick; onChange: Pat
           Min has to be a whole number, 0 or more.
         </GuardNote>
       ) : problem?.kind === 'min_over_choices' ? (
-        <GuardNote action={{ label: `Set Min to ${choices}`, onClick: () => set({ min: choices }) }}>
+        <GuardNote
+          action={{ label: `Set Min to ${choices}`, onClick: () => set({ min: choices }) }}
+        >
           There {isAre(choices)} only {choicesText}, so nobody could {swipe ? 'like' : 'pick'}{' '}
           {problem.min}.
         </GuardNote>
@@ -1002,6 +1031,35 @@ function starsRange(q: ScaleQuestion): { min: number; max: number } {
   const min = q.min < 1 ? 1 : q.min;
   const points = scalePointCount({ ...q, min });
   return { min, max: q.max < min || points > 7 ? min + 4 : q.max };
+}
+
+/**
+ * File types the form's filter can't read (R22): it leaves them out rather
+ * than refusing every file, and says so here with a one-tap fix.
+ */
+function AcceptGuard({
+  question,
+  onChange,
+}: {
+  question: { accept?: string };
+  onChange: (patch: Partial<Question>) => void;
+}) {
+  const unread = unreadableAccept(question.accept);
+  if (!unread.length) return null;
+  const kept = readableAccept(question.accept);
+  return (
+    <GuardNote
+      quiet
+      action={{
+        label: kept ? 'Keep the rest' : 'Clear it',
+        onClick: () => onChange({ accept: kept } as Partial<Question>),
+      }}
+    >
+      {unread.map((t) => `“${t}”`).join(', ')}{' '}
+      {unread.length === 1 ? 'isn’t a file ending' : 'aren’t file endings'} the form can read, so{' '}
+      {unread.length === 1 ? 'it’s' : 'they’re'} left out. List endings like pdf, jpg or png.
+    </GuardNote>
+  );
 }
 
 /** What can't work on a scale, said under Min / Max Value with a fix (QA F7, S16, F20). */
@@ -1032,15 +1090,33 @@ function ScaleGuards({ question, onChange }: { question: ScaleQuestion; onChange
       </GuardNote>
     );
   }
+  // A slider draws no cells (R4): 0–100 is fine; only a step too fine to land on is said.
+  if (question.display === 'slider') {
+    if (points <= SLIDER_STOPS_MAX) return null;
+    return (
+      <GuardNote
+        action={{
+          label: 'Use 100 stops',
+          onClick: () => onChange({ step: (max - min) / 100 } as Partial<Question>),
+        }}
+      >
+        That’s {points.toLocaleString('en-US')} stops on the slider, too many to land on. Use a
+        bigger step.
+      </GuardNote>
+    );
+  }
   if (points > SCALE_POINTS_MAX) {
     return (
       <GuardNote
+        quiet={points <= SCALE_CELLS_MAX}
         action={{
           label: `Use ${min} to ${min + 10}`,
           onClick: () => onChange({ max: min + 10, step: undefined } as Partial<Question>),
         }}
       >
-        That’s {points.toLocaleString('en-US')} points. A scale shows {SCALE_POINTS_MAX} at most.
+        {points > SCALE_CELLS_MAX
+          ? `That’s ${points.toLocaleString('en-US')} points: the form can show ${SCALE_CELLS_MAX}. Use fewer, or the Slider style.`
+          : `That’s ${points.toLocaleString('en-US')} points to tap through. ${SCALE_POINTS_MAX} or fewer reads better; the Slider style suits a long range.`}
       </GuardNote>
     );
   }
@@ -1142,7 +1218,7 @@ function RedirectSetting({
             },
           }}
         >
-          This needs https:// in front, or people land on a page that doesn’t exist.
+          People will go to {url}. Press Fix to save it that way.
         </GuardNote>
       ) : null}
     </>
@@ -1228,16 +1304,18 @@ function PrefillSetting({
     ? null
     : !trimmed
       ? 'Give the link a name for this answer.'
-      : !isValidPrefillKey(trimmed)
-        ? 'Letters, numbers, - and _ only (and not src, embed or utm_…).'
-        : taken.has(trimmed.toLowerCase())
-          ? 'Another question already uses this name.'
-          : null;
+      : !/^[A-Za-z0-9_-]{1,40}$/.test(trimmed)
+        ? 'Use only letters, numbers, - and _.'
+        : !isValidPrefillKey(trimmed)
+          ? 'The link already uses this name for itself. Pick another.'
+          : taken.has(trimmed.toLowerCase())
+            ? 'Another question already uses this name.'
+            : null;
   return (
     <CollapsibleSection
       label="Fill from link"
       hint="Let a link fill this answer in, e.g. from your own site or an email. They can still change it."
-      summary={on && trimmed ? `?${trimmed}=` : 'Off'}
+      summary={on && trimmed ? `On · ${trimmed}` : 'Off'}
       defaultOpen={on}
       questionId={question.id}
     >
@@ -1509,7 +1587,9 @@ function OptionsEditor({
         </div>
       ))}
       <OptionNotes options={options} onChange={onChange} noun={noun} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}
+      >
         <button
           type="button"
           className="slate-btn slate-btn--ghost slate-btn--compact"
@@ -1641,10 +1721,15 @@ function PictureOptionsEditor({
           <input
             className="slate-input"
             value={opt.src}
-            placeholder="https://image-url..."
+            placeholder="https://… link to a picture"
+            aria-label={`Picture link for ${opt.label || `option ${i + 1}`}`}
+            aria-invalid={pictureLinkProblem(opt.src) ? true : undefined}
             style={{ padding: '6px 8px', fontFamily: 'var(--slate-font-mono)', fontSize: 12 }}
             onChange={(e) => update(i, { src: e.target.value })}
           />
+          {pictureLinkProblem(opt.src) ? (
+            <GuardNote quiet>{pictureLinkProblem(opt.src)}</GuardNote>
+          ) : null}
           {pricing.show ? (
             <PriceInputs
               low={opt.price}
@@ -1693,9 +1778,6 @@ function PictureOptionsEditor({
 
 function Divider() {
   return (
-    <div
-      style={{ height: 1, background: 'var(--slate-border)', margin: '0 12px' }}
-      aria-hidden
-    />
+    <div style={{ height: 1, background: 'var(--slate-border)', margin: '0 12px' }} aria-hidden />
   );
 }

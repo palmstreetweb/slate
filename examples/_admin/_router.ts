@@ -13,6 +13,9 @@
  *   /forms/:id/submissions       → submissions list
  *   /r?d=…                       → portable (schema-in-URL) respond
  *   /motion                      → motion gallery (dev demo, own bundle, no sign-in; ADR-059)
+ *   anything else                → "We couldn’t find that page" (respondent words, public
+ *                                  bundle, no sign-in: usually an old redirect or a form link
+ *                                  with something stuck on its end; F27)
  */
 
 import { useEffect, useState } from 'react';
@@ -108,12 +111,22 @@ export function readRoute(): Route {
 }
 
 /**
- * Routes a respondent can open without signing in. `fill` and `respond` are
- * served by the small public bundle; `dropLab` is a dev page that lives in
- * the studio bundle but still skips sign-in.
+ * Routes a respondent can open without signing in. `fill`, `respond` and
+ * `notfound` are served by the small public bundle; `dropLab` is a dev page
+ * that lives in the studio bundle but still skips sign-in.
  */
 export function isPublicRoute(route: Route): boolean {
-  return route.name === 'respond' || route.name === 'fill' || route.name === 'dropLab';
+  return (
+    route.name === 'respond' ||
+    route.name === 'fill' ||
+    route.name === 'notfound' ||
+    route.name === 'dropLab'
+  );
+}
+
+/** Routes the small respondent bundle serves on a full page load (ADR-048). */
+export function isRespondentRoute(route: Route): boolean {
+  return route.name === 'fill' || route.name === 'respond' || route.name === 'notfound';
 }
 
 /** Stable key for page transition animations. */

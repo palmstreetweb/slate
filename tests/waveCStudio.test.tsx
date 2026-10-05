@@ -459,7 +459,7 @@ describe('Inspector for Wave C', () => {
   it('the pin question shows its photo and how many pins', () => {
     renderInspector(pin);
     expect(screen.getByRole('button', { name: 'Replace photo' })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: /image link/i })).toHaveValue(PHOTO);
+    expect(screen.getByRole('textbox', { name: /link to a photo/i })).toHaveValue(PHOTO);
   });
 
   it('the logic editor offers inside / outside the area for a location with a radius', async () => {

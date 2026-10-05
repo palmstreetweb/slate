@@ -133,7 +133,8 @@ export function PriceInputs({
  * "Country for local numbers" on phone and contact questions (QA F13, S14): a
  * list of countries the phone check knows, so a number typed without its
  * country code (805-555-0123) is always understood. A saved code it doesn't
- * know (or none) shows "Pick a country" and says why.
+ * know (or none) shows "Pick a country" and says what happens until then:
+ * the engine reads such a number as a US one (R16).
  */
 export function PhoneCountrySetting({
   question,
@@ -159,8 +160,8 @@ export function PhoneCountrySetting({
         />
       </Field>
       {known ? null : (
-        <p className="slate-help" style={{ color: 'var(--slate-warn)' }} role="status">
-          Pick a country. Until then, a number typed without its country code is turned down.
+        <p className="slate-help" role="status">
+          Until you pick one, a number typed without its country code is read as a US number.
         </p>
       )}
     </>

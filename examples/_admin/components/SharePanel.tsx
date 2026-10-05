@@ -245,7 +245,7 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
         setIgnited(true);
         toast.push({
           title: wasStale ? 'Republished' : 'You’re live',
-          detail: 'Public link is serving this draft.',
+          detail: 'Public link updated.',
           tone: 'success',
           sound: 'success',
         });

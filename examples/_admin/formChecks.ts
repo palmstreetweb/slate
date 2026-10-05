@@ -23,6 +23,7 @@ import type {
 } from '@/index.js';
 import { checkSchema, type SchemaIssue } from '@/logic/schemaCheck.js';
 import { contactMode } from '@/logic/contact.js';
+import { acceptTokens } from '@/components/questions/FileUploadField.js';
 import { isPhoneCountry } from './phoneCountries.js';
 
 export type StudioIssueKind =
@@ -38,13 +39,17 @@ export type StudioIssueKind =
   | 'blank_option'
   /** Two options with the same value: picking one picks both. */
   | 'same_option'
-  /** A max length that isn't a whole number of 1 or more. */
+  /** A max length that isn't a whole number of 1 or more (read as no limit, or rounded down). */
   | 'bad_length'
   | 'bad_file_size'
   | 'bad_file_count'
+  /** File types in Accept the form can't read (left out of the filter). */
+  | 'bad_accept'
+  /** A picture option with no picture link, or one that isn't https. */
+  | 'picture_src'
   /** A number or scale step that isn't more than 0. */
   | 'bad_step'
-  /** A scale with more points than the form can draw. */
+  /** A scale with more points than reads well (heads-up), or than the form can draw (blocks). */
   | 'scale_points'
   /** Stars counted from 0: the first star saves 0. */
   | 'stars_from_zero'
@@ -63,8 +68,12 @@ export type FormIssue = {
   blocking: boolean;
 };
 
-/** The engine draws at most this many points on a scale (ScaleStyledField). */
+/** More points than this on a drawn scale (numbers, stars, faces) is a lot to tap through: a heads-up. */
 export const SCALE_POINTS_MAX = 21;
+/** The engine draws at most this many cells (scaleCells.ts MAX_CELLS): past it, top values are missing. */
+export const SCALE_CELLS_MAX = 101;
+/** A slider draws no cells; past this many stops its step is too fine to land on (a heads-up). */
+export const SLIDER_STOPS_MAX = 1001;
 /** Uploads stop at this size whatever the question says (storage-sign's cap). */
 export const FILE_SIZE_MAX_MB = 32;
 /** The server keeps at most this many files per answer. */
@@ -297,6 +306,44 @@ export function scalePointCount(q: Pick<ScaleQuestion, 'min' | 'max' | 'step'>):
   return q.max >= q.min ? Math.floor((q.max - q.min) / step + 1e-9) + 1 : 0;
 }
 
+/* ---------- pictures ---------- */
+
+/**
+ * What's wrong with a picture option's link, in plain words, or null (QA
+ * coverage: picture option image link). Only an https link shows for
+ * everyone; a blank one shows a broken picture.
+ */
+export function pictureLinkProblem(src: unknown): string | null {
+  const t = typeof src === 'string' ? src.trim() : '';
+  if (!t) return 'Add a link to a picture, or this option shows no picture.';
+  try {
+    const u = new URL(t);
+    if (u.protocol === 'https:' && u.hostname.includes('.')) return null;
+  } catch {
+    /* not a link at all */
+  }
+  return 'Use a picture link that starts with https://, or the picture won’t show.';
+}
+
+/* ---------- file types ---------- */
+
+/** The words in an Accept list the form's file filter can't read (it leaves them out). */
+export function unreadableAccept(accept: string | undefined): string[] {
+  return (accept ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t && acceptTokens(t).length === 0);
+}
+
+/** The Accept list with only what the filter can read, or undefined for "any file". */
+export function readableAccept(accept: string | undefined): string | undefined {
+  const kept = (accept ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t && acceptTokens(t).length > 0);
+  return kept.length ? kept.join(', ') : undefined;
+}
+
 /* ---------- sign-up slots ---------- */
 
 export type SlotProblem = { kind: 'times' } | { kind: 'past' } | { kind: 'twice'; first: number };
@@ -386,13 +433,31 @@ export function studioIssues(
       if (p) out.push(pickIssue(q, p));
     }
 
+    if (q.type === 'picture_choice' && Array.isArray(q.options)) {
+      const bad = q.options.filter((o) => pictureLinkProblem(o.src));
+      if (bad.length) {
+        const first = (bad[0]!.label ?? '').trim();
+        add(
+          q,
+          'picture_src',
+          `${name}: ${first ? `“${short(first, 30)}”` : 'an option'}${bad.length > 1 ? ` and ${count(bad.length - 1, 'other', 'others')}` : ''} ${bad.length > 1 ? 'need' : 'needs'} a picture link that starts with https://, or the picture won’t show.`,
+          false,
+        );
+      }
+    }
+
+    // The engine reads a max length below 1 as no limit and rounds one down (R23):
+    // nobody is trapped, so these are heads-ups.
     if ((q.type === 'short_text' || q.type === 'long_text') && q.maxLength !== undefined) {
-      if (!whole(q.maxLength, 1)) {
+      const len = q.maxLength as unknown;
+      if (!whole(len, 1)) {
         add(
           q,
           'bad_length',
-          `${name}: Max length has to be a whole number, 1 or more. Leave it empty for no limit.`,
-          true,
+          typeof len === 'number' && len >= 1
+            ? `${name}: Max length ${len} counts as ${Math.floor(len)} characters.`
+            : `${name}: Max length ${String(len)} means no limit. Clear it, or use 1 or more.`,
+          false,
         );
       }
     }
@@ -403,8 +468,8 @@ export function studioIssues(
         add(
           q,
           'bad_file_size',
-          `${name}: Max size has to be more than 0 MB. Leave it empty for the ${FILE_SIZE_MAX_MB} MB limit.`,
-          true,
+          `${name}: Max size ${String(size)} MB means the usual ${FILE_SIZE_MAX_MB} MB limit. Clear it, or use 1 MB or more.`,
+          false,
         );
       } else if (typeof size === 'number' && size > FILE_SIZE_MAX_MB) {
         add(
@@ -417,7 +482,13 @@ export function studioIssues(
       const files = q.maxFiles as unknown;
       if (q.multiple !== false && files !== undefined) {
         if (!whole(files, 1)) {
-          add(q, 'bad_file_count', `${name}: Max files has to be a whole number, 1 or more.`, true);
+          const counted = typeof files === 'number' && files >= 1 ? Math.floor(files) : 10;
+          add(
+            q,
+            'bad_file_count',
+            `${name}: Max files ${String(files)} counts as ${counted}. Use a whole number, 1 or more.`,
+            false,
+          );
         } else if (files > FILE_COUNT_MAX) {
           add(
             q,
@@ -426,6 +497,15 @@ export function studioIssues(
             false,
           );
         }
+      }
+      const unread = unreadableAccept(q.accept);
+      if (unread.length) {
+        add(
+          q,
+          'bad_accept',
+          `${name}: ${unread.map((t) => `“${short(t, 24)}”`).join(', ')} ${unread.length === 1 ? 'isn’t a file type' : 'aren’t file types'} the form can read, so ${unread.length === 1 ? 'it’s' : 'they’re'} left out. Use endings like pdf or jpg.`,
+          false,
+        );
       }
     }
 
@@ -445,12 +525,29 @@ export function studioIssues(
           `${name} can’t count its points in steps of ${String(q.step)}. Open it and press “Count by 1”.`,
           true,
         );
+      } else if (q.display === 'slider') {
+        // A slider draws no cells (R4): a 0–100 slider is fine; only a step too fine to land on is said.
+        if (points > SLIDER_STOPS_MAX) {
+          add(
+            q,
+            'scale_points',
+            `${name}: the slider has ${points.toLocaleString('en-US')} stops, too many to land on. Use a bigger step.`,
+            false,
+          );
+        }
+      } else if (points > SCALE_CELLS_MAX) {
+        add(
+          q,
+          'scale_points',
+          `${name} has ${points.toLocaleString('en-US')} points, more than the form can show (${SCALE_CELLS_MAX}). Use fewer, or the Slider style.`,
+          true,
+        );
       } else if (points > SCALE_POINTS_MAX) {
         add(
           q,
           'scale_points',
-          `${name} has ${points.toLocaleString('en-US')} points. Keep it to ${SCALE_POINTS_MAX} or fewer.`,
-          true,
+          `${name} has ${points.toLocaleString('en-US')} points to tap through. ${SCALE_POINTS_MAX} or fewer reads better; the Slider style suits a long range.`,
+          false,
         );
       }
       if (q.display === 'stars' && q.min < 1 && q.max >= q.min) {
@@ -474,11 +571,12 @@ export function studioIssues(
           true,
         );
       } else if (url !== raw) {
+        // The engine opens a bare address as https (R23): a heads-up, not a trap.
         add(
           q,
           'bad_redirect',
-          `${name} sends people to “${short(raw)}”, which needs https:// in front. Open it and press “Fix”.`,
-          true,
+          `${name} sends people to “${short(raw)}”, which opens as ${short(url, 60)}. Open it and press “Fix” to save it that way.`,
+          false,
         );
       }
     }
@@ -488,11 +586,12 @@ export function studioIssues(
       q.defaultCountry !== undefined &&
       !isPhoneCountry(q.defaultCountry)
     ) {
+      // The engine reads a local number as a US one until a country is picked (R16).
       add(
         q,
         'bad_country',
-        `${name}: pick a country for local phone numbers. Without one, a number typed without its country code is turned down.`,
-        true,
+        `${name}: a number typed without its country code is read as a US number. Pick a country if most people answering aren’t in the US.`,
+        false,
       );
     }
 

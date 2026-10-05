@@ -26,6 +26,10 @@ export const UPLOAD_COPY = {
   locked: 'This form is locked. Reload the page and enter the password.',
   /** An owner's upload (draft scope) whose sign-in lapsed. */
   signedOut: 'You’ve been signed out. Reload the page and sign in again.',
+  /** The site isn't set up to keep files. */
+  cantStore: 'Files can’t be added on this form right now. You can still send your other answers.',
+  /** The page lost track of which form it is. */
+  reload: 'That upload didn’t go through. Reload the page and try again.',
 } as const;
 
 /** storagesign's own plain sentences (STORAGE_COPY there) that are safe to show as sent. */
@@ -155,12 +159,16 @@ export async function uploadToNeonStorage(
   file: File,
   opts?: { formId?: string; scope?: 'public' | 'draft'; questionId?: string },
 ): Promise<string> {
+  // A host set up without file storage, or a page that lost track of its form:
+  // plain words for whoever is uploading, the detail in the console (copy QA).
   if (!isNeonConfigured() || !hasStorageSignUrl()) {
-    throw new Error('Neon Object Storage is not configured.');
+    console.error('[slate] file storage is not configured on this host');
+    throw new Error(UPLOAD_COPY.cantStore);
   }
   const resolvedFormId = opts?.formId ?? getUploadFormId();
   if (!resolvedFormId) {
-    throw new Error('Upload context missing form id.');
+    console.error('[slate] upload without a form id');
+    throw new Error(UPLOAD_COPY.reload);
   }
   // Nothing to store, and storagesign would refuse it with "Missing or invalid contentLength".
   if (file.size === 0) throw new Error(UPLOAD_COPY.empty);

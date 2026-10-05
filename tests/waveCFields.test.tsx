@@ -449,7 +449,8 @@ describe('voice note', () => {
     });
     expect(await screen.findByText(/can’t record audio here/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(screen.getByText(/please record a voice note/i)).toBeInTheDocument();
+    // The screen offers typing, so the message does too (copy QA).
+    expect(screen.getByText('Please record or type an answer')).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Type instead' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'No mic on this laptop' } });

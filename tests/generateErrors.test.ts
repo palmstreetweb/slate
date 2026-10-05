@@ -275,6 +275,29 @@ describe('the studio client never shows a raw error', () => {
     expect(err.retryable).toBe(false);
   });
 
+  it('a string error that reads like a log line is not shown (copy QA)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    for (const raw of [
+      'Failed after 2 attempts. Last error: Overloaded',
+      'TypeError: x is undefined',
+      'upstream status 529',
+    ]) {
+      fetchMock.mockResolvedValue(
+        new Response(JSON.stringify({ error: raw, retry: true }), { status: 500 }),
+      );
+      const err = await failure();
+      expect(err.message).toBe('Build with AI isn’t working right now. Try again in a minute.');
+    }
+    // The route's own sentences still go through as written.
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: 'Keep the description under 2,000 characters.', retry: false }),
+        { status: 400 },
+      ),
+    );
+    expect((await failure()).message).toBe('Keep the description under 2,000 characters.');
+  });
+
   it('a JSON error that is not ours is not shown', async () => {
     fetchMock.mockResolvedValue(
       new Response(

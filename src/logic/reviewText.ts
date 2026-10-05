@@ -61,6 +61,15 @@ export function filesText(v: unknown): string {
   return names.length === 1 ? '1 file' : `${names.length} files`;
 }
 
+/**
+ * A US number as people write it: "+18055550100" reads "(805) 555-0100".
+ * Other countries keep the stored international form (+44 …), which is how
+ * they were typed or understood. Works inside a longer line too.
+ */
+export function usPhoneText(text: string): string {
+  return text.replace(/\+1(\d{3})(\d{3})(\d{4})(?!\d)/g, '($1) $2-$3');
+}
+
 /** The answer as the Review step shows it; '' when unanswered. */
 export function reviewText(
   q: Question,
@@ -84,6 +93,10 @@ export function reviewText(
       return formatAvailability(q as unknown as Record<string, unknown>, v);
     case 'file_upload':
       return filesText(v);
+    case 'phone':
+    case 'contact_info':
+      // As typed, not as stored: "(805) 555-0100", never "+18055550100" (copy QA).
+      return usPhoneText(format(q, v));
     default:
       return format(q, v);
   }

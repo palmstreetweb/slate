@@ -106,8 +106,9 @@ const far = { street: '1 Main St', city: 'Fresno', region: 'CA', postal: '93701'
 
 describe('Responses formatting', () => {
   it('contact: one part per line; address: one line, flagged outside the area', () => {
+    // The phone as people write it, not as stored (copy QA).
     expect(formatAnswerForQuestion(contact, ada)).toBe(
-      'Ada Lovelace\nada@example.com\n+18055550100',
+      'Ada Lovelace\nada@example.com\n(805) 555-0100',
     );
     expect(formatAnswerForQuestion(contact, {})).toBe('—');
     expect(formatAnswerForQuestion(address, home)).toBe('12 Palm St, Santa Barbara, CA 93101');

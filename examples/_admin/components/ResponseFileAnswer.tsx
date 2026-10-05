@@ -44,6 +44,9 @@ function isHeicNameOrMime(mime: string, name: string): boolean {
   return m.includes('heic') || m.includes('heif') || n.endsWith('.heic') || n.endsWith('.heif');
 }
 
+/** Any preview that couldn't be shown: the file itself is fine, and Download opens it. */
+const PREVIEW_FAILED = 'We couldn’t show a preview of this file. Use Download to open it.';
+
 /** Types we can show in the lightbox (HEIC is converted client-side). */
 function isPreviewable(mime: string, name: string): boolean {
   // The stored MIME wins. The filename only helps when storage has no type,
@@ -291,7 +294,7 @@ async function buildDisplayPreview(
   // Can't fetch (CORS) and not HEIC — <img src=signedUrl> often still works.
   if (isHeicNameOrMime(mime, name)) {
     if (sourceRevoke) URL.revokeObjectURL(sourceUrl);
-    throw new Error('Could not load HEIC for conversion (storage CORS). Use Download.');
+    throw new Error(PREVIEW_FAILED);
   }
 
   return { url: sourceUrl, revoke: sourceRevoke, mime, name };
@@ -371,7 +374,7 @@ function FileLightbox({
           <p className="slate-file-lightbox-status">{loadError}</p>
         ) : loading && !url ? (
           <p className="slate-file-lightbox-status">
-            {isHeicNameOrMime(mime, name) ? 'Converting HEIC…' : 'Loading preview…'}
+            {isHeicNameOrMime(mime, name) ? 'Getting the photo ready…' : 'Loading preview…'}
           </p>
         ) : url && isPdf ? (
           // Safe to frame only because storage-sign never serves text/html and
@@ -521,15 +524,13 @@ function FileRow({ item }: { item: File | string }) {
         return;
       }
       if (!access) {
-        setLightbox((cur) =>
-          cur ? { ...cur, loading: false, loadError: 'Could not load file for preview.' } : cur,
-        );
+        setLightbox((cur) => (cur ? { ...cur, loading: false, loadError: PREVIEW_FAILED } : cur));
         return;
       }
       if (!isPreviewable(access.meta.mime, access.meta.name)) {
         if (access.revoke) URL.revokeObjectURL(access.url);
         setLightbox(null);
-        setError('Preview isn’t available for this file type — use Download.');
+        setError('This kind of file can’t be previewed here. Use Download to open it.');
         return;
       }
 
@@ -562,8 +563,9 @@ function FileRow({ item }: { item: File | string }) {
       });
     } catch (err) {
       if (gen !== previewGen.current) return;
-      const message = err instanceof Error ? err.message : 'Could not load file for preview.';
-      setLightbox((cur) => (cur ? { ...cur, loading: false, loadError: message } : cur));
+      // Plain words for the owner; what went wrong stays in the console (copy QA).
+      console.error('[slate] file preview failed', err);
+      setLightbox((cur) => (cur ? { ...cur, loading: false, loadError: PREVIEW_FAILED } : cur));
     } finally {
       if (gen === previewGen.current) setBusy(null);
     }

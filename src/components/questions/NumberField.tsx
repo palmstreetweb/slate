@@ -74,6 +74,7 @@ export function NumberField({
       ref={inputRef}
       type="text"
       inputMode="decimal"
+      enterKeyHint="next"
       pattern="[0-9]*[.]?[0-9]*"
       value={text}
       onChange={(e) => {

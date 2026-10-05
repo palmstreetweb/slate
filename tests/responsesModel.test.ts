@@ -425,7 +425,8 @@ describe('charts', () => {
     expect(d.rows).toEqual([
       { value: 'repair', label: 'Repair', count: 2, pct: 50 },
       { value: 'quote', label: 'Quote', count: 1, pct: 25 },
-      { value: 'retired_option', label: 'retired_option', count: 1, pct: 25 },
+      // An option deleted since reads as such, never its stored code (copy QA).
+      { value: '\u0000removed', label: 'Removed option', count: 1, pct: 25 },
       { value: 'new_install', label: 'New install', count: 0, pct: 0 },
     ]);
   });

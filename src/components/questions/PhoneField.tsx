@@ -137,6 +137,7 @@ export function PhoneField({
           ref={inputRef}
           type="tel"
           inputMode="tel"
+          enterKeyHint="next"
           autoComplete="tel"
           value={value}
           onChange={(e) => {

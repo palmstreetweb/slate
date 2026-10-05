@@ -1,13 +1,15 @@
 /**
- * Respondent bundle (ADR-048): `/forms/{slug}` and `/r?d=…` only. No studio
+ * Respondent bundle (ADR-048): `/forms/{slug}`, `/r?d=…` and paths nothing
+ * serves ("We couldn’t find that page", F27) only. No studio
  * pages, no auth provider, no Neon SDK — a QR scan on bad Wi-Fi downloads
  * the form engine and this, nothing else.
  */
 
 import { StrictMode, Suspense, lazy, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { routeKey, useRoute } from './_admin/_router.js';
+import { isRespondentRoute, routeKey, useRoute } from './_admin/_router.js';
 import { PublicFill } from './_admin/pages/PublicFill.js';
+import { PageNotFound } from './_admin/pages/PageNotFound.js';
 import { PageTransition } from './_admin/shell/PageTransition.js';
 import { LoadingScreen } from './_admin/shell/LoadingScreen.js';
 import { PAGE_DIDNT_LOAD } from './_admin/fillCopy.js';
@@ -59,7 +61,7 @@ const PublicRespond = lazy(() =>
 function PublicRoutes() {
   const route = useRoute();
   const key = routeKey(route);
-  const respondentRoute = route.name === 'fill' || route.name === 'respond';
+  const respondentRoute = isRespondentRoute(route);
 
   useEffect(() => {
     // Anything else needs the studio bundle — reload so the entry picks it.
@@ -82,6 +84,7 @@ function PublicRoutes() {
       </PageTransition>
     );
   }
+  if (route.name === 'notfound') return <PageNotFound />;
   return null;
 }
 

@@ -115,6 +115,7 @@ export function DateField({ question, answers, initialValue, onAnswer, onAdvance
       ref={ref}
       type="text"
       inputMode="numeric"
+      enterKeyHint="next"
       autoComplete="off"
       value={seg[part]}
       onChange={(e) => setPart(part, e.target.value, next)}

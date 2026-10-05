@@ -19,10 +19,10 @@ import { FormPreview } from './_admin/pages/FormPreview.js';
 import { FormSubmissions } from './_admin/pages/FormSubmissions.js';
 import { PublicRespond } from './_admin/pages/PublicRespond.js';
 import { PublicFill } from './_admin/pages/PublicFill.js';
+import { PageNotFound } from './_admin/pages/PageNotFound.js';
 import { Login } from './_admin/pages/Login.js';
 import { Settings } from './_admin/pages/Settings.js';
 import { DropLab } from './_admin/pages/DropLab.js';
-import { AdminShell } from './_admin/shell/AdminShell.js';
 import { LoadingScreen, useMinBootMs } from './_admin/shell/LoadingScreen.js';
 import { PageTransition } from './_admin/shell/PageTransition.js';
 import { AuthProvider, useAuth, useRequiresAuth } from './_admin/neon/AuthProvider.js';
@@ -91,6 +91,10 @@ function AppRoutes() {
       case 'dropLab':
         page = <DropLab />;
         break;
+      case 'notfound':
+        // Respondent words, no raw path, no studio button (F27).
+        page = <PageNotFound />;
+        break;
     }
     return <PageTransition routeKey={key}>{page}</PageTransition>;
   }
@@ -130,16 +134,8 @@ function AppRoutes() {
       page = <ReloadForBundle />;
       break;
     case 'notfound':
-      page = (
-        <AdminShell crumbs={null}>
-          <div className="slate-empty">
-            <p style={{ margin: '0 0 12px' }}>Page not found: {route.path}</p>
-            <a href="/" className="slate-btn slate-btn--primary" style={{ textDecoration: 'none' }}>
-              Back to dashboard
-            </a>
-          </div>
-        </AdminShell>
-      );
+      // Public (isPublicRoute): handled above.
+      page = <PageNotFound />;
       break;
   }
 

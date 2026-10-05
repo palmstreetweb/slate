@@ -172,25 +172,43 @@ describe('options', () => {
 });
 
 describe('lengths, files, steps', () => {
-  it('max length must be a whole number, 1 or more', () => {
+  it('a max length below 1 or with a decimal is a heads-up: the form reads it as no limit, or rounds down (R23)', () => {
     const q = (maxLength: number) =>
       ({ id: 't', type: 'short_text', title: 'Name?', maxLength }) as Question;
-    for (const n of [0, -5, 1.5]) expect(kinds([q(n)])).toEqual([['bad_length', true]]);
+    for (const n of [0, -5, 1.5]) expect(kinds([q(n)])).toEqual([['bad_length', false]]);
     expect(kinds([q(10)])).toEqual([]);
+    expect(studioIssues([q(0)])[0]!.message).toBe(
+      '“Name?”: Max length 0 means no limit. Clear it, or use 1 or more.',
+    );
+    expect(studioIssues([q(2.5)])[0]!.message).toBe(
+      '“Name?”: Max length 2.5 counts as 2 characters.',
+    );
   });
 
   it('file size above 0 (blank = 32 MB); file count a whole number', () => {
     const f = (extra: Record<string, unknown>) =>
       ({ id: 'f', type: 'file_upload', title: 'Upload', ...extra }) as Question;
-    expect(kinds([f({ maxSizeMb: 0 })])).toEqual([['bad_file_size', true]]);
-    expect(kinds([f({ maxSizeMb: -1 })])).toEqual([['bad_file_size', true]]);
+    // The form reads 0 MB as the usual 32 MB and 2.5 files as 2 (R23): heads-ups, not traps.
+    expect(kinds([f({ maxSizeMb: 0 })])).toEqual([['bad_file_size', false]]);
+    expect(kinds([f({ maxSizeMb: -1 })])).toEqual([['bad_file_size', false]]);
     expect(kinds([f({ maxSizeMb: 50 })])).toEqual([['bad_file_size', false]]);
     expect(kinds([f({ maxSizeMb: 0.5 })])).toEqual([]);
-    expect(kinds([f({ maxFiles: 2.5 })])).toEqual([['bad_file_count', true]]);
+    expect(kinds([f({ maxFiles: 2.5 })])).toEqual([['bad_file_count', false]]);
     expect(kinds([f({ maxFiles: 0, multiple: false })])).toEqual([]);
     expect(studioIssues([f({ maxSizeMb: 0 })])[0]!.message).toBe(
-      '“Upload”: Max size has to be more than 0 MB. Leave it empty for the 32 MB limit.',
+      '“Upload”: Max size 0 MB means the usual 32 MB limit. Clear it, or use 1 MB or more.',
     );
+    expect(studioIssues([f({ maxFiles: 2.5 })])[0]!.message).toBe(
+      '“Upload”: Max files 2.5 counts as 2. Use a whole number, 1 or more.',
+    );
+    // File types the filter can't read are left out, and said (R22).
+    expect(kinds([f({ accept: 'pdf, jpg' })])).toEqual([]);
+    expect(studioIssues([f({ accept: 'pdf, documents' })])[0]).toMatchObject({
+      kind: 'bad_accept',
+      blocking: false,
+      message:
+        '“Upload”: “documents” isn’t a file type the form can read, so it’s left out. Use endings like pdf or jpg.',
+    });
   });
 
   it('a number step has to be more than 0', () => {
@@ -213,10 +231,23 @@ describe('scale', () => {
   it('a 20,001-point scale or a step of 0 is refused (it would freeze the page)', () => {
     expect(kinds([scale({ max: 20000 })])).toEqual([['scale_points', true]]);
     expect(studioIssues([scale({ max: 20000 })])[0]!.message).toBe(
-      '“Rate us” has 20,001 points. Keep it to 21 or fewer.',
+      '“Rate us” has 20,001 points, more than the form can show (101). Use fewer, or the Slider style.',
     );
     expect(kinds([scale({ step: 0 })])).toEqual([['bad_step', true]]);
     expect(kinds([scale({ max: 20 })])).toEqual([]);
+  });
+
+  it('a 0–100 scale draws in full: a heads-up, not a blocker; a slider is fine (R4, R10, R11)', () => {
+    expect(kinds([scale({ max: 100 })])).toEqual([['scale_points', false]]);
+    expect(studioIssues([scale({ max: 100 })])[0]!.message).toBe(
+      '“Rate us” has 101 points to tap through. 21 or fewer reads better; the Slider style suits a long range.',
+    );
+    expect(kinds([scale({ max: 100, display: 'slider' })])).toEqual([]);
+    expect(kinds([scale({ max: 100, step: 0.5, display: 'slider' })])).toEqual([]);
+    // Only a slider step too fine to land on is said, and it never blocks.
+    expect(kinds([scale({ max: 2_000_000, display: 'slider' })])).toEqual([
+      ['scale_points', false],
+    ]);
   });
 
   it('stars from 0 is a heads-up: the first star saves 0', () => {
@@ -257,9 +288,10 @@ describe('redirect', () => {
     expect(bad!.message).toBe(
       '“Thanks!” sends people to “javascript:alert(1)”, which isn’t a web address. Use a full one, like https://yoursite.com/thanks.',
     );
+    // The form opens a bare address as https (R23): a heads-up with the address it will use.
     const [bare] = studioIssues([thanks('example.com/thank-you')]);
-    expect(bare).toMatchObject({ kind: 'bad_redirect', blocking: true });
-    expect(bare!.message).toContain('needs https:// in front');
+    expect(bare).toMatchObject({ kind: 'bad_redirect', blocking: false });
+    expect(bare!.message).toContain('which opens as https://example.com/thank-you');
     expect(studioIssues([thanks('https://example.com/thank-you')])).toEqual([]);
   });
 });
@@ -276,15 +308,22 @@ describe('phone country', () => {
     expect(list).toHaveLength(PHONE_COUNTRIES.length);
   });
 
-  it('an empty or unknown code blocks: every local number would be turned down', () => {
+  it('an empty or unknown code is a heads-up: local numbers are read as US ones (R16)', () => {
     expect(isPhoneCountry('US')).toBe(true);
     for (const code of ['', 'XX', 'ZZ', 'us', '1']) {
       const q = { id: 'p', type: 'phone', title: 'Phone?', defaultCountry: code } as Question;
-      expect(kinds([q])).toEqual([['bad_country', true]]);
+      expect(kinds([q])).toEqual([['bad_country', false]]);
     }
+    expect(
+      studioIssues([
+        { id: 'p', type: 'phone', title: 'Phone?', defaultCountry: '' } as Question,
+      ])[0]!.message,
+    ).toBe(
+      '“Phone?”: a number typed without its country code is read as a US number. Pick a country if most people answering aren’t in the US.',
+    );
     expect(kinds([{ id: 'p', type: 'phone', title: 'Phone?' } as Question])).toEqual([]);
     const contact = { id: 'c', type: 'contact_info', title: 'Reach you?', defaultCountry: 'XX' };
-    expect(kinds([contact as Question])).toEqual([['bad_country', true]]);
+    expect(kinds([contact as Question])).toEqual([['bad_country', false]]);
     expect(kinds([{ ...contact, fields: { phone: 'off' } } as Question])).toEqual([]);
   });
 });

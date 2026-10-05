@@ -89,17 +89,21 @@ function pictureOptionsOf(q: GeneratedQuestion): PictureOption[] {
 }
 
 /**
- * A number question's bounds (F15). The model's blank is 0, so 0 means "no
- * limit", and a max at or below the min is no max: a draft can't ask for a
- * budget with "Maximum is 0".
+ * A number question's bounds (F15). The model's blank is 0 for both, so 0 and
+ * 0 mean "no limits". Otherwise a 0 is a real bound — "How many kids (0–10)?"
+ * keeps min 0, so -2 is refused, and -5 to 0 keeps its max (QA retest) — and a
+ * max at or below the min is no max: a draft can't ask for a budget with
+ * "Maximum is 0".
  */
 function numberBounds(q: GeneratedQuestion): { min?: number; max?: number; step: number } {
-  const min = Number.isFinite(q.min) && q.min !== 0 ? q.min : undefined;
-  const max = Number.isFinite(q.max) && q.max !== 0 && q.max > (min ?? 0) ? q.max : undefined;
+  const step = Number.isFinite(q.step) && q.step > 0 ? q.step : 1;
+  const lo = Number.isFinite(q.min) ? q.min : 0;
+  const hi = Number.isFinite(q.max) ? q.max : 0;
+  if (lo === 0 && hi === 0) return { step };
   return {
-    ...(min !== undefined ? { min } : {}),
-    ...(max !== undefined ? { max } : {}),
-    step: Number.isFinite(q.step) && q.step > 0 ? q.step : 1,
+    min: lo,
+    ...(hi > lo ? { max: hi } : {}),
+    step,
   };
 }
 

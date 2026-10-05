@@ -30,6 +30,7 @@ import { clearUploadContext, setUploadContext } from '../uploadContext.js';
 import { TYPE_LABEL } from '../questionTypeMeta.js';
 import { sampleEstimate } from '../estimatePreview.js';
 import { usePreviewFocusGuard } from './usePreviewFocusGuard.js';
+import { withoutRepeats } from '../uniqueOptions.js';
 
 import '@/styles/tokens.css';
 import '@/styles/toggle.css';
@@ -158,6 +159,8 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
     selectedQuestion.type !== 'statement';
 
   const noop = () => {};
+  // Each option value once (CH-05), as the public page shows it; the banner asks for Fix.
+  const shownQuestion = useMemo(() => withoutRepeats(selectedQuestion), [selectedQuestion]);
   // The preview's fields never pull the keyboard out of the inspector (S15).
   const focusGuard = usePreviewFocusGuard();
 
@@ -237,7 +240,7 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
                 style={{ minHeight: 'auto' }}
               >
                 <QuestionRenderer
-                  question={selectedQuestion}
+                  question={shownQuestion}
                   answers={answers}
                   setAnswer={setAnswer}
                   advance={restartTry}

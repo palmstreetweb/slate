@@ -48,7 +48,6 @@ export function TapActions({
 }: Props) {
   const [error, setError] = useState<string | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
-  const shownAt = useRef(Date.now());
 
   // A pick answers the message.
   useEffect(() => {
@@ -66,12 +65,7 @@ export function TapActions({
     onAdvance();
   }, [check, onAdvance, pickFocused, target]);
 
-  const enter = useCallback(() => {
-    if (Date.now() - shownAt.current < ENTER_WAIT_MS) return;
-    go();
-  }, [go]);
-
-  useRegisterFormConfirm(enter);
+  useRegisterFormConfirm(go, true, ENTER_WAIT_MS);
 
   return (
     <>

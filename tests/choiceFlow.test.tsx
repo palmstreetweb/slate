@@ -172,7 +172,13 @@ describe('optional single choice and yes/no can be skipped (CH-09)', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Skip' }));
     expect(await screen.findByText('Fine?')).toBeInTheDocument();
+    // Right as it appears, Enter waits (a double Enter mustn't skip it unseen)…
     key('Enter');
+    expect(onSubmit).not.toHaveBeenCalled();
+    // …a moment later it skips.
+    const later = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600);
+    key('Enter');
+    later.mockRestore();
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0]![0]).toEqual({});
   });

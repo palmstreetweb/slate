@@ -128,13 +128,11 @@ describe('a short text pattern that came through JSON (NEW-01)', () => {
   });
 
   it('a portable link drops the pattern before the form renders', () => {
-    const out = sanitizeUntrustedSchema(
-      defineSchema({
-        brand: { name: 'B' },
-        theme: 'classic',
-        questions: [q('^[A-Z]{3}$') as never, { id: 'done', type: 'thanks', title: 'T' }],
-      }) as never,
-    );
+    const out = sanitizeUntrustedSchema({
+      brand: { name: 'B' },
+      theme: 'classic',
+      questions: [q('^[A-Z]{3}$'), { id: 'done', type: 'thanks', title: 'T' }],
+    } as never);
     expect(out.questions[0]).not.toHaveProperty('pattern');
   });
 
@@ -398,7 +396,7 @@ describe('repeated option values (CH-05)', () => {
       { value: 'y' },
     ]);
     const [shown] = withoutRepeatedOptions([dup]);
-    expect((shown as { options: unknown[] }).options).toHaveLength(3);
+    expect((shown as unknown as { options: unknown[] }).options).toHaveLength(3);
     const grid = {
       id: 'g',
       type: 'matrix',
@@ -409,19 +407,23 @@ describe('repeated option values (CH-05)', () => {
       ],
       columns: [{ label: 'Good', value: 'c' }],
     } as Question;
-    expect((withoutRepeatedOptions([grid])[0] as { rows: unknown[] }).rows).toHaveLength(1);
+    expect((withoutRepeatedOptions([grid])[0] as unknown as { rows: unknown[] }).rows).toHaveLength(
+      1,
+    );
     // Nothing repeated: the very same schema comes back (no needless re-render).
-    const clean = defineSchema({ brand: { name: 'B' }, theme: 'classic', questions: [grid] });
+    const clean = { brand: { name: 'B' }, theme: 'classic', questions: [grid] };
     const fixed = withoutRepeatedOptionsIn(clean as never);
     expect(fixed).not.toBe(clean);
     expect(withoutRepeatedOptionsIn(fixed)).toBe(fixed);
   });
 
   it('a portable link drops repeated values before the form renders', () => {
-    const out = sanitizeUntrustedSchema(
-      defineSchema({ brand: { name: 'B' }, theme: 'classic', questions: [dup] }) as never,
-    );
-    expect((out.questions[0] as { options: unknown[] }).options).toHaveLength(3);
+    const out = sanitizeUntrustedSchema({
+      brand: { name: 'B' },
+      theme: 'classic',
+      questions: [dup],
+    } as never);
+    expect((out.questions[0] as unknown as { options: unknown[] }).options).toHaveLength(3);
   });
 });
 
@@ -465,6 +467,46 @@ describe('a tap past the most picks says why (R5)', () => {
     expect(
       screen.getByText('You can pick up to 1. Tap one of your picks to let it go.'),
     ).toBeInTheDocument();
+  });
+});
+
+/* ---------- grid ---------- */
+
+describe('a grid whose column headers can’t fit their words stacks (R7)', () => {
+  it('stacks when a header word is wider than its column, and goes back when there is room', async () => {
+    let resize: (width: number) => void = () => {};
+    class FakeResizeObserver {
+      constructor(cb: (entries: Array<{ contentRect: { width: number } }>) => void) {
+        resize = (width) => cb([{ contentRect: { width } }]);
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    let wordTooWide = true;
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains('slate-matrix-colhead') && wordTooWide ? 62 : 10;
+    });
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(54);
+    vi.spyOn(HTMLElement.prototype, 'offsetParent', 'get').mockReturnValue(document.body);
+    const labels = ['Strongly disagree', 'Disagree', 'Somewhat disagree', 'Neutral'];
+    renderLive({
+      id: 'g',
+      type: 'matrix',
+      title: 'How do you feel?',
+      rows: [{ label: 'Price', value: 'r1' }],
+      columns: labels.map((label, i) => ({ label, value: `c${i}` })),
+    } as Question);
+    await screen.findAllByRole('radio');
+    const grid = document.querySelector('.slate-matrix')!;
+    act(() => resize(600));
+    expect(grid).toHaveClass('slate-matrix--stack');
+    wordTooWide = false;
+    act(() => resize(1000));
+    expect(grid).not.toHaveClass('slate-matrix--stack');
+    vi.unstubAllGlobals();
   });
 });
 

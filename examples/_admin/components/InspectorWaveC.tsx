@@ -196,7 +196,7 @@ export function ImagePinSettings({
             : 'A house, a roof, a car — whatever they should mark. Uploads are resized to load fast on phones.'}
         </p>
       )}
-      <Field label="Or an image link (https)">
+      <Field label="Or paste a link to a photo" hint="A link that starts with https://">
         <input
           className="slate-input"
           value={link}

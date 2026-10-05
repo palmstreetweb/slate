@@ -169,6 +169,19 @@ describe('batches keep what fits (MEDIA-10, GAP-22)', () => {
     expect(screen.getByText(/big\.pdf is too big\. The limit is 1 MB\./)).toBeInTheDocument();
   });
 
+  it('removing a file clears the note about the last pick (R21)', async () => {
+    const { setAnswer } = renderField(q);
+    await screen.findByText(/choose files/i);
+    const a = new File(['a'], 'a.txt', { type: 'text/plain' });
+    const b = new File(['b'], 'b.txt', { type: 'text/plain' });
+    const c = new File(['c'], 'notes.txt', { type: 'text/plain' });
+    await pick([a, b, c]);
+    expect(screen.getByText(/notes\.txt wasn’t added/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Remove a\.txt/ }));
+    expect(setAnswer).toHaveBeenLastCalledWith('docs', [b]);
+    expect(screen.queryByText(/wasn’t added/)).toBeNull();
+  });
+
   it('an empty file is named and skipped', async () => {
     const { setAnswer } = renderField(q);
     await screen.findByText(/choose files/i);
@@ -254,6 +267,35 @@ describe('photo checklist', () => {
     );
     expect(onFileUpload).not.toHaveBeenCalled();
     expect(screen.getByText('0 of 2 photos')).toBeInTheDocument();
+  });
+
+  it('a file named like a photo that the browser can’t draw is refused (MEDIA-08 retest)', async () => {
+    // A 25-byte text file renamed broken.jpg: the browser can't decode it.
+    vi.stubGlobal('createImageBitmap', async () => {
+      throw new DOMException('The source image could not be decoded.', 'InvalidStateError');
+    });
+    const onFileUpload = vi.fn<FileUploadHandler>(async () => 'slate-file://p');
+    renderField(q, onFileUpload);
+    await screen.findByText('0 of 2 photos');
+    await shoot('Front of house', new File(['not a picture at all!!!'], 'broken.jpg'), false);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'That file isn’t a photo. Take or choose a photo.',
+    );
+    expect(onFileUpload).not.toHaveBeenCalled();
+    expect(screen.getByText('0 of 2 photos')).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it('a photo the browser can draw goes through', async () => {
+    const close = vi.fn();
+    vi.stubGlobal('createImageBitmap', async () => ({ close }));
+    const onFileUpload = vi.fn<FileUploadHandler>(async () => 'slate-file://p');
+    renderField(q, onFileUpload);
+    await screen.findByText('0 of 2 photos');
+    await shoot('Front of house', jpg('front.jpg'));
+    await waitFor(() => expect(onFileUpload).toHaveBeenCalledTimes(1));
+    expect(close).toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it('a failed retake keeps the earlier photo, the count, and what is sent (MEDIA-09)', async () => {

@@ -255,9 +255,24 @@ describe('scale (F6, F7, F20, S16, S22)', () => {
 
   it('too many points is explained, with a fix', async () => {
     const { user, spy } = setup({ ...scale, max: 20000 } as Question);
-    expect(screen.getByText('That’s 20,001 points. A scale shows 21 at most.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'That’s 20,001 points: the form can show 101. Use fewer, or the Slider style.',
+      ),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Use 0 to 10' }));
     expect(spy).toHaveBeenLastCalledWith({ max: 10, step: undefined });
+  });
+
+  it('a 0–100 slider draws no cells: no points note (R4, R10)', () => {
+    setup({ ...scale, max: 100, display: 'slider' } as Question);
+    expect(screen.queryByText(/points/)).toBeNull();
+  });
+
+  it('a 0–100 numbers scale gets a quiet note, not a warning (it draws in full)', () => {
+    setup({ ...scale, max: 100 } as Question);
+    const note = screen.getByText(/That’s 101 points to tap through/).closest('.slate-guard');
+    expect(note).toHaveClass('slate-guard--quiet');
   });
 
   it('switching to Stars counts from 1, five stars by default', async () => {
@@ -280,16 +295,44 @@ describe('scale (F6, F7, F20, S16, S22)', () => {
 });
 
 describe('text and files (F9, S13, MEDIA-05)', () => {
-  it('max length takes whole numbers from 1; a saved 0 is explained', async () => {
+  it('max length: a saved 0 means no limit, said plainly, with Clear', async () => {
     const { user, spy } = setup({
       id: 't',
       type: 'short_text',
       title: 'Name?',
       maxLength: 0,
     } as Question);
-    expect(screen.getByText(/With 0, nobody could type an answer/)).toBeInTheDocument();
+    expect(screen.getByText('0 means no limit.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Clear it' }));
     expect(spy).toHaveBeenLastCalledWith({ maxLength: undefined });
+  });
+
+  it('max length: typing 0 or -5 saves no limit, never a limit of 1 (R18)', async () => {
+    const { user, spy, leave } = setup({ id: 't', type: 'short_text', title: 'Name?' } as Question);
+    const box = numberIn('Max Length (Characters)');
+    await user.click(box);
+    await user.keyboard('0');
+    await leave();
+    expect(spy).toHaveBeenLastCalledWith({ maxLength: undefined });
+    await user.click(box);
+    await user.keyboard('-5');
+    await leave();
+    expect(spy).not.toHaveBeenCalledWith({ maxLength: 1 });
+    expect(spy).toHaveBeenLastCalledWith({ maxLength: undefined });
+  });
+
+  it('max length: a saved 2.5 says it counts as 2, with a fix', async () => {
+    const { user, spy } = setup({
+      id: 't',
+      type: 'short_text',
+      title: 'Name?',
+      maxLength: 2.5,
+    } as Question);
+    expect(
+      screen.getByText('Answers can be up to 2 characters: a limit is a whole number.'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Use 2' }));
+    expect(spy).toHaveBeenLastCalledWith({ maxLength: 2 });
   });
 
   it('max size: − on an empty field is 1 MB, never −1; a saved −1 is explained', async () => {
@@ -305,7 +348,7 @@ describe('text and files (F9, S13, MEDIA-05)', () => {
       title: 'Upload',
       maxSizeMb: -1,
     } as Question);
-    expect(screen.getByText('With -1 MB, nobody could attach a file.')).toBeInTheDocument();
+    expect(screen.getByText('-1 MB means the usual 32 MB limit.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Use 32 MB' }));
     expect(spy).toHaveBeenLastCalledWith({ maxSizeMb: 32 });
   });
@@ -342,9 +385,13 @@ describe('phone country (F13, S14)', () => {
     expect(screen.getByRole('button', { name: 'Country for local numbers' })).toHaveTextContent(
       'Pick a country',
     );
+    // What actually happens until then (R16): read as a US number, never "turned down".
     expect(
-      screen.getByText(/a number typed without its country code is turned down/),
+      screen.getByText(
+        'Until you pick one, a number typed without its country code is read as a US number.',
+      ),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/turned down/)).toBeNull();
     expect(screen.queryByText(/ISO 3166/)).toBeNull();
   });
 });
@@ -375,7 +422,9 @@ describe('redirect (F3, S12)', () => {
 
   it('a saved address without https:// is pointed out, and Fix adds it', async () => {
     const { user, spy } = setup(thanks('www.example.com'));
-    expect(screen.getByText(/This needs https:\/\/ in front/)).toBeInTheDocument();
+    expect(
+      screen.getByText('People will go to https://www.example.com. Press Fix to save it that way.'),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Fix' }));
     expect(spy).toHaveBeenLastCalledWith({ redirectUrl: 'https://www.example.com' });
   });

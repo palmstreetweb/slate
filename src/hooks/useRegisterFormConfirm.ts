@@ -1,21 +1,28 @@
 'use client';
 
-import { createContext, useContext, useEffect, type MutableRefObject } from 'react';
+import { createContext, useContext, useEffect, useState, type MutableRefObject } from 'react';
 
 export const FormConfirmRefContext = createContext<MutableRefObject<(() => void) | null> | null>(
   null,
 );
 
-/** Register this step's OK/submit handler so global Enter works from any focus. */
-export function useRegisterFormConfirm(fn: () => void, enabled = true): void {
+/**
+ * Register this step's OK/submit handler so global Enter works from any focus.
+ * With `wait`, Enter does nothing until the field has been up that long (ms):
+ * a Skip on Enter must not catch the double Enter that confirmed the question
+ * before, before anyone saw this one (QA retest).
+ */
+export function useRegisterFormConfirm(fn: () => void, enabled = true, wait = 0): void {
   const ref = useContext(FormConfirmRefContext);
+  const [shown] = useState(Date.now);
   useEffect(() => {
     if (!ref || !enabled) return undefined;
-    ref.current = fn;
+    const go = () => Date.now() - shown < wait || fn();
+    ref.current = go;
     return () => {
-      if (ref.current === fn) ref.current = null;
+      if (ref.current === go) ref.current = null;
     };
-  }, [ref, fn, enabled]);
+  }, [ref, fn, enabled, wait, shown]);
 }
 
 /**

@@ -54,7 +54,9 @@
    to its content exactly as on the public page; rounded corners still clip.
    Its height is the window's minus what sits above and below it (the header,
    the content padding and the note line), divided by the studio size's zoom
-   (ADR-045), so the page itself never scrolls. */
+   (ADR-045), so the page itself never scrolls. The frame holds still and the
+   box inside it scrolls, so the form's light / dark toggle, pinned to the
+   frame, stays on screen (R17). */
 [data-slate-forms][data-theme-name='slate'] .slate-preview.slate-preview--page {
   height: calc(
     100vh / var(--slate-zoom, 1) - var(--slate-header-h) - 2 * var(--slate-content-pad) - 28px
@@ -62,6 +64,11 @@
   height: calc(
     100dvh / var(--slate-zoom, 1) - var(--slate-header-h) - 2 * var(--slate-content-pad) - 28px
   );
+  overflow: hidden;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-preview--page > .slate-preview-scroll {
+  height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;

@@ -6,6 +6,21 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   background: transparent;
 }
 
+/* The engine's wrapper lets text break anywhere (GAP-12: a long link in a
+   form). The studio's own chrome is a [data-slate-forms] too, and there it
+   broke "Light" / "Dark" and titles mid-word (R20): in the chrome a word
+   breaks only when it can't fit a line on its own. Forms inside keep theirs. */
+[data-slate-forms][data-theme-name='slate'] {
+  overflow-wrap: break-word;
+}
+
+/* Build with AI's "⌘+Enter … drop a PDF" means nothing on a phone (copy QA). */
+@media (hover: none) {
+  [data-slate-forms][data-theme-name='slate'] .slate-ai-keys {
+    display: none;
+  }
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-header {
   position: sticky;
   top: 0;
@@ -1371,12 +1386,10 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   min-width: 0;
 }
 
+/* The heading is in ink on every banner: red text on the red-tinted banner fell
+   below 4.5:1 in the warm and cool palettes (R24). The tint and border say "fix". */
 [data-slate-forms][data-theme-name='slate'] .slate-issues-title {
   font-weight: 600;
-  color: var(--slate-error);
-}
-
-[data-slate-forms][data-theme-name='slate'] .slate-issues--check .slate-issues-title {
   color: var(--chrome-ink);
 }
 
@@ -2072,17 +2085,27 @@ body.slate-editor-resizing * {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--chrome-hair);
   background: var(--chrome-bg);
 }
 
+/* The label gives way (an ellipsis), never the Light / Dark tabs (R20). */
 [data-slate-forms][data-theme-name='slate'] .slate-canvas-label {
   font-size: var(--slate-fs-xs);
   font-family: var(--slate-font-mono);
   color: var(--chrome-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-canvas-toolbar > :last-child {
+  flex-shrink: 0;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-canvas {

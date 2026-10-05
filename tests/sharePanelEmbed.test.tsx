@@ -35,7 +35,7 @@ vi.mock('../examples/_admin/useFocusTrap.js', () => ({ useFocusTrap: vi.fn() }))
 vi.mock('../examples/_admin/lockBodyScroll.js', () => ({ lockBodyScroll: () => () => {} }));
 
 import { SharePanel } from '../examples/_admin/components/SharePanel.js';
-import { buildEmbedSnippet } from '../examples/_admin/shareUrls.js';
+import { EMBED_TOP_SCRIPT, buildEmbedSnippet } from '../examples/_admin/shareUrls.js';
 
 const schema = {
   brand: { name: 'T' },
@@ -73,8 +73,42 @@ describe('embed snippet (ADR-054)', () => {
     // scrolls inside the host page on a phone.
     expect(buildEmbedSnippet('https://slate.test/forms/48210377', 'Crew')).toBe(
       '<iframe src="https://slate.test/forms/48210377?embed=1" title="Crew" ' +
-        'style="width:100%;height:85vh;height:85svh;min-height:560px;border:0" loading="lazy"></iframe>',
+        'style="width:100%;height:85vh;height:85svh;min-height:560px;border:0" loading="lazy"></iframe>\n' +
+        EMBED_TOP_SCRIPT,
     );
+  });
+
+  it('the host script brings the frame’s top back into view on a new question, for its own frame only (GAP-25)', () => {
+    document.body.innerHTML = buildEmbedSnippet('https://slate.test/forms/1', 'Crew');
+    const frame = document.querySelector('iframe')!;
+    // innerHTML never runs scripts; run the snippet's own, as the host page's parser would.
+    const code = document.querySelector('script')!.textContent!;
+    Object.defineProperty(document, 'currentScript', {
+      configurable: true,
+      get: () => document.querySelector('script'),
+    });
+    const listeners: Array<(e: MessageEvent) => void> = [];
+    const add = vi.spyOn(window, 'addEventListener').mockImplementation(((
+      type: string,
+      fn: never,
+    ) => {
+      if (type === 'message') listeners.push(fn);
+    }) as never);
+    new Function(code.replace(/^<script>|<\/script>$/g, ''))();
+    add.mockRestore();
+    delete (document as { currentScript?: unknown }).currentScript;
+    expect(listeners).toHaveLength(1);
+    const scrolled = vi.fn();
+    frame.scrollIntoView = scrolled;
+    const send = (source: unknown, top: number) => {
+      frame.getBoundingClientRect = () => ({ top }) as DOMRect;
+      listeners[0]!({ source, data: { type: 'slate:top' } } as MessageEvent);
+    };
+    send(frame.contentWindow, -300); // scrolled past the frame: back into view
+    expect(scrolled).toHaveBeenCalledTimes(1);
+    send(frame.contentWindow, 40); // already in view: left alone
+    send({}, -300); // another window's message: ignored
+    expect(scrolled).toHaveBeenCalledTimes(1);
   });
 
   it('escapes the form name so it cannot break out of the title attribute', () => {
@@ -85,7 +119,9 @@ describe('embed snippet (ADR-054)', () => {
     expect(html).toContain(
       'title="Tom &amp; Jerry&#39;s &quot;quote&quot; &lt;script&gt;x&lt;/script&gt;"',
     );
-    expect(html).not.toContain('<script>');
+    // No script from the name: only the snippet's own, after the frame.
+    expect(html.split('<script>')).toHaveLength(2);
+    expect(html.endsWith(EMBED_TOP_SCRIPT)).toBe(true);
     // One element, attributes intact.
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const frames = doc.querySelectorAll('iframe');

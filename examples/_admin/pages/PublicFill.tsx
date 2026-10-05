@@ -34,6 +34,7 @@ import { prefillFromSearch, trackingFromSearch } from '../trackedLinks.js';
 import { clearFillUnlockToken, readFillUnlockToken, writeFillUnlockToken } from '../fillUnlock.js';
 import { routeSearchParams } from '../_router.js';
 import { FORM_UNAVAILABLE, LOAD_LATER, LOAD_OFFLINE, SEND_TOO_LONG_HERE } from '../fillCopy.js';
+import { withoutRepeatedOptionsIn } from '../uniqueOptions.js';
 
 type Props = { slug: string };
 
@@ -196,7 +197,12 @@ export function PublicFill({ slug }: Props) {
    * the tab (GAP-05, ADR-017 addendum) — and the "Try again" on a part that
    * didn't load (a page reload) keeps them too.
    */
-  const fillSchema = useMemo(() => (form ? { ...form.schema, id: form.id } : null), [form]);
+  const fillSchema = useMemo(
+    // Each option value once (CH-05): a form published before options got
+    // their own values never ticks two rows at once or asks for picks nobody has.
+    () => (form ? { ...withoutRepeatedOptionsIn(form.schema), id: form.id } : null),
+    [form],
+  );
 
   const onUnlock = useCallback(
     async (password: string): Promise<string | null> => {
@@ -220,9 +226,19 @@ export function PublicFill({ slug }: Props) {
 
   // Someone reaching a sign-up question sees fresh counts (at most every 30 s),
   // from the same throttled lookup — a locked form re-proves with this tab's token.
+  /** The question on screen, so `slate:top` goes out once per new question, never on load. */
+  const shownQuestion = useRef<string | null>(null);
   const onQuestionChange = useCallback(
     (questionId: string) => {
       if (!form) return;
+      // Embedded (GAP-25): a new question asks the host page to bring the
+      // frame's top back into view; the snippet's script does it if needed.
+      if (embed && shownQuestion.current !== questionId) {
+        if (shownQuestion.current !== null && window.parent !== window) {
+          window.parent.postMessage({ type: 'slate:top' }, '*');
+        }
+        shownQuestion.current = questionId;
+      }
       const q = form.schema.questions.find((x) => x.id === questionId);
       if (q?.type !== 'signup_slots' || Date.now() - slotsAt.current < SLOTS_STALE_MS) return;
       slotsAt.current = Date.now();
@@ -234,7 +250,7 @@ export function PublicFill({ slug }: Props) {
         if (next) setSlotsLeft((cur) => mergeSlotsLeft(cur, next));
       })();
     },
-    [form, slug],
+    [form, slug, embed],
   );
 
   if (loading) {

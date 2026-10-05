@@ -455,8 +455,11 @@ export default function VoiceNoteField({
           ? { audio: savedRef, sec: String(savedSec ?? 0) }
           : undefined;
     // Typing is always allowed once offered: with the owner's typing off, only
-    // a blocked or missing microphone leads here (MEDIA-17).
-    const err = validate(phase === 'typed' ? { ...question, allowTyped: true } : question, answer);
+    // a blocked or missing microphone leads here (MEDIA-17). The blocked screen
+    // offers typing too, so its message mentions it ("Please record or type an
+    // answer"), never only "record" (copy QA).
+    const typingOffered = phase === 'typed' || phase === 'blocked';
+    const err = validate(typingOffered ? { ...question, allowTyped: true } : question, answer);
     if (err) {
       setError(err.message);
       shakeInvalid(phase === 'typed' ? typedRef.current : rootRef.current);

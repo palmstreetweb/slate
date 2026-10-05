@@ -52,6 +52,9 @@ export const LINK_PREVIEW_ONLY =
 /** A 0-byte file: nothing to upload. */
 export const FILE_EMPTY = 'That file is empty. Pick a different file.';
 
+/** A path nothing serves (F27): an old redirect, a form link with something stuck on its end. */
+export const PAGE_NOT_FOUND = 'We couldn’t find that page. Check the link you were sent.';
+
 /** A page part (a chunk) that didn't download. */
 export const PAGE_DIDNT_LOAD = 'This page didn’t load. Check your connection, then try again.';
 

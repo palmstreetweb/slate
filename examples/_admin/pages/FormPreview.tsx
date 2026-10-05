@@ -16,6 +16,7 @@ import { IconChart } from '../mobile/PhoneChrome.js';
 import { hostFileUpload } from '../hostFileUpload.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
 import { setUploadContext, clearUploadContext } from '../uploadContext.js';
+import { withoutRepeatedOptionsIn } from '../uniqueOptions.js';
 
 type Props = { formId: string };
 
@@ -33,6 +34,9 @@ export function FormPreview({ formId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- recount when responses change
     [form, formId, subsTick],
   );
+
+  // A form saved before options got their own values shows each value once (CH-05).
+  const shownSchema = useMemo(() => (form ? withoutRepeatedOptionsIn(form.schema) : null), [form]);
 
   // The frame scrolls (a tall question reaches OK); each new question starts at
   // its top, like the public page. The first question is already there.
@@ -135,33 +139,38 @@ export function FormPreview({ formId }: Props) {
         </button>
         .
       </p>
-      <div ref={frameRef} className="slate-preview slate-preview--page">
-        {/* No `resume` here: the preview is a build/test surface, not a real
+      {/* The frame holds still and the box inside it scrolls: the form's
+          light / dark toggle, pinned to the frame, stays on screen on a tall
+          question (R17). */}
+      <div className="slate-preview slate-preview--page">
+        <div ref={frameRef} className="slate-preview-scroll">
+          {/* No `resume` here: the preview is a build/test surface, not a real
             respondent session. Autosaving partial test runs and offering to
             resume them on every preview open reads as a glitch. Production
             embeds opt into save-and-resume themselves (ADR-017). */}
-        <Form
-          schema={form.schema}
-          onFileUpload={hostFileUpload}
-          resolveFileUploadMeta={resolveUploadMeta}
-          slotsLeft={slotsLeft}
-          onQuestionChange={toFrameTop}
-          onSubmit={async (answers, meta) => {
-            const left = localSlotsLeft(form.schema.questions, listSubmissions(formId));
-            const full = Object.entries(left).flatMap(([question, per]) =>
-              signupPicks(answers[question])
-                .slots.filter((slot) => per[slot] === 0)
-                .map((slot) => ({ question, slot })),
-            );
-            if (full.length) {
-              throw Object.assign(new Error(slotFullMessage(form.schema.questions, full)), {
-                goTo: full[0]!.question,
-              });
-            }
-            // As the submit Function stores it: a location keeps only its verdict (ADR-068).
-            addSubmission(formId, asStoredAnswers(form.schema.questions, answers), meta);
-          }}
-        />
+          <Form
+            schema={shownSchema ?? form.schema}
+            onFileUpload={hostFileUpload}
+            resolveFileUploadMeta={resolveUploadMeta}
+            slotsLeft={slotsLeft}
+            onQuestionChange={toFrameTop}
+            onSubmit={async (answers, meta) => {
+              const left = localSlotsLeft(form.schema.questions, listSubmissions(formId));
+              const full = Object.entries(left).flatMap(([question, per]) =>
+                signupPicks(answers[question])
+                  .slots.filter((slot) => per[slot] === 0)
+                  .map((slot) => ({ question, slot })),
+              );
+              if (full.length) {
+                throw Object.assign(new Error(slotFullMessage(form.schema.questions, full)), {
+                  goTo: full[0]!.question,
+                });
+              }
+              // As the submit Function stores it: a location keeps only its verdict (ADR-068).
+              addSubmission(formId, asStoredAnswers(form.schema.questions, answers), meta);
+            }}
+          />
+        </div>
       </div>
     </AdminShell>
   );

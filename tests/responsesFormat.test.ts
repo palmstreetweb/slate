@@ -17,6 +17,15 @@ describe('responsesFormat', () => {
     ],
   };
 
+  it('titleOf shows piping as "…", and a code title by its type, never an id (copy QA)', () => {
+    expect(
+      titleOf({ id: 'e', type: 'email', title: 'Your email, {{field:name}}?' } as Question),
+    ).toBe('Your email, …?');
+    expect(
+      titleOf({ id: 'q_7', type: 'short_text', title: () => 'Hi' } as unknown as Question),
+    ).toBe('Short Text');
+  });
+
   it('titleOf uses string title', () => {
     expect(titleOf(choice)).toBe('Which service?');
   });

@@ -5,7 +5,7 @@
  */
 
 import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
-import { readRoute, syncPathFromHash } from './_admin/_router.js';
+import { isRespondentRoute, readRoute, syncPathFromHash } from './_admin/_router.js';
 import { isNeonConfigured } from './_admin/neon/config.js';
 import { loadPublishedForm } from './_admin/neon/publicForm.js';
 import { PAGE_DIDNT_LOAD } from './_admin/fillCopy.js';
@@ -15,8 +15,8 @@ migrateSlateLocalStorageKeys();
 syncPathFromHash();
 
 const route = readRoute();
-/** A respondent's page: the public fill link or a portable link. */
-const respondent = route.name === 'fill' || route.name === 'respond';
+/** A respondent's page: the public fill link, a portable link, or a path nothing serves (F27). */
+const respondent = isRespondentRoute(route);
 
 // A redeploy replaces hashed chunks: the studio reloads once to pick up the
 // new build. A respondent's page never reloads by itself (X2) — see preloadError.ts.

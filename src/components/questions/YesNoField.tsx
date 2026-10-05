@@ -22,7 +22,7 @@ export function YesNoField({ question, answers, selected, onSelect, onSkip }: Pr
   const { committed, markCommitted } = useChoiceCommit(selected);
   // Optional and unanswered: Skip (and Enter). Answered, a tap on a choice moves on.
   const skip = question.required === false && !selected ? onSkip : undefined;
-  useRegisterFormConfirm(skip!, Boolean(skip));
+  useRegisterFormConfirm(skip!, Boolean(skip), 500);
   const choices: ReadonlyArray<{ value: 'yes' | 'no'; label: string; badge: string }> = [
     { value: 'yes', label: question.yesLabel ?? 'Yes', badge: 'Y' },
     { value: 'no', label: question.noLabel ?? 'No', badge: 'N' },

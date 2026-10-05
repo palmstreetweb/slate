@@ -11,12 +11,14 @@
  * `schemaIssueBlocks` lists it.
  */
 
-import type { Question, SchemaIssue } from '@/index.js';
-import { checkSchema } from '@/index.js';
+import type { Option, Question, SchemaIssue, SignupSlot } from '@/index.js';
+import { OTHER_VALUE, checkSchema } from '@/index.js';
 import { isValidPrefillKey } from '@/logic/prefill.js';
+import { geoCenter, geoRadiusKm } from '@/logic/geo.js';
+import { PRICE_MAX } from '@/logic/estimate.js';
 import { TYPE_LABEL } from './questionTypeMeta.js';
 import { answerRemoved, conditionLeaves, indexOf, toLeaf, unfinishedReason } from './logicRules.js';
-import { schemaIssueBlocks, studioIssues, type StudioIssueKind } from './formChecks.js';
+import { schemaIssueBlocks, slotName, studioIssues, type StudioIssueKind } from './formChecks.js';
 
 export type OwnerIssueKind =
   | SchemaIssue['kind']
@@ -50,6 +52,92 @@ export function ownerName(q: Question | undefined): string {
     'title' in q && typeof q.title === 'string' ? q.title.replace(/\s+/g, ' ').trim() : '';
   const base = raw || `Untitled ${TYPE_LABEL[q.type] ?? 'question'}`;
   return `“${base.length > 60 ? `${base.slice(0, 59)}…` : base}”`;
+}
+
+const priceOk = (v: unknown) =>
+  typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= PRICE_MAX;
+
+/** Why a low / high price can't be used, as the inspector says it under the inputs; null when it can. */
+function priceWhy(low: unknown, high: unknown): string | null {
+  if (low === undefined && high === undefined) return null;
+  if (low === undefined) return 'Add the low price too, or clear the high end.';
+  if (!priceOk(low) || (high !== undefined && !priceOk(high))) {
+    return `Use a number up to ${PRICE_MAX.toLocaleString('en-US')}.`;
+  }
+  if (high !== undefined && (high as number) < (low as number)) {
+    return 'The high end has to be at least the low price.';
+  }
+  return null;
+}
+
+/** "“Gold”: the high end has to be at least the low price." — the option and the reason (copy QA). */
+function priceSentence(n: string, q: Question | undefined): string {
+  if (q?.type === 'number') {
+    const why = priceWhy(q.unitPrice, q.unitPriceMax);
+    return `${n}: fix the price per unit. ${why ?? ''}`.trim();
+  }
+  const options = (q && 'options' in q && Array.isArray(q.options) ? q.options : []) as Option[];
+  const at = options.findIndex((o) => priceWhy(o.price, o.priceMax));
+  const o = options[at];
+  if (!o) return `${n}: fix a price on one of its options.`;
+  const label = o.label?.trim() ? `“${o.label.trim()}”` : `option ${at + 1}`;
+  return `${n}: fix the price on ${label}. ${priceWhy(o.price, o.priceMax)}`;
+}
+
+/** What the availability grid can't use, in the inspector's own words (copy QA). */
+function gridSentence(n: string, q: Question | undefined): string {
+  const g = (q ?? {}) as {
+    days?: string[];
+    slotMinutes?: number;
+    startTime?: string;
+    endTime?: string;
+  };
+  const mins = (t: string | undefined, d: number) => {
+    if (t === undefined) return d;
+    const m = /^(\d{2}):(\d{2})$/.exec(t);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
+  };
+  const slot = g.slotMinutes ?? 60;
+  if ((g.days ?? []).some((d) => !['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].includes(d))) {
+    return `${n} has a day the grid can’t show. Pick its days again.`;
+  }
+  if (![15, 30, 60, 120].includes(slot)) {
+    return `${n} has a slot length the grid can’t use. Pick one under Each slot.`;
+  }
+  const from = mins(g.startTime, 480);
+  const until = mins(g.endTime, 1080);
+  if (Number.isNaN(from) || Number.isNaN(until)) {
+    return `${n} has a time the grid can’t read. Pick From and Until again.`;
+  }
+  if (until <= from) return `${n}: “Until” has to be after “From”.`;
+  return `${n}: From to Until is shorter than one slot. Pick a later Until or a shorter slot.`;
+}
+
+/** The first slot a sign-up can't offer, by name, and why — as the inline note says it (copy QA). */
+function slotSentence(n: string, q: Question | undefined): string {
+  const slots = (q && 'slots' in q && Array.isArray(q.slots) ? q.slots : []) as SignupSlot[];
+  const seen = new Set<string>();
+  for (const [i, x] of slots.entries()) {
+    const name = `“${slotName(x, i)}”`;
+    const value = typeof x.value === 'string' ? x.value : '';
+    if (!(x.label?.trim() || x.date)) return `${n}: give ${name} a name or a day.`;
+    if (!(Number.isInteger(x.capacity) && x.capacity >= 1 && x.capacity <= 1000)) {
+      return `${n}: ${name} needs 1 to 1,000 spots.`;
+    }
+    if (x.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(x.date)) {
+      return `${n}: ${name} has a day that doesn’t exist. Pick it again.`;
+    }
+    if ([x.start, x.end].some((t) => t !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(t))) {
+      return `${n}: ${name} has a time that can’t be used. Pick it again.`;
+    }
+    if (!/^[\w-]{1,64}$/.test(value) || seen.has(value)) {
+      return `${n}: ${name} can’t be told apart from another slot. Delete it and add it again.`;
+    }
+    seen.add(value);
+  }
+  return slots.length > 50
+    ? `${n} has more than 50 slots. Only the first 50 can be offered.`
+    : `${n} has a slot it can’t offer. Check each one’s name, day and spots.`;
 }
 
 function sentence(
@@ -94,27 +182,38 @@ function sentence(
       }
       return `${n} has a minimum above its maximum, so no answer fits.`;
     case 'bad_price':
-      return `${n} has a price that isn’t a number, is too big, or ends below where it starts.`;
+      return priceSentence(n, q);
     case 'area_off':
       return `${n} has a rule about the service area, but that question has no service area set up.`;
-    case 'bad_service_area':
-      return q?.type === 'location'
-        ? `${n} needs your business location and a distance to check the service area.`
-        : `${n} lists a service area entry that isn’t a ZIP code.`;
+    case 'bad_service_area': {
+      if (q?.type !== 'location') return `${n} lists a service area entry that isn’t a ZIP code.`;
+      // Say only what's missing (copy QA): the location, the distance, or both.
+      const rec = q as unknown as Record<string, unknown>;
+      const center = geoCenter(rec) !== null;
+      const radius = geoRadiusKm(rec) !== null;
+      return center && !radius
+        ? `${n} needs a distance to check the service area, or clear your business location.`
+        : !center && radius
+          ? `${n} needs your business location to check the service area, or clear the distance.`
+          : `${n} needs your business location and a distance to check the service area.`;
+    }
     case 'no_fields':
       return `${n} asks for no contact details. Turn on name, email or phone.`;
     case 'no_image':
-      return `${n} needs a photo to mark. Upload one or paste an https link.`;
+      return `${n} needs a photo to mark. Upload one, or paste a link to a photo.`;
     case 'no_items':
-      return `${n} doesn’t list any photos to take. Add at least one.`;
+      // A checklist whose photos are all unnamed isn't empty (copy QA).
+      return q?.type === 'photo_checklist' && (q.items ?? []).length > 0
+        ? `${n} has photos to take with no names. Name each one, so people know what to shoot.`
+        : `${n} doesn’t list any photos to take. Add at least one.`;
     case 'bad_grid':
-      return `${n} has days, times or a slot length the grid can’t use.`;
+      return gridSentence(n, q);
     case 'swipe_single':
       return `${n} uses swipe cards, which need “Allow multiple selections” turned on.`;
     case 'no_slots':
       return `${n} has no slots to sign up for. Add one with a name and its spots.`;
     case 'bad_slots':
-      return `${n} has a slot it can’t offer. Each needs a name, 1 to 1,000 spots, and a real date and time.`;
+      return slotSentence(n, q);
     default:
       // A check this list doesn't know yet: its message, with titles for ids.
       return issue.message.replace(/"([^"]+)"/g, (whole, id: string) =>
@@ -154,7 +253,8 @@ function ruleIssues(questions: ReadonlyArray<Question>, byId: Map<string, Questi
             'rule_unfinished',
             `${n} has an unfinished “when to show” rule. Finish it or remove it.`,
           );
-        } else if (leaf && answerRemoved(leaf, questions)) {
+        } else if (leaf && leaf.value !== OTHER_VALUE && answerRemoved(leaf, questions)) {
+          // "Other" switched off is the engine's own issue (other_off): said once (R25).
           add(
             q,
             'answer_removed',
@@ -185,7 +285,7 @@ function ruleIssues(questions: ReadonlyArray<Question>, byId: Map<string, Questi
           );
         } else if (leaf && unfinishedReason(leaf, questions)) {
           add(q, 'rule_unfinished', `${n} has an unfinished skip rule. Finish it or remove it.`);
-        } else if (leaf && answerRemoved(leaf, questions)) {
+        } else if (leaf && leaf.value !== OTHER_VALUE && answerRemoved(leaf, questions)) {
           add(
             q,
             'answer_removed',

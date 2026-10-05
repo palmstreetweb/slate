@@ -41,8 +41,9 @@ export function withoutRepeatedOptions<Q extends Question>(questions: ReadonlyAr
   return next.some((q, i) => q !== questions[i]) ? next : (questions as Q[]);
 }
 
-/** The schema a respondent is shown (the same object when nothing repeats). */
+/** The schema a respondent is shown (the same object when nothing repeats, or nothing to read). */
 export function withoutRepeatedOptionsIn<S extends Schema>(schema: S): S {
+  if (!Array.isArray(schema?.questions)) return schema;
   const questions = withoutRepeatedOptions(schema.questions);
   return questions === schema.questions ? schema : { ...schema, questions };
 }

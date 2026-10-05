@@ -61,7 +61,7 @@ export function SingleChoiceField({
   // OK commits the typed Other; an optional, unanswered question can be skipped.
   const skip = !other.open && question.required === false && !selected ? onSkip : undefined;
   const confirm = other.open ? commitOther : skip;
-  useRegisterFormConfirm(confirm!, Boolean(confirm));
+  useRegisterFormConfirm(confirm!, Boolean(confirm), skip && 500);
   useRegisterOtherKey(other.openBox, other.enabled);
 
   return (

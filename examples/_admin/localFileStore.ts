@@ -23,7 +23,7 @@ export const LOCAL_FULL =
   'This device is out of room for files. Free up some space, then try again.';
 /** Saving failed for any other reason (some private windows block storage). */
 export const LOCAL_SAVE_FAILED =
-  'We couldn’t save that file on this device. Try again, or open the link in another browser.';
+  'We couldn’t save that on this device. Try again, or use another browser.';
 
 function idOf(ref: string): string {
   return ref.startsWith('slate-file://') ? ref.slice('slate-file://'.length) : ref;

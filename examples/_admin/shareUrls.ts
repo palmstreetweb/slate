@@ -95,6 +95,12 @@ function escapeHtmlAttr(raw: string): string {
  * bottom): the form is one question at a time and fills its frame, so on a
  * phone it reads like the form's own page instead of a 560 px box scrolling
  * inside the host page (GAP-25, ADR-054 addendum).
+ *
+ * A tiny script rides along (GAP-25 retest): on each new question the form
+ * posts `{ type: 'slate:top' }`, and if the host page has scrolled past the
+ * frame's top, the script brings it back into view — the form can't scroll
+ * someone else's page itself. It only listens to its own frame, reads nothing
+ * else, and a page that strips scripts still gets a working form.
  */
 export function buildEmbedSnippet(
   publicUrl: string,
@@ -111,8 +117,22 @@ export function buildEmbedSnippet(
     ...(questions.some((q) => q.type === 'location') ? ['geolocation'] : []),
   ];
   const allowAttr = allow.length ? ` allow="${allow.join('; ')}"` : '';
-  return `<iframe src="${src}" title="${title}"${allowAttr} style="width:100%;height:85vh;height:85svh;min-height:560px;border:0" loading="lazy"></iframe>`;
+  return (
+    `<iframe src="${src}" title="${title}"${allowAttr} style="width:100%;height:85vh;height:85svh;min-height:560px;border:0" loading="lazy"></iframe>\n` +
+    EMBED_TOP_SCRIPT
+  );
 }
+
+/**
+ * The host-page half of `slate:top` (GAP-25): scroll the frame's top back
+ * into view when a new question appears and the page has scrolled past it.
+ * It follows the iframe it was pasted with, and answers that frame only.
+ */
+export const EMBED_TOP_SCRIPT =
+  '<script>(function(f){addEventListener("message",function(e){' +
+  'if(f&&e.source===f.contentWindow&&e.data&&e.data.type==="slate:top"' +
+  '&&f.getBoundingClientRect().top<0)f.scrollIntoView()})})' +
+  '(document.currentScript&&document.currentScript.previousElementSibling)</script>';
 
 /** Hash-route preview — schema from localStorage on this device only. */
 export function buildDevPreviewUrl(formId: string): string {

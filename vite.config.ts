@@ -58,7 +58,12 @@ export default defineConfig(({ mode }) => {
               console.error('[slate] /api/generate', err);
               res.statusCode = 500;
               res.setHeader('content-type', 'application/json');
-              res.end(JSON.stringify({ error: 'Generate failed.' }));
+              res.end(
+                JSON.stringify({
+                  error: 'Build with AI isn’t working right now. Try again in a minute.',
+                  retry: true,
+                }),
+              );
             });
           });
         },

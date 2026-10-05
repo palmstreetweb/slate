@@ -57,7 +57,11 @@ import {
 } from '../examples/_admin/neon/neonError.js';
 import {
   clearFormsRemoteCache,
+  duplicateFormRemoteSync,
   hydrateFormsRemote,
+  listFormsRemote,
+  listTrashedFormsRemote,
+  restoreAllFormsRemoteSync,
   setFormFillPasswordRemote,
   trashFormRemoteSync,
   updateFormRemoteSync,
@@ -225,6 +229,39 @@ describe('form saves report plain words', () => {
       title: 'Couldn’t move that form to Trash',
       message: 'Check your connection and try again.',
     });
+  });
+
+  it('a duplicate that never left the device says to try again, and goes away (R27)', async () => {
+    db.insertError = FETCH_FAILED;
+    const copy = duplicateFormRemoteSync('f_1');
+    expect(copy).not.toBeNull();
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+    // Not the editor's "Your last change isn't saved yet": nothing was being edited.
+    expect(events[0]).toEqual({
+      kind: 'form',
+      title: 'Couldn’t create that form',
+      message: 'Check your connection and try again.',
+    });
+    expect(listFormsRemote().map((f) => f.id)).toEqual(['f_1']);
+    db.insertError = null;
+  });
+
+  it('Restore all that never left the device puts each form back in the trash (R27)', async () => {
+    trashFormRemoteSync('f_1');
+    await vi.waitFor(() => expect(listTrashedFormsRemote()).toHaveLength(1));
+    // Let the trash's own write land before the restore is queued behind it.
+    await new Promise((r) => setTimeout(r, 0));
+    db.upsertError = FETCH_FAILED;
+    restoreAllFormsRemoteSync();
+    expect(listTrashedFormsRemote()).toHaveLength(0);
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+    expect(events[0]).toEqual({
+      kind: 'form',
+      title: 'Couldn’t restore those forms',
+      message: 'Check your connection and try again.',
+    });
+    // The trash shows what the server still has: the form, not "Trash is empty".
+    expect(listTrashedFormsRemote().map((f) => f.id)).toEqual(['f_1']);
   });
 
   it('the password lock: offline and a missing switch, both plain', async () => {

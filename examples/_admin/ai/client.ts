@@ -2,6 +2,7 @@ import type { GeneratedForm } from '../../../api/generateFormSchema.js';
 import { mapGeneratedForm } from '../../../api/mapGeneratedForm.js';
 import type { Schema } from '@/index.js';
 import { authHeader } from '../storageUpload.js';
+import { looksTechnical } from '../shell/PersistErrorToasts.js';
 
 export type GeneratedDraft = {
   name: string;
@@ -38,6 +39,14 @@ export class GenerateRequestError extends Error {
 const OFFLINE = 'Can’t reach Slate. Check your connection and try again.';
 const TOO_SLOW = 'That took too long. Try a shorter description or a smaller PDF.';
 const NOT_WORKING = 'Build with AI isn’t working right now. Try again in a minute.';
+
+/** An error the route didn't word for owners: codes, log lines, markup, a model's own words. */
+function sentLooksTechnical(message: string): boolean {
+  return (
+    looksTechnical(message) ||
+    /\berror\b|exception|attempts?\b|overloaded|status \d|\b[45]\d\d\b/i.test(message)
+  );
+}
 const NO_FORM = 'Couldn’t build a form from that. Try describing it differently.';
 const DAILY_RESET = 'after the daily reset';
 
@@ -81,7 +90,11 @@ export async function requestGeneratedForm(
   } | null;
   if (!res.ok) {
     // Our route always words its `error` for owners (api/generate.ts).
-    const sent = typeof data?.error === 'string' ? data.error.trim() : '';
+    const raw = typeof data?.error === 'string' ? data.error.trim() : '';
+    // Our route words its errors; anything that still reads like a log line
+    // ("Failed after 2 attempts. Last error: Overloaded") gets plain words (copy QA).
+    if (raw && sentLooksTechnical(raw)) console.error('[slate] Build with AI error', raw);
+    const sent = raw && sentLooksTechnical(raw) ? NOT_WORKING : raw;
     if (sent) {
       const when = localResetPhrase(data?.resetsAt);
       const message = when && sent.includes(DAILY_RESET) ? sent.replace(DAILY_RESET, when) : sent;

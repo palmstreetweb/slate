@@ -23,13 +23,21 @@ import {
 import { formatVoiceNote, voiceAudioOf, voiceTypedOf } from '@/logic/media.js';
 import { signupPicks } from '@/logic/signupAnswer.js';
 import { slotName, slotWhenText } from '@/logic/signupView.js';
+import { usPhoneText } from '@/logic/reviewText.js';
 import { peekLocalUploadMeta } from './localFileStore.js';
+import { TYPE_LABEL } from './questionTypeMeta.js';
 import { safeText } from './answerShape.js';
 
 const CONTACT_PRIORITY = new Set<Question['type']>(['short_text', 'email', 'phone', 'url']);
 
+/**
+ * A question as the owner reads it in Responses: its title, with piping shown
+ * as "…" rather than "{{field:name}}" (one title serves every response), or
+ * its type when the title is code ("Short Text") — never its internal id.
+ */
 function titleOf(q: Question): string {
-  return typeof q.title === 'string' ? q.title : q.id;
+  if (typeof q.title !== 'string') return TYPE_LABEL[q.type] ?? 'Question';
+  return q.title.replace(/\{\{\s*(?:score|estimate|field:[\w-]+)\s*\}\}/g, '…');
 }
 
 function optionLabel(q: Question, value: string): string | null {
@@ -37,14 +45,29 @@ function optionLabel(q: Question, value: string): string | null {
   return q.options.find((o) => o.value === value)?.label ?? null;
 }
 
+/** How an answer reads when its option was deleted after it was given. */
+export const REMOVED_OPTION = 'Removed option';
+
+/**
+ * A value the studio gave an option (`opt_` and six letters or digits,
+ * formChecks.newOptionValue) that the question no longer lists: an option
+ * deleted after someone picked it, not something they typed under Other.
+ */
+export function isRemovedOptionValue(value: string): boolean {
+  return /^opt_[a-z0-9]{6}$/.test(value);
+}
+
 /**
  * A choice value as the owner reads it: the option's label, or — on a question
- * that allows Other (ADR-063) — "Other: what they typed".
+ * that allows Other (ADR-063) — "Other: what they typed". An option deleted
+ * since reads "Removed option", never its stored code (copy QA): without
+ * Other, any value the list doesn't have is one.
  */
 function choiceText(q: Question, value: string): string {
   const label = optionLabel(q, value);
   if (label !== null) return label;
-  return allowsOther(q) ? `${otherLabelOf(q)}: ${value}` : value;
+  if (!allowsOther(q) || isRemovedOptionValue(value)) return REMOVED_OPTION;
+  return `${otherLabelOf(q)}: ${value}`;
 }
 
 /**
@@ -77,14 +100,14 @@ function formatAnswer(question: Question, value: unknown): string {
       return safeText(value);
 
     case 'date':
-      // Plain dates stay ISO, as they always were; a time or a range reads in the form's format.
-      if (
-        typeof value === 'string' &&
-        (question.includeTime || question.range || value.length > 10)
-      ) {
-        return formatDateAnswer(value, question.format);
-      }
+      // In the form's own format ("10/12/2026"), as the respondent saw it (copy
+      // QA); the CSV keeps plain dates ISO so a sheet sorts them.
+      if (typeof value === 'string') return formatDateAnswer(value, question.format) || value;
       return safeText(value);
+
+    case 'phone':
+      // As typed, "(805) 555-0100", never the stored "+18055550100" (copy QA).
+      return typeof value === 'string' ? usPhoneText(value) : safeText(value);
 
     case 'number':
       if (typeof value === 'number' && (question.prefix || question.unit)) {
@@ -120,18 +143,27 @@ function formatAnswer(question: Question, value: unknown): string {
         !Array.isArray(value) &&
         'rows' in question
       ) {
-        return Object.entries(value as Record<string, unknown>)
-          .map(([rowVal, col]) => {
-            const rowLabel =
-              question.rows.find((r) => r.value === rowVal)?.label ?? safeText(rowVal);
-            const colVal = Array.isArray(col) ? col[0] : col;
-            const colLabel =
-              typeof colVal === 'string' && 'columns' in question
-                ? (question.columns.find((c) => c.value === colVal)?.label ?? safeText(colVal))
-                : safeText(col);
-            return `${rowLabel}: ${colLabel}`;
-          })
-          .join('\n');
+        return (
+          Object.entries(value as Record<string, unknown>)
+            // A row ticked and then unticked stays in the answer, empty: leave it out (copy QA).
+            .filter(
+              ([, col]) => !(col === '' || col == null || (Array.isArray(col) && !col.length)),
+            )
+            .map(([rowVal, col]) => {
+              const rowLabel =
+                question.rows.find((r) => r.value === rowVal)?.label ?? safeText(rowVal);
+              // Several per row: every column picked, not only the first.
+              const colLabel = (Array.isArray(col) ? col : [col])
+                .map((colVal) =>
+                  typeof colVal === 'string' && 'columns' in question
+                    ? (question.columns.find((c) => c.value === colVal)?.label ?? safeText(colVal))
+                    : safeText(colVal),
+                )
+                .join(', ');
+              return `${rowLabel}: ${colLabel}`;
+            })
+            .join('\n')
+        );
       }
       return safeText(value);
 
@@ -170,7 +202,7 @@ function formatAnswer(question: Question, value: unknown): string {
       if (typeof value !== 'object' || Array.isArray(value)) return safeText(value);
       const parts = CONTACT_FIELDS.map((f) => (value as Record<string, unknown>)[f])
         .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
-        .map((v) => v.trim());
+        .map((v) => usPhoneText(v.trim()));
       return parts.length ? parts.join('\n') : '—';
     }
 
@@ -584,6 +616,8 @@ export function formatAnswerForCsv(question: Question, value: unknown): string {
     const name = describeFileUploadAnswer(ref, peekLocalUploadMeta(ref));
     return `${formatVoiceNote(value)}${name ? `: ${name}` : ''}`;
   }
+  // A plain date stays ISO in a sheet, which sorts it (the reader shows the form's format).
+  if (question.type === 'date' && typeof value === 'string' && value.length === 10) return value;
   const formatted = formatAnswerForQuestion(question, value);
   if (formatted === '—') return '';
   return formatted.replace(/\n/g, '; ');

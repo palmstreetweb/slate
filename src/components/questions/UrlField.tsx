@@ -76,6 +76,7 @@ export function UrlField({
           ref={inputRef}
           type="text"
           inputMode="url"
+          enterKeyHint="next"
           autoComplete="url"
           value={value}
           onChange={(e) => {
