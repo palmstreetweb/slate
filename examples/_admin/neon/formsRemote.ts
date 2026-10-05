@@ -15,7 +15,14 @@ import {
   quotaFromUnknown,
   type FormQuota,
 } from '../formQuota.js';
-import { formatNeonError, isQuotaExceededError, isRlsOrAuthError } from './neonError.js';
+import {
+  SessionNotReadyError,
+  formatNeonError,
+  isQuotaExceededError,
+  isRlsOrAuthError,
+  userNeonError,
+  type NeonAction,
+} from './neonError.js';
 import { formRecordToRow, rowToFormRecord } from './mappers.js';
 import {
   FORM_CLOSE_COLUMNS,
@@ -123,7 +130,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
   if (rows.length === 0 && cache.length === 0 && opts?.soft) {
     const { data: uid } = await neon.rpc('auth_uid');
     if (typeof uid !== 'string' || !uid) {
-      throw new Error('No auth session — cannot load forms.');
+      throw new SessionNotReadyError('Slate couldn’t confirm it’s you yet.');
     }
     rows = await fetchForms();
   }
@@ -132,9 +139,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
   if (rows.length === 0 && !opts?.soft) {
     const auth = await waitForAuthReady(3);
     if (!auth.ok) {
-      throw new Error(
-        'Signed in, but the database could not resolve your user id from the session. Sign out and back in, then try again.',
-      );
+      throw new SessionNotReadyError('Slate couldn’t confirm it’s you yet.');
     }
     // Auth is confirmed — empty library is normal. One brief refetch only if
     // the first read may have raced token attachment.
@@ -241,9 +246,11 @@ export async function setFormFillPasswordRemote(
     }
     if ((err as { code?: string } | null)?.code === 'PGRST202') {
       // Migration 012 applied but the Data API schema cache is stale (or 012 is missing).
-      return { ok: false, message: 'Password lock isn’t switched on for this workspace yet.' };
+      console.error('[slate] fill password RPC missing:', formatNeonError(err, 'PGRST202'));
+      return { ok: false, message: 'Password lock isn’t available yet. Try again later.' };
     }
-    return { ok: false, message: formatNeonError(err, 'Could not update the password.') };
+    console.error('[slate] fill password failed:', formatNeonError(err, 'unknown error'));
+    return { ok: false, message: userNeonError(err, 'password') };
   }
 }
 
@@ -337,7 +344,7 @@ async function insertForm(form: FormRecord): Promise<string> {
     if (!isRlsOrAuthError(err)) throw err;
     const auth = await waitForAuthReady(3);
     if (!auth.ok) {
-      throw new Error('Could not save — session expired. Sign out and back in, then try again.');
+      throw new SessionNotReadyError('Your sign-in expired. Sign out and back in, then try again.');
     }
     await write();
   }
@@ -368,7 +375,7 @@ async function upsertForm(form: FormRecord): Promise<void> {
     // allowAnonymous can briefly attach an anon JWT while the UI still looks signed-in.
     const auth = await waitForAuthReady(3);
     if (!auth.ok) {
-      throw new Error('Could not save — session expired. Sign out and back in, then try again.');
+      throw new SessionNotReadyError('Your sign-in expired. Sign out and back in, then try again.');
     }
     await write();
   }
@@ -414,11 +421,22 @@ function mergeHydratedForms(serverRows: FormRecord[]): FormRecord[] {
   );
 }
 
-function emitPersistError(kind: 'form' | 'submission', message: string): void {
+/** `message` is owner copy; `title` replaces the toast's default heading. */
+function emitPersistError(kind: 'form' | 'submission', message: string, title?: string): void {
   console.error(`[slate] ${kind} persist failed:`, message);
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('slate-persist-error', { detail: { kind, message } }));
+    window.dispatchEvent(
+      new CustomEvent('slate-persist-error', {
+        detail: { kind, message, ...(title ? { title } : {}) },
+      }),
+    );
   }
+}
+
+/** Log the raw error, tell the owner in plain words (QA COPY-01). */
+function reportFormFailure(err: unknown, action: NeonAction, title?: string): void {
+  console.error('[slate] form write failed:', formatNeonError(err, 'unknown error'));
+  emitPersistError('form', userNeonError(err, action), title);
 }
 
 function emitPersistOk(kind: 'form' | 'submission'): void {
@@ -431,7 +449,7 @@ function emitPersistOk(kind: 'form' | 'submission'): void {
  * `onFail` runs when this exact write fails, so an optimistic change (trash,
  * restore) can be put back instead of looking done while the server disagrees.
  */
-function enqueueFormUpsert(form: FormRecord, onFail?: () => void): void {
+function enqueueFormUpsert(form: FormRecord, onFail?: () => void, failTitle?: string): void {
   if (deletedFormIds.has(form.id)) return;
   queuedFormWrite.set(form.id, form);
   const prev = formWriteChain.get(form.id) ?? Promise.resolve();
@@ -451,9 +469,10 @@ function enqueueFormUpsert(form: FormRecord, onFail?: () => void): void {
           await upsertForm(latest);
           emitPersistOk('form');
         } catch (err) {
-          const message = formatNeonError(err, 'Could not save form');
           if (latest === form) onFail?.();
-          emitPersistError('form', message);
+          // A trash or restore names itself; an edit says the change isn't saved.
+          const own = latest === form && failTitle;
+          reportFormFailure(err, own ? 'delete' : 'save', own ? failTitle : undefined);
           throw err;
         }
       }
@@ -499,8 +518,7 @@ function enqueueFormInsert(form: FormRecord): void {
         emitPersistOk('form');
       } catch (err) {
         dropOptimisticForm(form.id);
-        const message = formatNeonError(err, 'Could not save form');
-        emitPersistError('form', message);
+        reportFormFailure(err, 'save', 'Couldn’t create that form');
         throw err;
       }
     })
@@ -529,8 +547,7 @@ function enqueueFormDelete(formId: string, onFailRestore?: FormRecord): void {
         emitPersistOk('form');
       } catch (err) {
         deletedFormIds.delete(formId);
-        const message = formatNeonError(err, 'Could not delete form');
-        emitPersistError('form', message);
+        reportFormFailure(err, 'delete', 'Couldn’t delete that form');
         if (onFailRestore) {
           cache = [onFailRestore, ...read().filter((f) => f.id !== onFailRestore.id)];
           notify();
@@ -756,7 +773,11 @@ export async function replaceAllFormsRemote(input: FormRecord[]): Promise<boolea
 /** Optimistic sync wrapper — updates cache immediately, persists in background. */
 export function createFormRemoteSync(opts: { name: string; schema: Schema }): FormRecord | null {
   if (isAtFormQuotaRemote()) {
-    emitPersistError('form', formQuotaUserMessage(getFormQuotaRemote()));
+    emitPersistError(
+      'form',
+      formQuotaUserMessage(getFormQuotaRemote()),
+      'Couldn’t create that form',
+    );
     return null;
   }
   const now = new Date().toISOString();
@@ -821,7 +842,7 @@ export function trashFormRemoteSync(formId: string): boolean {
   copy[idx] = next;
   cache = copy;
   notify();
-  enqueueFormUpsert(next, () => rollbackForm(before, next));
+  enqueueFormUpsert(next, () => rollbackForm(before, next), 'Couldn’t move that form to Trash');
   return true;
 }
 
@@ -835,7 +856,7 @@ export function restoreFormRemoteSync(formId: string): boolean {
   copy[idx] = next;
   cache = copy;
   notify();
-  enqueueFormUpsert(next, () => rollbackForm(before, next));
+  enqueueFormUpsert(next, () => rollbackForm(before, next), 'Couldn’t restore that form');
   return true;
 }
 
@@ -923,8 +944,7 @@ export function replaceAllFormsRemoteSync(input: FormRecord[]): boolean {
       for (const f of prev) await deleteFormRow(f.id);
       for (const f of forms) await upsertForm(f);
     } catch (err) {
-      const message = formatNeonError(err, 'Could not replace forms');
-      emitPersistError('form', message);
+      reportFormFailure(err, 'restore-backup', 'Couldn’t restore your backup');
       try {
         await hydrateFormsRemote();
       } catch {

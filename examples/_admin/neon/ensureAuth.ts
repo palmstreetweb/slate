@@ -5,7 +5,7 @@
  */
 
 import { getNeon } from './client.js';
-import { isRlsOrAuthError } from './neonError.js';
+import { SessionNotReadyError, isRlsOrAuthError } from './neonError.js';
 
 function tokenFromSession(session: unknown): string {
   if (!session || typeof session !== 'object') return '';
@@ -78,7 +78,7 @@ export async function ensureAuthForDataApi(): Promise<ReadyAuth> {
     // AuthProvider checks with the server and shows Login if the session is gone,
     // instead of leaving a studio where every save fails (login check).
     window.dispatchEvent(new Event('slate-auth-lost'));
-    throw new Error('No auth session — cannot load forms.');
+    throw new SessionNotReadyError();
   }
 
   return { accessToken: token, email: emailFromSession(session) };
@@ -102,9 +102,9 @@ export async function waitForAuthReady(maxAttempts = 5): Promise<{
 
     const { data: uid, error } = await neon.rpc('auth_uid');
     // No token for the Data API yet is "not settled", not a failure — retry below.
-    if (error && !isRlsOrAuthError(error)) {
-      throw new Error(`${error.message || 'Database access check failed'} — cannot load forms.`);
-    }
+    // Not an auth hiccup (offline, the database is down): hand the error on as
+    // it is, so the studio can say which in plain words (neonError.ts).
+    if (error && !isRlsOrAuthError(error)) throw error;
 
     const authUid = !error && typeof uid === 'string' && uid ? uid : null;
     if (authUid) {

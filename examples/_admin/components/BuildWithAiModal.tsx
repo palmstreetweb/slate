@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
-import { requestGeneratedForm, type GeneratedDraft } from '../ai/client.js';
+import { GenerateRequestError, requestGeneratedForm, type GeneratedDraft } from '../ai/client.js';
 import { readSlateMode } from '../slateMode.js';
 import { useFocusTrap } from '../useFocusTrap.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
@@ -65,6 +65,15 @@ const TYPE_LABEL: Record<string, string> = {
 
 type Phase = 'compose' | 'generating' | 'review' | 'opening';
 
+/** Same caps as /api/generate, enforced while typing instead of after sending. */
+export const AI_PROMPT_MAX = 2000;
+export const AI_REVISE_MAX = 800;
+const MAX_FILE_BYTES = 3_000_000;
+/** The counter appears once a description gets long. */
+const AI_PROMPT_COUNT_FROM = 1500;
+
+type AiError = { message: string; retryable: boolean };
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -75,7 +84,9 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [prompt, setPrompt] = useState('');
   const [revise, setRevise] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AiError | null>(null);
+  /** A file that can't be used — never retried, so it has no Retry button. */
+  const [fileError, setFileError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('compose');
   const [revealed, setRevealed] = useState<string[]>([]);
   const [draft, setDraft] = useState<GeneratedDraft | null>(null);
@@ -87,6 +98,11 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
   const dropLandedTimer = useRef<number>(0);
 
   const busy = phase === 'generating' || phase === 'opening';
+  /** The form-limit dialog closes this modal before onReady throws; don't reopen onto that error. */
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   useFocusTrap(panelRef, open, () => {
     if (!busy) onClose();
@@ -100,6 +116,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
   useEffect(() => {
     if (open) return;
     setError(null);
+    setFileError(null);
     setRevealed([]);
     setDraft(null);
     setRevise('');
@@ -123,6 +140,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
       const token = (genRef.current += 1);
       setPhase('generating');
       setError(null);
+      setFileError(null);
       setRevealed([]);
       const fromPdf = !revising && Boolean(file);
       if (fromPdf) setConverting(true);
@@ -159,7 +177,12 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
         setPhase('review');
       } catch (err) {
         if (token !== genRef.current) return;
-        setError(err instanceof Error ? err.message : 'Could not generate the form.');
+        if (err instanceof GenerateRequestError) {
+          setError({ message: err.message, retryable: err.retryable });
+        } else {
+          console.error('[slate] Build with AI failed', err);
+          setError({ message: 'Something went wrong building your form. Try again.', retryable: true });
+        }
         setPhase(draft ? 'review' : 'compose');
       } finally {
         if (!revising && file) setConverting(false);
@@ -172,8 +195,8 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
     if (!picked || busy) return;
     const name = picked.name || 'document';
     const ext = name.split('.').pop()?.toLowerCase() ?? '';
-    if (picked.size > 3_000_000) {
-      setError('Keep the file under 3 MB.');
+    if (picked.size > MAX_FILE_BYTES) {
+      setFileError('That PDF is too big. Pick one under 3 MB.');
       return;
     }
     if (ext === 'pdf' || picked.type === 'application/pdf') {
@@ -184,10 +207,11 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
         binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
       }
       setFile({ name, mime: 'application/pdf', base64: btoa(binary) });
+      setFileError(null);
       setError(null);
       return;
     }
-    setError('Start with a PDF. Word and Pages can come later.');
+    setFileError('Only PDFs work here for now. Save it as a PDF and try again.');
   }, [busy]);
 
   useEffect(() => {
@@ -244,7 +268,14 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
     try {
       await onReady(draft);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save the draft.');
+      // The form limit has its own dialog (Dashboard), which closes this modal;
+      // anything else is a save that didn't land, and "Open in editor" retries.
+      console.error('[slate] Build with AI draft not saved', err);
+      if (!openRef.current) return;
+      setError({
+        message: 'Couldn’t save the draft. Check your connection, then press Open in editor again.',
+        retryable: false,
+      });
       setPhase('review');
     }
   }, [draft, onReady, phase]);
@@ -297,6 +328,8 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                   rows={5}
                   value={prompt}
                   disabled={busy}
+                  maxLength={AI_PROMPT_MAX}
+                  aria-describedby={prompt.length >= AI_PROMPT_COUNT_FROM ? 'slate-ai-count' : undefined}
                   placeholder="Type what this form should ask…"
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => {
@@ -306,6 +339,22 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                     }
                   }}
                 />
+                {prompt.length >= AI_PROMPT_COUNT_FROM ? (
+                  <p
+                    id="slate-ai-count"
+                    aria-live="polite"
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      textAlign: 'right',
+                      color: 'var(--chrome-muted, var(--slate-muted))',
+                    }}
+                  >
+                    {prompt.length >= AI_PROMPT_MAX
+                      ? `That’s the limit: ${AI_PROMPT_MAX.toLocaleString()} characters.`
+                      : `${prompt.length.toLocaleString()} / ${AI_PROMPT_MAX.toLocaleString()} characters`}
+                  </p>
+                ) : null}
                 <input
                   ref={fileRef}
                   type="file"
@@ -334,7 +383,10 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                         disabled={busy}
                         aria-label="Remove PDF"
                         data-slate-sound="none"
-                        onClick={() => setFile(null)}
+                        onClick={() => {
+                          setFile(null);
+                          setFileError(null);
+                        }}
                       >
                         ✕
                       </button>
@@ -392,6 +444,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                 rows={2}
                 value={revise}
                 disabled={busy}
+                maxLength={AI_REVISE_MAX}
                 placeholder="Tell it what to change…"
                 onChange={(e) => setRevise(e.target.value)}
                 onKeyDown={(e) => {
@@ -432,16 +485,24 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
             </ol>
           ) : null}
 
+          {fileError ? (
+            <div className="slate-ai-error" role="alert">
+              <p>{fileError}</p>
+            </div>
+          ) : null}
+
           {error && (
             <div className="slate-ai-error" role="alert">
-              <p>{error}</p>
-              <button
-                type="button"
-                className="slate-btn slate-btn--compact"
-                onClick={() => void generate(lastInstructionRef.current)}
-              >
-                Retry
-              </button>
+              <p>{error.message}</p>
+              {error.retryable ? (
+                <button
+                  type="button"
+                  className="slate-btn slate-btn--compact"
+                  onClick={() => void generate(lastInstructionRef.current)}
+                >
+                  Retry
+                </button>
+              ) : null}
             </div>
           )}
 

@@ -1,7 +1,8 @@
 /**
- * Zod model for Build with AI drafts (ADR-039).
- * Flat question objects (not a 20-way union) so Anthropic structured output
- * can compile the grammar. Every editor-addable type is still allowed.
+ * Zod model for Build with AI drafts (ADR-039): the full draft the studio
+ * reviews, revises and maps. Flat question objects, every editor-addable type.
+ * The model itself fills the smaller shape in _modelForm.ts — this one grew
+ * past what Anthropic's structured output can compile.
  */
 
 import { z } from 'zod';
@@ -302,9 +303,13 @@ export function withDraftDefaults(raw: unknown): unknown {
 export type GeneratedForm = z.infer<typeof generatedFormSchema>;
 export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
 
+/**
+ * Written for the model's own shape (api/_modelForm.ts): 13 fields per
+ * question, rare settings as short words, option extras in `more`.
+ */
 export const GENERATE_SYSTEM_PROMPT = `You author first-draft conversational forms for Slate (Palm Street Web).
 
-Return one form object that matches the schema exactly. Each question is a flat object: fill unused strings with "", unused numbers with 0, unused option arrays with [].
+Return one form object that matches the schema exactly. Every question has the same fields: fill unused strings with "", unused numbers with 0, unused lists with [].
 
 Chrome (never inside questions[]):
 - welcome — ALWAYS the first screen the respondent sees. A host greeting, not a question.
@@ -326,39 +331,55 @@ Use only when the prompt clearly needs them:
 - scale — 1–5 / 1–10 rating (not NPS)
 - nps — "how likely to recommend"
 - ranking / matrix — only if the user asks to rank or grade several items
-- picture_choice — only if the user wants images. Each option needs https src + alt. You may use https://picsum.photos/seed/<value>/400/300
+- picture_choice — only if the user wants images
 - statement / review — sparingly
 
 Do not add ranking, matrix, NPS, or picture_choice to "look complete."
 
-Options (leave false / "" unless they clearly help):
-- allowOther: true on single_choice, multi_choice, dropdown or picture_choice when people may not fit the list ("How did you hear about us?", "Which service?"). Adds "Other" with a text box. Never on yes_no or legal.
-- display on scale: "stars" to rate a visit or service, "emoji" (faces) for how someone feels, "slider" for a wide range like 0–10. Otherwise "".
-- display "stepper" on number for small counts (rooms, windows, people, pets): set min and max; unit ("windows", "sq ft") and prefix ("$") are display only.
-- min / max: on number the lowest / highest answer, on multi_choice and picture_choice how many picks (whole numbers). 0 = no limit. A required multi_choice needs at least one pick.
-- date: includeTime for appointments or pickups at a time of day; range for spans (a stay, event dates, "available from / to").
+Question fields:
+- text — the placeholder for typed answers and dropdowns (specific, never "Type here"); the body for statement, legal, signature, voice_note and signup_slots; the subtitle for review.
+- labels — words shown on the screen: yes_no buttons only when custom (["Count me in", "Not this time"]; [] shows Yes / No); legal buttons only when custom ([] shows Accept / Decline); scale and nps [low-end label, high-end label] ("Not at all likely", "Extremely likely"); statement and review [button text]; matrix: the column labels (the rows are its options); address: the ZIP codes or prefixes served, only when the user lists them (e.g. ["93101","93103"] or ["931"]). Otherwise [].
+- options — choices, ranking items, matrix rows, photo_checklist shots, signup_slots slots. label is shown; value is a stable snake_case id (chicken, vegetarian). price and more: see below.
+- min / max / step — number: bounds and step (0 = no limit); scale: low and high end; multi_choice and picture_choice: fewest / most picks, whole numbers (0 = no limit; a required multi_choice needs at least one pick); image_pin: max = most pins (1–10, usually 3); voice_note: max = longest recording in seconds (default 60); location: max = how far the business serves (0 = no radius); availability: min / max = first and last hour (8 = 08:00, 17.5 = 17:30), step = slot minutes (15, 30, 60 or 120; default 60); signup_slots: max = most slots one person may take (0 or 1 = one each).
+- settings — short words that switch extras on. Leave [] unless they clearly help:
+  - "other" on single_choice, multi_choice, dropdown or picture_choice when people may not fit the list ("How did you hear about us?", "Which service?"). Adds "Other" with a text box. Never on yes_no or legal.
+  - scale: "stars" to rate a visit or service, "faces" for how someone feels, "slider" for a wide range like 0–10.
+  - number: "stepper" for small counts (rooms, windows, people, pets) — set min and max; "unit: windows" or "unit: sq ft" and "prefix: $" are display only.
+  - date: "time" for appointments or pickups at a time of day; "range" for spans (a stay, event dates, "available from / to"); "day-first" when dates are written day first (DD/MM/YYYY).
+  - phone: "country: GB" (two letters) when the form is clearly for a country other than the US.
+  - file_upload: "multiple" for several files; "accept: image/*" or "accept: .pdf" only when the user limits file types.
+  - matrix: "multiple" when a row can take several columns.
+  - picture_choice: "multiple" to pick several; "swipe" (with "multiple") for a card stack to like / pass ("Which styles do you like?"). yes_no: "swipe" for one swipe card ("this or that").
+  - signature: "typing-off" only when the user wants a drawn signature only. voice_note: "typing-off" only when the user wants audio only.
+  - location: "km" when the user gives the distance in kilometres (miles otherwise).
+  - availability: the weekdays to show, e.g. "mon", "tue", "wed", "thu", "fri".
+  - signup_slots: "waitlist" only when the user wants a waitlist.
 
 Service-business types (use when they fit):
 - contact_info — name, email and phone on ONE screen. For quotes, bookings and leads, prefer it over separate name / email / phone questions. Title like "How can we reach you?"
-- address — a service or property address (street, unit, city, state, ZIP). serviceArea only when the user lists the ZIP codes they serve (e.g. ["93101","93103"], or a prefix "931"); otherwise [].
+- address — a service or property address (street, unit, city, state, ZIP).
 - signature — only when the user asks for a signature, authorization or agreement.
 
 On-site capture (use only when they clearly fit; never "to look complete"):
 - photo_checklist — the shots a crew needs before quoting ("Front of house", "Roof close-up", "Electrical panel"): each option is one shot (label + value). Opens the phone camera.
-- image_pin — "show us where": the respondent taps the owner's photo to mark spots. max = most pins (1–10, usually 3). The owner adds the photo afterwards; do not invent one.
-- voice_note — "describe it in your own words" when talking is easier than typing. max = longest recording in seconds (default 60). allowTyped true unless the user wants audio only. body is what to talk about.
-- location — "use my location" to check the service area. radius + radiusUnit ("mi" / "km") only when the user gives a distance ("within 25 miles"); the owner sets the business location afterwards. Never invent coordinates.
-- availability — a week grid to paint free times. days (e.g. ["mon","tue","wed","thu","fri"]), startTime / endTime as "HH:MM" 24-hour, step = slot minutes (15, 30, 60 or 120; default 60).
-- display "swipe": on picture_choice with multiple true, a card stack to like / pass ("Which styles do you like?"); on yes_no, one swipe card ("this or that"). Otherwise "".
+- image_pin — "show us where": the respondent taps the owner's photo to mark spots. The owner adds the photo afterwards; do not invent one.
+- voice_note — "describe it in your own words" when talking is easier than typing. text is what to talk about.
+- location — "use my location" to check the service area. Set max only when the user gives a distance ("within 25 miles"); the owner sets the business location afterwards. Never invent coordinates.
+- availability — a week grid to paint free times. Put its weekdays in settings ("mon", "tue", "wed", "thu", "fri"; add "sat" / "sun" when asked), min / max = first and last hour, step = slot minutes.
 
 Sign-ups with limited spots (use when people pick a time or a task that only so many can take: "pick a time", volunteer shifts, tours, class spots, "what will you bring"):
-- signup_slots — each option is one slot: label ("Sat 10–11am", "Bring drinks"), value (a short id), capacity = its spots (use the numbers the user gives; otherwise a sensible small number like 8). date "YYYY-MM-DD" and start / end "HH:MM" (24-hour) only when the user gives a day or times; otherwise "". max = most slots one person may take (0 or 1 = one each). waitlist true only when the user wants a waitlist. Never invent dates.
+- signup_slots — each option is one slot: label ("Sat 10–11am", "Bring drinks"), value (a short id), and in more: "spots: 8" (use the numbers the user gives; otherwise a sensible small number like 8), plus the day "2026-10-18" and the time "10:00-11:00" (24-hour) only when the user gives them. Never invent dates.
+
+Option extras (more — usually []):
+- picture_choice: the https image URL of each option. You may use https://picsum.photos/seed/<value>/400/300
+- package cards: up to 6 short feature lines, and "badge: Most popular" on at most one option.
+- a price range: "up to 12000" (with price 8000 for "$8,000–12,000").
 
 Prices and the instant estimate (never invent prices — only use prices the user gave):
-- price on a choice option = its price; priceMax for a range ("$8,000–12,000" → price 8000, priceMax 12000). 0 = no price.
-- unitPrice on a number = price per unit (windows × $450). 0 = none.
-- display "cards" on single_choice for packages or tiers (Basic / Standard / Premium): give each option up to 6 short features and badge "Most popular" on at most one.
-- estimate.show true when the form has prices and the user wants a quote or estimate shown; currency is the ISO code ("USD"); base is a flat fee added to every quote (0 = none); disclaimer is one short line ("Final price after inspection"). Otherwise show false, currency "USD", base 0, disclaimer "".
+- price on an option = its price. 0 = no price.
+- "price: 450" in a number's settings = price per unit (windows × $450).
+- "cards" in a single_choice's settings for packages or tiers (Basic / Standard / Premium), with features in more.
+- estimate.show true when the form has prices and the user wants a quote or estimate shown; currency is the three-letter code ("USD"); base is a flat fee added to every quote (0 = none); disclaimer is one short line ("Final price after inspection"). Otherwise show false, currency "USD", base 0, disclaimer "".
 
 Branching (showIfField / showIfEquals):
 - Empty strings = always visible.

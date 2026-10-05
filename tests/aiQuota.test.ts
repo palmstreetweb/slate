@@ -31,7 +31,7 @@ import handler, {
 } from '../api/generate.js';
 import { neonDataApiUrl } from '../api/neonDataApi.js';
 import { resetRateLimit } from '../api/rateLimit.js';
-import { requestGeneratedForm } from '../examples/_admin/ai/client.js';
+import { GenerateRequestError, requestGeneratedForm } from '../examples/_admin/ai/client.js';
 import { deriveNeonServiceUrls } from '../examples/_admin/neon/config.js';
 
 const NEON_URL = 'https://ep-cool-rain-123.us-east-2.aws.neon.tech/neondb';
@@ -103,7 +103,7 @@ describe('Build with AI daily cap (ADR-051)', () => {
     vi.stubEnv('AI_QUOTA_KEY', '');
     const res = await call(post());
     expect(res.status).toBe(503);
-    expect(await res.json()).toEqual({ error: AI_QUOTA_UNAVAILABLE_MESSAGE });
+    expect(await res.json()).toEqual({ error: AI_QUOTA_UNAVAILABLE_MESSAGE, retry: true });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(runGenerateForm).not.toHaveBeenCalled();
   });
@@ -123,10 +123,15 @@ describe('Build with AI daily cap (ADR-051)', () => {
     );
     const res = await call(post());
     expect(res.status).toBe(429);
-    expect(await res.json()).toEqual({ error: AI_QUOTA_USER_MESSAGE });
+    const body = await res.json();
+    expect(body).toMatchObject({ error: AI_QUOTA_USER_MESSAGE, retry: false });
     const retryAfter = Number(res.headers.get('retry-after'));
     expect(retryAfter).toBeGreaterThanOrEqual(1);
     expect(retryAfter).toBeLessThanOrEqual(86_400);
+    // The studio turns this into the owner's local time; it is the next UTC midnight.
+    const resetsAt = new Date(body.resetsAt as string);
+    expect(resetsAt.getUTCHours()).toBe(0);
+    expect(Math.abs(resetsAt.getTime() - (Date.now() + retryAfter * 1000))).toBeLessThan(5_000);
     expect(runGenerateForm).not.toHaveBeenCalled();
   });
 
@@ -136,7 +141,7 @@ describe('Build with AI daily cap (ADR-051)', () => {
     );
     const res = await call(post());
     expect(res.status).toBe(429);
-    expect(await res.json()).toEqual({ error: AI_QUOTA_GLOBAL_MESSAGE });
+    expect(await res.json()).toMatchObject({ error: AI_QUOTA_GLOBAL_MESSAGE, retry: false });
     expect(runGenerateForm).not.toHaveBeenCalled();
   });
 
@@ -157,7 +162,7 @@ describe('Build with AI daily cap (ADR-051)', () => {
     fetchMock.mockImplementation(async () => respond());
     const res = await call(post());
     expect(res.status).toBe(503);
-    expect(await res.json()).toEqual({ error: AI_QUOTA_UNAVAILABLE_MESSAGE });
+    expect(await res.json()).toEqual({ error: AI_QUOTA_UNAVAILABLE_MESSAGE, retry: true });
     expect(runGenerateForm).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalled();
   });
@@ -308,20 +313,27 @@ describe('Build with AI client', () => {
     });
   }
 
-  it('surfaces the daily-limit message as-is', async () => {
+  it('says when the daily limit resets in the owner’s own time, with no Retry', async () => {
     wireClientToHandler(() =>
       quotaRow({ allowed: false, used: 25, per_user_daily: 25, global_used: 90 }),
     );
-    await expect(requestGeneratedForm({ prompt: 'Wedding RSVP' })).rejects.toMatchObject({
-      message: AI_QUOTA_USER_MESSAGE,
-    });
+    const err = (await requestGeneratedForm({ prompt: 'Wedding RSVP' }).catch(
+      (e: unknown) => e,
+    )) as GenerateRequestError;
+    expect(err).toBeInstanceOf(GenerateRequestError);
+    expect(err.retryable).toBe(false);
+    expect(err.message).toMatch(
+      /^You’ve used today’s Build with AI drafts\. You can make more (after .+ today|tomorrow after .+)\.$/,
+    );
+    expect(err.message).not.toMatch(/UTC|daily reset/);
     expect(runGenerateForm).not.toHaveBeenCalled();
   });
 
-  it('surfaces the unavailable message as-is', async () => {
+  it('surfaces the unavailable message as-is, with Retry', async () => {
     wireClientToHandler(() => new Response('', { status: 404 }));
     await expect(requestGeneratedForm({ prompt: 'Wedding RSVP' })).rejects.toMatchObject({
       message: AI_QUOTA_UNAVAILABLE_MESSAGE,
+      retryable: true,
     });
   });
 });

@@ -74,7 +74,9 @@ export function PublicRespond({ token }: Props) {
   // Portable links never expire: one that can't be read was cut short or mistyped.
   if (!payload) return <Notice text={LINK_BROKEN} />;
   // On the live site a portable link can never reach the owner (it is the
-  // unpublished preview's link): say so before anyone types (GAPV-X2).
+  // unpublished preview's link): say so before anyone types (GAPV-X2, COPY-05).
+  // That holds for a device-only link too: its answers would stay on the
+  // respondent's own device, where the owner never sees them.
   if (isNeonConfigured()) return <Notice text={LINK_PREVIEW_ONLY} />;
 
   const { schema, formId, name } = payload;

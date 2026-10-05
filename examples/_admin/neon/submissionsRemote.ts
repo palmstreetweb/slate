@@ -18,7 +18,12 @@ import type { DbSubmissionRow } from './database.types.js';
 import { getNeon } from './client.js';
 import { afterPermanentDelete } from './storageQuotaRemote.js';
 import { ensureAuthForDataApi, waitForAuthReady } from './ensureAuth.js';
-import { formatNeonError, isRlsOrAuthError } from './neonError.js';
+import {
+  SessionNotReadyError,
+  formatNeonError,
+  isRlsOrAuthError,
+  userNeonError,
+} from './neonError.js';
 import { rowToSubmission, submissionToRow } from './mappers.js';
 
 type Listener = (subs: StoredSubmission[]) => void;
@@ -238,9 +243,7 @@ export async function hydrateSubmissionsRemote(opts?: { soft?: boolean }): Promi
   if (idx.length === 0 && !opts?.soft) {
     const auth = await waitForAuthReady(3);
     if (!auth.ok) {
-      throw new Error(
-        'Signed in, but the database could not resolve your user id from the session. Sign out and back in, then try again.',
-      );
+      throw new SessionNotReadyError('Slate couldn’t confirm it’s you yet.');
     }
     await sleep(150);
     await ensureAuthForDataApi();
@@ -370,20 +373,20 @@ export function isFormSubmissionsLoadedRemote(formId: string): boolean {
 // Writes
 // ---------------------------------------------------------------------------
 
-function emitPersistError(message: string): void {
-  console.error('[slate] submission persist failed:', message);
+/** The raw error goes to the console; the owner reads one plain sentence (QA COPY-01). */
+function emitPersistError(err: unknown, title: string): void {
+  console.error('[slate] submission persist failed:', formatNeonError(err, 'unknown error'));
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
-      new CustomEvent('slate-persist-error', { detail: { kind: 'submission', message } }),
+      new CustomEvent('slate-persist-error', {
+        detail: { kind: 'submission', title, message: userNeonError(err, 'response') },
+      }),
     );
   }
 }
 
 /** Run a write with one auth-settle retry, like the rest of the Neon layer. */
-async function withAuthRetry(
-  write: () => PromiseLike<{ error: unknown }>,
-  fallback: string,
-): Promise<void> {
+async function withAuthRetry(write: () => PromiseLike<{ error: unknown }>): Promise<void> {
   await ensureAuthForDataApi();
   const once = async () => {
     const { error } = await write();
@@ -394,18 +397,21 @@ async function withAuthRetry(
   } catch (err) {
     if (!isRlsOrAuthError(err)) throw err;
     const auth = await waitForAuthReady(3);
-    if (!auth.ok) throw new Error(formatNeonError(err, fallback));
+    if (!auth.ok) throw err;
     await once();
   }
 }
 
-/** Optimistic local change, then the server write; roll back on failure. */
-function optimistic(apply: () => void, write: () => Promise<void>, failMessage: string): void {
+/**
+ * Optimistic local change, then the server write; roll back on failure.
+ * `failTitle` heads the toast ("Couldn’t empty Trash").
+ */
+function optimistic(apply: () => void, write: () => Promise<void>, failTitle: string): void {
   const prev = snapshot();
   apply();
   notify();
   void write().catch((err: unknown) => {
-    emitPersistError(formatNeonError(err, failMessage));
+    emitPersistError(err, failTitle);
     restoreSnapshot(prev);
   });
 }
@@ -443,12 +449,8 @@ export function addSubmissionRemoteSync(
   const sub = makeSubmission(formId, answers, meta);
   optimistic(
     () => putFull(sub),
-    () =>
-      withAuthRetry(
-        () => getNeon().from('submissions').insert(submissionToRow(sub)),
-        'Could not save submission — sign out and back in, then try again.',
-      ),
-    'Could not save submission',
+    () => withAuthRetry(() => getNeon().from('submissions').insert(submissionToRow(sub))),
+    'Couldn’t save that test response',
   );
   return sub;
 }
@@ -466,8 +468,8 @@ export function trashSubmissionsRemoteSync(formId?: string): void {
         let q = getNeon().from('submissions').update({ deleted_at: now }).is('deleted_at', null);
         if (formId) q = q.eq('form_id', formId);
         return q;
-      }, 'Could not trash responses'),
-    'Could not trash responses',
+      }),
+    'Couldn’t move those responses to Trash',
   );
 }
 
@@ -476,11 +478,10 @@ export function trashSubmissionRemoteSync(submissionId: string): void {
   optimistic(
     () => stampDeleted(submissionId, now),
     () =>
-      withAuthRetry(
-        () => getNeon().from('submissions').update({ deleted_at: now }).eq('id', submissionId),
-        'Could not trash response',
+      withAuthRetry(() =>
+        getNeon().from('submissions').update({ deleted_at: now }).eq('id', submissionId),
       ),
-    'Could not trash response',
+    'Couldn’t move that response to Trash',
   );
 }
 
@@ -488,11 +489,10 @@ export function restoreSubmissionRemoteSync(submissionId: string): void {
   optimistic(
     () => stampDeleted(submissionId, undefined),
     () =>
-      withAuthRetry(
-        () => getNeon().from('submissions').update({ deleted_at: null }).eq('id', submissionId),
-        'Could not restore response',
+      withAuthRetry(() =>
+        getNeon().from('submissions').update({ deleted_at: null }).eq('id', submissionId),
       ),
-    'Could not restore response',
+    'Couldn’t restore that response',
   );
 }
 
@@ -504,16 +504,14 @@ export function restoreSubmissionsRemoteSync(formId: string): void {
       }
     },
     () =>
-      withAuthRetry(
-        () =>
-          getNeon()
-            .from('submissions')
-            .update({ deleted_at: null })
-            .eq('form_id', formId)
-            .not('deleted_at', 'is', null),
-        'Could not restore responses',
+      withAuthRetry(() =>
+        getNeon()
+          .from('submissions')
+          .update({ deleted_at: null })
+          .eq('form_id', formId)
+          .not('deleted_at', 'is', null),
       ),
-    'Could not restore responses',
+    'Couldn’t restore those responses',
   );
 }
 
@@ -521,11 +519,10 @@ export function permanentlyDeleteSubmissionRemoteSync(submissionId: string): voi
   optimistic(
     () => removeLocal(submissionId),
     () =>
-      withAuthRetry(
-        () => getNeon().from('submissions').delete().eq('id', submissionId),
-        'Could not delete response',
-      ).then(afterPermanentDelete),
-    'Could not delete response',
+      withAuthRetry(() => getNeon().from('submissions').delete().eq('id', submissionId)).then(
+        afterPermanentDelete,
+      ),
+    'Couldn’t delete that response',
   );
 }
 
@@ -541,8 +538,8 @@ export function emptyTrashRemoteSync(formId?: string): void {
         let q = getNeon().from('submissions').delete().not('deleted_at', 'is', null);
         if (formId) q = q.eq('form_id', formId);
         return q;
-      }, 'Could not empty trash').then(afterPermanentDelete),
-    'Could not empty trash',
+      }).then(afterPermanentDelete),
+    'Couldn’t empty Trash',
   );
 }
 
@@ -553,11 +550,10 @@ export function purgeSubmissionsRemoteSync(formId: string): void {
       loadedForms.delete(formId);
     },
     () =>
-      withAuthRetry(
-        () => getNeon().from('submissions').delete().eq('form_id', formId),
-        'Could not purge responses',
-      ).then(afterPermanentDelete),
-    'Could not purge responses',
+      withAuthRetry(() => getNeon().from('submissions').delete().eq('form_id', formId)).then(
+        afterPermanentDelete,
+      ),
+    'Couldn’t delete those responses',
   );
 }
 
@@ -586,19 +582,13 @@ export function replaceAllSubmissionsRemoteSync(subs: StoredSubmission[]): void 
     },
     async () => {
       for (const ids of chunks(existing)) {
-        await withAuthRetry(
-          () => getNeon().from('submissions').delete().in('id', ids),
-          'Could not restore submissions backup',
-        );
+        await withAuthRetry(() => getNeon().from('submissions').delete().in('id', ids));
       }
       for (const batch of chunks(subs)) {
-        await withAuthRetry(
-          () => getNeon().from('submissions').insert(batch.map(submissionToRow)),
-          'Could not restore submissions backup',
-        );
+        await withAuthRetry(() => getNeon().from('submissions').insert(batch.map(submissionToRow)));
       }
     },
-    'Could not restore submissions backup',
+    'Couldn’t restore the responses from your backup',
   );
 }
 

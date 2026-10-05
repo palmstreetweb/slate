@@ -138,7 +138,10 @@ export function Login() {
     clearAuthError();
     setMessage(null);
     setStatus('google');
-    const { error } = await signInWithGoogle();
+    const { error } = await signInWithGoogle().catch((err: unknown) => {
+      console.error('[slate] Google sign-in failed:', err);
+      return { error: 'Google sign-in didn’t start. Try again in a minute.' };
+    });
     if (error) {
       setStatus('error');
       setMessage(error);
@@ -152,7 +155,15 @@ export function Login() {
     clearAuthError();
     setStatus('sending');
     setMessage(null);
-    const { error, magicLinkSent: sentLink } = await signInWithEmail(email);
+    const { error, magicLinkSent: sentLink } = await signInWithEmail(email).catch(
+      (err: unknown) => {
+        console.error('[slate] sign-in email failed:', err);
+        return {
+          error: 'We couldn’t send the sign-in email. Try again in a minute.',
+          magicLinkSent: false,
+        };
+      },
+    );
     if (error) {
       setStatus('error');
       setMessage(error);
@@ -181,8 +192,10 @@ export function Login() {
         codeRef.current?.focus();
       }
     } catch (err) {
+      // verifyEmailOtp words its own failures; this is only a safety net.
+      console.error('[slate] sign-in code check failed:', err);
       setStatus('sent');
-      setMessage(err instanceof Error ? err.message : 'Could not verify that code.');
+      setMessage('We couldn’t check that code. Try again in a minute.');
       setCode('');
       codeRef.current?.focus();
     } finally {
@@ -202,7 +215,15 @@ export function Login() {
     clearAuthError();
     setResending(true);
     setMessage(null);
-    const { error, magicLinkSent: sentLink } = await signInWithEmail(email);
+    const { error, magicLinkSent: sentLink } = await signInWithEmail(email).catch(
+      (err: unknown) => {
+        console.error('[slate] sign-in email failed:', err);
+        return {
+          error: 'We couldn’t send the sign-in email. Try again in a minute.',
+          magicLinkSent: false,
+        };
+      },
+    );
     setResending(false);
     if (error) {
       setMessage(error);

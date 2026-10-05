@@ -51,13 +51,56 @@ function authRedirectUrl(): string | undefined {
   return `${window.location.origin}/`;
 }
 
-function friendlyAuthSendError(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const t = raw.trim();
-  if (/invalid callbackurl/i.test(t) || /^HTTP\s*403$/i.test(t)) {
-    return 'This site is not allowed to finish sign-in yet. Use https://slateforms.vercel.app, or http://127.0.0.1:5173 / http://localhost:5173 for local.';
+type AuthStep = 'send' | 'verify' | 'google';
+
+const AUTH_FALLBACK: Record<AuthStep, string> = {
+  send: 'We couldn’t send the sign-in email. Try again in a minute.',
+  verify: 'We couldn’t check that code. Try again in a minute.',
+  google: 'Google sign-in didn’t start. Try again in a minute.',
+};
+
+/**
+ * Sign-in failures in plain words (QA COPY-04). Better Auth keeps its own
+ * message for codes Neon doesn't map ("Invalid OTP", "OTP expired", "Too many
+ * attempts") and the SDK builds "HTTP 500 Internal Server Error", so this
+ * maps by message text and status, never by code. Anything it doesn't know
+ * gets the step's fallback; the raw error goes to the console.
+ */
+export function friendlyAuthError(raw: unknown, step: AuthStep): string | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const e = (typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const message = (
+    typeof raw === 'string' ? raw : typeof e.message === 'string' ? e.message : ''
+  ).trim();
+  const status = typeof e.status === 'number' ? e.status : undefined;
+  console.warn(`[slate] sign-in ${step} failed:`, message || raw);
+  if (/invalid callbackurl/i.test(message) || /^HTTP\s*403$/i.test(message)) {
+    return 'Sign-in doesn’t work on this address. Go to slateforms.vercel.app and sign in there.';
   }
-  return t;
+  if (/invalid otp|invalid code|incorrect code/i.test(message)) {
+    return 'That code doesn’t match. Check the newest email and try again.';
+  }
+  if (/otp expired|code expired|expired otp/i.test(message)) {
+    return 'That code has expired. Send a new one.';
+  }
+  if (/too many attempts/i.test(message)) {
+    return 'Too many tries with that code. Send a new one.';
+  }
+  if (
+    raw instanceof TypeError ||
+    e.name === 'TypeError' ||
+    status === 0 ||
+    /failed to fetch|load failed|networkerror|network request failed|fetch failed/i.test(message)
+  ) {
+    return 'Can’t reach Slate. Check your connection and try again.';
+  }
+  if (status === 429 || /too many (email )?requests|rate limit|\b429\b/i.test(message)) {
+    return step === 'verify'
+      ? 'Too many tries for now. Wait a few minutes, then try again.'
+      : 'Too many sign-in emails for now. Wait a few minutes, then try again.';
+  }
+  if (/invalid email/i.test(message)) return 'Enter a valid email address.';
+  return AUTH_FALLBACK[step];
 }
 
 function normalizeSession(raw: unknown): AuthSession | null {
@@ -84,6 +127,7 @@ const NO_EMAIL_MSG =
   'This sign-in has no email address. Use Google or an email code instead.';
 
 const VERIFY_TIMEOUT_MS = 18_000;
+const VERIFY_TIMEOUT_MSG = 'Sign-in took too long. Send a new code, or use the email link.';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -163,13 +207,14 @@ async function requestMagicLink(
     | { message?: string; error?: { message?: string } | string }
     | null;
   if (!res.ok) {
-    const message = friendlyAuthSendError(
+    const message = friendlyAuthError(
       (typeof body?.error === 'object' && body.error?.message) ||
         (typeof body?.error === 'string' && body.error) ||
         body?.message ||
         `HTTP ${res.status}`,
+      'send',
     );
-    return { error: { message: message ?? 'Could not send a sign-in link.' } };
+    return { error: { message: message ?? AUTH_FALLBACK.send } };
   }
   return { error: null };
 }
@@ -339,7 +384,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithEmail = useCallback(async (email: string) => {
     if (!isNeonConfigured()) {
-      return { error: 'Neon is not configured.', magicLinkSent: false };
+      return { error: 'Sign-in isn’t available here.', magicLinkSent: false };
     }
     const trimmed = email.trim().toLowerCase();
     if (!trimmed.includes('@') || trimmed.length < 5) {
@@ -367,30 +412,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestMagicLink(auth, trimmed, redirectTo),
     ]);
 
-    const otpError = friendlyAuthSendError(
-      otp.status === 'fulfilled'
-        ? (otp.value.error?.message ?? null)
-        : otp.reason instanceof Error
-          ? otp.reason.message
-          : 'Could not send a code.',
+    const otpError = friendlyAuthError(
+      otp.status === 'fulfilled' ? (otp.value.error ?? null) : (otp.reason ?? 'unknown'),
+      'send',
     );
     const magicError =
       magic.status === 'fulfilled'
-        ? friendlyAuthSendError(magic.value.error?.message ?? null)
-        : magic.reason instanceof Error
-          ? friendlyAuthSendError(magic.reason.message)
-          : 'Could not send a sign-in link.';
+        ? friendlyAuthError(magic.value.error ?? null, 'send')
+        : friendlyAuthError(magic.reason ?? 'unknown', 'send');
     const magicLinkSent = magic.status === 'fulfilled' && !magic.value.error;
 
     if (otpError && !magicLinkSent) {
-      return { error: otpError ?? magicError ?? 'Could not send a sign-in email.', magicLinkSent: false };
+      return { error: otpError ?? magicError ?? AUTH_FALLBACK.send, magicLinkSent: false };
     }
     return { error: null, magicLinkSent };
   }, []);
 
   const verifyEmailOtp = useCallback(async (email: string, token: string) => {
     if (!isNeonConfigured()) {
-      return { error: 'Neon is not configured.' };
+      return { error: 'Sign-in isn’t available here.' };
     }
     const trimmed = email.trim().toLowerCase();
     const code = token.replace(/\s+/g, '');
@@ -408,9 +448,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           type: 'email',
         }),
         VERIFY_TIMEOUT_MS,
-        'Sign-in timed out. Request a new code, or use the email link.',
+        VERIFY_TIMEOUT_MSG,
       );
-      if (error) return { error: error.message ?? 'That code did not work.' };
+      if (error) return { error: friendlyAuthError(error, 'verify') ?? AUTH_FALLBACK.verify };
 
       // Same-tab OTP does not fire onAuthStateChange in neon-js — pull the session.
       const next = await readUsableSession(auth);
@@ -425,27 +465,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return { error: null };
     } catch (err) {
-      return {
-        error: err instanceof Error ? err.message : 'Could not verify that code.',
-      };
+      if (err instanceof Error && err.message === VERIFY_TIMEOUT_MSG) return { error: err.message };
+      return { error: friendlyAuthError(err ?? 'unknown', 'verify') ?? AUTH_FALLBACK.verify };
     }
   }, [applySession]);
 
   const signInWithGoogle = useCallback(async () => {
     if (!isNeonConfigured()) {
-      return { error: 'Neon is not configured.' };
+      return { error: 'Sign-in isn’t available here.' };
     }
     setAuthError(null);
     const auth = getNeon().auth as {
       signInWithOAuth: (args: unknown) => Promise<{ error: { message?: string } | null }>;
     };
-    const { error } = await auth.signInWithOAuth({
-      provider: 'google',
-      // `queryParams: { prompt: 'select_account' }` was silently dropped by the
-      // SDK, so it's gone. Account choice is set on the Google provider in Neon.
-      options: { redirectTo: authRedirectUrl() },
-    });
-    return { error: error?.message ?? null };
+    try {
+      const { error } = await auth.signInWithOAuth({
+        provider: 'google',
+        // `queryParams: { prompt: 'select_account' }` was silently dropped by the
+        // SDK, so it's gone. Account choice is set on the Google provider in Neon.
+        options: { redirectTo: authRedirectUrl() },
+      });
+      return { error: friendlyAuthError(error ?? null, 'google') };
+    } catch (err) {
+      return { error: friendlyAuthError(err ?? 'unknown', 'google') ?? AUTH_FALLBACK.google };
+    }
   }, []);
 
   const clearAuthError = useCallback(() => setAuthError(null), []);

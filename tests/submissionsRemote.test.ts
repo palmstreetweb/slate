@@ -187,11 +187,21 @@ describe('responses store: slim index + per-form answers (ADR-049)', () => {
     window.addEventListener('slate-persist-error', (e) =>
       errors.push((e as CustomEvent<{ message: string }>).detail.message),
     );
+    const titles: string[] = [];
+    window.addEventListener('slate-persist-error', (e) =>
+      titles.push((e as CustomEvent<{ title: string }>).detail.title),
+    );
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     db.failNext = 'update';
     r.trashSubmissionRemoteSync('a000');
     expect(r.countSubmissionsRemote('A')).toBe(59);
     await vi.waitFor(() => expect(errors).toHaveLength(1));
     expect(r.countSubmissionsRemote('A')).toBe(60);
+    // Plain words for the owner (QA COPY-01); the raw text only in the console.
+    expect(titles).toEqual(['Couldn’t move that response to Trash']);
+    expect(errors).toEqual(['Try again in a moment.']);
+    expect(JSON.stringify(log.mock.calls)).toContain('boom');
+    log.mockRestore();
   });
 
   it('pages past the Data API row cap so the index is never truncated', async () => {

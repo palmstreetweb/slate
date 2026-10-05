@@ -39,6 +39,7 @@ import {
   trashFormRemoteSync,
 } from '../examples/_admin/neon/formsRemote.js';
 import { PersistErrorToasts } from '../examples/_admin/shell/PersistErrorToasts.js';
+import { isSessionNotReadyError } from '../examples/_admin/neon/neonError.js';
 import { ToastProvider } from '../examples/_admin/toast.js';
 
 const row = (id: string) => ({
@@ -67,7 +68,11 @@ afterEach(() => vi.restoreAllMocks());
 describe('empty dashboard after sign-in (owner report)', () => {
   it('an empty first read run as the anonymous role is an error, not "no forms"', async () => {
     db.authUid = null;
-    await expect(hydrateFormsRemote({ soft: true })).rejects.toThrow(/No auth session/);
+    // A typed error the studio retries quietly while sign-in settles (studioApp),
+    // worded for people if it ever shows (QA COPY-01).
+    const err = await hydrateFormsRemote({ soft: true }).catch((e: unknown) => e);
+    expect(isSessionNotReadyError(err)).toBe(true);
+    expect((err as Error).message).toBe('Slate couldn’t confirm it’s you yet.');
   });
 
   it('re-reads once the database confirms the user, and shows their forms', async () => {

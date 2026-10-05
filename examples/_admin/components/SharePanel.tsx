@@ -112,8 +112,10 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
   const productionUrl = isNeonConfigured() && isPublished ? publicFillUrl(slug) : null;
   // A portable link carries the whole schema in the URL — it would walk straight
   // past the password (ADR-043). Locked forms only share the real public link.
+  // It also keeps answers on the respondent's own device, so in the cloud it can
+  // never send them: an unpublished cloud form gets "Publish" instead (QA COPY-05).
   const portableUrl =
-    !form?.fillLocked && canEncodePortableSchema(schema)
+    !isNeonConfigured() && !form?.fillLocked && canEncodePortableSchema(schema)
       ? buildPortableShareUrl(schema, { formId, name: formName })
       : null;
   // Tracked links (ADR-063) build on the published public link; `?src=` is added, never answers.
@@ -133,7 +135,7 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
     typeof window !== 'undefined'
       ? `${window.location.origin}/forms/${formId}/preview`
       : `/forms/${formId}/preview`;
-  const qrUrl = trackedUrl ?? productionUrl ?? shortFormUrl;
+  const qrUrl = shareUrl ? (trackedUrl ?? productionUrl ?? shortFormUrl) : null;
 
   useEffect(() => {
     if (!open) return;

@@ -35,9 +35,16 @@ import {
 } from './_admin/neon/hydrate.js';
 import { isFormsHydrated } from './_admin/neon/formsRemote.js';
 import { isNeonConfigured } from './_admin/neon/env.js';
-import { formatNeonError, isRlsOrAuthError } from './_admin/neon/neonError.js';
+import {
+  formatNeonError,
+  isRlsOrAuthError,
+  isSessionNotReadyError,
+  neonFailureKind,
+  userNeonError,
+} from './_admin/neon/neonError.js';
 import { installAdminUiSounds } from './_admin/uiSounds.js';
 import { enableSafeAreaViewport } from './_admin/mobile/viewport.js';
+import { detectAdminUiTheme } from './_admin/adminUiTheme.js';
 
 import './_admin/slateChromeTokens.css';
 import '@/styles/toggle.css';
@@ -142,10 +149,13 @@ function AppRoutes() {
 /** Fetch remote stores only after the user is authenticated (cloud mode). */
 function AdminCloudBootstrap() {
   const { ready, allowed } = useRequiresAuth();
-  const { user, authUnreachable } = useAuth();
+  const { user, authUnreachable, signOut } = useAuth();
   const userId = user?.id ?? null;
   const [storesReady, setStoresReady] = useState(() => isAdminSessionHydrated(userId));
-  const [hydrateError, setHydrateError] = useState<string | null>(null);
+  /** Owner copy only (neonError.ts); the raw error goes to the console. */
+  const [hydrateError, setHydrateError] = useState<{ message: string; signedOut: boolean } | null>(
+    null,
+  );
   const [retryToken, setRetryToken] = useState(0);
   const minBootDone = useMinBootMs();
 
@@ -182,11 +192,8 @@ function AdminCloudBootstrap() {
         setStoresReady(true);
       } catch (err: unknown) {
         if (cancelled) return;
-        const message = formatNeonError(err, 'Could not load your forms from the cloud.');
-        // Data API errors are plain objects, so check the formatted text too.
-        const transientAuth =
-          /could not resolve your user id|no auth session|session expired/i.test(message) ||
-          isRlsOrAuthError(err);
+        // Data API errors are plain objects, so check the raw text too.
+        const transientAuth = isSessionNotReadyError(err) || isRlsOrAuthError(err);
         // Auto-retry transient JWT settle races before showing the error screen.
         if (transientAuth && attempt < 3) {
           console.warn(`[slate] Hydrate auth settle — retry ${attempt + 1}/3`, err);
@@ -194,9 +201,16 @@ function AdminCloudBootstrap() {
           if (cancelled) return;
           return runHydrate(attempt + 1);
         }
-        console.error('[slate] Hydrate failed — not treating as empty library.', err);
+        console.error(
+          '[slate] Hydrate failed — not treating as empty library.',
+          formatNeonError(err, 'unknown error'),
+          err,
+        );
         clearAdminSessionHydrated();
-        setHydrateError(message);
+        setHydrateError({
+          message: userNeonError(err, 'load'),
+          signedOut: neonFailureKind(err) === 'signed-out',
+        });
         setStoresReady(true);
       }
     };
@@ -222,21 +236,22 @@ function AdminCloudBootstrap() {
         data-slate-forms=""
         data-theme-name="slate"
         data-theme="dark"
+        // The chrome tokens hang off data-admin-ui; without it the buttons had no style.
+        data-admin-ui={detectAdminUiTheme()}
         className="slate-empty"
         style={{
           minHeight: '100dvh',
           display: 'grid',
           placeContent: 'center',
+          justifyItems: 'center',
           gap: 16,
           padding: 24,
           textAlign: 'center',
         }}
       >
-        <p style={{ margin: 0, maxWidth: 420 }}>
-          Couldn’t load your forms from the cloud. They are probably still saved — this is a
-          connection/auth glitch, not a delete.
+        <p role="alert" style={{ margin: 0, maxWidth: 420 }}>
+          {hydrateError.message} Your forms are still saved.
         </p>
-        <p style={{ margin: 0, opacity: 0.7, fontSize: 13, maxWidth: 420 }}>{hydrateError}</p>
         <button
           type="button"
           className="slate-btn slate-btn--primary"
@@ -244,6 +259,11 @@ function AdminCloudBootstrap() {
         >
           Try again
         </button>
+        {hydrateError.signedOut ? (
+          <button type="button" className="slate-btn" onClick={() => void signOut()}>
+            Sign out
+          </button>
+        ) : null}
       </div>
     );
   }
