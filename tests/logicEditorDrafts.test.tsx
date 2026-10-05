@@ -268,6 +268,40 @@ describe('skip rules', () => {
   });
 });
 
+describe('inside the Inspector', () => {
+  it('a rule that stops being finished mid-typing keeps its row (the section stays open)', async () => {
+    const user = userEvent.setup();
+    const { Inspector } = await import('../examples/_admin/components/Inspector.js');
+    function Harness() {
+      const [q, setQ] = useState<Question>({
+        ...later,
+        visibleIf: { field: 'rate', op: 'gt', value: 5 },
+      } as Question);
+      return (
+        <div data-slate-forms="" data-theme-name="slate">
+          <Inspector
+            question={q}
+            allQuestions={[welcome, rate, size, details, q, done]}
+            onChange={(patch) => setQ((cur) => ({ ...cur, ...patch }) as Question)}
+            onDelete={() => {}}
+            canDelete
+          />
+        </div>
+      );
+    }
+    render(<Harness />);
+    const box = screen.getByRole('textbox', { name: 'Value' });
+    await user.clear(box);
+    await user.type(box, 'abc');
+    // The rule isn't saved while it isn't a number, but the row and its note stay.
+    expect(screen.getByRole('textbox', { name: 'Value' })).toHaveValue('abc');
+    expect(screen.getByText('Use a number, like 3 or 2.5.')).toBeInTheDocument();
+    await user.clear(screen.getByRole('textbox', { name: 'Value' }));
+    await user.type(screen.getByRole('textbox', { name: 'Value' }), '7');
+    expect(screen.getByText('Show when Rate us is greater than “7”')).toBeInTheDocument();
+  });
+});
+
 describe('deleting a question that rules use (S8)', () => {
   const sized: Question = {
     ...details,

@@ -4,7 +4,7 @@
  * two-up rows and checkboxes.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function CollapsibleSection({
   label,
@@ -22,9 +22,19 @@ export function CollapsibleSection({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const shownFor = useRef(questionId);
 
+  // Another question starts from its own state. On the same question, rules
+  // appearing open the section, but it never snaps shut under the owner's
+  // cursor: a rule being typed isn't saved yet, so the count can drop to 0
+  // mid-edit and folding would throw the half-made rule away (S7).
   useEffect(() => {
-    setOpen(defaultOpen);
+    if (shownFor.current !== questionId) {
+      shownFor.current = questionId;
+      setOpen(defaultOpen);
+    } else if (defaultOpen) {
+      setOpen(true);
+    }
   }, [questionId, defaultOpen]);
 
   return (
