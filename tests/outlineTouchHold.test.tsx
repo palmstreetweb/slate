@@ -46,11 +46,12 @@ const schema = defineSchema({
 
 function renderOutline(phone: boolean) {
   const onMove = vi.fn();
+  const onSelect = vi.fn();
   const utils = render(
     <Outline
       schema={schema}
       selectedId="a"
-      onSelect={vi.fn()}
+      onSelect={onSelect}
       onAddQuestion={vi.fn()}
       onReorder={vi.fn()}
       onMove={onMove}
@@ -68,7 +69,7 @@ function renderOutline(phone: boolean) {
   );
   const grip = utils.container.querySelectorAll<HTMLButtonElement>('.slate-outline-grip')[1]!;
   const item = grip.closest('.slate-outline-item')!;
-  return { ...utils, grip, item, onMove };
+  return { ...utils, grip, item, onMove, onSelect };
 }
 
 const LIFTED = 'slate-outline-item--lifted';
@@ -113,6 +114,32 @@ describe('phone outline grip', () => {
     });
     expect(item).not.toHaveClass(LIFTED);
     expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it('a card put back where it was leaves the next tap on a row alone', () => {
+    // Reduced motion settles at once (jsdom has no Web Animations).
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      ...realMatchMedia(query),
+      matches: /prefers-reduced-motion:\s*reduce/.test(query),
+    })) as typeof window.matchMedia;
+    try {
+      const { grip, container, onMove, onSelect } = renderOutline(true);
+      fireEvent.pointerDown(grip, touch);
+      act(() => {
+        vi.advanceTimersByTime(TOUCH_HOLD_MS + 10);
+      });
+      fireEvent.pointerUp(window, touch);
+      fireEvent.click(grip);
+      expect(onMove).not.toHaveBeenCalled();
+
+      const row = container.querySelectorAll<HTMLButtonElement>('.slate-outline-row')[3]!;
+      fireEvent.pointerDown(row, touch);
+      fireEvent.click(row);
+      expect(onSelect).toHaveBeenCalledWith('c');
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
   });
 
   it('once lifted, the page stops scrolling under the finger', () => {

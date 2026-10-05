@@ -457,9 +457,14 @@ export function Outline({
                           else onSelect(q.id);
                         }}
                         onPointerDown={(e) => {
-                          if (!canDrag) return;
                           // Phones scroll with a finger on the list; the grip drags.
-                          if (phone && e.pointerType !== 'mouse') return;
+                          // A new tap is its own: a card lifted from a grip earlier
+                          // must not swallow this row's click.
+                          if (phone && e.pointerType !== 'mouse') {
+                            didDragRef.current = false;
+                            return;
+                          }
+                          if (!canDrag) return;
                           startReorder(e, e.currentTarget);
                         }}
                       >
