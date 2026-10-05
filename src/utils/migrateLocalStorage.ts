@@ -2,7 +2,10 @@
  * One-time migration for rebranded localStorage keys (psw-* → slate-*).
  * Copies legacy → new when new is absent; leaves legacy keys in place.
  *
- * TODO(remove after ~2026-07-15): drop psw-* localStorage migration shim
+ * The engine stopped running this on 2026-10-04 (past the ADR-025 removal date of
+ * ~2026-07-15), which freed engine budget for the QA pass. The studio still runs it
+ * once at startup (examples/main.tsx) for old psw-* studio data; drop it there too
+ * once no studio browser can still hold psw-* keys.
  */
 
 export function migrateLocalStorageKey(oldKey: string, newKey: string): void {

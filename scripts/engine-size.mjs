@@ -52,6 +52,7 @@ for (const f of readdirSync(DIST).filter((x) => x.endsWith('.js'))) {
 
 console.log(`engine (index.js + static chunks: ${core.join(', ')})`);
 console.log(`  ${kb(coreBuf.length)} kB raw, ${kb(coreGz)} kB gzip (budget ${MAX_KB} kB)`);
+console.log(`  exact: ${coreGz} B gzip, ${MAX_KB * 1000 - coreGz} B under budget`);
 for (const f of [...lazy].sort()) {
   const closure = staticClosure(f).filter((x) => !core.includes(x));
   const buf = Buffer.concat(closure.map((x) => readFileSync(join(DIST, x))));

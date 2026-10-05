@@ -54,7 +54,6 @@ import {
   resolveFormSound,
 } from '@/utils/formSounds.js';
 import { LEAVE_MAX_MS, snapshotLeavingQuestion } from '@/utils/questionHandoff.js';
-import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
 
 import '@/styles/tokens.css';
 import '@/styles/toggle.css';
@@ -91,10 +90,6 @@ export function Form<S extends Schema>({
   const confirmStepRef = useRef<(() => void) | null>(null);
   const otherKeyRef = useRef<(() => void) | null>(null);
   const reducedMotion = useReducedMotion();
-
-  useEffect(() => {
-    migrateSlateLocalStorageKeys();
-  }, []);
 
   // On-demand field UIs this schema uses start downloading now, so they are
   // usually there before the respondent reaches them (ADR-063).
