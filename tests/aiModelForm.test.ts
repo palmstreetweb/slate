@@ -396,6 +396,19 @@ describe('model draft → full draft → engine schema', () => {
     expect(avail).toMatchObject({ startTime: '08:00', endTime: '17:30', slotMinutes: 30 });
   });
 
+  it('a stored value written as a button word still reads as a word', () => {
+    const full = fromModelForm(
+      form([
+        q({ id: 'a', type: 'yes_no', title: 'A?', labels: ['yes', 'no'] }),
+        q({ id: 'b', type: 'legal', title: 'B', labels: ['accept', 'decline'] }),
+        q({ id: 'c', type: 'yes_no', title: 'C?', labels: ['yes please', 'no thanks'] }),
+      ]),
+    );
+    expect(full.questions[0]).toMatchObject({ yesLabel: 'Yes', noLabel: 'No' });
+    expect(full.questions[1]).toMatchObject({ acceptLabel: 'Accept', declineLabel: 'Decline' });
+    expect(full.questions[2]).toMatchObject({ yesLabel: 'yes please', noLabel: 'no thanks' });
+  });
+
   it('leaves everything off when the model leaves settings empty', () => {
     const full = fromModelForm(
       form([

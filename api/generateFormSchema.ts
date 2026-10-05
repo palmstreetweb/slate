@@ -338,7 +338,7 @@ Do not add ranking, matrix, NPS, or picture_choice to "look complete."
 
 Question fields:
 - text — the placeholder for typed answers and dropdowns (specific, never "Type here"); the body for statement, legal, signature, voice_note and signup_slots; the subtitle for review.
-- labels — yes_no [yes, no]; legal [accept, decline]; scale and nps [low-end label, high-end label]; statement and review [button text]; matrix: the column labels (the rows are its options); address: the ZIP codes or prefixes served, only when the user lists them (e.g. ["93101","93103"] or ["931"]). Otherwise [].
+- labels — words shown on the screen: yes_no buttons only when custom (["Count me in", "Not this time"]; [] shows Yes / No); legal buttons only when custom ([] shows Accept / Decline); scale and nps [low-end label, high-end label] ("Not at all likely", "Extremely likely"); statement and review [button text]; matrix: the column labels (the rows are its options); address: the ZIP codes or prefixes served, only when the user lists them (e.g. ["93101","93103"] or ["931"]). Otherwise [].
 - options — choices, ranking items, matrix rows, photo_checklist shots, signup_slots slots. label is shown; value is a stable snake_case id (chicken, vegetarian). price and more: see below.
 - min / max / step — number: bounds and step (0 = no limit); scale: low and high end; multi_choice and picture_choice: fewest / most picks (0 = no limit); image_pin: max = most pins (1–10, usually 3); voice_note: max = longest recording in seconds (default 60); location: max = how far the business serves (0 = no radius); availability: min / max = first and last hour (8 = 08:00, 17.5 = 17:30), step = slot minutes (15, 30, 60 or 120; default 60); signup_slots: max = most slots one person may take (0 or 1 = one each).
 - settings — short words that switch extras on. Leave [] unless they clearly help:
@@ -365,7 +365,7 @@ On-site capture (use only when they clearly fit; never "to look complete"):
 - image_pin — "show us where": the respondent taps the owner's photo to mark spots. The owner adds the photo afterwards; do not invent one.
 - voice_note — "describe it in your own words" when talking is easier than typing. text is what to talk about.
 - location — "use my location" to check the service area. Set max only when the user gives a distance ("within 25 miles"); the owner sets the business location afterwards. Never invent coordinates.
-- availability — a week grid to paint free times.
+- availability — a week grid to paint free times. Put its weekdays in settings ("mon", "tue", "wed", "thu", "fri"; add "sat" / "sun" when asked), min / max = first and last hour, step = slot minutes.
 
 Sign-ups with limited spots (use when people pick a time or a task that only so many can take: "pick a time", volunteer shifts, tours, class spots, "what will you bring"):
 - signup_slots — each option is one slot: label ("Sat 10–11am", "Bring drinks"), value (a short id), and in more: "spots: 8" (use the numbers the user gives; otherwise a sensible small number like 8), plus the day "2026-10-18" and the time "10:00-11:00" (24-hour) only when the user gives them. Never invent dates.

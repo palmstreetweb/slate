@@ -59,7 +59,7 @@ const modelQuestionSchema = z.object({
   labels: z
     .array(z.string())
     .describe(
-      'yes_no [yes, no]; legal [accept, decline]; scale and nps [low end, high end]; statement and review [button]; matrix: the column labels; address: ZIP codes served. Otherwise [].',
+      'Words shown on screen. yes_no / legal: custom button words, or [] for Yes / No and Accept / Decline; scale and nps [low-end label, high-end label]; statement and review [button]; matrix: the column labels; address: ZIP codes served. Otherwise [].',
     ),
   settings: z
     .array(z.string())
@@ -348,7 +348,11 @@ const TYPING_OFF = ['typing-off', 'no-typing', 'audio-only', 'draw-only'];
 
 function fromModelQuestion(q: ModelQuestion): GeneratedQuestion {
   const { words, values } = readSettings(q.settings);
-  const labels = q.labels.map((l) => (typeof l === 'string' ? l.trim() : ''));
+  // A model sometimes writes the stored value ("yes") as the button word.
+  const labels = q.labels.map((l) => {
+    const t = typeof l === 'string' ? l.trim() : '';
+    return /^(yes|no|accept|decline)$/.test(t) ? t[0]!.toUpperCase() + t.slice(1) : t;
+  });
   const text = q.text;
   const display =
     Object.entries(DISPLAY_FOR[q.type] ?? {}).find(([word]) => words.has(word))?.[1] ?? '';
