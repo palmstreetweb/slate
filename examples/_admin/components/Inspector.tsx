@@ -170,6 +170,7 @@ export function Inspector({
           question.type === 'url' ||
           question.type === 'number' ||
           question.type === 'date' ||
+          question.type === 'single_choice' ||
           question.type === 'dropdown' ||
           question.type === 'yes_no' ||
           question.type === 'legal' ||
@@ -197,7 +198,8 @@ export function Inspector({
             <Checkbox
               checked={
                 (question as { required?: boolean }).required ??
-                (question.type === 'dropdown' ||
+                (question.type === 'single_choice' ||
+                  question.type === 'dropdown' ||
                   question.type === 'yes_no' ||
                   question.type === 'legal' ||
                   question.type === 'picture_choice')

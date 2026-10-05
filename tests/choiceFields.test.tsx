@@ -15,6 +15,7 @@ import { QuestionRenderer } from '@/components/questions/QuestionRenderer.js';
 import { RankingField } from '@/components/questions/RankingField.js';
 import { FormConfirmRefContext, FormOtherRefContext } from '@/hooks/useRegisterFormConfirm.js';
 import type { LooseAnswers } from '@/types/Answers.js';
+import { Inspector } from '../examples/_admin/components/Inspector.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -479,5 +480,33 @@ describe('grid (CH-15, GAP-28)', () => {
     await screen.findByRole('radio', { name: 'Speed: Good' });
     fireEvent.click(screen.getByTestId('confirm'));
     expect(screen.getByText('! Please answer every row. 3 are still empty.')).toBeInTheDocument();
+  });
+});
+
+/* ---------- studio: a single choice can be made optional (CH-09) ---------- */
+
+describe('Inspector: Required on a single choice', () => {
+  it('is shown, ticked by default, and unticking makes the question optional', () => {
+    const onChange = vi.fn();
+    render(
+      <div data-slate-forms="" data-theme-name="slate">
+        <Inspector
+          question={{
+            id: 'how',
+            type: 'single_choice',
+            title: 'How did you hear about us?',
+            options: [{ label: 'Flyer', value: 'opt_1' }],
+          }}
+          allQuestions={[]}
+          onChange={onChange}
+          onDelete={vi.fn()}
+          canDelete
+        />
+      </div>,
+    );
+    const required = screen.getByRole('checkbox', { name: 'Required' });
+    expect(required).toBeChecked();
+    fireEvent.click(required);
+    expect(onChange).toHaveBeenLastCalledWith({ required: false });
   });
 });
