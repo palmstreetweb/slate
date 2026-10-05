@@ -104,7 +104,7 @@ describe('a crafted portable link with a question that isn’t one (SEC-3)', () 
     } as unknown as Schema;
     const out = sanitizeUntrustedSchema(s);
     expect(out.questions.map((q) => q.id)).toEqual(['c']);
-    expect((out.questions[0] as { options: unknown[] }).options).toEqual([
+    expect((out.questions[0] as unknown as { options: unknown[] }).options).toEqual([
       { label: 'A', value: 'a' },
     ]);
     expect(withoutRepeats(null as never)).toBeNull();

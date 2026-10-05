@@ -143,7 +143,7 @@ export function Form<S extends Schema>({
   // This fill's id (`SubmitMeta.fillId`, ADR-069): saved with the answers, so
   // a reload and Resume send the same fill again, and a server keying on it
   // stores it once (ENG-03). "Submit another" starts a new one.
-  const fillRef = useRef(newFillId());
+  const fillRef = useRef<string | undefined>(newFillId());
 
   const resumeEnabled = Boolean(resume && schema.id);
   // Nothing is saved once an ending is reached: a reload after the submit
