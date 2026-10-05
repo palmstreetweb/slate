@@ -23,7 +23,10 @@ let calls: string[];
 let consoleError: ReturnType<typeof vi.spyOn>;
 
 /** storagesign answers `sign`; the bucket answers `put`. */
-function server(sign: () => Response, put: () => Response | Promise<Response> = () => new Response('')) {
+function server(
+  sign: () => Response,
+  put: () => Response | Promise<Response> = () => new Response(''),
+) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
@@ -34,7 +37,9 @@ function server(sign: () => Response, put: () => Response | Promise<Response> = 
 }
 
 const signOk = () =>
-  new Response(JSON.stringify({ url: 'https://bucket.invalid/put', method: 'PUT', contentType: 'text/plain' }));
+  new Response(
+    JSON.stringify({ url: 'https://bucket.invalid/put', method: 'PUT', contentType: 'text/plain' }),
+  );
 
 beforeEach(() => {
   calls = [];
@@ -45,7 +50,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const failure = (f = file()) => uploadToNeonStorage(f, opts).catch((e: unknown) => (e as Error).message);
+const failure = (f = file()) =>
+  uploadToNeonStorage(f, opts).catch((e: unknown) => (e as Error).message);
 
 describe('sign refusals', () => {
   it.each([
@@ -61,7 +67,9 @@ describe('sign refusals', () => {
   });
 
   it('storagesign’s own sentences for a stale page and a lost race read as sent', async () => {
-    server(() => new Response('This page is out of date. Reload it to add files.', { status: 400 }));
+    server(
+      () => new Response('This page is out of date. Reload it to add files.', { status: 400 }),
+    );
     expect(await failure()).toBe('This page is out of date. Reload it to add files.');
     server(() => new Response('That upload didn’t go through. Please try again.', { status: 409 }));
     expect(await failure()).toBe('That upload didn’t go through. Please try again.');
@@ -100,11 +108,13 @@ describe('the upload itself', () => {
   });
 
   it('a refused PUT never shows the XML', async () => {
-    server(signOk, () =>
-      new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Error><Code>RequestTimeTooSkewed</Code><Message>The difference between the request time and the current time is too large.</Message></Error>',
-        { status: 403 },
-      ),
+    server(
+      signOk,
+      () =>
+        new Response(
+          '<?xml version="1.0" encoding="UTF-8"?><Error><Code>RequestTimeTooSkewed</Code><Message>The difference between the request time and the current time is too large.</Message></Error>',
+          { status: 403 },
+        ),
     );
     const message = await failure();
     expect(message).toBe(UPLOAD_COPY.put);

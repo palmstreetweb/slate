@@ -69,9 +69,7 @@ function showLoadFailed(el: HTMLElement): void {
 }
 
 if (respondent) {
-  void import('./publicApp.js')
-    .then((m) => m.mountPublic(root))
-    .catch(() => showLoadFailed(root));
+  void import('./publicApp.js').then((m) => m.mountPublic(root)).catch(() => showLoadFailed(root));
 } else if (route.name === 'motion') {
   // Motion gallery (ADR-059): a dev demo with built-in schemas. Its own
   // chunk — no studio, no auth, no Neon.
@@ -86,7 +84,5 @@ if (respondent) {
   link.textContent = 'Open Slate in its own tab';
   root.replaceChildren(link);
 } else {
-  void import('./studioApp.js')
-    .then((m) => m.mountStudio(root))
-    .catch(() => showLoadFailed(root));
+  void import('./studioApp.js').then((m) => m.mountStudio(root)).catch(() => showLoadFailed(root));
 }

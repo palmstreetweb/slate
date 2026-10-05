@@ -130,7 +130,9 @@ describe('file type filter (MEDIA-08)', () => {
     });
     await screen.findByText(/choose files/i);
     await pick([new File(['%PDF'], 'doc.pdf', { type: 'application/pdf' })]);
-    expect(screen.getByText(/doc\.pdf can’t be added — this question takes photos only\./)).toBeInTheDocument();
+    expect(
+      screen.getByText(/doc\.pdf can’t be added — this question takes photos only\./),
+    ).toBeInTheDocument();
     expect(setAnswer).not.toHaveBeenCalled();
   });
 });
@@ -199,7 +201,9 @@ describe('sizes and settings', () => {
 
   it('a browser’s own error text never reaches the respondent (MEDIA-06)', async () => {
     const onFileUpload = vi.fn<FileUploadHandler>(async () => {
-      throw Object.assign(new Error('The quota has been exceeded.'), { name: 'QuotaExceededError' });
+      throw Object.assign(new Error('The quota has been exceeded.'), {
+        name: 'QuotaExceededError',
+      });
     });
     renderField({ id: 'docs', type: 'file_upload', title: 'Docs' }, onFileUpload);
     await screen.findByText(/choose files/i);
@@ -227,7 +231,9 @@ describe('photo checklist', () => {
         name: camera ? new RegExp(`(Take|Retake) photo: ${item}`) : `Choose a photo for ${item}`,
       }),
     );
-    const [cam, lib] = Array.from(document.querySelectorAll<HTMLInputElement>('.slate-shots-input'));
+    const [cam, lib] = Array.from(
+      document.querySelectorAll<HTMLInputElement>('.slate-shots-input'),
+    );
     await act(async () => {
       fireEvent.change(camera ? cam! : lib!, { target: { files: [file] } });
     });
@@ -238,8 +244,14 @@ describe('photo checklist', () => {
     const onFileUpload = vi.fn<FileUploadHandler>(async () => 'slate-file://p');
     renderField(q, onFileUpload);
     await screen.findByText('0 of 2 photos');
-    await shoot('Front of house', new File(['%PDF'], 'doc.pdf', { type: 'application/pdf' }), false);
-    expect(screen.getByRole('alert')).toHaveTextContent('That file isn’t a photo. Take or choose a photo.');
+    await shoot(
+      'Front of house',
+      new File(['%PDF'], 'doc.pdf', { type: 'application/pdf' }),
+      false,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'That file isn’t a photo. Take or choose a photo.',
+    );
     expect(onFileUpload).not.toHaveBeenCalled();
     expect(screen.getByText('0 of 2 photos')).toBeInTheDocument();
   });
@@ -268,9 +280,12 @@ describe('photo checklist', () => {
 
   it('a first photo that fails says why in plain words (MEDIA-06)', async () => {
     const onFileUpload = vi.fn<FileUploadHandler>(async () => {
-      throw Object.assign(new Error('Encountered full disk while opening backing store for indexedDB.open.'), {
-        name: 'UnknownError',
-      });
+      throw Object.assign(
+        new Error('Encountered full disk while opening backing store for indexedDB.open.'),
+        {
+          name: 'UnknownError',
+        },
+      );
     });
     renderField(q, onFileUpload);
     await screen.findByText('0 of 2 photos');
@@ -331,7 +346,10 @@ describe('voice note', () => {
 
   it('“Stop the recording first” goes away once it stops and saves (MEDIA-12)', async () => {
     stubMic();
-    renderField(q, vi.fn<FileUploadHandler>(async () => 'slate-file://v1'));
+    renderField(
+      q,
+      vi.fn<FileUploadHandler>(async () => 'slate-file://v1'),
+    );
     const stop = await record();
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(screen.getByText(/Stop the recording first/)).toBeInTheDocument();

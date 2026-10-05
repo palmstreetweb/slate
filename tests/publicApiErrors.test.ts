@@ -50,7 +50,9 @@ describe('unlockPublicForm 429', () => {
   it('uses retryAfterSeconds from the body when the header is hidden', async () => {
     respond(new Response(JSON.stringify({ retryAfterSeconds: 3600 }), { status: 429 }));
     const r = await unlockPublicForm('crew', { password: 'x' });
-    expect(r).toMatchObject({ message: 'Too many tries from this network. Try again in about an hour.' });
+    expect(r).toMatchObject({
+      message: 'Too many tries from this network. Try again in about an hour.',
+    });
   });
 
   it('a non-JSON body with no header says about 1 minute', async () => {

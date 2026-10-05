@@ -91,9 +91,9 @@ describe('matrix answers (GAP-14)', () => {
   });
 
   it('drops rows and columns the question doesn’t have', () => {
-    expect(clampForQuestion(grid, { r1: 'good', r2: 'meh', nope: 'bad', toString: 'good' })).toEqual(
-      { r1: 'good' },
-    );
+    expect(
+      clampForQuestion(grid, { r1: 'good', r2: 'meh', nope: 'bad', toString: 'good' }),
+    ).toEqual({ r1: 'good' });
     expect(clampForQuestion(grid, { r1: 'meh' })).toBeUndefined();
     expect(clampForQuestion(grid, ['good'])).toBeUndefined();
   });

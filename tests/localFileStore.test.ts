@@ -118,8 +118,9 @@ describe('saving on the device (MEDIA-06)', () => {
   it('a full device reads as plain copy, not “The quota has been exceeded.”', async () => {
     vi.stubGlobal(
       'indexedDB',
-      fakeIndexedDb({ putError: { name: 'QuotaExceededError', message: 'The quota has been exceeded.' } })
-        .api,
+      fakeIndexedDb({
+        putError: { name: 'QuotaExceededError', message: 'The quota has been exceeded.' },
+      }).api,
     );
     await expect(saveLocalUpload(file())).rejects.toThrow(LOCAL_FULL);
   });
@@ -127,9 +128,14 @@ describe('saving on the device (MEDIA-06)', () => {
   it('a blocked store (some private windows) reads as plain copy', async () => {
     vi.stubGlobal('indexedDB', {
       open() {
-        throw Object.assign(new Error('A mutation operation was attempted on a database that did not allow mutations.'), {
-          name: 'InvalidStateError',
-        });
+        throw Object.assign(
+          new Error(
+            'A mutation operation was attempted on a database that did not allow mutations.',
+          ),
+          {
+            name: 'InvalidStateError',
+          },
+        );
       },
     });
     await expect(saveLocalUpload(file())).rejects.toThrow(LOCAL_SAVE_FAILED);
@@ -173,6 +179,11 @@ describe('deleting files nothing keeps (MEDIA-19)', () => {
       voice: { audio: 'slate-file://4', sec: '3' },
       name: 'Ada',
     });
-    expect([...refs].sort()).toEqual(['slate-file://1', 'slate-file://2', 'slate-file://3', 'slate-file://4']);
+    expect([...refs].sort()).toEqual([
+      'slate-file://1',
+      'slate-file://2',
+      'slate-file://3',
+      'slate-file://4',
+    ]);
   });
 });

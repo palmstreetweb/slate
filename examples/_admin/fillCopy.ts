@@ -29,7 +29,8 @@ export const SEND_LATER =
 export const SEND_TOO_LONG_HERE = 'This answer is too long to send. Shorten it, then press OK.';
 
 /** 413 when no single answer can be named. */
-export const SEND_TOO_LONG = 'Your answers are too long to send. Shorten your longest answer, then try again.';
+export const SEND_TOO_LONG =
+  'Your answers are too long to send. Shorten your longest answer, then try again.';
 
 /** The password didn't match. */
 export const WRONG_PASSWORD = 'That password didn’t match. Try again.';
@@ -41,7 +42,8 @@ export const GATE_OFFLINE = 'We couldn’t check the password. Check your connec
 export const GATE_LATER = 'We couldn’t check the password just now. Try again in a moment.';
 
 /** A portable link that can't be read (cut short by a text message, or mistyped). */
-export const LINK_BROKEN = 'This link looks broken or incomplete. Ask whoever sent it for a new one.';
+export const LINK_BROKEN =
+  'This link looks broken or incomplete. Ask whoever sent it for a new one.';
 
 /** A portable (preview) link opened on the live site, where it can't send answers anywhere. */
 export const LINK_PREVIEW_ONLY =

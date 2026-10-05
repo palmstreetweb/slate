@@ -9,8 +9,7 @@ export function resolveFileInputAccept(accept?: string): string | undefined {
 }
 
 /** The one "too big" sentence, wherever a size limit refuses a file. */
-export const tooBigMessage = (mb: number): string =>
-  `That file is too big. The limit is ${mb} MB.`;
+export const tooBigMessage = (mb: number): string => `That file is too big. The limit is ${mb} MB.`;
 
 /**
  * Words a respondent can act on. A host's own sentence (a plain `Error`) is

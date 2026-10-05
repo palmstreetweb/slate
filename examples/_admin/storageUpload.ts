@@ -226,7 +226,11 @@ export async function uploadToNeonStorage(
   }
   if (!put.ok) {
     // Object storage answers in XML (RequestTimeTooSkewed, SignatureDoesNotMatch…): log it only.
-    console.error('[slate] upload put failed', put.status, (await put.text().catch(() => '')).slice(0, 200));
+    console.error(
+      '[slate] upload put failed',
+      put.status,
+      (await put.text().catch(() => '')).slice(0, 200),
+    );
     throw new Error(UPLOAD_COPY.put);
   }
   const ref = `${SLATE_FILE_REF_PREFIX}${STORAGE_PREFIX}${stored}`;

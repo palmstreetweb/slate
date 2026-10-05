@@ -46,7 +46,11 @@ async function uploadToRemote(
   }
   if (!res.ok) {
     // Never the upload server's own text (QA pass, COPY-03): the console has it.
-    console.error('[slate] upload failed', res.status, (await res.text().catch(() => '')).slice(0, 200));
+    console.error(
+      '[slate] upload failed',
+      res.status,
+      (await res.text().catch(() => '')).slice(0, 200),
+    );
     throw new Error(UPLOAD_COPY.later);
   }
 

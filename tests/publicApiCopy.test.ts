@@ -146,11 +146,15 @@ describe('password gate replies (COPY-11)', () => {
         throw new TypeError('Failed to fetch');
       }),
     );
-    expect((await unlockPublicForm('crew', { password: 'x' })) as { message: string }).toMatchObject({
+    expect(
+      (await unlockPublicForm('crew', { password: 'x' })) as { message: string },
+    ).toMatchObject({
       message: GATE_OFFLINE,
     });
     respond(new Response('Temporarily unavailable', { status: 503 }));
-    expect(await unlockPublicForm('crew', { password: 'x' })).toMatchObject({ message: GATE_LATER });
+    expect(await unlockPublicForm('crew', { password: 'x' })).toMatchObject({
+      message: GATE_LATER,
+    });
     respond(new Response('Not found', { status: 404 }));
     expect(await unlockPublicForm('crew', { password: 'x' })).toMatchObject({
       message: FORM_UNAVAILABLE,

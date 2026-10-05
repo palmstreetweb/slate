@@ -124,7 +124,9 @@ describe('filling a portable link', () => {
     };
     let n = 0;
     files.upload.mockImplementation(async () => `slate-file://local-${++n}`);
-    render(<PublicRespond token={encodePortableSchema(withFiles, { formId: 'portable_files1' })} />);
+    render(
+      <PublicRespond token={encodePortableSchema(withFiles, { formId: 'portable_files1' })} />,
+    );
     await screen.findByText(/choose files/i, {}, { timeout: 8000 });
     const input = document.querySelector('input[type="file"]')!;
     await act(async () => {

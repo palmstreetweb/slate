@@ -168,7 +168,9 @@ describe('same-tab resume (GAP-05)', () => {
     render(<PublicFill slug="48210378" />);
     expect(await screen.findByText('Pick up where you left off?')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Resume' }));
-    expect(await screen.findByRole('heading', { name: 'Tell us about the job' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Tell us about the job' }),
+    ).toBeInTheDocument();
   });
 
   it('a successful submit clears the tab’s save', async () => {
@@ -178,8 +180,6 @@ describe('same-tab resume (GAP-05)', () => {
     render(<PublicFill slug="48210378" />);
     await fillBoth(user);
     await screen.findByText('response received');
-    await waitFor(() =>
-      expect(window.sessionStorage.getItem('slate-forms-resume:f_1')).toBeNull(),
-    );
+    await waitFor(() => expect(window.sessionStorage.getItem('slate-forms-resume:f_1')).toBeNull());
   });
 });
