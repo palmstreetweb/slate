@@ -550,9 +550,12 @@ describe('Wave C schema checks', () => {
       kinds([{ id: 'a', type: 'availability', title: 'T', startTime: '17:00', endTime: '09:00' }]),
     ).toContain('bad_grid');
     expect(kinds([{ id: 'a', type: 'availability', title: 'T' }])).toEqual([]);
-    expect(kinds([{ id: 'l', type: 'location', title: 'T', radius: 10 }])).toContain(
-      'bad_service_area',
-    );
+    // A radius alone is a service area not set up yet — a new Location question starts
+    // that way, and the inspector says "Not set" (QA 2026-10, MEDIA-13). A center needs a radius.
+    expect(kinds([{ id: 'l', type: 'location', title: 'T', radius: 10 }])).toEqual([]);
+    expect(
+      kinds([{ id: 'l', type: 'location', title: 'T', center: { lat: 34.4, lng: -119.7 } }]),
+    ).toContain('bad_service_area');
     expect(
       kinds([{ id: 's', type: 'picture_choice', title: 'T', options: [], display: 'swipe' }]),
     ).toContain('swipe_single');
