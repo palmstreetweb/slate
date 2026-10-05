@@ -37,7 +37,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const heic = () => new File([new Uint8Array([0, 1, 2, 3])], 'IMG_0512.HEIC', { type: 'image/heic' });
+const heic = () =>
+  new File([new Uint8Array([0, 1, 2, 3])], 'IMG_0512.HEIC', { type: 'image/heic' });
+
+/** The error a promise rejects with (a resolve is a failure of its own). */
+const rejection = (p: Promise<unknown>): Promise<Error> =>
+  p.then(
+    () => new Error('it resolved'),
+    (e: unknown) => e as Error,
+  );
 
 describe('an iPhone photo that can’t be opened', () => {
   it('says so in plain words, with no format names or “download”', async () => {
@@ -48,13 +56,13 @@ describe('an iPhone photo that can’t be opened', () => {
     vi.stubGlobal('Image', BrokenImage);
     URL.createObjectURL ??= () => 'blob:test';
     URL.revokeObjectURL ??= () => undefined;
-    const err = await convertHeicToJpegFile(heic()).catch((e: unknown) => e as Error);
+    const err = await rejection(convertHeicToJpegFile(heic()));
     expect(err.message).toBe(
       'We couldn’t open this iPhone photo. Try another, or save it as a JPG first.',
     );
     expect(err.message).not.toMatch(/HEIC|HEIF|download/i);
     // The upload path passes the same words on (never stores raw HEIC).
-    const viaUpload = await prepareFileForUpload(heic()).catch((e: unknown) => e as Error);
+    const viaUpload = await rejection(prepareFileForUpload(heic()));
     expect(viaUpload.message).toBe(err.message);
   });
 });
