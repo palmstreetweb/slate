@@ -155,6 +155,38 @@
   letter-spacing: 0.01em;
 }
 
+/* A field's message slot stays in the page so screen readers announce it
+   (GAP-21); empty, it takes no room and doesn't animate. Its slide-in
+   (motion.css) starts when a message arrives, as the selector starts to match. */
+[data-slate-forms] p.slate-err:empty {
+  margin: 0;
+  animation: none;
+}
+
+/* Phones have no keys to press (GAP-26): "press Enter" beside OK, and other
+   keyboard-only hints (.slate-keys), step aside. */
+@media (hover: none) {
+  [data-slate-forms] .slate-ok-btn ~ .slate-hint:not(.slate-hint--touch),
+  [data-slate-forms] .slate-keys {
+    display: none;
+  }
+}
+
+/* "9410 / 10000" near a text answer's limit; past it, in the error colour. */
+[data-slate-forms] .slate-count {
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--slate-text);
+  opacity: 0.7;
+}
+
+[data-slate-forms] .slate-count--over {
+  color: var(--slate-error);
+  opacity: 1;
+  font-weight: 700;
+}
+
 /* ---------- a submit sent the respondent back here (ADR-066) ---------- */
 
 [data-slate-forms] .slate-notice {

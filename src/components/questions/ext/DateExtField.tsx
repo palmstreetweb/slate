@@ -14,18 +14,21 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import type { DateQuestion } from '@/types/Question.js';
 import { validate } from '@/logic/validation.js';
+import { isValidTime, parseDateAnswer, type DatePart } from '@/logic/dateValue.js';
 import {
+  buildIsoDate,
   dateAnswerToString,
-  isValidIsoDate,
-  isValidTime,
-  parseDateAnswer,
-  type DatePart,
-} from '@/logic/dateValue.js';
+  fullYear,
+  splitTypedDate,
+  typedBox,
+  type DateFormat,
+} from '@/logic/dateEntry.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import { FieldError } from './fieldMessage.js';
 import '@/styles/extensions.css';
 
 type Seg = 'month' | 'day' | 'year' | 'hour' | 'minute';
@@ -40,7 +43,6 @@ type PartState = {
 };
 
 const EMPTY: PartState = { month: '', day: '', year: '', hour: '', minute: '', meridiem: null };
-const SEG_LEN: Record<Seg, number> = { month: 2, day: 2, year: 4, hour: 2, minute: 2 };
 
 function fromPart(p: DatePart | undefined, clock12: boolean): PartState {
   if (!p) return EMPTY;
@@ -75,10 +77,17 @@ function isBlank(s: PartState, withTime: boolean): boolean {
 
 type Built = { part: DatePart } | { error: string };
 
-function build(s: PartState, withTime: boolean, clock12: boolean, which: string): Built {
-  if (!s.month || !s.day || s.year.length !== 4) return { error: `Please finish the ${which}` };
-  const date = `${s.year}-${s.month.padStart(2, '0')}-${s.day.padStart(2, '0')}`;
-  if (!isValidIsoDate(date)) return { error: "That doesn't look like a valid date" };
+function build(
+  s: PartState,
+  withTime: boolean,
+  clock12: boolean,
+  which: string,
+  format: DateFormat,
+): Built {
+  // The date rules (and their words) are the plain date's: logic/dateEntry.ts.
+  const d = buildIsoDate(s, format, which);
+  if ('error' in d) return d;
+  const { date } = d;
   if (!withTime) return { part: { date } };
   if (!s.hour || !s.minute) return { error: `Please add a time to the ${which}` };
   let h = Number(s.hour);
@@ -86,7 +95,10 @@ function build(s: PartState, withTime: boolean, clock12: boolean, which: string)
     if (h < 1 || h > 12) return { error: 'Hours run from 1 to 12' };
     const pm = meridiemOf(s) === 'PM';
     h = (h % 12) + (pm ? 12 : 0);
+  } else if (h > 23) {
+    return { error: 'Hours run from 0 to 23' };
   }
+  if (Number(s.minute) > 59) return { error: 'Minutes run from 00 to 59' };
   const time = `${String(h).padStart(2, '0')}:${s.minute.padStart(2, '0')}`;
   if (!isValidTime(time)) return { error: "That doesn't look like a valid time" };
   return { part: { date, time } };
@@ -96,10 +108,12 @@ type PartProps = {
   idPrefix: string;
   state: PartState;
   onChange: (next: PartState) => void;
-  format: 'MM/DD/YYYY' | 'DD/MM/YYYY';
+  format: DateFormat;
   withTime: boolean;
   clock12: boolean;
   invalid: boolean;
+  /** The message slot, for each box's aria-describedby. */
+  errId: string;
   /** Where each input registers itself, for focus hand-off. */
   register: (seg: Seg, el: HTMLInputElement | null) => void;
   /** Focus the input after `seg` (across parts). */
@@ -115,20 +129,23 @@ function DateTimePart({
   withTime,
   clock12,
   invalid,
+  errId,
   register,
   onFilled,
   onEnter,
 }: PartProps) {
   const setSeg = (seg: Seg, raw: string) => {
-    const digits = raw.replace(/\D/g, '').slice(0, SEG_LEN[seg]);
+    // A whole date typed or pasted into a date box fills the three of them.
+    const whole = seg === 'hour' || seg === 'minute' ? null : splitTypedDate(raw, format);
+    if (whole) {
+      onChange({ ...state, ...whole });
+      onFilled('year');
+      return;
+    }
+    // Moves on at full length, after "/" or ":", or on a digit that can't start two.
+    const { digits, done } = typedBox(seg, raw, clock12 ? 1 : 2);
     onChange({ ...state, [seg]: digits });
-    const full =
-      digits.length === SEG_LEN[seg] ||
-      // A single digit that can't start a two-digit value is complete on its own.
-      (seg === 'month' && Number(digits) > 1) ||
-      (seg === 'day' && Number(digits) > 3) ||
-      (seg === 'hour' && Number(digits) > (clock12 ? 1 : 2));
-    if (full && digits.length > 0) onFilled(seg);
+    if (done) onFilled(seg);
   };
 
   const keyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -155,6 +172,7 @@ function DateTimePart({
       placeholder={placeholder}
       aria-label={label}
       aria-invalid={invalid}
+      aria-describedby={errId}
       autoComplete="off"
       className={`slate-input slate-date-seg${extra}${invalid ? ' slate-input--error' : ''}`}
     />
@@ -213,6 +231,7 @@ export default function DateExtField({
   onAdvance,
 }: ExtFieldProps<DateQuestion>) {
   const labelId = useId();
+  const errId = `${labelId}-err`;
   const idPrefix = useId();
   const format = question.format ?? 'MM/DD/YYYY';
   const clock12 = format === 'MM/DD/YYYY';
@@ -253,23 +272,28 @@ export default function DateExtField({
     };
     let stored = '';
     if (!(isBlank(a, withTime) && (!range || isBlank(b, withTime)))) {
-      const start = build(a, withTime, clock12, range ? 'start date' : 'date');
+      const start = build(a, withTime, clock12, range ? 'start date' : 'date', format);
       if ('error' in start) return fail(start.error);
       if (range) {
         if (isBlank(b, withTime)) return fail('Please add an end date');
-        const end = build(b, withTime, clock12, 'end date');
+        const end = build(b, withTime, clock12, 'end date', format);
         if ('error' in end) return fail(end.error);
         stored = dateAnswerToString({ start: start.part, end: end.part });
       } else {
         stored = dateAnswerToString({ start: start.part });
       }
+      // Show the years as they are read: "26" becomes 2026.
+      setParts(([x, y]) => [
+        { ...x, year: fullYear(x.year) },
+        { ...y, year: fullYear(y.year) },
+      ]);
     }
     const err = validate(question, stored);
     if (err) return fail(err.message);
     setError(null);
     onAnswer(stored === '' ? undefined : stored);
     onAdvance();
-  }, [parts, withTime, range, clock12, question, onAnswer, onAdvance]);
+  }, [parts, withTime, range, clock12, format, question, onAnswer, onAdvance]);
 
   useRegisterFormConfirm(submit);
 
@@ -282,6 +306,7 @@ export default function DateExtField({
       withTime={withTime}
       clock12={clock12}
       invalid={Boolean(error)}
+      errId={errId}
       register={(seg, el) => {
         const key = `${i}:${seg}`;
         if (el) inputs.current.set(key, el);
@@ -326,11 +351,7 @@ export default function DateExtField({
           part(0)
         )}
       </div>
-      {error && (
-        <p className="slate-err" aria-live="polite">
-          ! {error}
-        </p>
-      )}
+      <FieldError id={errId} error={error} />
       <div className="slate-actions">
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>

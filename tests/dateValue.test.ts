@@ -1,13 +1,8 @@
 /** Date answers with a time and/or a range (ADR-063). */
 
 import { describe, it, expect } from 'vitest';
-import {
-  dateAnswerToString,
-  formatDateAnswer,
-  formatTime12,
-  isValidTime,
-  parseDateAnswer,
-} from '@/logic/dateValue.js';
+import { formatDateAnswer, formatTime12, isValidTime, parseDateAnswer } from '@/logic/dateValue.js';
+import { dateAnswerToString } from '@/logic/dateEntry.js';
 import { isValidIsoDate, validate } from '@/logic/validation.js';
 import type { DateQuestion } from '@/types/Question.js';
 

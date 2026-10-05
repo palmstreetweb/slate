@@ -57,8 +57,9 @@ function renderField(question: Question, answers: LooseAnswers = {}) {
 describe('registry', () => {
   it('maps variants to on-demand UIs and leaves the rest on their core field', () => {
     const scale = { id: 's', type: 'scale', title: 'S', min: 1, max: 5 } as const;
-    expect(extFieldKey(scale)).toBeNull();
-    expect(extFieldKey({ ...scale, display: 'numbers' })).toBeNull();
+    // The numbers scale loads on demand too (QA pass), with the other long-standing fields.
+    expect(extFieldKey(scale)).toBe('core-fields');
+    expect(extFieldKey({ ...scale, display: 'numbers' })).toBe('core-fields');
     expect(extFieldKey({ ...scale, display: 'stars' })).toBe('scale-styled');
     expect(extFieldKey({ ...scale, display: 'emoji' })).toBe('scale-styled');
     expect(extFieldKey({ ...scale, display: 'slider' })).toBe('scale-styled');
@@ -180,7 +181,7 @@ describe('slider', () => {
     const slider = await screen.findByRole('slider', { name: 'How urgent?' });
     expect(slider).toHaveAttribute('aria-valuetext', expect.stringMatching(/not answered yet/i));
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(screen.getByText(/drag the slider to choose/i)).toBeInTheDocument();
+    expect(screen.getByText(/move the slider to choose a number/i)).toBeInTheDocument();
     expect(setAnswer).not.toHaveBeenCalled();
     expect(advance).not.toHaveBeenCalled();
   });
@@ -256,10 +257,10 @@ describe('number stepper', () => {
     expect(box).toHaveValue('1');
     fireEvent.change(box, { target: { value: '12' } });
     fireEvent.keyDown(box, { key: 'Enter' });
-    expect(screen.getByText(/maximum is 3/i)).toBeInTheDocument();
+    expect(screen.getByText('! Enter a number from 0 to 3 windows')).toBeInTheDocument();
     fireEvent.change(box, { target: { value: 'lots' } });
     fireEvent.keyDown(box, { key: 'Enter' });
-    expect(screen.getByText(/please enter a number/i)).toBeInTheDocument();
+    expect(screen.getByText(/please use numbers only, like 1500/i)).toBeInTheDocument();
     expect(setAnswer).not.toHaveBeenCalled();
   });
 

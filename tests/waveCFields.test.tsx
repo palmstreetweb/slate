@@ -563,7 +563,7 @@ describe('location', () => {
     const { advance } = renderField(q);
     await screen.findByRole('button', { name: 'Use my location' });
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(screen.getByText(/share your location, or enter it below/i)).toBeInTheDocument();
+    expect(screen.getByText(/share your location, or type it instead/i)).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
   });
 });

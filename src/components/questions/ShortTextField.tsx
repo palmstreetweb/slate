@@ -1,97 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ShortTextQuestion } from '@/types/Question.js';
-import type { LooseAnswers } from '@/types/Answers.js';
-import { validate } from '@/logic/validation.js';
-import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
-import { shakeInvalid } from '@/utils/motion.js';
-import { focusAfter } from '@/utils/focus.js';
-import { isTypewriterKey } from '@/utils/typewriterKey.js';
-import { resolveTitle } from './_resolveTitle.js';
+import { textMax } from '@/logic/validation.js';
+import { TextAnswer, type TextFieldProps } from './TextAnswer.js';
 
-type Props = {
-  question: ShortTextQuestion;
-  answers: LooseAnswers;
-  initialValue: string;
-  onAnswer: (value: string) => void;
-  onAdvance: () => void;
-  onType?: () => void;
-};
-
-export function ShortTextField({
-  question,
-  answers,
-  initialValue,
-  onAnswer,
-  onAdvance,
-  onType,
-}: Props) {
-  const [value, setValue] = useState(initialValue);
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const labelId = useId();
-
-  useEffect(() => {
-    return focusAfter(inputRef.current);
-  }, [question.id]);
-
-  const submit = useCallback(() => {
-    const err = validate(question, value);
-    if (err) {
-      setError(err.message);
-      shakeInvalid(inputRef.current);
-      return;
-    }
-    setError(null);
-    onAnswer(value.trim());
-    onAdvance();
-  }, [question, value, onAnswer, onAdvance]);
-
-  useRegisterFormConfirm(submit);
-
-  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (isTypewriterKey(e)) onType?.();
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      submit();
-    }
-  };
-
+export function ShortTextField(props: TextFieldProps<ShortTextQuestion>) {
   return (
-    <div>
-      <h1 id={labelId} className="slate-title">
-        {resolveTitle(question.title, answers)}
-      </h1>
-      <div style={{ marginTop: 24 }}>
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            if (error) setError(null);
-          }}
-          onKeyDown={handleKey}
-          placeholder={question.placeholder ?? 'Type your answer...'}
-          maxLength={question.maxLength}
-          aria-labelledby={labelId}
-          aria-invalid={Boolean(error)}
-          className={`slate-input${error ? ' slate-input--error' : ''}`}
-          autoComplete="off"
-        />
-        {error && (
-          <p className="slate-err" aria-live="polite">
-            ! {error}
-          </p>
-        )}
-        <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={submit}>
-            OK <span aria-hidden>✓</span>
-          </button>
-          <span className="slate-hint">press Enter ↵</span>
-        </div>
-      </div>
-    </div>
+    <TextAnswer
+      {...props}
+      box={{
+        type: 'text',
+        autoComplete: 'off',
+        placeholder: props.question.placeholder ?? 'Type your answer...',
+      }}
+      max={textMax(props.question)}
+      hint="press Enter ↵"
+    />
   );
 }

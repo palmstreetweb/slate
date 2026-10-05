@@ -56,6 +56,18 @@
   outline-offset: 2px;
 }
 
+/* Focus starts on the row itself, so a stray Enter picks nothing (F4); a
+   keyboard user sees a quiet ring around the row until an arrow key moves in. */
+[data-slate-forms] .slate-scale-icons:focus {
+  outline: none;
+}
+
+[data-slate-forms] .slate-scale-icons:focus-visible {
+  outline: 2px dashed rgb(var(--slate-accent-rgb) / 0.55);
+  outline-offset: 6px;
+  border-radius: var(--slate-radius);
+}
+
 /* Stars: bare, big, and close together — the row reads as one control. */
 [data-slate-forms] .slate-scale-icons--stars {
   gap: 2px;

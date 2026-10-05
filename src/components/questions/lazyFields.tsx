@@ -124,7 +124,7 @@ export function extFieldKey(q: Question): ExtFieldKey | null {
     case 'scale':
       return q.display === 'stars' || q.display === 'emoji' || q.display === 'slider'
         ? 'scale-styled'
-        : null;
+        : 'core-fields';
     case 'number':
       return q.display === 'stepper' ? 'number-stepper' : 'core-fields';
     case 'date':

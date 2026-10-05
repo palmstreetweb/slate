@@ -3,10 +3,16 @@
  * stars) react while you drag. Loaded on demand (lazyFields.tsx). The answer
  * is the same number as the plain numbers scale.
  *
- * Stars and faces are a radiogroup: arrow keys move and preview, Space/Enter
- * or a tap picks and auto-advances after the commit beat, and the form's
- * number keys still work. The slider is a native range input, so screen
- * readers and keyboards get its semantics for free; it waits for OK / Enter.
+ * Stars and faces are a radiogroup: arrow keys move and preview, a tap (or
+ * Space / Enter on the star the keyboard moved to) picks and auto-advances
+ * after the commit beat, and the form's number keys still work. Focus starts
+ * on the group, not the first star, so an Enter pressed out of habit picks
+ * nothing: an optional rating moves on (Skip), a required one says what to do.
+ * Each star is named by its value ("4.5 stars"), which is what is stored.
+ *
+ * The slider is a native range input, so screen readers and keyboards get its
+ * semantics for free; it waits for OK / Enter. A scroll that starts on it
+ * leaves it as it was.
  */
 
 'use client';
@@ -21,23 +27,15 @@ import { shakeInvalid } from '@/utils/motion.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
 import { Face, Star } from './scaleArt.js';
+import { nearestStep, scaleRange, scaleValues } from './scaleCells.js';
+import { FieldError } from './fieldMessage.js';
+import { TapActions } from './TapActions.js';
 import '@/styles/extensions.css';
-
-/** More cells than this and a scale is clearly misconfigured; draw the first ones only. */
-const MAX_CELLS = 21;
-
-function scaleValues(q: ScaleQuestion): number[] {
-  const step = q.step && q.step > 0 ? q.step : 1;
-  const out: number[] = [];
-  for (let v = q.min; v <= q.max + 1e-9 && out.length < MAX_CELLS; v += step) {
-    out.push(Number(v.toFixed(6)));
-  }
-  return out.length ? out : [q.min];
-}
 
 /** 0 at the lowest value, 1 at the highest. */
 function moodOf(v: number, q: ScaleQuestion): number {
-  return q.max > q.min ? (v - q.min) / (q.max - q.min) : 0.5;
+  const { lo, hi } = scaleRange(q);
+  return hi > lo ? (v - lo) / (hi - lo) : 0.5;
 }
 
 function ScaleLabels({ q }: { q: ScaleQuestion }) {
@@ -60,8 +58,9 @@ export default function ScaleStyledField(props: ExtFieldProps<ScaleQuestion>) {
 
 /* ---------- stars and faces ---------- */
 
-function ScaleIcons({ question, answers, value, onCommit }: ExtFieldProps<ScaleQuestion>) {
+function ScaleIcons({ question, answers, value, onCommit, onAdvance }: ExtFieldProps<ScaleQuestion>) {
   const labelId = useId();
+  const errId = `${labelId}-err`;
   const stars = question.display === 'stars';
   const values = scaleValues(question);
   const picked = typeof value === 'number' ? value : undefined;
@@ -72,10 +71,15 @@ function ScaleIcons({ question, answers, value, onCommit }: ExtFieldProps<ScaleQ
     picked === undefined ? undefined : String(picked),
   );
   const cellsRef = useRef<Array<HTMLButtonElement | null>>([]);
+  const groupRef = useRef<HTMLDivElement>(null);
 
-  // Focus lands once per question (brief §10.5): on the stored pick, else the first cell.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => focusAfter(cellsRef.current[Math.max(0, pickedIdx)] ?? null), [question.id]);
+  // Focus lands once per question (brief §10.5): on the stored pick, else on
+  // the group, so Enter or Space right away picks nothing.
+  useEffect(
+    () => focusAfter(pickedIdx >= 0 ? (cellsRef.current[pickedIdx] ?? null) : groupRef.current),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [question.id],
+  );
 
   const pick = (i: number) => {
     const v = values[i];
@@ -86,11 +90,13 @@ function ScaleIcons({ question, answers, value, onCommit }: ExtFieldProps<ScaleQ
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const last = values.length - 1;
+    // From the group itself (nothing focused yet), the first arrow lands on the first icon.
+    const from = e.target === e.currentTarget ? -1 : cursor;
     const next =
       e.key === 'ArrowRight' || e.key === 'ArrowUp'
-        ? Math.min(last, cursor + 1)
+        ? Math.min(last, from + 1)
         : e.key === 'ArrowLeft' || e.key === 'ArrowDown'
-          ? Math.max(0, cursor - 1)
+          ? Math.max(0, from - 1)
           : e.key === 'Home'
             ? 0
             : e.key === 'End'
@@ -114,9 +120,12 @@ function ScaleIcons({ question, answers, value, onCommit }: ExtFieldProps<ScaleQ
       </h1>
       <div className="slate-scale slate-scale--icons">
         <div
+          ref={groupRef}
+          tabIndex={-1}
           className={`slate-scale-icons slate-scale-icons--${stars ? 'stars' : 'emoji'}${committedIdx >= 0 ? ' slate-scale-icons--committed' : ''}`}
           role="radiogroup"
           aria-labelledby={labelId}
+          aria-describedby={errId}
           onKeyDown={onKeyDown}
           onPointerLeave={() => setPreview(null)}
           onBlur={(e) => {
@@ -125,8 +134,9 @@ function ScaleIcons({ question, answers, value, onCommit }: ExtFieldProps<ScaleQ
         >
           {values.map((v, i) => {
             const selected = i === pickedIdx;
+            // Named by the value stored: a 0–5 scale's first star is "0 stars".
             const label =
-              (stars ? `${i + 1} ${i === 0 ? 'star' : 'stars'}` : String(v)) +
+              (stars ? `${v} ${v === 1 ? 'star' : 'stars'}` : String(v)) +
               (i === 0 && question.minLabel ? `, ${question.minLabel}` : '') +
               (i === values.length - 1 && question.maxLabel ? `, ${question.maxLabel}` : '');
             const fill = stars
@@ -167,11 +177,33 @@ function ScaleIcons({ question, answers, value, onCommit }: ExtFieldProps<ScaleQ
         </div>
         <ScaleLabels q={question} />
       </div>
-      <div className="slate-actions">
-        <span className="slate-hint">
-          {stars ? 'tap a star, or press a number' : 'tap a face, or press a number'}
-        </span>
-      </div>
+      <TapActions
+        answered={picked !== undefined}
+        required={question.required === true}
+        check={() =>
+          picked === undefined
+            ? question.required
+              ? 'Please pick a rating'
+              : null
+            : (validate(question, picked)?.message ?? null)
+        }
+        onAdvance={onAdvance}
+        target={groupRef}
+        errorId={errId}
+        // Enter on the icon the keyboard moved to picks it.
+        pickFocused={() => {
+          const i = cellsRef.current.indexOf(document.activeElement as HTMLButtonElement);
+          if (i < 0) return false;
+          pick(i);
+          return true;
+        }}
+        hint={
+          <span className="slate-hint slate-hint--touch">
+            {stars ? 'tap a star' : 'tap a face'}
+            <span className="slate-keys">, or press a number</span>
+          </span>
+        }
+      />
     </div>
   );
 }
@@ -186,13 +218,16 @@ function ScaleSlider({
   onAdvance,
 }: ExtFieldProps<ScaleQuestion>) {
   const labelId = useId();
+  const errId = `${labelId}-err`;
   const values = scaleValues(question);
-  const step = question.step && question.step > 0 ? question.step : 1;
+  const { lo, hi, step } = scaleRange(question);
   const [local, setLocal] = useState<number | undefined>(
     typeof value === 'number' ? value : undefined,
   );
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** The answer before a touch began: a touch that turns into a scroll puts it back. */
+  const beforeTouch = useRef<number | undefined>(undefined);
 
   // The form's number keys store a value directly; follow it.
   useEffect(() => {
@@ -201,7 +236,8 @@ function ScaleSlider({
 
   useEffect(() => focusAfter(inputRef.current), [question.id]);
 
-  const middle = values[Math.floor((values.length - 1) / 2)] ?? question.min;
+  // The real middle of the range, on the step grid (not of the first 21 cells).
+  const middle = nearestStep(question, (lo + hi) / 2);
   const shown = local ?? middle;
   const touched = local !== undefined;
   const t = moodOf(shown, question);
@@ -210,7 +246,7 @@ function ScaleSlider({
   const submit = useCallback(() => {
     if (local === undefined) {
       if (question.required) {
-        setError('Drag the slider to choose');
+        setError('Move the slider to choose a number');
         shakeInvalid(inputRef.current);
         return;
       }
@@ -241,20 +277,18 @@ function ScaleSlider({
       submit();
       return;
     }
-    // Number keys pick a value here too (the form's own handler skips inputs).
+    // Number keys pick a value here too (the form's own handler skips inputs),
+    // snapped to the nearest step: 7 on a 0–100 by 5 slider is 5.
     if (/^[0-9]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      const v = Number(e.key);
-      if (values.includes(v)) {
-        e.preventDefault();
-        set(v);
-      }
+      e.preventDefault();
+      set(nearestStep(question, Number(e.key)));
     }
   };
 
   const valueText =
     `${shown}` +
-    (shown === question.min && question.minLabel ? `, ${question.minLabel}` : '') +
-    (shown === question.max && question.maxLabel ? `, ${question.maxLabel}` : '');
+    (shown === lo && question.minLabel ? `, ${question.minLabel}` : '') +
+    (shown === hi && question.maxLabel ? `, ${question.maxLabel}` : '');
   const starCount = Math.min(values.length, 10);
   const litStars = Math.round(t * (starCount - 1)) + 1;
 
@@ -279,32 +313,37 @@ function ScaleSlider({
           ref={inputRef}
           type="range"
           className="slate-slider-input"
-          min={question.min}
-          max={question.max}
+          min={lo}
+          max={hi}
           step={step}
           value={shown}
           aria-labelledby={labelId}
+          aria-describedby={errId}
           aria-valuetext={touched ? valueText : `Not answered yet. ${valueText}`}
           aria-invalid={Boolean(error)}
           style={{ '--slate-slider-pct': `${t * 100}%` } as React.CSSProperties}
+          // A tap on the thumb where it sits answers with that value.
           onPointerDown={() => {
+            beforeTouch.current = local;
             if (!touched) set(shown);
           }}
+          // The browser took the gesture for a page scroll: nothing was chosen.
+          onPointerCancel={() => setLocal(beforeTouch.current)}
           onChange={(e) => set(Number(e.target.value))}
           onKeyDown={onKeyDown}
         />
         <ScaleLabels q={question} />
       </div>
-      {error && (
-        <p className="slate-err" aria-live="polite">
-          ! {error}
-        </p>
-      )}
+      <FieldError id={errId} error={error} />
       <div className="slate-actions">
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>
         </button>
-        <span className="slate-hint">{touched ? 'press Enter ↵' : 'drag to answer'}</span>
+        {touched ? (
+          <span className="slate-hint">press Enter ↵</span>
+        ) : (
+          <span className="slate-hint slate-hint--touch">drag to answer</span>
+        )}
       </div>
     </div>
   );

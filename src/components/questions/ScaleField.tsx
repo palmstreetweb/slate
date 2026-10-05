@@ -1,22 +1,35 @@
+/**
+ * The numbers scale: one button per value, min to max by step. A tap answers
+ * and moves on; Skip (when optional) or OK (once answered) moves on without
+ * one. Loaded on demand with the other long-standing fields (CoreFieldsExt).
+ */
+
 'use client';
 
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import type { ScaleQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
+import { validate } from '@/logic/validation.js';
+import { scaleValues } from './ext/scaleCells.js';
+import { TapActions } from './ext/TapActions.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
   question: ScaleQuestion;
   answers: LooseAnswers;
   initialValue: number | undefined;
+  /** Store the pick and move on after the commit beat. */
   onAnswer: (value: number) => void;
+  /** Move on without a pick (Skip) or with the one already made (OK). */
+  onAdvance: () => void;
 };
 
-export function ScaleField({ question, answers, initialValue, onAnswer }: Props) {
+export function ScaleField({ question, answers, initialValue, onAnswer, onAdvance }: Props) {
   const labelId = useId();
-  const step = question.step ?? 1;
-  const cells: number[] = [];
-  for (let v = question.min; v <= question.max; v += step) cells.push(v);
+  const errId = `${labelId}-err`;
+  const rowRef = useRef<HTMLDivElement>(null);
+  // Rounded values, a usable step and at most 21 cells, whatever the schema says.
+  const cells = scaleValues(question);
 
   return (
     <div>
@@ -24,7 +37,13 @@ export function ScaleField({ question, answers, initialValue, onAnswer }: Props)
         {resolveTitle(question.title, answers)}
       </h1>
 
-      <div className="slate-scale" role="radiogroup" aria-labelledby={labelId}>
+      <div
+        ref={rowRef}
+        className="slate-scale"
+        role="radiogroup"
+        aria-labelledby={labelId}
+        aria-describedby={errId}
+      >
         <div className="slate-scale-row">
           {cells.map((v) => {
             const selected = initialValue === v;
@@ -50,9 +69,15 @@ export function ScaleField({ question, answers, initialValue, onAnswer }: Props)
         )}
       </div>
 
-      <div className="slate-actions">
-        <span className="slate-hint">press a number ↑</span>
-      </div>
+      <TapActions
+        answered={initialValue !== undefined}
+        required={question.required === true}
+        check={() => validate(question, initialValue)?.message ?? null}
+        onAdvance={onAdvance}
+        target={rowRef}
+        errorId={errId}
+        hint={<span className="slate-hint slate-keys">press a number ↑</span>}
+      />
     </div>
   );
 }
