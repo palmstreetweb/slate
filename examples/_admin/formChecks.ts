@@ -185,7 +185,9 @@ export function pickProblem(q: MultiPick): PickProblem | null {
 
 /** A pick-limit problem respondents would get stuck on (anything but a Max that's never reached, or a negative Min). */
 export function pickProblemBlocks(p: PickProblem): boolean {
-  if (p.kind === 'max_over_choices') return false;
+  // Max below Min is bounds set the wrong way round: the engine drops the Max
+  // (pickLimits), so nobody is stuck — a heads-up (review fixes, COPY-R5).
+  if (p.kind === 'max_over_choices' || p.kind === 'max_under_min') return false;
   return !(p.kind === 'min_whole' && typeof p.min === 'number' && p.min < 0);
 }
 
@@ -201,7 +203,7 @@ function pickIssue(q: MultiPick, p: PickProblem): FormIssue {
       case 'min_over_choices':
         return `${name} asks for at least ${p.min} ${w.picks} but has only ${count(p.choices, w.choice, w.choices)}${w.other}.`;
       case 'max_under_min':
-        return `${name} asks for at least ${p.min} ${w.picks} but allows at most ${p.max}.`;
+        return `${name}: Max ${w.field} (${p.max}) is less than Min (${p.min}), so Max is ignored. Swap them.`;
       case 'max_over_choices':
         return `${name} allows up to ${p.max} ${w.picks} but has only ${count(p.choices, w.choice, w.choices)}${w.other}.`;
     }

@@ -96,10 +96,11 @@ describe('multi choice: Required, Min and Max (CH-04, CH-08)', () => {
     ).toBeInTheDocument();
   });
 
-  it('Max below Min is explained, and Swap fixes it', async () => {
+  it('Max below Min is explained as what happens, and Swap fixes it', async () => {
     const { user, spy } = setup({ ...base, min: 3, max: 2 } as Question);
+    // The form drops a Max below the Min (pickLimits): nobody is stuck (COPY-R5).
     expect(
-      screen.getByText('Max (2) is less than Min (3), so nobody could finish.'),
+      screen.getByText('Max (2) is less than Min (3), so Max is ignored.'),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Swap them' }));
     expect(spy).toHaveBeenLastCalledWith({ min: 2, max: 3 });

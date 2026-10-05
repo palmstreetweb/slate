@@ -67,11 +67,11 @@ describe('multi-select pick limits', () => {
     );
   });
 
-  it('Max below Min traps respondents', () => {
+  it('Max below Min is a heads-up said for what happens: the form ignores the Max (COPY-R5)', () => {
     const [issue] = studioIssues([multi({ min: 3, max: 2 })]);
-    expect(issue).toMatchObject({ kind: 'pick_range', blocking: true });
+    expect(issue).toMatchObject({ kind: 'pick_range', blocking: false });
     expect(issue!.message).toBe(
-      '“Which services?” asks for at least 3 picks but allows at most 2.',
+      '“Which services?”: Max selections (2) is less than Min (3), so Max is ignored. Swap them.',
     );
   });
 
@@ -404,7 +404,8 @@ describe('formIssues', () => {
     expect(issues.map((i) => [i.questionId, i.kind, i.blocking])).toEqual([
       // The form ignores bounds set the wrong way round: a heads-up (STU-3).
       ['n', 'bad_bounds', false],
-      ['services', 'pick_range', true],
+      // Max below Min: the form ignores the Max, so a heads-up (COPY-R5).
+      ['services', 'pick_range', false],
       ['x', 'dangling_condition', false],
       ['done', 'bad_redirect', true],
     ]);

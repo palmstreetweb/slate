@@ -1012,7 +1012,7 @@ function PickLimits({ question, onChange }: { question: MultiPick; onChange: Pat
             onClick: () => set({ min: problem.max, max: problem.min }),
           }}
         >
-          Max ({problem.max}) is less than Min ({problem.min}), so nobody could finish.
+          Max ({problem.max}) is less than Min ({problem.min}), so Max is ignored.
         </GuardNote>
       ) : problem?.kind === 'max_over_choices' ? (
         <GuardNote quiet>
