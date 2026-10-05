@@ -429,4 +429,24 @@ describe('sign-up slots (MEDIA-20, S17)', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Same name, day and time as slot 3.')).toBeInTheDocument();
   });
+
+  it('a slot with neither a name nor a day asks for one', () => {
+    const q: SignupSlotsQuestion = {
+      id: 'su',
+      type: 'signup_slots',
+      title: 'Bring something',
+      slots: [
+        { label: 'Drinks', value: 's_a', capacity: 2 },
+        { label: '  ', value: 's_b', capacity: 2 },
+      ],
+    };
+    render(
+      <ConfirmProvider>
+        <div data-slate-forms="" data-theme-name="slate">
+          <SignupSlotsSettings question={q} onChange={vi.fn()} />
+        </div>
+      </ConfirmProvider>,
+    );
+    expect(screen.getAllByText('Give this slot a name or a day.')).toHaveLength(1);
+  });
 });

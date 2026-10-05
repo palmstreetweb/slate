@@ -141,7 +141,8 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
         ![15, 30, 60, 120].includes(slot) ||
         !(mins(q.endTime, 1080) - mins(q.startTime, 480) >= slot)
       ) {
-        add(q, 'bad_grid', `${named(q)}: “Until” has to be at least one slot after “From”.`);
+        // The studio's own controls can only get the hours wrong; imports can get any of them.
+        add(q, 'bad_grid', `${named(q)} has days or hours the grid can’t use. Check From, Until and Each slot.`);
       }
     }
     // A radius alone is a service area not set up yet (new questions start that

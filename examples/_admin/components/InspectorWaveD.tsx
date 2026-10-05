@@ -101,7 +101,10 @@ function SlotRow({
   onMove: (dir: -1 | 1) => void;
   onRemove: () => void;
 }) {
-  const note = slotNote(problem);
+  // A slot with neither a name nor a day can't be told apart (the engine's bad_slots).
+  const note =
+    slotNote(problem) ??
+    (!slot.label.trim() && !slot.date ? 'Give this slot a name or a day.' : null);
   const over = taken > slot.capacity;
   const name = slot.label.trim() || `Slot ${index + 1}`;
   return (
