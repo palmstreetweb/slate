@@ -16,6 +16,7 @@ import { ThanksScreen } from '@/components/questions/ThanksScreen.js';
 import { QuestionRenderer } from '@/components/questions/QuestionRenderer.js';
 import { FormConfirmRefContext } from '@/hooks/useRegisterFormConfirm.js';
 import { jpgName } from '@/utils/heicToJpeg.js';
+import { prefillAnswers } from '@/logic/prefill.js';
 
 // The website / NPS / phone UIs live in one on-demand chunk; this one never downloads.
 vi.mock('@/components/questions/ext/CoreFieldsExt.js', () => {
@@ -160,6 +161,27 @@ describe('<Form resume="tab"> (GAP-05)', () => {
     expect(window.localStorage.getItem(KEY)).toContain('Ada');
     expect(window.sessionStorage.getItem(KEY)).toBeNull();
     window.localStorage.removeItem(KEY);
+  });
+});
+
+describe('prefill (GAP-23)', () => {
+  it('a link with more picks than the question takes keeps the first ones', () => {
+    const q: Question = {
+      id: 'k',
+      type: 'multi_choice',
+      title: 'Pick',
+      prefillKey: 'k',
+      max: 2,
+      options: [
+        { label: 'One', value: 'c1' },
+        { label: 'Two', value: 'c2' },
+        { label: 'Three', value: 'c3' },
+      ],
+    };
+    expect(prefillAnswers([q], { k: 'c1,c2,c3' })).toEqual({ k: ['c1', 'c2'] });
+    expect(prefillAnswers([{ ...q, max: undefined } as Question], { k: 'c1,c3' })).toEqual({
+      k: ['c1', 'c3'],
+    });
   });
 });
 

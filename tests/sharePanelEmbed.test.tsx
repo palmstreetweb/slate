@@ -69,9 +69,11 @@ beforeEach(() => {
 
 describe('embed snippet (ADR-054)', () => {
   it('frames the public link in embed mode with the agreed attributes', () => {
+    // Most of the screen tall, at least 560 px (GAP-25): not a small box that
+    // scrolls inside the host page on a phone.
     expect(buildEmbedSnippet('https://slate.test/forms/48210377', 'Crew')).toBe(
       '<iframe src="https://slate.test/forms/48210377?embed=1" title="Crew" ' +
-        'style="width:100%;min-height:560px;border:0" loading="lazy"></iframe>',
+        'style="width:100%;height:85vh;height:85svh;min-height:560px;border:0" loading="lazy"></iframe>',
     );
   });
 

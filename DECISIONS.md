@@ -233,6 +233,7 @@ Alternatives:
 - `sessionStorage`. Rejected — doesn't survive the accidental-close case, which is the whole point.
 Consequences: Hosts embedding multiple forms must give each a distinct `schema.id`. The resume prompt is wrapper-scoped UI (no document-level dialogs). Phase 5 also adds the `review` chrome screen (no answer stored, listed in no payload) and `onPartialChange(answers, meta)` for abandonment capture — both pure additions to the public API.
 Revisit when: resume-from-URL-token (cross-device) gets scheduled; that needs signing and stays deferred.
+Addendum (QA pass 2026-10-04, GAP-05): `<Form resume="tab">` keeps the same snapshot in `sessionStorage` instead: it survives a reload, back / forward and a phone discarding the tab (the camera app on Android), but never reaches another tab, a later visit or another device, so a shared phone at an event can't hand one person's answers to the next. The public fill page and portable links pass it (with the form id as `schema.id`); the banner and its Start over are unchanged, and a successful submit clears it. `resume` (true) is unchanged. It is also what lets a question whose on-demand part failed to download recover: browsers refuse a module that failed once without asking the network again, so that part's "Try again" reloads the page, and the answers come back. localStorage persistence on the public pages stays off until Caleb decides.
 
 ## ADR-018 — The studio is a supported dev-tool surface
 Date: 2026-06-12
@@ -626,6 +627,7 @@ Consequences: Owners must be signed in for Build with AI. `storagesign` needs `N
 Revisit when: custom domains (CSP `frame-ancestors`, cookies), per-respondent access codes, or a second app on the origin.
 Addendum (ADR-058): item 1, read ops are now charged after a valid Bearer, to the account plus an IP backstop, never before. Item 4, the body cap is 64 KiB counted in bytes.
 Addendum (ADR-061): the enumeration half of "per-owner slugs are globally unique (a squatting/enumeration oracle)" is closed by the throttled lookup; squatting was closed by ADR-057.
+Addendum (QA pass 2026-10-04, GAP-14, CH-16): item 4's 10 KB string clamp is now the 64 KiB body cap: it cut long answers short without telling anyone, while a body over the cap is a 413 that sends the respondent back to their longest answer. A matrix keeps its published rows and columns (it kept the first 20 entries of any object), and choice answers keep only option values, deduplicated, with one typed Other when allowed, capped at `max` with the engine's never-trap clamp and lenient on `min`.
 
 ## ADR-047 — v1 responses live in the app only
 Date: 2026-09-22
@@ -731,6 +733,7 @@ Consequences: Any site can frame /forms/{slug}. Clickjacking risk is limited to 
 Revisit when: owners need per-domain allow-lists, a script-tag loader, custom domains, or redirects that must leave the frame.
 Addendum (review): the snippet does not request camera access — nothing in the public bundle uses it, and plain file pickers don't need it.
 Addendum (ADR-065): a form with a voice note or a location question gets `allow="microphone"` / `allow="geolocation"` on the snippet (only those forms), so the host page can let the frame ask on the respondent's tap. The camera is still never requested: the photo checklist opens the OS camera through a file input, which needs no permission.
+Addendum (QA pass 2026-10-04, GAP-25): the snippet's frame is `height:85vh;height:85svh;min-height:560px`. On a phone a 560 px box scrolled inside the host page, with errors and the focused field out of sight; most of the screen tall, the one-question-at-a-time form reads like its own page and scrolls inside its own frame (where "each question opens at its top" works). Auto-sizing to the posted height stays deferred: a frame that only grows leaves the next question above the respondent's view unless the host also scrolls, which needs the script-tag loader.
 
 ## ADR-055 — Responses: Inbox + Summary views
 Date: 2026-09-23
