@@ -1124,12 +1124,6 @@ exports[`question types render > nps 1`] = `
     <div
       class="slate-actions"
     >
-      <button
-        class="slate-ok-btn slate-ok-btn--skip"
-        type="button"
-      >
-        Skip
-      </button>
       <span
         class="slate-hint slate-keys"
       >
@@ -1361,12 +1355,6 @@ exports[`question types render > scale 1`] = `
     <div
       class="slate-actions"
     >
-      <button
-        class="slate-ok-btn slate-ok-btn--skip"
-        type="button"
-      >
-        Skip
-      </button>
       <span
         class="slate-hint slate-keys"
       >

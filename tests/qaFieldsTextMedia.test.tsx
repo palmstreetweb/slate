@@ -151,12 +151,40 @@ describe('stars and faces (F4, F20, GAP-11)', () => {
 });
 
 describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
+  // Optional is `required: false`, which the studio writes when Required is
+  // unticked; a rating with no `required` stays one-tap (CON-04, below).
   it('an optional numbers scale shows Skip, and Enter moves on', async () => {
-    const { advance } = renderField({ id: 's', type: 'scale', title: 'S', min: 0, max: 10 });
+    const { advance } = renderField({
+      id: 's',
+      type: 'scale',
+      title: 'S',
+      min: 0,
+      max: 10,
+      required: false,
+    });
     fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
     expect(advance).toHaveBeenCalledTimes(1);
     await enter();
     expect(advance).toHaveBeenCalledTimes(2);
+  });
+
+  it('a rating saved without Required (before the studio offered it) has no Skip, as before (CON-04)', async () => {
+    for (const q of [
+      { id: 's', type: 'scale', title: 'S', min: 0, max: 10 },
+      { id: 'n', type: 'nps', title: 'N' },
+      { id: 'st', type: 'scale', title: 'Stars', min: 1, max: 5, display: 'stars' },
+      { id: 'f', type: 'scale', title: 'Faces', min: 1, max: 5, display: 'emoji' },
+    ] as Question[]) {
+      const { advance, unmount } = renderField(q);
+      await screen.findAllByRole('radio');
+      expect(screen.queryByRole('button', { name: 'Skip' })).toBeNull();
+      await enter();
+      expect(
+        screen.getByText(q.type === 'scale' && q.display ? 'Please pick a rating' : 'Please pick a number'),
+      ).toBeInTheDocument();
+      expect(advance).not.toHaveBeenCalled();
+      unmount();
+    }
   });
 
   it('a required scale says "Please pick a number" on Enter', async () => {
@@ -186,7 +214,7 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
   });
 
   it('NPS: optional skips; required asks for a number', async () => {
-    const first = renderField({ id: 'n', type: 'nps', title: 'N' });
+    const first = renderField({ id: 'n', type: 'nps', title: 'N', required: false });
     fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
     expect(first.advance).toHaveBeenCalledTimes(1);
     first.unmount();

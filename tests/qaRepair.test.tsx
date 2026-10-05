@@ -326,7 +326,8 @@ describe('a reload after the submit never offers to resume onto it (R12)', () =>
 /* ---------- Enter on one-tap questions ---------- */
 
 describe('a double or held Enter never skips a one-tap question (QA retest)', () => {
-  const nps: Question = { id: 'n', type: 'nps', title: 'How likely?' };
+  // An optional NPS: the owner unticked Required (CON-04).
+  const nps: Question = { id: 'n', type: 'nps', title: 'How likely?', required: false };
 
   it('an Enter in the first moment after the question appears does nothing; later it skips', async () => {
     const { advance } = renderLive(nps);

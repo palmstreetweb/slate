@@ -231,13 +231,17 @@ export function Inspector({
               </Field>
             )}
             <Checkbox
+              // Unset reads as the form treats it: choices and one-tap ratings
+              // (all but the slider) can only be skipped once unticked (CON-04).
               checked={
                 (question as { required?: boolean }).required ??
                 (question.type === 'single_choice' ||
                   question.type === 'dropdown' ||
                   question.type === 'yes_no' ||
                   question.type === 'legal' ||
-                  question.type === 'picture_choice')
+                  question.type === 'picture_choice' ||
+                  question.type === 'nps' ||
+                  (question.type === 'scale' && question.display !== 'slider'))
               }
               onChange={(v) => onChange({ required: v } as Partial<Question>)}
               label="Required"

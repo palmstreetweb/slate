@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Question, SignupSlotsQuestion } from '@/index.js';
 import { Inspector } from '../examples/_admin/components/Inspector.js';
@@ -240,10 +240,23 @@ describe('scale (F6, F7, F20, S16, S22)', () => {
     expect(spy).toHaveBeenLastCalledWith({ max: 5 });
   });
 
-  it('has a Required switch', async () => {
+  it('has a Required switch, ticked while unset as the form treats it, and writes what it shows (CON-04)', async () => {
     const { user, spy } = setup(scale);
-    await user.click(screen.getByRole('checkbox', { name: 'Required' }));
-    expect(spy).toHaveBeenLastCalledWith({ required: true });
+    const box = screen.getByRole('checkbox', { name: 'Required' });
+    expect(box).toBeChecked();
+    await user.click(box);
+    expect(spy).toHaveBeenLastCalledWith({ required: false });
+    cleanup();
+    const optional = setup({ ...scale, required: false } as Question);
+    await optional.user.click(screen.getByRole('checkbox', { name: 'Required' }));
+    expect(optional.spy).toHaveBeenLastCalledWith({ required: true });
+    cleanup();
+    // A slider skips with OK unless it's required, as it always did: unset reads unticked.
+    setup({ ...scale, display: 'slider' } as Question);
+    expect(screen.getByRole('checkbox', { name: 'Required' })).not.toBeChecked();
+    cleanup();
+    setup({ id: 'n', type: 'nps', title: 'N' } as Question);
+    expect(screen.getByRole('checkbox', { name: 'Required' })).toBeChecked();
   });
 
   it('Min above Max is explained, with Swap', () => {
