@@ -121,8 +121,8 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 |---|---|---|---|
 | `welcome` | `title`, `subtitle?`, `cta?` (default `'Start'`) | — | _not stored_ |
 | `statement` | `title`, `body?`, `cta?` (default `'Continue'`) | — | _not stored_ |
-| `short_text` | `title`, `placeholder?`, `required?`, `maxLength?`, `pattern?`, `patternError?` | required + pattern | `string` |
-| `long_text` | `title`, `placeholder?`, `required?`, `maxLength?` | required + maxLength | `string` |
+| `short_text` | `title`, `placeholder?`, `required?`, `maxLength?`, `pattern?`, `patternError?` | required + length (never cut: a counter near the limit; 10,000 when unset) + pattern | `string` |
+| `long_text` | `title`, `placeholder?`, `required?`, `maxLength?` | required + length (never cut: a counter near the limit; 10,000 when unset) | `string` |
 | `email` | `title`, `placeholder?`, `required?` | RFC-lite regex | `string` |
 | `phone` | `title`, `placeholder?`, `required?`, `defaultCountry?` (default `'US'`) | E.164 normalization via `libphonenumber-js` | `string` (E.164) |
 | `url` | `title`, `placeholder?`, `required?` | website shape; bare domains get `https://` prefixed | `string` |
@@ -260,8 +260,8 @@ type SubmitMeta = {
 
 | Key | Action |
 |---|---|
-| `Enter` | Advance from welcome / statement; submit text-type fields |
-| `Shift + Enter` | New line in `long_text` |
+| `Enter` | Advance from welcome / statement; submit text-type fields; on an optional rating, NPS or legal question with no answer, skip it (ADR-069) |
+| `Shift + Enter` | New line in `long_text` (on touch screens Return is a new line; OK submits) |
 | `A`–`F` | Select choice option (also `picture_choice` and `legal` accept/decline) |
 | `Y` / `N` | Answer `yes_no` questions |
 | `0`–`9` | Select scale / NPS value (within range) |

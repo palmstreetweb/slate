@@ -1299,6 +1299,33 @@ Revisit when: owners want a coarse location by default (a service-area zone name
 
 ---
 
+## ADR-069 — QA pass: one-tap questions can be skipped, typed answers are read as people type them
+Date: 2026-10-04
+Status: proposed — direction approved by Caleb ("fix everything, errors in plain language"); the calls below were the QA pass's defaults (workstream w2b, fields / text / media)
+Context: The QA pass found respondents trapped or misled by the fields themselves: an optional rating with no way past it, a stray Enter recording one star, "1,000" refused while "0x0A" passed, "26" stored as the year 0026, pasted text cut silently, Return submitting long answers on phones, messages that said "Minimum is 1" or "Earliest allowed date is 2026-01-01". The brief (§5) makes one-tap questions auto-advance and says nothing about skipping them.
+Decision:
+1. **One-tap questions get an OK / Skip row** (numbers scale, NPS, legal consent, stars, faces; `ext/TapActions.tsx`). A tap still answers and moves on after the commit beat. Optional and unanswered: a **Skip** button, and Enter moves on. Required and unanswered: no button, and Enter says what to do ("Please pick a number", "Please choose an option", "Please pick a rating"). Answered (after Back): **OK** keeps the answer. The slider already had OK. (Single choice, yes / no and picture choice are the choice workstream's, under the same rule.)
+2. **A stray Enter never answers.** Stars and faces focus their row, not the first icon; Enter picks only the icon the arrow keys moved to. Each star is named by the value stored ("0 stars", "4.5 stars").
+3. **Typed text is never cut.** The `maxlength` attribute is gone: near the limit a counter shows "9410 / 10000", red past it, and OK says "Keep it to 10 characters or fewer". A limit below 1 counts as unset; with none, text stops at 10,000 characters, what the server keeps. On touch screens (`hover: none`) Return starts a new line in long text; OK submits.
+4. **Numbers as people type them.** "1,000", "$150", "1 500", "2,5", full-width digits and the question's own prefix or unit are read; hex, exponents and "Infinity" are not ("Please use numbers only, like 1500"). Range messages say the range in the question's units ("Enter a number from 0 to 3 windows"). Bounds set the wrong way round (min above max) are ignored on number and date questions, and a scale draws them in order, so a live form never asks for something nobody can give. The stepper's + / − keys step only where the number can't be negative.
+5. **Dates.** A 2-digit year is this century ("26" is 2026); 3-digit years and years before 1900 are refused in plain words; "/", "-" or "." finish a box; a pasted date fills all three; a partly filled date says "Please finish the date (MM/DD/YYYY)"; an impossible one names the month ("February 2026 has only 28 days"). Limits read in the form's own format. Stored answers and their parsing (`dateValue.ts`) are unchanged.
+6. **Scrolls aren't answers.** A touch that turns into a page scroll leaves the slider and the stepper as they were; the availability grid needs a ~0.5 s rest (was 0.32 s) before a drag paints, with the held cell filling in; a quick up / down flick that runs off the signature pad scrolls the page and leaves no ink.
+7. **Keyboard-only hints** ("press Enter", "press a number", "tap a key (A, B)") are hidden on touch screens.
+8. **Messages stay announced**: each field touched keeps its message slot in the page (`aria-live`, tied to the input with `aria-describedby`).
+9. **The numbers scale loads on demand** (CoreFieldsExt, with NPS and legal), paying for the core bytes above.
+Numbers: engine core 49,653 → 49,757 B gzip (+104; the workstream's allowance was +110). On demand: CoreFieldsExt 3.6 → 6.3 kB gzip with its new shared helpers (the scale, date and number typing, phone wording, TapActions), ScaleStyledField 3.4 → 4.2, DateExtField 3.1 → 4.1. `styles.css` 30.0 → 31.2 kB gzip.
+Alternatives:
+- Keeping one-tap questions tap-only and making the studio default them to required. Rejected: an optional question nobody can skip isn't optional.
+- Cutting pasted text with a notice. Rejected: the person loses what they pasted; showing the count and refusing OK keeps it.
+- Reading "1,5" as fifteen (US grouping). Rejected: a comma followed by one or two digits is a decimal comma everywhere it appears.
+Consequences / risks:
+- A required rating shows no button until it's answered; Enter explains, a tap answers.
+- Long answers are limited to 10,000 characters in the form, as the server already was.
+- "99" in a birth-year box reads 2099; the box shows the year it read, and a form limit catches it.
+Revisit when: owners ask for a per-question "can be skipped" switch on choice questions, or for 2-digit years in the past (birth dates).
+
+---
+
 ## Deferred to V2
 
 Per brief §14, V1 explicitly does **not** include the items below. Each gets a stub ADR when the work is actually scheduled.
