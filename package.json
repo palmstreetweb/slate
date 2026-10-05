@@ -1,6 +1,6 @@
 {
   "name": "@palmstreetweb/slate",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "Slate — Palm Street Web's internal conversational form engine. Schema in, Typeform-quality form out.",
   "type": "module",
   "license": "UNLICENSED",

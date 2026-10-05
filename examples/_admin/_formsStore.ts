@@ -331,19 +331,34 @@ export async function setFormFillPassword(
 
 /**
  * Publish the current draft. In the cloud the write lands in the background:
- * `onFail` runs if it never reaches the server, after the form is put back to
- * how it was (COPY-10).
+ * `onLanded` runs once it reached the server, `onFail` if it never does, after
+ * the form is put back to how it was (COPY-10). "You're live" waits for
+ * `onLanded` (STU-5). On this device alone the write is done at once.
  */
-export function publishForm(formId: string, opts: { onFail?: () => void } = {}): FormRecord | null {
-  if (useRemote()) return remote.publishFormRemoteSync(formId, opts.onFail);
+export function publishForm(
+  formId: string,
+  opts: { onFail?: () => void; onLanded?: () => void } = {},
+): FormRecord | null {
+  if (useRemote()) return remote.publishFormRemoteSync(formId, opts.onFail, opts.onLanded);
   const form = getForm(formId);
   if (!form) return null;
-  const [updated] = updateForm(formId, {
+  const [updated, saved] = updateForm(formId, {
     publishedSchema: form.schema,
     publishedName: form.name,
     status: 'published',
   });
+  if (updated && saved) opts.onLanded?.();
+  else if (updated) opts.onFail?.();
   return updated;
+}
+
+/**
+ * This form's last change didn't reach the cloud, so it isn't saved yet: the
+ * editor sends it again when it opens, and says so until it lands (STU-8).
+ */
+export function hasUnsavedEdits(formId: string): boolean {
+  // Only cloud writes can fail after the fact; this device's own are done at once.
+  return remote.hasUnsavedFormEditRemote(formId);
 }
 
 export function unpublishForm(formId: string): FormRecord | null {

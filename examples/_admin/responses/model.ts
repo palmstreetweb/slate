@@ -8,7 +8,7 @@
 import { WAITLIST_VALUE, signupPicks } from '@/logic/signupAnswer.js';
 import type { Question } from '@/index.js';
 import { OTHER_VALUE } from '@/index.js';
-import { allowsOther, hasOtherAnswer, otherLabelOf, splitOther } from '@/logic/other.js';
+import { allowsOther, otherLabelOf } from '@/logic/other.js';
 import {
   IN_AREA_VALUE,
   OUT_OF_AREA_VALUE,
@@ -28,6 +28,7 @@ import type { StoredSubmission } from '../_submissionStore.js';
 import type { TrackedSource } from '../_formsStore.js';
 import {
   REMOVED_OPTION,
+  choiceText,
   formatAnswerForQuestion,
   formatRelativeAge,
   isRemovedOptionValue,
@@ -35,8 +36,11 @@ import {
   titleOf,
 } from '../responsesFormat.js';
 
-/** The Summary's one row for answers whose option was deleted since (copy QA). */
-const REMOVED_ROW = '\u0000removed';
+/**
+ * The Summary's one row (and its filter) for answers whose option was deleted
+ * and only the studio's code for it is left: "Removed option" (copy QA).
+ */
+export const REMOVED_ROW = '\u0000removed';
 import { sourceLabel, sourceOf } from '../trackedLinks.js';
 import type {
   AnswerFilter,
@@ -503,8 +507,15 @@ export function answerMatchesFilter(
     }
     return normalizePostal(postalOf(value)) === filter.value;
   }
-  if (filter.value === OTHER_VALUE && question && allowsOther(question)) {
-    return hasOtherAnswer(value, new Set(question.options.map((o) => o.value)));
+  // Choice questions: the "Removed option" row and the "Other" row match what they
+  // count in the Summary (questionDistribution), so a bar never filters to nothing.
+  if (question && OPTION_TYPES.has(question.type) && 'options' in question) {
+    const listed = new Set(question.options.map((o) => String(o.value)));
+    const unlisted = answerValues(value).filter((v) => v.trim() !== '' && !listed.has(v));
+    if (filter.value === REMOVED_ROW) return unlisted.some(isRemovedOptionValue);
+    if (filter.value === OTHER_VALUE && allowsOther(question)) {
+      return unlisted.some((v) => !isRemovedOptionValue(v));
+    }
   }
   return answerValues(value).includes(filter.value);
 }
@@ -684,44 +695,45 @@ export function questionDistribution(
   const order = new Map(options.map((o, i) => [o.value, i]));
   const counts = new Map<string, number>();
   const extra: string[] = [];
+  const count = (v: string) => {
+    if (!order.has(v) && !counts.has(v)) extra.push(v);
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  };
   // Other (ADR-063): typed answers count together in one row; the texts are listed.
   const withOther = allowsOther(question);
+  // Only choice questions have option codes; a yes / no or consent value is what it is.
+  const codes = OPTION_TYPES.has(question.type);
   const typed = new Map<string, { text: string; count: number }>();
   let answered = 0;
   for (const s of subs) {
-    const raw = s.answers[question.id];
-    const vals = answerValues(raw);
+    const vals = answerValues(s.answers[question.id]).filter((v) => v.trim() !== '');
     if (vals.length === 0) continue;
     answered++;
-    if (withOther) {
-      const { picked, other } = splitOther(options, raw);
-      for (const v of picked) counts.set(v, (counts.get(v) ?? 0) + 1);
-      if (other && isRemovedOptionValue(other)) {
-        // An option deleted after it was picked, not typed text (copy QA).
-        if (!counts.has(REMOVED_ROW)) extra.push(REMOVED_ROW);
-        counts.set(REMOVED_ROW, (counts.get(REMOVED_ROW) ?? 0) + 1);
-      } else if (other) {
-        counts.set(OTHER_VALUE, (counts.get(OTHER_VALUE) ?? 0) + 1);
-        const key = other.trim().toLowerCase();
+    let removed = false;
+    let other = false;
+    for (const v of vals) {
+      if (order.has(v)) count(v);
+      // An option deleted after it was picked, known only by its code: one row (copy QA).
+      else if (codes && isRemovedOptionValue(v)) removed = true;
+      else if (withOther) {
+        other = true;
+        const key = v.trim().toLowerCase();
         const hit = typed.get(key);
         if (hit) hit.count++;
-        else typed.set(key, { text: other.trim(), count: 1 });
+        else typed.set(key, { text: v.trim(), count: 1 });
       }
-      continue;
+      // Without Other, a value the list doesn't have (Other turned off since, or a
+      // readable option deleted) keeps its own row, read as the reader reads it.
+      else count(v);
     }
-    for (const raw of vals) {
-      // Without Other, a value the list doesn't have is an option deleted since:
-      // one "Removed option" row, never its stored code (copy QA).
-      const v = order.has(raw) ? raw : REMOVED_ROW;
-      if (!order.has(v) && !counts.has(v)) extra.push(v);
-      counts.set(v, (counts.get(v) ?? 0) + 1);
-    }
+    if (removed) count(REMOVED_ROW);
+    if (other) counts.set(OTHER_VALUE, (counts.get(OTHER_VALUE) ?? 0) + 1);
   }
   const all: Array<ChoiceOption & { i: number }> = [
     ...options.map((o, i) => ({ ...o, i })),
     ...extra.map((v, j) => ({
       value: v,
-      label: v === REMOVED_ROW ? REMOVED_OPTION : v,
+      label: v === REMOVED_ROW ? REMOVED_OPTION : codes ? choiceText(question, v) : v,
       i: options.length + j,
     })),
     ...(withOther

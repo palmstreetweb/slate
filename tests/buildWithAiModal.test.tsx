@@ -60,13 +60,13 @@ describe('Build with AI errors', () => {
   it('no Retry for the daily limit', async () => {
     requestGeneratedForm.mockRejectedValueOnce(
       new GenerateRequestError(
-        'You’ve used today’s Build with AI drafts. You can make more after 5:00 PM today.',
+        'You’ve used your Build with AI drafts for now. You can make more after 5:00 PM today.',
         false,
       ),
     );
     renderModal();
     await generateWith('Wedding RSVP');
-    expect(await screen.findByRole('alert')).toHaveTextContent(/used today’s Build with AI drafts/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/used your Build with AI drafts/);
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
   });
 
@@ -200,9 +200,18 @@ describe('Build with AI length limits', () => {
     fireEvent.change(box, { target: { value: 'x'.repeat(100) } });
     expect(screen.queryByText(/characters/)).toBeNull();
     fireEvent.change(box, { target: { value: 'x'.repeat(1700) } });
-    expect(screen.getByText('1,700 / 2,000 characters')).toBeInTheDocument();
+    const count = screen.getByText('1,700 / 2,000 characters');
+    // The running count is read with the box, not announced on every keystroke (COPY-R9).
+    expect(count).not.toHaveAttribute('aria-live');
+    expect(box).toHaveAttribute('aria-describedby', count.id);
+    const live = screen.getAllByRole('status').find((el) => el.classList.contains('slate-sr'))!;
+    expect(live).toHaveTextContent('');
     fireEvent.change(box, { target: { value: 'x'.repeat(AI_PROMPT_MAX) } });
-    expect(screen.getByText('That’s the limit: 2,000 characters.')).toBeInTheDocument();
+    expect(document.getElementById('slate-ai-count')).toHaveTextContent(
+      'That’s the limit: 2,000 characters.',
+    );
+    // Said once, by a region that was there all along.
+    expect(live).toHaveTextContent('That’s the limit: 2,000 characters.');
   });
 
   it('exports the revision cap the route enforces', () => {

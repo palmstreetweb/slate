@@ -1393,6 +1393,7 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   color: var(--chrome-ink);
 }
 
+/* Ink, underlined: muted fell to 3.7–4.3:1 on the red and amber tints (COPY-R10). */
 [data-slate-forms][data-theme-name='slate'] .slate-issues-toggle {
   margin-left: auto;
   flex: none;
@@ -1402,7 +1403,7 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   background: none;
   font: inherit;
   font-size: var(--slate-fs-sm);
-  color: var(--slate-muted);
+  color: var(--chrome-ink);
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;

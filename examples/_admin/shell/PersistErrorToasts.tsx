@@ -29,6 +29,20 @@ const TITLES: Record<string, string> = {
   submission: 'Couldn’t update that response',
 };
 
+/** What a publish that didn't reach the server says: a first publish isn't live; a republish's earlier version still is. */
+export function publishErrorCopy(wasLive: boolean): { title: string; detail: string } {
+  return wasLive
+    ? {
+        title: 'Couldn’t republish',
+        detail:
+          'Your changes aren’t live yet. People still see the version you published before. Check your connection and try again.',
+      }
+    : {
+        title: 'Couldn’t publish',
+        detail: 'Your form isn’t live yet. Check your connection and try again.',
+      };
+}
+
 export function PersistErrorToasts() {
   const toast = useToast();
   const last = useRef<{ key: string; at: number } | null>(null);
@@ -58,13 +72,11 @@ export function PersistErrorToasts() {
     };
     // A publish whose write never landed: the form isn't live, whatever was shown.
     // Never folded into an earlier save error — it's news even right after one.
-    const onPublishError = () => {
+    const onPublishError = (event: Event) => {
       last.current = { key: PUBLISH_KEY, at: Date.now() };
-      toast.push({
-        title: 'Couldn’t publish',
-        detail: 'Your form isn’t live yet. Check your connection and try again.',
-        tone: 'error',
-      });
+      // A republish that failed leaves the version published before live (STU-6, COPY-R1).
+      const wasLive = (event as CustomEvent<{ wasLive?: boolean }>).detail?.wasLive === true;
+      toast.push({ ...publishErrorCopy(wasLive), tone: 'error' });
     };
     window.addEventListener('slate-persist-error', onError);
     window.addEventListener('slate-publish-error', onPublishError);

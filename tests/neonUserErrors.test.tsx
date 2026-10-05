@@ -202,8 +202,10 @@ describe('form saves report plain words', () => {
     db.upsertError = FETCH_FAILED;
     updateFormRemoteSync('f_1', { name: 'Pool care 2' });
     await vi.waitFor(() => expect(events).toHaveLength(1));
+    // The event names its form, so an open editor only listens to its own (STU-8).
     expect(events[0]).toEqual({
       kind: 'form',
+      formId: 'f_1',
       message: 'Check your connection. Your last change isn’t saved yet.',
     });
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).toContain('Failed to fetch');
@@ -215,6 +217,7 @@ describe('form saves report plain words', () => {
     await vi.waitFor(() => expect(events).toHaveLength(1));
     expect(events[0]).toEqual({
       kind: 'form',
+      formId: 'f_1',
       title: 'Couldn’t move that form to Trash',
       message: 'Slate is having trouble right now. Try again in a minute.',
     });
@@ -226,6 +229,7 @@ describe('form saves report plain words', () => {
     await vi.waitFor(() => expect(events).toHaveLength(1));
     expect(events[0]).toEqual({
       kind: 'form',
+      formId: 'f_1',
       title: 'Couldn’t move that form to Trash',
       message: 'Check your connection and try again.',
     });
@@ -257,6 +261,7 @@ describe('form saves report plain words', () => {
     await vi.waitFor(() => expect(events).toHaveLength(1));
     expect(events[0]).toEqual({
       kind: 'form',
+      formId: 'f_1',
       title: 'Couldn’t restore those forms',
       message: 'Check your connection and try again.',
     });

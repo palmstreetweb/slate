@@ -24,8 +24,10 @@
   color: var(--slate-warn);
 }
 
+/* A heads-up: ink, not amber. The muted token fell to 4.2–4.4:1 on the page behind
+   the phone's transparent rail (COPY-R10); ink clears 4.5:1 everywhere. */
 [data-slate-forms][data-theme-name='slate'] .slate-guard--quiet {
-  color: var(--slate-dim);
+  color: var(--chrome-ink);
 }
 
 /* Ink, underlined: the accent fell below 4.5:1 at 12 px in warm and cool (R24). */

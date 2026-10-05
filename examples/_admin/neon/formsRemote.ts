@@ -65,6 +65,8 @@ export function isFormsHydrated(): boolean {
 export function clearFormsRemoteCache(): void {
   writeGeneration += 1;
   queuedFormWrite.clear();
+  queuedWaiters.clear();
+  unsavedFormIds.clear();
   formWriteChain.clear();
   deletedFormIds.clear();
   cache = [];
@@ -392,6 +394,19 @@ async function deleteFormRow(formId: string): Promise<void> {
 
 /** Coalesce rapid editor saves so older in-flight upserts can't overwrite newer ones. */
 const queuedFormWrite = new Map<string, FormRecord>();
+/**
+ * What waits on a write: `onLanded` once it reaches the server, `onFail` if it
+ * doesn't. A newer record that replaces a queued one carries the older one's
+ * waiters too — it holds the older change — so a publish whose write merged into
+ * an edit still hears how that write went (STU-5).
+ */
+type WriteWaiter = { onLanded?: () => void; onFail?: () => void; failTitle?: string };
+const queuedWaiters = new Map<string, WriteWaiter[]>();
+/**
+ * Forms whose last write didn't reach the server, so the cache is ahead of it:
+ * a refresh keeps the local record, and the editor sends it again (STU-8).
+ */
+const unsavedFormIds = new Set<string>();
 const formWriteChain = new Map<string, Promise<void>>();
 /** Form ids with a pending/completed permanent delete — block resurrecting upserts. */
 const deletedFormIds = new Set<string>();
@@ -408,6 +423,16 @@ function mergeHydratedForms(serverRows: FormRecord[]): FormRecord[] {
     byId.set(id, local);
   }
 
+  // A write that failed left the cache ahead of the server: keep the owner's
+  // edit until a write of it lands (STU-8). A form gone from the server was
+  // deleted elsewhere, so its unsaved edit goes too rather than bring it back.
+  for (const id of [...unsavedFormIds]) {
+    if (queuedFormWrite.has(id)) continue;
+    const local = cache.find((f) => f.id === id);
+    if (local && byId.has(id) && !deletedFormIds.has(id)) byId.set(id, local);
+    else unsavedFormIds.delete(id);
+  }
+
   for (const local of cache) {
     if (deletedFormIds.has(local.id)) continue;
     if (byId.has(local.id)) continue;
@@ -421,37 +446,55 @@ function mergeHydratedForms(serverRows: FormRecord[]): FormRecord[] {
   );
 }
 
-/** `message` is owner copy; `title` replaces the toast's default heading. */
-function emitPersistError(kind: 'form' | 'submission', message: string, title?: string): void {
+/**
+ * `message` is owner copy; `title` replaces the toast's default heading; `formId`
+ * says which form's write it was, when it was one form's.
+ */
+function emitPersistError(
+  kind: 'form' | 'submission',
+  message: string,
+  title?: string,
+  formId?: string,
+): void {
   console.error(`[slate] ${kind} persist failed:`, message);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent('slate-persist-error', {
-        detail: { kind, message, ...(title ? { title } : {}) },
+        detail: { kind, message, ...(title ? { title } : {}), ...(formId ? { formId } : {}) },
       }),
     );
   }
 }
 
 /** Log the raw error, tell the owner in plain words (QA COPY-01). */
-function reportFormFailure(err: unknown, action: NeonAction, title?: string): void {
+function reportFormFailure(
+  err: unknown,
+  action: NeonAction,
+  title?: string,
+  formId?: string,
+): void {
   console.error('[slate] form write failed:', formatNeonError(err, 'unknown error'));
-  emitPersistError('form', userNeonError(err, action), title);
+  emitPersistError('form', userNeonError(err, action), title, formId);
 }
 
-function emitPersistOk(kind: 'form' | 'submission'): void {
+function emitPersistOk(kind: 'form' | 'submission', formId?: string): void {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('slate-persist-ok', { detail: { kind } }));
+    window.dispatchEvent(
+      new CustomEvent('slate-persist-ok', { detail: { kind, ...(formId ? { formId } : {}) } }),
+    );
   }
 }
 
 /**
- * `onFail` runs when this exact write fails, so an optimistic change (trash,
- * restore) can be put back instead of looking done while the server disagrees.
+ * `waiter.onFail` runs when the write carrying this change fails — this record's
+ * own, or a newer one that replaced it in the queue — so an optimistic change
+ * (trash, restore, publish) can be put back instead of looking done while the
+ * server disagrees; `waiter.onLanded` runs when it lands.
  */
-function enqueueFormUpsert(form: FormRecord, onFail?: () => void, failTitle?: string): void {
+function enqueueFormUpsert(form: FormRecord, waiter?: WriteWaiter): void {
   if (deletedFormIds.has(form.id)) return;
   queuedFormWrite.set(form.id, form);
+  if (waiter) queuedWaiters.set(form.id, [...(queuedWaiters.get(form.id) ?? []), waiter]);
   const prev = formWriteChain.get(form.id) ?? Promise.resolve();
   const next = prev
     .catch(() => {
@@ -461,18 +504,29 @@ function enqueueFormUpsert(form: FormRecord, onFail?: () => void, failTitle?: st
       while (queuedFormWrite.has(form.id)) {
         if (deletedFormIds.has(form.id)) {
           queuedFormWrite.delete(form.id);
+          queuedWaiters.delete(form.id);
           return;
         }
         const latest = queuedFormWrite.get(form.id)!;
+        const waiters = queuedWaiters.get(form.id) ?? [];
         queuedFormWrite.delete(form.id);
+        queuedWaiters.delete(form.id);
         try {
           await upsertForm(latest);
-          emitPersistOk('form');
+          unsavedFormIds.delete(form.id);
+          emitPersistOk('form', form.id);
+          for (const w of waiters) w.onLanded?.();
         } catch (err) {
-          if (latest === form) onFail?.();
+          for (const w of waiters) w.onFail?.();
           // A trash or restore names itself; an edit says the change isn't saved.
-          const own = latest === form && failTitle;
-          reportFormFailure(err, own ? 'delete' : 'save', own ? failTitle : undefined);
+          const own = waiters.find((w) => w.failTitle)?.failTitle;
+          // An edit's change stays in the cache, ahead of the server, until a write of
+          // this form lands (STU-8). A trash or restore put itself back just now.
+          if (!own) {
+            unsavedFormIds.add(form.id);
+            resendWhenOnline();
+          }
+          reportFormFailure(err, own ? 'delete' : 'save', own, form.id);
           throw err;
         }
       }
@@ -485,6 +539,28 @@ function enqueueFormUpsert(form: FormRecord, onFail?: () => void, failTitle?: st
   formWriteChain.set(form.id, next);
   // Already reported via slate-persist-error; the chain stays rejected for awaiters.
   next.catch(() => {});
+}
+
+/**
+ * The form's last write didn't reach the server, so what this browser shows
+ * isn't saved yet (STU-8). The editor sends it again when it opens.
+ */
+export function hasUnsavedFormEditRemote(formId: string): boolean {
+  return unsavedFormIds.has(formId);
+}
+
+let resendHooked = false;
+
+/** When the connection comes back, send each unsaved form again (STU-8). */
+function resendWhenOnline(): void {
+  if (resendHooked || typeof window === 'undefined') return;
+  resendHooked = true;
+  window.addEventListener('online', () => {
+    for (const id of unsavedFormIds) {
+      const local = read().find((f) => f.id === id);
+      if (local && !queuedFormWrite.has(id)) enqueueFormUpsert(local);
+    }
+  });
 }
 
 function dropOptimisticForm(formId: string): void {
@@ -800,8 +876,10 @@ export function createFormRemoteSync(opts: { name: string; schema: Schema }): Fo
 export function updateFormRemoteSync(
   formId: string,
   patch: Partial<Omit<FormRecord, 'id' | 'createdAt'>>,
-  /** Runs if this exact write fails, with the record before and after the patch. */
+  /** Runs if the write carrying this patch fails, with the record before and after it. */
   onFail?: (before: FormRecord, after: FormRecord) => void,
+  /** Runs once the write carrying this patch has landed. */
+  onLanded?: () => void,
 ): [FormRecord | null, boolean] {
   const idx = read().findIndex((f) => f.id === formId && isActive(f));
   if (idx === -1) return [null, false];
@@ -819,16 +897,38 @@ export function updateFormRemoteSync(
   copy[idx] = next;
   cache = copy;
   notify();
-  enqueueFormUpsert(next, onFail && (() => onFail(prev, next)));
+  enqueueFormUpsert(next, {
+    onFail: onFail && (() => onFail(prev, next)),
+    onLanded,
+  });
   return [next, true];
 }
 
-/** Put `before` back, unless something newer has replaced `after` since. */
-function rollbackForm(before: FormRecord, after: FormRecord): void {
+/**
+ * Put `before` back. When something newer has replaced `after` since (an edit
+ * merged into the same write), put back only `keys` — the fields this change set —
+ * and only while the newer record still has them as `after` set them.
+ */
+function rollbackForm(
+  before: FormRecord,
+  after: FormRecord,
+  keys: ReadonlyArray<keyof FormRecord> = [],
+): void {
   const idx = read().findIndex((f) => f.id === before.id);
-  if (idx === -1 || read()[idx] !== after) return;
+  if (idx === -1) return;
+  const now = read()[idx]!;
+  let back: FormRecord;
+  if (now === after) back = before;
+  else if (keys.length && keys.every((k) => now[k] === after[k])) {
+    back = { ...now };
+    const record = back as Record<string, unknown>;
+    for (const k of keys) {
+      if (before[k] === undefined) delete record[k];
+      else record[k] = before[k];
+    }
+  } else return;
   const copy = [...read()];
-  copy[idx] = before;
+  copy[idx] = back;
   cache = copy;
   notify();
 }
@@ -843,7 +943,10 @@ export function trashFormRemoteSync(formId: string): boolean {
   copy[idx] = next;
   cache = copy;
   notify();
-  enqueueFormUpsert(next, () => rollbackForm(before, next), 'Couldn’t move that form to Trash');
+  enqueueFormUpsert(next, {
+    onFail: () => rollbackForm(before, next, ['deletedAt']),
+    failTitle: 'Couldn’t move that form to Trash',
+  });
   return true;
 }
 
@@ -857,7 +960,10 @@ export function restoreFormRemoteSync(formId: string): boolean {
   copy[idx] = next;
   cache = copy;
   notify();
-  enqueueFormUpsert(next, () => rollbackForm(before, next), 'Couldn’t restore that form');
+  enqueueFormUpsert(next, {
+    onFail: () => rollbackForm(before, next, ['deletedAt']),
+    failTitle: 'Couldn’t restore that form',
+  });
   return true;
 }
 
@@ -875,7 +981,10 @@ export function restoreAllFormsRemoteSync(): boolean {
   // Each one that doesn't reach the server goes back to the trash, and the toast
   // says what failed (R27): Trash never looks empty while the server disagrees.
   for (const { before, next } of toRestore) {
-    enqueueFormUpsert(next, () => rollbackForm(before, next), 'Couldn’t restore those forms');
+    enqueueFormUpsert(next, {
+      onFail: () => rollbackForm(before, next, ['deletedAt']),
+      failTitle: 'Couldn’t restore those forms',
+    });
   }
   return true;
 }
@@ -906,7 +1015,16 @@ export function duplicateFormRemoteSync(formId: string): FormRecord | null {
   return createFormRemoteSync({ name: `${src.name} (Copy)`, schema: src.schema });
 }
 
-export function publishFormRemoteSync(formId: string, onFail?: () => void): FormRecord | null {
+/**
+ * Publish the draft. The write lands in the background: `onLanded` runs once
+ * the write carrying it reached the server (its own, or an edit's it merged
+ * into), `onFail` once it didn't — after the form is put back and the shell told.
+ */
+export function publishFormRemoteSync(
+  formId: string,
+  onFail?: () => void,
+  onLanded?: () => void,
+): FormRecord | null {
   const form = getFormRemote(formId);
   if (!form) return null;
   const [updated] = updateFormRemoteSync(
@@ -921,12 +1039,17 @@ export function publishFormRemoteSync(formId: string, onFail?: () => void): Form
       // The publish never reached the server, so it isn't live: put the draft
       // state back and say so (the shell's toast), instead of a "Live" that
       // isn't (COPY-10). Runs before the save error, which the toast folds in.
-      rollbackForm(before, after);
+      rollbackForm(before, after, ['status', 'publishedSchema', 'publishedName']);
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('slate-publish-error', { detail: { formId } }));
+        // A republish that fails leaves the earlier version live (STU-6, COPY-R1).
+        const wasLive = before.status === 'published' && Boolean(before.publishedSchema);
+        window.dispatchEvent(
+          new CustomEvent('slate-publish-error', { detail: { formId, wasLive } }),
+        );
       }
       onFail?.();
     },
+    onLanded,
   );
   return updated;
 }

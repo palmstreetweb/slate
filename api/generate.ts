@@ -70,10 +70,12 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
  * the studio shows it as sent). `retry` says whether sending the same request
  * again can help, so the modal only offers Retry when it can.
  */
+// "for now", not "today": the studio swaps "after the daily reset" for the owner's own
+// time, which in US time zones is often later the same day ("after 5:00 PM today").
 export const AI_QUOTA_USER_MESSAGE =
-  'You’ve used today’s Build with AI drafts. You can make more after the daily reset.';
+  'You’ve used your Build with AI drafts for now. You can make more after the daily reset.';
 export const AI_QUOTA_GLOBAL_MESSAGE =
-  'Build with AI is fully booked for today. You can make more after the daily reset.';
+  'Build with AI is fully booked right now. You can make more after the daily reset.';
 export const AI_QUOTA_UNAVAILABLE_MESSAGE =
   'Build with AI isn’t available right now. Try again in a few minutes.';
 export const AI_BUSY_MESSAGE = 'The AI is busy right now. Try again in a minute.';

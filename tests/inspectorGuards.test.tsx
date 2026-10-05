@@ -96,10 +96,11 @@ describe('multi choice: Required, Min and Max (CH-04, CH-08)', () => {
     ).toBeInTheDocument();
   });
 
-  it('Max below Min is explained, and Swap fixes it', async () => {
+  it('Max below Min is explained as what happens, and Swap fixes it', async () => {
     const { user, spy } = setup({ ...base, min: 3, max: 2 } as Question);
+    // The form drops a Max below the Min (pickLimits): nobody is stuck (COPY-R5).
     expect(
-      screen.getByText('Max (2) is less than Min (3), so nobody could finish.'),
+      screen.getByText('Max (2) is less than Min (3), so Max is ignored.'),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Swap them' }));
     expect(spy).toHaveBeenLastCalledWith({ min: 2, max: 3 });
@@ -202,7 +203,7 @@ describe('options (CH-05, S5, S6)', () => {
 });
 
 describe('numbers (F7, F11)', () => {
-  it('Min above Max is explained, and Swap fixes it', async () => {
+  it('Min above Max is explained as what happens, and Swap fixes it', async () => {
     const { user, spy } = setup({
       id: 'n',
       type: 'number',
@@ -210,11 +211,19 @@ describe('numbers (F7, F11)', () => {
       min: 10,
       max: 2,
     });
+    // The form ignores bounds set the wrong way round (ENG-11): nobody is stuck.
     expect(
-      screen.getByText('Min (10) is more than Max (2), so nobody could answer.'),
+      screen.getByText('Min (10) is more than Max (2), so neither limit is used.'),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Swap them' }));
     expect(spy).toHaveBeenLastCalledWith({ min: 2, max: 10 });
+  });
+
+  it('a step of 0 says what the form does with it, with Use 1 (STU-3)', async () => {
+    const { user, spy } = setup({ id: 'n', type: 'number', title: 'Amount?', step: 0 } as Question);
+    expect(screen.getByText('A step of 0 can’t be used, so it counts by 1.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Use 1' }));
+    expect(spy).toHaveBeenLastCalledWith({ step: undefined });
   });
 
   it('Step 0.01 is saved as 0.01', async () => {
@@ -224,6 +233,31 @@ describe('numbers (F7, F11)', () => {
     await leave();
     expect(spy).toHaveBeenLastCalledWith({ step: 0.01 });
     expect(numberIn('Step')).toHaveValue(0.01);
+  });
+});
+
+describe('date limits (STU-3)', () => {
+  it('limits set the wrong way round can be fixed here, though the inspector has no fields for them', async () => {
+    const { user, spy } = setup({
+      id: 'd',
+      type: 'date',
+      title: 'When?',
+      min: '2026-12-01',
+      max: '2026-01-01',
+    } as Question);
+    expect(
+      screen.getByText(
+        'The earliest date (12/01/2026) is after the latest (01/01/2026), so neither limit is used.',
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Swap them' }));
+    expect(spy).toHaveBeenLastCalledWith({ min: '2026-01-01', max: '2026-12-01' });
+    expect(screen.queryByText(/so neither limit is used/)).toBeNull();
+  });
+
+  it('says nothing for limits in order, or only one of them', () => {
+    setup({ id: 'd', type: 'date', title: 'When?', min: '2026-01-01' } as Question);
+    expect(screen.queryByRole('button', { name: 'Swap them' })).toBeNull();
   });
 });
 
@@ -259,10 +293,13 @@ describe('scale (F6, F7, F20, S16, S22)', () => {
     expect(screen.getByRole('checkbox', { name: 'Required' })).toBeChecked();
   });
 
-  it('Min above Max is explained, with Swap', () => {
+  it('Min above Max is explained as what happens, with Swap', () => {
     setup({ ...scale, min: 10, max: 1 } as Question);
+    // The scale is drawn from the lower number to the higher (ENG-11).
     expect(
-      screen.getByText('Min Value (10) is more than Max Value (1), so there’s nothing to pick.'),
+      screen.getByText(
+        'Min Value (10) is more than Max Value (1), so the scale runs from 1 to 10.',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -277,6 +314,15 @@ describe('scale (F6, F7, F20, S16, S22)', () => {
     expect(spy).toHaveBeenLastCalledWith({ max: 10, step: undefined });
   });
 
+  it('a scale step of 0 says it counts by 1, with Count by 1 (STU-3)', async () => {
+    const { user, spy } = setup({ ...scale, step: 0 } as Question);
+    expect(
+      screen.getByText('A step of 0 can’t be used, so this scale counts by 1.'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Count by 1' }));
+    expect(spy).toHaveBeenLastCalledWith({ step: undefined });
+  });
+
   it('a 0–100 slider draws no cells: no points note (R4, R10)', () => {
     setup({ ...scale, max: 100, display: 'slider' } as Question);
     expect(screen.queryByText(/points/)).toBeNull();
@@ -288,13 +334,37 @@ describe('scale (F6, F7, F20, S16, S22)', () => {
     expect(note).toHaveClass('slate-guard--quiet');
   });
 
-  it('switching to Stars counts from 1, five stars by default', async () => {
+  it('trying Stars never rewrites the range: it offers 1 to 5 instead (STU-9)', async () => {
     const { user, spy } = setup(scale);
     await user.click(screen.getByRole('button', { name: 'Scale style' }));
     await user.click(screen.getByRole('option', { name: 'Stars' }));
-    expect(spy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ display: 'stars', min: 1, max: 5 }),
-    );
+    expect(spy).toHaveBeenLastCalledWith({ display: 'stars', sliderIcon: undefined });
+    // A 0–10 scale stays 0–10; the guard says why 1–5 reads better, with one tap to set it.
+    expect(numberIn('Min Value')).toHaveValue(0);
+    expect(numberIn('Max Value')).toHaveValue(10);
+    expect(
+      screen.getByText('Stars start at 1. Starting at 0, the first star saves 0.'),
+    ).toBeInTheDocument();
+    // Switching back leaves the range as it was.
+    await user.click(screen.getByRole('button', { name: 'Scale style' }));
+    await user.click(screen.getByRole('option', { name: 'Numbers' }));
+    expect(spy).toHaveBeenLastCalledWith({ display: undefined, sliderIcon: undefined });
+    expect(spy).not.toHaveBeenCalledWith(expect.objectContaining({ min: 1 }));
+    expect(numberIn('Max Value')).toHaveValue(10);
+  });
+
+  it('Stars from 0 to 10: one tap sets 1 to 5, and the button says so', async () => {
+    const { user, spy } = setup({ ...scale, display: 'stars' } as Question);
+    await user.click(screen.getByRole('button', { name: 'Use 1 to 5' }));
+    expect(spy).toHaveBeenLastCalledWith({ min: 1, max: 5 });
+  });
+
+  it('Stars from 1 to 10: a quiet note that 5 reads best, with a fix', async () => {
+    const { user, spy } = setup({ ...scale, min: 1, display: 'stars' } as Question);
+    const note = screen.getByText('10 stars is a lot to tap on a phone. 5 reads best.');
+    expect(note.closest('.slate-guard')).toHaveClass('slate-guard--quiet');
+    await user.click(screen.getByRole('button', { name: 'Use 1 to 5' }));
+    expect(spy).toHaveBeenLastCalledWith({ min: 1, max: 5 });
   });
 
   it('stars from 0 are pointed out', async () => {
@@ -364,6 +434,55 @@ describe('text and files (F9, S13, MEDIA-05)', () => {
     expect(screen.getByText('-1 MB means the usual 32 MB limit.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Use 32 MB' }));
     expect(spy).toHaveBeenLastCalledWith({ maxSizeMb: 32 });
+  });
+
+  it('max files 2.5: the note, the banner and the fix all say 2 (COPY-R4)', async () => {
+    const { user, spy } = setup({
+      id: 'f',
+      type: 'file_upload',
+      title: 'Upload',
+      multiple: true,
+      maxFiles: 2.5,
+    } as Question);
+    expect(
+      screen.getByText('This counts as 2 files: a limit is a whole number.'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Use 2' }));
+    expect(spy).toHaveBeenLastCalledWith({ maxFiles: 2 });
+  });
+
+  it('max files 1.5 says one file; below 1 counts as the usual 10', async () => {
+    setup({
+      id: 'f',
+      type: 'file_upload',
+      title: 'Upload',
+      multiple: true,
+      maxFiles: 1.5,
+    } as Question);
+    expect(
+      screen.getByText('This counts as 1 file: a limit is a whole number.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use 1' })).toBeInTheDocument();
+  });
+
+  it('max files below 1 offers the usual 10', async () => {
+    const { user, spy } = setup({
+      id: 'f',
+      type: 'file_upload',
+      title: 'Upload',
+      multiple: true,
+      maxFiles: 0.5,
+    } as Question);
+    expect(screen.getByText('0.5 counts as 10, the usual limit.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Use 10' }));
+    expect(spy).toHaveBeenLastCalledWith({ maxFiles: 10 });
+  });
+
+  it('max length 1.5 says one character', () => {
+    setup({ id: 't', type: 'short_text', title: 'Name?', maxLength: 1.5 } as Question);
+    expect(
+      screen.getByText('Answers can be up to 1 character: a limit is a whole number.'),
+    ).toBeInTheDocument();
   });
 
   it('max files can be cleared (blank = 10) and retyped', async () => {
@@ -443,6 +562,75 @@ describe('redirect (F3, S12)', () => {
   });
 });
 
+describe('redirect per ending (STU-7)', () => {
+  it('a half-typed address stays with its ending: another ending starts empty', async () => {
+    const endings: Question[] = [
+      { id: 'done', type: 'thanks', title: 'Thanks!' },
+      { id: 'out_of_area', type: 'thanks', title: 'Out of area' },
+    ];
+    const spy = vi.fn();
+    function TwoEndings() {
+      const [qs, setQs] = useState(endings);
+      const [at, setAt] = useState(0);
+      const q = qs[at]!;
+      return (
+        <div data-slate-forms="" data-theme-name="slate">
+          <button type="button" onClick={() => setAt(1)}>
+            second ending
+          </button>
+          {/* Not keyed by question, like the editor's own inspector. */}
+          <Inspector
+            question={q}
+            allQuestions={qs}
+            onChange={(patch) => {
+              spy(q.id, patch);
+              setQs((cur) =>
+                cur.map((x) => (x.id === q.id ? ({ ...x, ...patch } as Question) : x)),
+              );
+            }}
+            onDelete={vi.fn()}
+            canDelete
+          />
+        </div>
+      );
+    }
+    const user = userEvent.setup();
+    render(<TwoEndings />);
+    const box = () => screen.getByPlaceholderText('https://yoursite.com/thanks');
+    await user.type(box(), 'mysite');
+    expect(spy).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'second ending' }));
+    expect(box()).toHaveValue('');
+    expect(screen.queryByText(/That isn’t a web address/)).toBeNull();
+    await user.type(box(), 'other.com');
+    expect(spy).toHaveBeenLastCalledWith('out_of_area', { redirectUrl: 'https://other.com' });
+    expect(spy).not.toHaveBeenCalledWith('out_of_area', { redirectUrl: 'https://mysite.com' });
+  });
+});
+
+describe('plain labels (QA leftovers)', () => {
+  it('a title set in the form’s code says so, without developer words', () => {
+    setup({ id: 'q', type: 'short_text', title: (() => 'Hi') as never } as Question);
+    expect(screen.getByText('Title (set in code)')).toBeInTheDocument();
+    expect(screen.queryByText(/Dynamic Function/)).toBeNull();
+  });
+
+  it('Fill from link says how, in a sentence', () => {
+    // A question with a link name opens the section.
+    setup({
+      id: 'first_name',
+      type: 'short_text',
+      title: 'First name?',
+      prefillKey: 'first_name',
+    } as Question);
+    expect(
+      screen.getByText(
+        'To fill it in, add ?first_name= and the answer to the end of the form’s link.',
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('welcome and thanks keep a Subtitle field (S18)', () => {
   it('shows it even when the subtitle was cleared', () => {
     setup({ id: 'w', type: 'welcome', title: 'Hi' } as Question);
@@ -494,6 +682,45 @@ describe('sign-up slots (MEDIA-20, S17)', () => {
       screen.getByText('This day has passed, so nobody should sign up for it.'),
     ).toBeInTheDocument();
     expect(screen.getByText('Same name, day and time as slot 3.')).toBeInTheDocument();
+  });
+
+  it('a too-big Spots then a tap on + Add Slot keeps the new slot (touch order, STU-4)', async () => {
+    const initial: SignupSlotsQuestion = {
+      id: 'su',
+      type: 'signup_slots',
+      title: 'Pick a time',
+      slots: [
+        { label: 'A', value: 's_a', capacity: 8 },
+        { label: 'B', value: 's_b', capacity: 8 },
+      ],
+    };
+    let latest = initial;
+    function Editor() {
+      const [q, setQ] = useState(initial);
+      latest = q;
+      return (
+        <ConfirmProvider>
+          <div data-slate-forms="" data-theme-name="slate">
+            <SignupSlotsSettings
+              question={q}
+              // Patches merge into the newest question, as the editor's updateQuestion does.
+              onChange={(patch) => setQ((cur) => ({ ...cur, ...patch }) as SignupSlotsQuestion)}
+            />
+          </div>
+        </ConfirmProvider>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Editor />);
+    const spots = screen.getByRole('spinbutton', { name: 'Spots in B' });
+    await user.tripleClick(spots);
+    await user.keyboard('1500');
+    // On a phone the blur and the click both land before the next frame.
+    act(() => spots.blur());
+    act(() => screen.getByRole('button', { name: /Add Slot/ }).click());
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    expect(latest.slots).toHaveLength(3);
+    expect(latest.slots.map((x) => x.capacity)).toEqual([8, 1000, expect.any(Number)]);
   });
 
   it('a slot with neither a name nor a day asks for one', () => {

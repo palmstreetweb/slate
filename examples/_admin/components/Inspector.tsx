@@ -15,6 +15,7 @@ import type {
 } from '@/index.js';
 import { OUT_OF_AREA_VALUE, IN_AREA_VALUE } from '@/logic/address.js';
 import { estimateCurrency } from '@/logic/estimate.js';
+import { formatDateAnswer } from '@/logic/dateValue.js';
 import { TYPE_LABEL } from '../questionTypeMeta.js';
 import { TypeIcon } from './TypeIcon.js';
 import { ConditionBuilder, JumpRulesEditor } from './LogicEditor.js';
@@ -141,7 +142,7 @@ export function Inspector({
           </Field>
         )}
         {'title' in question && typeof question.title === 'function' && (
-          <Field label="Title (Dynamic Function)">
+          <Field label="Title (set in code)">
             <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
               This title changes with the answers, so it’s set in the form’s code and can’t be
               edited here.
@@ -278,6 +279,8 @@ export function Inspector({
           </Field>
         )}
 
+        {question.type === 'date' && <DateLimitsGuard question={question} onChange={onChange} />}
+
         {question.type === 'yes_no' && (
           <YesNoStyleSetting question={question} onChange={onChange} />
         )}
@@ -402,7 +405,7 @@ export function Inspector({
                 }
               >
                 {question.maxLength >= 1
-                  ? `Answers can be up to ${Math.floor(question.maxLength)} characters: a limit is a whole number.`
+                  ? `Answers can be up to ${plural(Math.floor(question.maxLength), 'character', 'characters')}: a limit is a whole number.`
                   : `${String(question.maxLength)} means no limit.`}
               </GuardNote>
             ) : null}
@@ -454,7 +457,7 @@ export function Inspector({
                     onChange({ min: question.max, max: question.min } as Partial<Question>),
                 }}
               >
-                Min ({question.min}) is more than Max ({question.max}), so nobody could answer.
+                Min ({question.min}) is more than Max ({question.max}), so neither limit is used.
               </GuardNote>
             ) : null}
             <Row>
@@ -501,7 +504,7 @@ export function Inspector({
                   onClick: () => onChange({ step: undefined } as Partial<Question>),
                 }}
               >
-                Step has to be more than 0.
+                {`A step of ${String(question.step)} can’t be used, so it counts by 1.`}
               </GuardNote>
             ) : null}
             <UnitPriceSetting question={question} onChange={onChange} currency={currency} />
@@ -628,7 +631,9 @@ export function Inspector({
             <Field
               label="Style"
               hint={
-                (question.display === 'stars' || question.display === 'emoji') &&
+                // Stars from 1 say this under Min / Max instead, with a fix (ScaleGuards).
+                (question.display === 'emoji' ||
+                  (question.display === 'stars' && question.min < 1)) &&
                 scalePoints(question) > 7
                   ? `${scalePoints(question)} points is a lot of ${question.display === 'stars' ? 'stars' : 'faces'} on a phone — 5 reads best.`
                   : question.display === 'slider'
@@ -646,13 +651,11 @@ export function Inspector({
                 ]}
                 aria-label="Scale style"
                 onChange={(display) =>
+                  // A style never changes the range: trying Stars on a live 0–10 scale
+                  // must not leave it 1–5. The guard under Min / Max offers that (STU-9).
                   onChange({
                     display: display === 'numbers' ? undefined : display,
                     sliderIcon: display === 'slider' ? question.sliderIcon : undefined,
-                    // Stars count from one: "1 star" saves 1 (QA F20), and 5 reads best.
-                    ...(display === 'stars' && question.display !== 'stars'
-                      ? starsRange(question)
-                      : {}),
                   } as Partial<Question>)
                 }
               />
@@ -742,16 +745,8 @@ export function Inspector({
                 </Field>
                 {question.maxFiles !== undefined &&
                 !(Number.isInteger(question.maxFiles) && question.maxFiles >= 1) ? (
-                  <GuardNote
-                    action={{
-                      label: 'Use 10',
-                      onClick: () => onChange({ maxFiles: 10 } as Partial<Question>),
-                    }}
-                  >
-                    {question.maxFiles >= 1
-                      ? `This counts as ${Math.floor(question.maxFiles)} files: a limit is a whole number.`
-                      : `${String(question.maxFiles)} counts as 10, the usual limit.`}
-                  </GuardNote>
+                  // The note, the banner and the fix name one number (COPY-R4): 2.5 is 2.
+                  <MaxFilesGuard maxFiles={question.maxFiles} onChange={onChange} />
                 ) : null}
               </>
             )}
@@ -871,7 +866,10 @@ export function Inspector({
 
         {question.type === 'multi_choice' && <PickLimits question={question} onChange={onChange} />}
 
-        {question.type === 'thanks' && <RedirectSetting question={question} onChange={onChange} />}
+        {question.type === 'thanks' && (
+          // One field per ending: a half-typed address never follows the owner to another (STU-7).
+          <RedirectSetting key={question.id} question={question} onChange={onChange} />
+        )}
 
         {question.type === 'thanks' && onEstimateChange && (
           <EstimateSection
@@ -1018,7 +1016,7 @@ function PickLimits({ question, onChange }: { question: MultiPick; onChange: Pat
             onClick: () => set({ min: problem.max, max: problem.min }),
           }}
         >
-          Max ({problem.max}) is less than Min ({problem.min}), so nobody could finish.
+          Max ({problem.max}) is less than Min ({problem.min}), so Max is ignored.
         </GuardNote>
       ) : problem?.kind === 'max_over_choices' ? (
         <GuardNote quiet>
@@ -1065,6 +1063,52 @@ function AcceptGuard({
   );
 }
 
+/** "1 file", "2 files". */
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** A Max Files that isn't a whole number of 1 or more: what the form counts it as, and that fix. */
+function MaxFilesGuard({ maxFiles, onChange }: { maxFiles: number; onChange: Patch }) {
+  const counted = maxFiles >= 1 ? Math.floor(maxFiles) : 10;
+  return (
+    <GuardNote
+      action={{
+        label: `Use ${counted}`,
+        onClick: () => onChange({ maxFiles: counted } as Partial<Question>),
+      }}
+    >
+      {maxFiles >= 1
+        ? `This counts as ${plural(counted, 'file', 'files')}: a limit is a whole number.`
+        : `${String(maxFiles)} counts as 10, the usual limit.`}
+    </GuardNote>
+  );
+}
+
+/**
+ * A date question's limits set the wrong way round (from code or a backup; the
+ * inspector has no fields for them): the form ignores both, said with a one-tap
+ * fix so they can always be put right here (review fixes, STU-3).
+ */
+function DateLimitsGuard({
+  question,
+  onChange,
+}: {
+  question: Extract<Question, { type: 'date' }>;
+  onChange: Patch;
+}) {
+  const { min, max, format } = question;
+  if (!min || !max || !(min > max)) return null;
+  return (
+    <GuardNote
+      action={{
+        label: 'Swap them',
+        onClick: () => onChange({ min: max, max: min } as Partial<Question>),
+      }}
+    >
+      {`The earliest date (${formatDateAnswer(min, format)}) is after the latest (${formatDateAnswer(max, format)}), so neither limit is used.`}
+    </GuardNote>
+  );
+}
+
 /** What can't work on a scale, said under Min / Max Value with a fix (QA F7, S16, F20). */
 function ScaleGuards({ question, onChange }: { question: ScaleQuestion; onChange: Patch }) {
   const { min, max } = question;
@@ -1077,7 +1121,7 @@ function ScaleGuards({ question, onChange }: { question: ScaleQuestion; onChange
           onClick: () => onChange({ min: max, max: min } as Partial<Question>),
         }}
       >
-        Min Value ({min}) is more than Max Value ({max}), so there’s nothing to pick.
+        Min Value ({min}) is more than Max Value ({max}), so the scale runs from {max} to {min}.
       </GuardNote>
     );
   }
@@ -1089,7 +1133,7 @@ function ScaleGuards({ question, onChange }: { question: ScaleQuestion; onChange
           onClick: () => onChange({ step: undefined } as Partial<Question>),
         }}
       >
-        This scale counts in steps of {String(question.step)}, so it can’t show its points.
+        A step of {String(question.step)} can’t be used, so this scale counts by 1.
       </GuardNote>
     );
   }
@@ -1123,15 +1167,21 @@ function ScaleGuards({ question, onChange }: { question: ScaleQuestion; onChange
       </GuardNote>
     );
   }
-  if (question.display === 'stars' && min < 1) {
-    return (
-      <GuardNote
-        action={{
-          label: 'Start at 1',
-          onClick: () => onChange(starsRange(question) as Partial<Question>),
-        }}
-      >
+  // Stars count from 1 ("1 star" saves 1) and 5 reads best: offered, never applied by
+  // the style alone (STU-9). The button says the range it sets.
+  if (question.display === 'stars' && (min < 1 || points > 7)) {
+    const fix = starsRange(question);
+    const action = {
+      label: fix.max === max ? `Start at ${fix.min}` : `Use ${fix.min} to ${fix.max}`,
+      onClick: () => onChange(fix as Partial<Question>),
+    };
+    return min < 1 ? (
+      <GuardNote action={action}>
         Stars start at 1. Starting at {min}, the first star saves {min}.
+      </GuardNote>
+    ) : (
+      <GuardNote quiet action={action}>
+        {points} stars is a lot to tap on a phone. 5 reads best.
       </GuardNote>
     );
   }
@@ -1332,7 +1382,13 @@ function PrefillSetting({
         label="Can Be Prefilled From the Link"
       />
       {on && (
-        <Field label="Link Name" hint={problem ?? `Add ?${trimmed}=… to the form link.`}>
+        <Field
+          label="Link Name"
+          hint={
+            problem ??
+            `To fill it in, add ?${trimmed}= and the answer to the end of the form’s link.`
+          }
+        >
           <input
             className={`slate-input${problem ? ' slate-input--error' : ''}`}
             value={key ?? ''}

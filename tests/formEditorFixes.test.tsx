@@ -18,6 +18,8 @@ import type * as Router from '../examples/_admin/_router.js';
 
 const state = vi.hoisted(() => ({
   cloud: true,
+  /** Forms whose last cloud write failed (STU-8). */
+  unsaved: new Set<string>(),
   forms: new Map<string, FormRecord>(),
   listeners: new Set<() => void>(),
   updateForm: vi.fn(),
@@ -70,7 +72,9 @@ vi.mock('../examples/_admin/_formsStore.js', () => {
         f.status === 'published' &&
         JSON.stringify(f.publishedSchema) !== JSON.stringify(f.schema),
       ),
-    publishForm: (id: string, opts?: { onFail?: () => void }) => state.publishForm(id, opts),
+    publishForm: (id: string, opts?: { onFail?: () => void; onLanded?: () => void }) =>
+      state.publishForm(id, opts),
+    hasUnsavedEdits: (id: string) => state.unsaved.has(id),
     unpublishForm: vi.fn(),
     createFormAsync: (opts: unknown) => state.createFormAsync(opts),
     permanentlyDeleteForm: vi.fn(),
@@ -147,6 +151,13 @@ const named: Question = {
 };
 const done: Question = { id: 'done', type: 'thanks', title: 'Thanks' };
 const badNumber: Question = { id: 'qty', type: 'number', title: 'How many?', min: 10, max: 5 };
+/** Nothing to pick: this one would stop people finishing. */
+const noOptions: Question = {
+  id: 'kind',
+  type: 'single_choice',
+  title: 'Which kind?',
+  options: [],
+};
 
 function seed(questions: Question[], extra: Partial<FormRecord> = {}): FormRecord {
   const schema: Schema = {
@@ -184,13 +195,14 @@ function renderEditor(formId: string | null = 'f_1') {
 
 beforeEach(() => {
   state.cloud = true;
+  state.unsaved.clear();
   state.forms.clear();
   state.listeners.clear();
   state.updateForm.mockReset();
   state.publishForm.mockReset();
   state.createFormAsync.mockReset();
   state.navigate.mockReset();
-  state.publishForm.mockImplementation((id: string) => {
+  state.publishForm.mockImplementation((id: string, opts?: { onLanded?: () => void }) => {
     const f = state.forms.get(id)!;
     const next: FormRecord = {
       ...f,
@@ -199,6 +211,8 @@ beforeEach(() => {
       publishedName: f.name,
     };
     state.forms.set(id, next);
+    // The cloud write lands a moment later.
+    setTimeout(() => opts?.onLanded?.(), 0);
     return next;
   });
 });
@@ -227,6 +241,33 @@ describe('opening and saving (COPY-X2, COPY-X1)', () => {
     expect(state.forms.get('f_1')!.schema.questions[1]).toMatchObject({ title: 'What size?!' });
   });
 
+  it('reopening after a save that failed sends it again and says “Not saved” until it lands (STU-8)', async () => {
+    seed([welcome, size, done]);
+    state.unsaved.add('f_1');
+    renderEditor();
+    const status = document.querySelector('.slate-save-status')!;
+    expect(status.textContent).toBe('Not saved');
+    expect(status.getAttribute('title')).toBe(
+      'Your last change isn’t saved yet. Sending it again now.',
+    );
+    // Opening writes once, the change the cloud never got.
+    expect(state.updateForm).toHaveBeenCalledTimes(1);
+    expect(status.textContent).toBe('Not saved');
+    // Another form's write landing says nothing about this one.
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('slate-persist-ok', { detail: { kind: 'form', formId: 'f_other' } }),
+      );
+    });
+    expect(status.textContent).toBe('Not saved');
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('slate-persist-ok', { detail: { kind: 'form', formId: 'f_1' } }),
+      );
+    });
+    expect(status.textContent).toMatch(/^Saved /);
+  });
+
   it('a save error reads “Not saved” in the header, with the sentence on hover', () => {
     seed([welcome, size, done]);
     renderEditor();
@@ -249,9 +290,10 @@ describe('the issues banner (S9)', () => {
     renderEditor();
     const region = banner()!;
     expect(region).toBeTruthy();
-    expect(region.textContent).toContain('1 thing to fix before you publish');
+    // Bounds set the wrong way round are ignored by the form: a heads-up (STU-3).
+    expect(region.textContent).toContain('1 thing to check');
     expect(region.textContent).toContain(
-      '“How many?” has a lowest number above its highest, so no answer fits. Swap them.',
+      '“How many?” has Min (10) above Max (5), so neither limit is used. Swap them.',
     );
     expect(region.textContent).not.toMatch(/schema|qty|visibleIf/);
 
@@ -285,9 +327,10 @@ describe('the issues banner (S9)', () => {
     await user.type(min, '30');
     // Min 30 is above max 20, but the owner is mid-edit (maybe about to raise the max).
     expect(banner()).toBeNull();
-    await waitFor(() => expect(banner()?.textContent).toContain('“How many?” has a lowest'), {
-      timeout: 3000,
-    });
+    await waitFor(
+      () => expect(banner()?.textContent).toContain('“How many?” has Min (30) above Max (20)'),
+      { timeout: 3000 },
+    );
   });
 
   it('a new Location question raises nothing (no half-set service area)', async () => {
@@ -304,7 +347,7 @@ describe('the issues banner (S9)', () => {
 describe('Publish (S10, COPY-10)', () => {
   it('waits while something would stop people finishing, and Show me opens it', async () => {
     const user = userEvent.setup();
-    seed([welcome, size, badNumber, done]);
+    seed([welcome, size, noOptions, done]);
     renderEditor();
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     const dialog = await screen.findByRole('alertdialog');
@@ -312,7 +355,16 @@ describe('Publish (S10, COPY-10)', () => {
     expect(dialog.textContent).toContain('People couldn’t finish your form as it is.');
     expect(state.publishForm).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole('button', { name: 'Show me' }));
-    expect(screen.getByDisplayValue('How many?')).toBeTruthy();
+    expect(screen.getByDisplayValue('Which kind?')).toBeTruthy();
+  });
+
+  it('bounds set the wrong way round never hold Publish back: the form ignores them (STU-3)', async () => {
+    const user = userEvent.setup();
+    seed([welcome, size, badNumber, done]);
+    renderEditor();
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(state.publishForm).toHaveBeenCalledTimes(1);
   });
 
   it('warnings never hold Publish back', async () => {
@@ -332,6 +384,64 @@ describe('Publish (S10, COPY-10)', () => {
     renderEditor();
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     expect(await screen.findByText('You’re live', {}, { timeout: 2000 })).toBeTruthy();
+  });
+
+  it('a slow write keeps “Publishing…” and no “You’re live” until it lands (STU-5)', async () => {
+    const user = userEvent.setup();
+    seed([welcome, size, done]);
+    let land = () => {};
+    state.publishForm.mockImplementation((id: string, opts?: { onLanded?: () => void }) => {
+      const f = state.forms.get(id)!;
+      const next: FormRecord = { ...f, status: 'published', publishedSchema: f.schema };
+      state.forms.set(id, next);
+      land = () => opts?.onLanded?.();
+      return next;
+    });
+    renderEditor();
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    // Well past the spinner beat (420 ms): the write hasn't landed, so nothing is live yet.
+    await new Promise((r) => setTimeout(r, 700));
+    expect(screen.queryByText('You’re live')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Publishing…' })).toBeDisabled();
+    act(() => land());
+    expect(await screen.findByText('You’re live')).toBeTruthy();
+  });
+
+  it('a republish that fails says the earlier version is still live (STU-6, COPY-R1)', async () => {
+    const user = userEvent.setup();
+    const live = seed([welcome, size, done], {
+      status: 'published',
+      publishedSchema: {
+        brand: { name: 'Shop' },
+        theme: 'swiss',
+        themeMode: 'toggle',
+        questions: [welcome, done],
+      },
+    });
+    state.publishForm.mockImplementation((id: string, opts?: { onFail?: () => void }) => {
+      const next: FormRecord = { ...live, publishedSchema: live.schema };
+      state.forms.set(id, next);
+      setTimeout(() => {
+        state.forms.set(id, live);
+        state.listeners.forEach((l) => l());
+        window.dispatchEvent(
+          new CustomEvent('slate-publish-error', { detail: { formId: id, wasLive: true } }),
+        );
+        opts?.onFail?.();
+      }, 50);
+      return next;
+    });
+    renderEditor();
+    await user.click(screen.getByRole('button', { name: 'Republish' }));
+    expect(await screen.findByText('Couldn’t republish')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Your changes aren’t live yet. People still see the version you published before. Check your connection and try again.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/isn’t live yet/)).toBeNull();
+    await new Promise((r) => setTimeout(r, 700));
+    expect(screen.queryByText('Republished')).toBeNull();
   });
 
   it('a publish whose write fails says “Couldn’t publish”, never “You’re live”', async () => {

@@ -25,6 +25,7 @@ import {
   subscribe,
   updateForm,
   hasUnpublishedChanges,
+  hasUnsavedEdits,
   publishForm,
 } from '../_formsStore.js';
 import { clearAiDraft, isAiDraft } from '../ai/client.js';
@@ -57,7 +58,13 @@ import { withBrandLogo } from '../brandLogo.js';
 import { isNeonConfigured } from '../neon/env.js';
 import { useToast } from '../toast.js';
 import { playUiSound } from '../uiSounds.js';
-import { FlipPill, PublishButton, usePublishIgnition } from '../delight/ignition.js';
+import {
+  FlipPill,
+  PublishButton,
+  publishLanding,
+  publishMissingCopy,
+  usePublishIgnition,
+} from '../delight/ignition.js';
 import { closedReason } from '../formClose.js';
 import { countSubmissions } from '../_submissionStore.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
@@ -177,8 +184,17 @@ function FormEditorBody({ formId }: { formId: string }) {
   const [schema, setSchema] = useState<Schema | null>(() =>
     seed ? sanitizeSchemaLogic(seed.schema) : null,
   );
+  /**
+   * This form's last change never reached the cloud (a save failed, then the
+   * editor closed): opening sends it again, and the header says "Not saved"
+   * until that write lands, never "All changes saved" (STU-8).
+   */
+  const [resendAtOpen] = useState(() => seed !== null && hasUnsavedEdits(formId));
+  const resendingRef = useRef(resendAtOpen);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(
+    resendAtOpen ? RESENDING_UNSAVED : null,
+  );
   const [selectedId, setSelectedId] = useState<string>(() => {
     const first = seed?.schema.questions[0];
     return first?.id ?? '';
@@ -206,7 +222,7 @@ function FormEditorBody({ formId }: { formId: string }) {
    * save" before the owner touched anything (COPY-X2).
    */
   const lastSavedRef = useRef<string | null>(
-    seed ? saveKey(seed.name, seed.slug, seed.schema) : null,
+    seed && !resendAtOpen ? saveKey(seed.name, seed.slug, seed.schema) : null,
   );
   /** One "couldn't save" toast per failing run in local mode, not one per keystroke. */
   const localSaveWarnedRef = useRef(false);
@@ -288,8 +304,11 @@ function FormEditorBody({ formId }: { formId: string }) {
     if (persisted) {
       lastSavedRef.current = key;
       localSaveWarnedRef.current = false;
-      setSavedAt(new Date());
-      setSaveError(null);
+      // Sending again a change that never reached the cloud: "Not saved" until it lands.
+      if (!resendingRef.current) {
+        setSavedAt(new Date());
+        setSaveError(null);
+      }
     } else {
       setSaveError(LOCAL_SAVE_FAILED);
       if (!localSaveWarnedRef.current) {
@@ -306,14 +325,16 @@ function FormEditorBody({ formId }: { formId: string }) {
 
   useEffect(() => {
     const onPersistError = (event: Event) => {
-      const detail = (event as CustomEvent<{ kind?: string; message?: string }>).detail;
-      if (detail?.kind !== 'form') return;
+      const detail = (event as CustomEvent<{ kind?: string; message?: string; formId?: string }>)
+        .detail;
+      if (detail?.kind !== 'form' || (detail.formId && detail.formId !== formId)) return;
       // The toast comes from the shell (PersistErrorToasts); this is the inline status.
       setSaveError(detail.message || 'Couldn’t save your last change. Check your connection.');
     };
     const onPersistOk = (event: Event) => {
-      const detail = (event as CustomEvent<{ kind?: string }>).detail;
-      if (detail?.kind !== 'form') return;
+      const detail = (event as CustomEvent<{ kind?: string; formId?: string }>).detail;
+      if (detail?.kind !== 'form' || (detail.formId && detail.formId !== formId)) return;
+      resendingRef.current = false;
       setSaveError(null);
       setSavedAt(new Date());
     };
@@ -323,7 +344,7 @@ function FormEditorBody({ formId }: { formId: string }) {
       window.removeEventListener('slate-persist-error', onPersistError);
       window.removeEventListener('slate-persist-ok', onPersistOk);
     };
-  }, [toast]);
+  }, [toast, formId]);
 
   const handleShareRef = useRef<() => Promise<void>>(async () => {});
 
@@ -496,21 +517,16 @@ function FormEditorBody({ formId }: { formId: string }) {
         schema,
       });
     pinnedLabelRef.current = statusLabelRef.current;
-    // Set when the publish never reached the server; the shell says so (COPY-10).
-    let failed = false;
-    // Publishes now; the check beat brings the toast and flips the pill.
+    // Publishes now; "You're live" waits until the write has landed (STU-5). A write
+    // that fails is said by the shell (PersistErrorToasts), and the button comes back.
     const ok = ignite.start(
       () => {
-        const next = publishForm(formId, {
-          onFail: () => {
-            failed = true;
-          },
-        });
+        const write = publishLanding();
+        const next = publishForm(formId, write.callbacks);
         if (next) setLiveForm(next);
-        return Boolean(next);
+        return next ? write.landed : false;
       },
       {
-        failed: () => failed,
         onFailed: () => {
           pinnedLabelRef.current = null;
         },
@@ -528,11 +544,7 @@ function FormEditorBody({ formId }: { formId: string }) {
     );
     if (!ok) {
       pinnedLabelRef.current = null;
-      toast.push({
-        title: 'Couldn’t publish',
-        detail: 'Your form isn’t live yet. Check your connection and try again.',
-        tone: 'error',
-      });
+      toast.push({ ...publishMissingCopy(isPublished), tone: 'error' });
     }
   };
 
@@ -1110,6 +1122,9 @@ function saveKey(name: string, slug: string | undefined, schema: Schema): string
 
 /** How long the question being edited keeps its old issues after the last change (S9). */
 const ISSUE_SETTLE_MS = 1500;
+
+/** The header's hover while a change that never reached the cloud is sent again (STU-8). */
+const RESENDING_UNSAVED = 'Your last change isn’t saved yet. Sending it again now.';
 
 const LOCAL_SAVE_FAILED =
   'Couldn’t save your last change. This browser may be out of space: export a backup, then delete old forms or responses.';

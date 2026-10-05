@@ -3,11 +3,15 @@
  * in three beats: a spinner while it works, then the spinner closes into a
  * self-drawing check with "Live", then the button bows out.
  *
- * The publish itself runs at once, on click — the beats are only what the
- * author sees, so leaving the page mid-spin never loses a publish. `onLive`
- * (toast, sound) fires on the check beat even if the button has unmounted by
- * then. Calm motion skips the spinner and the bow: the check shows at once
- * and holds.
+ * The publish itself starts at once, on click, so leaving the page mid-spin
+ * never loses a publish. A cloud publish hands back a promise for its write:
+ * the button reads "Publishing…" until that write has landed (and at least the
+ * spinner beat has played), and only then does the check — and `onLive`, the
+ * toast and the sound — follow; a write that fails goes back to Publish and
+ * calls `onFailed` instead, so "You're live" never comes before a publish that
+ * didn't happen (STU-5). `onLive` fires even if the button has unmounted by
+ * then. Calm motion never spins: "Publishing…" holds still, the check shows as
+ * soon as the write lands, and there is no bow.
  */
 
 'use client';
@@ -25,18 +29,23 @@ export const IGNITION_HOLD_MS = 1100;
 export const IGNITION_LEAVE_MS = 220;
 
 type StartOptions = {
-  /** Fires on the check beat (or at once with calm motion). */
+  /** Fires on the check beat: once the publish has landed. */
   onLive?: () => void;
   /**
-   * True once the publish is known not to have reached the server. Asked on the
-   * check beat: then there's no check and no `onLive`, `onFailed` runs instead,
-   * and the button goes back to Publish (the shell has said what went wrong).
+   * The publish's write didn't reach the server: no check and no `onLive`, and
+   * the button goes back to Publish (the shell has said what went wrong).
    */
-  failed?: () => boolean;
   onFailed?: () => void;
   /** Element whose wrapper decides calm motion (defaults to the OS setting). */
   scope?: Element | null;
 };
+
+/**
+ * What a publish hands back: `false` when it couldn't start, `true` when it is
+ * already done (this device only), or a promise that settles when its write
+ * lands — or rejects when it doesn't.
+ */
+export type PublishStart = boolean | PromiseLike<unknown>;
 
 export function usePublishIgnition() {
   const [phase, setPhase] = useState<IgnitionPhase>('idle');
@@ -54,13 +63,13 @@ export function usePublishIgnition() {
   }, []);
 
   /**
-   * Runs `publish` now. Returns its result; on success the beats play and
-   * `onLive` follows on the check.
+   * Runs `publish` now. Returns whether it started; the beats play, and `onLive`
+   * follows on the check once the publish has landed.
    */
-  const start = useCallback((publish: () => boolean, opts: StartOptions = {}): boolean => {
+  const start = useCallback((publish: () => PublishStart, opts: StartOptions = {}): boolean => {
     timers.current.splice(0).forEach((t) => window.clearTimeout(t));
-    const ok = publish();
-    if (!ok) {
+    const result = publish();
+    if (!result) {
       setPhase('idle');
       return false;
     }
@@ -73,29 +82,63 @@ export function usePublishIgnition() {
       timers.current.push(window.setTimeout(fn, ms));
     };
     const fireLive = () => {
-      if (opts.failed?.()) {
-        timers.current.splice(0).forEach((t) => window.clearTimeout(t));
-        set('idle');
-        opts.onFailed?.();
-        return;
-      }
       set('done');
       opts.onLive?.();
+      beat(IGNITION_HOLD_MS, () => set(calm ? 'idle' : 'leaving'));
+      if (!calm) beat(IGNITION_HOLD_MS + IGNITION_LEAVE_MS, () => set('idle'));
     };
-    if (spin > 0) {
-      set('working');
-      // Not tracked in `timers`: the toast must still say "You're live" if
-      // the panel closes during the spinner.
-      window.setTimeout(fireLive, spin);
-    } else {
-      fireLive();
+    if (result === true) {
+      // Already done: the spinner beat, then the check (at once with calm motion).
+      // Not tracked in `timers`: the toast must still say "You're live" if the
+      // panel closes during the spinner.
+      if (spin > 0) {
+        set('working');
+        window.setTimeout(fireLive, spin);
+      } else fireLive();
+      return true;
     }
-    beat(spin + IGNITION_HOLD_MS, () => set(calm ? 'idle' : 'leaving'));
-    if (!calm) beat(spin + IGNITION_HOLD_MS + IGNITION_LEAVE_MS, () => set('idle'));
+    // In flight: "Publishing…" until the write lands, and for the spinner beat at least.
+    set('working');
+    const beatDone = new Promise<void>((resolve) => window.setTimeout(resolve, spin));
+    Promise.all([result, beatDone]).then(fireLive, () => {
+      set('idle');
+      opts.onFailed?.();
+    });
     return true;
   }, []);
 
   return { phase, start };
+}
+
+/**
+ * A publish's write, as a promise for `start`: pass `callbacks` to publishForm
+ * and hand `landed` back. It settles when the write lands, or fails.
+ */
+export function publishLanding(): {
+  landed: Promise<void>;
+  callbacks: { onLanded: () => void; onFail: () => void };
+} {
+  let onLanded = () => {};
+  let onFail = () => {};
+  const landed = new Promise<void>((resolve, reject) => {
+    onLanded = resolve;
+    onFail = () => reject(new Error('publish did not land'));
+  });
+  // Nobody may be waiting by then (the publish never started): never an unhandled rejection.
+  landed.catch(() => {});
+  return { landed, callbacks: { onLanded, onFail } };
+}
+
+/**
+ * The publish couldn't start: the form isn't in this browser's list any more
+ * (deleted or signed out elsewhere). Not a connection problem, so it doesn't say
+ * one; a republish's earlier version is whatever the server still has.
+ */
+export function publishMissingCopy(republish: boolean): { title: string; detail: string } {
+  return {
+    title: republish ? 'Couldn’t republish' : 'Couldn’t publish',
+    detail: 'This form couldn’t be found here. Go back to your forms and open it again.',
+  };
 }
 
 function IgnitionGlyph() {

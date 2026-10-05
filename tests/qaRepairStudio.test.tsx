@@ -285,7 +285,10 @@ describe('the live preview never takes the keyboard (S4, S15)', () => {
               setV(n);
             }}
           />
-          <input aria-label="Preview answer" />
+          {/* The editor's live preview carries data-slate-preview (Canvas). */}
+          <div data-slate-preview="">
+            <input aria-label="Preview answer" />
+          </div>
         </>
       );
     }

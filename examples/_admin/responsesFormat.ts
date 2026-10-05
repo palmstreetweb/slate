@@ -45,29 +45,35 @@ function optionLabel(q: Question, value: string): string | null {
   return q.options.find((o) => o.value === value)?.label ?? null;
 }
 
-/** How an answer reads when its option was deleted after it was given. */
+/** How an answer reads when its option was deleted and only the studio's code for it is left. */
 export const REMOVED_OPTION = 'Removed option';
 
+/** After a stored value the question no longer lists, when nobody typed it under Other. */
+export const NO_LONGER_AN_OPTION = '(no longer an option)';
+
 /**
- * A value the studio gave an option (`opt_` and six letters or digits,
- * formChecks.newOptionValue) that the question no longer lists: an option
- * deleted after someone picked it, not something they typed under Other.
+ * A code the studio gave an option — `opt_` and six letters or digits
+ * (formChecks.newOptionValue), or the `opt_1`, `opt_2`… it gave them before —
+ * that the question no longer lists: an option deleted after someone picked
+ * it. Nobody types one under Other, and it means nothing to the owner.
  */
 export function isRemovedOptionValue(value: string): boolean {
-  return /^opt_[a-z0-9]{6}$/.test(value);
+  return /^opt_(\d+|[a-z0-9]{6})$/.test(value);
 }
 
 /**
- * A choice value as the owner reads it: the option's label, or — on a question
- * that allows Other (ADR-063) — "Other: what they typed". An option deleted
- * since reads "Removed option", never its stored code (copy QA): without
- * Other, any value the list doesn't have is one.
+ * A choice value as the owner reads it: the option's label; "Removed option"
+ * for the studio's code of an option deleted since; on a question that allows
+ * Other (ADR-063), "Other: what they typed"; otherwise the stored text marked
+ * "(no longer an option)" — Other turned off since, or a readable option
+ * deleted. Typed words are never hidden (review fixes, ADR-069): the reader,
+ * search, the CSV and the Summary all read this.
  */
-function choiceText(q: Question, value: string): string {
+export function choiceText(q: Question, value: string): string {
   const label = optionLabel(q, value);
   if (label !== null) return label;
-  if (!allowsOther(q) || isRemovedOptionValue(value)) return REMOVED_OPTION;
-  return `${otherLabelOf(q)}: ${value}`;
+  if (isRemovedOptionValue(value)) return REMOVED_OPTION;
+  return allowsOther(q) ? `${otherLabelOf(q)}: ${value}` : `${value} ${NO_LONGER_AN_OPTION}`;
 }
 
 /**
@@ -618,6 +624,9 @@ export function formatAnswerForCsv(question: Question, value: unknown): string {
   }
   // A plain date stays ISO in a sheet, which sorts it (the reader shows the form's format).
   if (question.type === 'date' && typeof value === 'string' && value.length === 10) return value;
+  // A phone stays as stored, "+18055550100", as it always exported: CRMs and diallers read
+  // it, and the contact block's Phone column is the same (the reader shows it as written).
+  if (question.type === 'phone' && typeof value === 'string') return value;
   const formatted = formatAnswerForQuestion(question, value);
   if (formatted === '—') return '';
   return formatted.replace(/\n/g, '; ');

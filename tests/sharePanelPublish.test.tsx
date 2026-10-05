@@ -19,7 +19,8 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../examples/_admin/_formsStore.js', () => ({
   getForm: () => state.form,
-  publishForm: (id: string, opts?: { onFail?: () => void }) => state.publishForm(id, opts),
+  publishForm: (id: string, opts?: { onFail?: () => void; onLanded?: () => void }) =>
+    state.publishForm(id, opts),
   unpublishForm: vi.fn(),
   subscribe: () => () => {},
   hasUnpublishedChanges: () => false,
@@ -57,7 +58,8 @@ function schemaWith(questions: unknown[]): Schema {
   } as unknown as Schema;
 }
 
-const broken = schemaWith([{ id: 'qty', type: 'number', title: 'How many?', min: 10, max: 5 }]);
+// Nothing to pick would stop people finishing (bounds set the wrong way round no longer do, STU-3).
+const broken = schemaWith([{ id: 'qty', type: 'single_choice', title: 'How many?', options: [] }]);
 const clean = schemaWith([{ id: 'name', type: 'short_text', title: 'Name?' }]);
 
 function draft(schema: Schema) {
@@ -88,7 +90,7 @@ describe('Publish waits for problems that stop people finishing (S10)', () => {
     );
     const notice = screen.getByRole('status', { name: 'Before you publish' });
     expect(notice.textContent).toContain('Fix this before you publish');
-    expect(notice.textContent).toContain('“How many?” has a lowest number above its highest');
+    expect(notice.textContent).toContain('“How many?” has no options. Add at least one.');
     expect(notice.textContent).not.toMatch(/schema|qty/);
 
     await user.click(screen.getAllByRole('button', { name: 'Publish' })[0]!);
@@ -113,11 +115,19 @@ describe('Publish waits for problems that stop people finishing (S10)', () => {
   it('a clean form publishes', async () => {
     const user = userEvent.setup();
     state.form = draft(clean);
-    state.publishForm.mockReturnValue({ ...draft(clean), status: 'published' });
+    let land = () => {};
+    state.publishForm.mockImplementation((_id: string, opts?: { onLanded?: () => void }) => {
+      land = () => opts?.onLanded?.();
+      return { ...draft(clean), status: 'published' };
+    });
     render(<SharePanel open onClose={() => {}} formId="f_1" formName="Crew" schema={clean} />);
     expect(screen.queryByRole('status', { name: 'Before you publish' })).toBeNull();
     await user.click(screen.getAllByRole('button', { name: 'Publish' })[0]!);
     expect(state.publishForm).toHaveBeenCalledTimes(1);
+    // Not before the write lands (STU-5), however long the spinner has run.
+    await new Promise((r) => setTimeout(r, 700));
+    expect(state.push).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'You’re live' }));
+    land();
     await vi.waitFor(() =>
       expect(state.push).toHaveBeenCalledWith(expect.objectContaining({ title: 'You’re live' })),
     );

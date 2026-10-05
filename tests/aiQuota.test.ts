@@ -145,6 +145,15 @@ describe('Build with AI daily cap (ADR-051)', () => {
     expect(runGenerateForm).not.toHaveBeenCalled();
   });
 
+  it('never says “for today” beside a reset later the same day (COPY-R13)', () => {
+    // The studio puts the owner's own time in place of "after the daily reset".
+    for (const message of [AI_QUOTA_GLOBAL_MESSAGE, AI_QUOTA_USER_MESSAGE]) {
+      expect(message).toContain('after the daily reset');
+      const local = message.replace('after the daily reset', 'after 5:00 PM today');
+      expect(local).not.toMatch(/\btoday’s\b|for today/);
+    }
+  });
+
   it.each([
     [
       'migration 014 not applied (404)',
@@ -323,7 +332,7 @@ describe('Build with AI client', () => {
     expect(err).toBeInstanceOf(GenerateRequestError);
     expect(err.retryable).toBe(false);
     expect(err.message).toMatch(
-      /^You’ve used today’s Build with AI drafts\. You can make more (after .+ today|tomorrow after .+)\.$/,
+      /^You’ve used your Build with AI drafts for now\. You can make more (after .+ today|tomorrow after .+)\.$/,
     );
     expect(err.message).not.toMatch(/UTC|daily reset/);
     expect(runGenerateForm).not.toHaveBeenCalled();

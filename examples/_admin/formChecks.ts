@@ -26,6 +26,7 @@ import { contactMode } from '@/logic/contact.js';
 import { acceptTokens } from '@/components/questions/FileUploadField.js';
 import { isPhoneCountry } from './phoneCountries.js';
 import { normalizeRedirectUrl } from './redirectUrl.js';
+import { TYPE_LABEL } from './questionTypeMeta.js';
 
 export type StudioIssueKind =
   /** Min / Max selections (or likes) that aren't whole numbers. */
@@ -85,7 +86,9 @@ export const FILE_COUNT_MAX = 100;
  * Publish back (decision 4). A skip to itself falls through to the next
  * question, and an empty checklist or contact block asks for nothing, so those
  * are heads-ups; a photo to mark, a grid or sign-up slots with nothing to use
- * trap people only when the question insists on an answer.
+ * trap people only when the question insists on an answer. Bounds set the wrong
+ * way round are a heads-up too (review fixes): the engine ignores a number's or a
+ * date's and draws a scale from the lower end, so every answer still goes through.
  */
 export function schemaIssueBlocks(kind: SchemaIssue['kind'], q: Question | undefined): boolean {
   if (!q) return false;
@@ -94,9 +97,6 @@ export function schemaIssueBlocks(kind: SchemaIssue['kind'], q: Question | undef
     // Two questions share one answer slot: answers mix, and Back goes to the wrong one.
     case 'duplicate_id':
       return true;
-    // No answer fits (a number, scale or date can never be valid).
-    case 'bad_bounds':
-      return q.type === 'number' || q.type === 'scale' || q.type === 'date';
     // Nothing to tap, paint or pick, and the question insists.
     case 'no_image':
     case 'bad_grid':
@@ -113,10 +113,22 @@ const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : 
 const short = (s: string, max = 40) =>
   s.length > max ? s.slice(0, max + 1).replace(/\s\S*$/, '') + '…' : s;
 
-/** How the owner knows a question: its title in quotes, cut short (as checkSchema words it). */
-export function questionName(q: Question, start = true): string {
-  const t = 'title' in q && typeof q.title == 'string' ? q.title.replace(/\s+/g, ' ').trim() : '';
-  return t ? `“${short(t)}”` : `${start ? 'A' : 'a'} question with no title`;
+/**
+ * How the owner knows a question, everywhere the studio lists issues: “Title”,
+ * or “Untitled Location” — never the internal id. One namer for the banner's
+ * engine, settings and rule lines, so one question reads one way (COPY-R6).
+ */
+export function ownerName(q: Question | undefined): string {
+  if (!q) return '“A question”';
+  const raw =
+    'title' in q && typeof q.title === 'string' ? q.title.replace(/\s+/g, ' ').trim() : '';
+  const base = raw || `Untitled ${TYPE_LABEL[q.type] ?? 'question'}`;
+  return `“${base.length > 60 ? `${base.slice(0, 59)}…` : base}”`;
+}
+
+/** The studio's settings checks name questions the way the banner does (`ownerName`). */
+export function questionName(q: Question): string {
+  return ownerName(q);
 }
 
 /* ---------- multi-select pick limits ---------- */
@@ -174,7 +186,9 @@ export function pickProblem(q: MultiPick): PickProblem | null {
 
 /** A pick-limit problem respondents would get stuck on (anything but a Max that's never reached, or a negative Min). */
 export function pickProblemBlocks(p: PickProblem): boolean {
-  if (p.kind === 'max_over_choices') return false;
+  // Max below Min is bounds set the wrong way round: the engine drops the Max
+  // (pickLimits), so nobody is stuck — a heads-up (review fixes, COPY-R5).
+  if (p.kind === 'max_over_choices' || p.kind === 'max_under_min') return false;
   return !(p.kind === 'min_whole' && typeof p.min === 'number' && p.min < 0);
 }
 
@@ -190,7 +204,7 @@ function pickIssue(q: MultiPick, p: PickProblem): FormIssue {
       case 'min_over_choices':
         return `${name} asks for at least ${p.min} ${w.picks} but has only ${count(p.choices, w.choice, w.choices)}${w.other}.`;
       case 'max_under_min':
-        return `${name} asks for at least ${p.min} ${w.picks} but allows at most ${p.max}.`;
+        return `${name}: Max ${w.field} (${p.max}) is less than Min (${p.min}), so Max is ignored. Swap them.`;
       case 'max_over_choices':
         return `${name} allows up to ${p.max} ${w.picks} but has only ${count(p.choices, w.choice, w.choices)}${w.other}.`;
     }
@@ -440,7 +454,7 @@ export function studioIssues(
           q,
           'bad_length',
           typeof len === 'number' && len >= 1
-            ? `${name}: Max length ${len} counts as ${Math.floor(len)} characters.`
+            ? `${name}: Max length ${len} counts as ${count(Math.floor(len), 'character', 'characters')}.`
             : `${name}: Max length ${String(len)} means no limit. Clear it, or use 1 or more.`,
           false,
         );
@@ -471,7 +485,7 @@ export function studioIssues(
           add(
             q,
             'bad_file_count',
-            `${name}: Max files ${String(files)} counts as ${counted}. Use a whole number, 1 or more.`,
+            `${name}: Max files ${String(files)} counts as ${count(counted, 'file', 'files')}. Use a whole number, 1 or more.`,
             false,
           );
         } else if (files > FILE_COUNT_MAX) {
@@ -494,23 +508,33 @@ export function studioIssues(
       }
     }
 
+    // A step that can't count is read as 1 by the engine (the stepper, scaleRange), so
+    // nobody is trapped: a heads-up, said for what happens (review fixes, STU-3).
     if (q.type === 'number' && q.step !== undefined) {
       const step = q.step as unknown;
       if (!(typeof step === 'number' && Number.isFinite(step) && step > 0)) {
-        add(q, 'bad_step', `${name}: Step has to be more than 0.`, true);
+        add(
+          q,
+          'bad_step',
+          `${name}: a step of ${String(step)} can’t be used, so it counts by 1. Clear it, or use more than 0.`,
+          false,
+        );
       }
     }
 
     if (q.type === 'scale') {
-      const points = scalePointCount(q);
-      if (Number.isNaN(points)) {
+      const counted = scalePointCount(q);
+      if (Number.isNaN(counted)) {
         add(
           q,
           'bad_step',
-          `${name} can’t count its points in steps of ${String(q.step)}. Open it and press “Count by 1”.`,
-          true,
+          `${name} can’t count in steps of ${String(q.step)}, so it counts by 1. Open it and press “Count by 1”.`,
+          false,
         );
-      } else if (q.display === 'slider') {
+      }
+      // Counted by 1 when the step can't count, as the form draws it.
+      const points = Number.isNaN(counted) ? scalePointCount({ ...q, step: 1 }) : counted;
+      if (q.display === 'slider') {
         // A slider draws no cells (R4): a 0–100 slider is fine; only a step too fine to land on is said.
         if (points > SLIDER_STOPS_MAX) {
           add(

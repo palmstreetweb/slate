@@ -1,7 +1,8 @@
 /**
- * Studio number fields (QA 2026-10: MEDIA-03, S4, F6, F11). What the owner types
- * is kept while the field has focus — never clamped or re-filled under the caret —
- * and is rounded or pulled into range only when they leave the field.
+ * Studio number fields (QA 2026-10: MEDIA-03, S4, F6, F11; review fix STU-4). What
+ * the owner types is kept on screen while the field has focus — never clamped or
+ * re-filled under the caret — and every complete number is saved as leaving the
+ * field would save it (rounded, pulled into range), so nothing half-typed is kept.
  */
 
 import { useState } from 'react';
@@ -45,7 +46,7 @@ function setup(initial: number | undefined, props: Extra = {}) {
   const user = userEvent.setup();
   render(<Harness initial={initial} spy={spy} {...props} />);
   const input = screen.getByRole('spinbutton', { name: 'Field' }) as HTMLInputElement;
-  // Leaving settles the draft a frame after the blur (a focus handed straight back isn't leaving).
+  // Leaving settles the draft at once; the frame is for a focus the preview hands back (S4).
   const leave = async () => {
     await user.click(screen.getByRole('button', { name: 'elsewhere' }));
     await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
@@ -71,8 +72,8 @@ describe('SlateNumberInput', () => {
     expect(input).toHaveValue(12);
   });
 
-  it('select-all then type keeps a first digit below the minimum (voice 60 → 30, not 5 or 50)', async () => {
-    const { user, input, leave, spy, last } = setup(60, {
+  it('select-all then type keeps a first digit below the minimum on screen (voice 60 → 30, not 50)', async () => {
+    const { user, input, leave, last } = setup(60, {
       min: 5,
       max: 300,
       step: 15,
@@ -81,11 +82,13 @@ describe('SlateNumberInput', () => {
     });
     await user.tripleClick(input);
     await user.keyboard('3');
-    // "3" is below 5: it stays on screen, isn't saved, and the range shows under the field.
+    // "3" is below 5: it stays on screen with the range under the field, and the
+    // form holds what leaving now would keep (5), never the old 60 (STU-4).
     expect(input).toHaveValue(3);
-    expect(spy).not.toHaveBeenCalled();
+    expect(last()).toBe(5);
     expect(screen.getByRole('status')).toHaveTextContent('A whole number from 5 to 300');
     await user.keyboard('0');
+    expect(input).toHaveValue(30);
     expect(last()).toBe(30);
     expect(screen.queryByRole('status')).toBeNull();
     await leave();
@@ -142,26 +145,122 @@ describe('SlateNumberInput', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('whole-number fields round a decimal when left (Min selections 1.5 → 2)', async () => {
+  it('whole-number fields save a typed decimal rounded, and show it on leave (Min selections 1.5 → 2)', async () => {
     const { user, input, leave, spy, last } = setup(undefined, { min: 0, integer: true });
     await user.click(input);
     await user.keyboard('1.5');
-    expect(spy).toHaveBeenLastCalledWith(1);
+    // "1.5" stays on screen; the form already holds the 2 that leaving keeps (STU-4).
+    expect(input).toHaveValue(1.5);
+    expect(spy).toHaveBeenLastCalledWith(2);
     expect(screen.getByRole('status')).toHaveTextContent('A whole number, 0 or more');
     await leave();
     expect(last()).toBe(2);
     expect(input).toHaveValue(2);
   });
 
-  it('too big a number waits, then is pulled into range on leave (Max Files 25 → 20)', async () => {
+  it('too big a number is saved as the most that fits, never as the part typed first (Max Files 25 → 20)', async () => {
     const { user, input, leave, last } = setup(10, { min: 1, max: 20, integer: true });
     await user.tripleClick(input);
     await user.keyboard('25');
-    expect(last()).toBe(2);
+    // "2" was saved on the way; "25" saves 20 straight away, not on leave (STU-4).
+    expect(last()).toBe(20);
+    expect(input).toHaveValue(25);
     expect(screen.getByRole('status')).toHaveTextContent('A whole number from 1 to 20');
     await leave();
     expect(last()).toBe(20);
     expect(input).toHaveValue(20);
+  });
+
+  it('leaving saves at once; the box tidies a frame later, so a tap lands where it was aimed (STU-4)', async () => {
+    const { user, input, last } = setup(10, { min: 1, max: 20, integer: true });
+    await user.tripleClick(input);
+    await user.keyboard('25');
+    act(() => input.blur());
+    // Saved already, with this render's props; the typed text and the line under it stay
+    // until the next frame, so nothing moves under a phone's tap before its click lands.
+    expect(last()).toBe(20);
+    expect(input).toHaveValue(25);
+    expect(screen.getByRole('status')).toHaveTextContent('A whole number from 1 to 20');
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    expect(input).toHaveValue(20);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('a question switched right after leaving keeps its own number (STU-4)', async () => {
+    const values = { a: 10, b: 50 } as Record<string, number | undefined>;
+    function Two() {
+      const [at, setAt] = useState<'a' | 'b'>('a');
+      const [, bump] = useState(0);
+      return (
+        <div data-slate-forms="" data-theme-name="slate">
+          {/* One field serving both, as the inspector's unkeyed fields do. */}
+          <SlateNumberInput
+            aria-label="Field"
+            min={1}
+            max={100}
+            integer
+            value={values[at]}
+            onChange={(n) => {
+              values[at] = n;
+              bump((x) => x + 1);
+            }}
+          />
+          <button type="button" onClick={() => setAt('b')}>
+            question b
+          </button>
+        </div>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Two />);
+    const input = screen.getByRole('spinbutton', { name: 'Field' });
+    await user.tripleClick(input);
+    await user.keyboard('150');
+    expect(values.a).toBe(100);
+    // Blur, then the other question opens before the next frame.
+    act(() => input.blur());
+    act(() => screen.getByRole('button', { name: 'question b' }).click());
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    expect(values).toEqual({ a: 100, b: 50 });
+    expect(input).toHaveValue(50);
+  });
+
+  it('closing the editor mid-number keeps the whole number, not the part typed first (STU-4)', async () => {
+    const stored: Array<number | undefined> = [];
+    function Editor() {
+      const [maxFiles, setMaxFiles] = useState<number | undefined>(10);
+      const [open, setOpen] = useState(true);
+      // The editor writes every change straight away (its auto-save).
+      stored.push(maxFiles);
+      return (
+        <div data-slate-forms="" data-theme-name="slate">
+          {open ? (
+            <SlateNumberInput
+              aria-label="Max Files"
+              min={1}
+              max={100}
+              integer
+              value={maxFiles}
+              onChange={setMaxFiles}
+            />
+          ) : null}
+          <button type="button" onClick={() => setOpen(false)}>
+            back
+          </button>
+        </div>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Editor />);
+    const input = screen.getByRole('spinbutton', { name: 'Max Files' });
+    await user.tripleClick(input);
+    await user.keyboard('150');
+    // Gone before any blur or frame (Alt+← on a computer): 150 was saved as 100, not 15.
+    act(() => {
+      screen.getByRole('button', { name: 'back' }).click();
+    });
+    expect(stored.at(-1)).toBe(100);
+    expect(stored).not.toContain(150);
   });
 
   it('Enter settles the number without leaving the field', async () => {

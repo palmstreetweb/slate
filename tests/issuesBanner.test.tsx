@@ -8,8 +8,8 @@ import type { OwnerIssue } from '../examples/_admin/editorIssues.js';
 
 const issues: OwnerIssue[] = Array.from({ length: 5 }, (_, i) => ({
   questionId: `q${i}`,
-  kind: 'bad_bounds',
-  text: `“Question ${i}” has a lowest number above its highest, so no answer fits. Swap them.`,
+  kind: 'no_options',
+  text: `“Question ${i}” has no options. Add at least one.`,
   blocking: i === 0,
 }));
 

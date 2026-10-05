@@ -31,7 +31,7 @@ import {
 } from '@/logic/media.js';
 import { WEEKDAY_KEYS, WEEKDAY_SHORT, availabilityGrid, clockLabel } from '@/logic/availability.js';
 import { PIN_IMAGE_DATA_MAX, safeImageSrc } from '@/utils/brandLogo.js';
-import { dataUrlKb, pinImageFromFile } from '../pinImage.js';
+import { PIN_PHOTO_UNREADABLE, dataUrlKb, pinImageFromFile } from '../pinImage.js';
 import { SlateNumberInput } from './SlateNumberInput.js';
 import { SlateSelect } from './SlateSelect.js';
 import { Checkbox, CollapsibleSection, Field, Row } from './inspectorParts.js';
@@ -135,7 +135,7 @@ export function ImagePinSettings({
       setLink('');
       onChange({ image: url } as Partial<Question>);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not use that photo.');
+      setError(err instanceof Error ? err.message : PIN_PHOTO_UNREADABLE);
     } finally {
       setBusy(false);
     }

@@ -157,6 +157,103 @@ describe('publish ignition', () => {
     expect(result.current.phase).toBe('idle');
   });
 
+  it('a cloud publish holds “Publishing…” until its write lands, then the check (STU-5)', async () => {
+    vi.useFakeTimers();
+    const onLive = vi.fn();
+    const onFailed = vi.fn();
+    let land = () => {};
+    const landed = new Promise<void>((resolve) => {
+      land = resolve;
+    });
+    const { result } = renderHook(() => usePublishIgnition());
+    act(() => {
+      result.current.start(() => landed, { onLive, onFailed });
+    });
+    expect(result.current.phase).toBe('working');
+    // Past the spinner beat, the write is still out: no check, no "You're live".
+    await act(() => vi.advanceTimersByTimeAsync(1500));
+    expect(result.current.phase).toBe('working');
+    expect(onLive).not.toHaveBeenCalled();
+    await act(async () => land());
+    expect(result.current.phase).toBe('done');
+    expect(onLive).toHaveBeenCalledTimes(1);
+    expect(onFailed).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(IGNITION_HOLD_MS + IGNITION_LEAVE_MS));
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('a write that lands at once still plays the spinner beat before the check', async () => {
+    vi.useFakeTimers();
+    const onLive = vi.fn();
+    const { result } = renderHook(() => usePublishIgnition());
+    act(() => {
+      result.current.start(() => Promise.resolve(), { onLive });
+    });
+    await act(() => vi.advanceTimersByTimeAsync(IGNITION_SPIN_MS - 20));
+    expect(onLive).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(40));
+    expect(onLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('a write that fails after the spinner beat never says live (normal motion, 1 s)', async () => {
+    vi.useFakeTimers();
+    const onLive = vi.fn();
+    const onFailed = vi.fn();
+    const { result } = renderHook(() => usePublishIgnition());
+    act(() => {
+      result.current.start(
+        () =>
+          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('offline')), 1020)),
+        { onLive, onFailed },
+      );
+    });
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+    expect(onLive).not.toHaveBeenCalled();
+    expect(onFailed).toHaveBeenCalledTimes(1);
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('with calm motion a failing write never says live either (50 ms)', async () => {
+    vi.useFakeTimers();
+    setOsReduce(true);
+    const onLive = vi.fn();
+    const onFailed = vi.fn();
+    const { result } = renderHook(() => usePublishIgnition());
+    act(() => {
+      result.current.start(
+        () => new Promise<void>((_, reject) => setTimeout(() => reject(new Error('offline')), 50)),
+        { onLive, onFailed },
+      );
+    });
+    // No spinner, but no check either: "Publishing…" holds still until the write is known.
+    expect(result.current.phase).toBe('working');
+    expect(onLive).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(onLive).not.toHaveBeenCalled();
+    expect(onFailed).toHaveBeenCalledTimes(1);
+    expect(result.current.phase).toBe('idle');
+  });
+
+  it('still says live once the write lands, if the button unmounted meanwhile', async () => {
+    vi.useFakeTimers();
+    const onLive = vi.fn();
+    let land = () => {};
+    const { result, unmount } = renderHook(() => usePublishIgnition());
+    act(() => {
+      result.current.start(
+        () =>
+          new Promise<void>((resolve) => {
+            land = resolve;
+          }),
+        { onLive },
+      );
+    });
+    unmount();
+    await act(() => vi.advanceTimersByTimeAsync(IGNITION_SPIN_MS + 100));
+    await act(async () => land());
+    expect(onLive).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the phases as labels, with a glyph only while busy', () => {
     const { rerender } = render(
       <PublishButton phase="idle" onClick={() => {}}>

@@ -2,7 +2,7 @@
 
 > Slate — conversational form engine for Palm Street Web client projects. Schema in → Typeform-quality form out.
 
-**Status:** `1.0.0-beta.1`. Internal Palm Street Web tooling — restricted npm scope.
+**Status:** `1.0.0-beta.2`. Internal Palm Street Web tooling — restricted npm scope.
 
 **Live demo:** [slateforms.vercel.app](https://slateforms.vercel.app) — also `npm run dev` locally
 
@@ -74,13 +74,13 @@ export default function QuotePage() {
 | Prop | Type | Required | Notes |
 |---|---|---|---|
 | `schema` | `Schema` | ✓ | Wrap with `defineSchema` for full type inference. |
-| `onSubmit` | `(answers, meta) => void \| Promise<void>` | ✓ | Fires exactly once on entering `thanks`. Async errors flip the thanks screen to a Retry state. |
+| `onSubmit` | `(answers, meta) => void \| Promise<void>` | ✓ | Fires exactly once on entering `thanks`, with the answers on the respondent's path (ADR-069). Async errors flip the thanks screen to a Retry state. |
 | `onQuestionChange` | `(questionId, answers) => void` |  | Fires on every step transition. Good for analytics. |
 | `hiddenFields` | `Record<string, unknown>` |  | Passed through to `meta.hiddenFields`. Never rendered. |
 | `errorMessage` | `string` |  | Fallback shown when `onSubmit` rejects (default: "Something went wrong submitting your form. Please try again."). |
 | `onFileUpload` | `(file, questionId) => Promise<string>` |  | Host-controlled storage for `file_upload` questions. Resolved string is stored as the answer; omit it to receive raw `File` objects in `onSubmit`. See `DECISIONS.md` ADR-012. |
 | `resume` | `boolean \| 'tab'` |  | Save-and-resume (ADR-017). Autosaves progress to `localStorage` under `slate-forms-resume:<schema.id>`, prompts to resume on remount (Resume or Start over), clears on submit. `'tab'` uses `sessionStorage` instead: it survives a reload, back / forward and a phone discarding the tab, and goes with the tab when the browser copies it (a duplicated tab, a closed tab reopened, a restored session); it is offered back only within 30 minutes of the last answer. Requires `schema.id`. With either, a question whose part didn't download reloads the page when the respondent taps Try again (the answers come back); without `resume` the form never reloads your page — Try again asks for the part again in place, and the message says the page can be reloaded. |
-| `onPartialChange` | `(answers, meta) => void` |  | Fires on every answer change with the visibility-filtered answers — abandonment capture. `meta` carries `startedAt`, `lastQuestionId`, `questionsVisited`, `hiddenFields`, `score`. |
+| `onPartialChange` | `(answers, meta) => void` |  | Fires on every answer change with the answers on the respondent's path, as `onSubmit` gets them (hidden questions and a branch they backed out of are left out) — abandonment capture. `meta` carries `startedAt`, `lastQuestionId`, `questionsVisited`, `hiddenFields`, `score`. |
 
 ### `defineSchema(schema)`
 

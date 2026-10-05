@@ -67,11 +67,11 @@ describe('multi-select pick limits', () => {
     );
   });
 
-  it('Max below Min traps respondents', () => {
+  it('Max below Min is a heads-up said for what happens: the form ignores the Max (COPY-R5)', () => {
     const [issue] = studioIssues([multi({ min: 3, max: 2 })]);
-    expect(issue).toMatchObject({ kind: 'pick_range', blocking: true });
+    expect(issue).toMatchObject({ kind: 'pick_range', blocking: false });
     expect(issue!.message).toBe(
-      '“Which services?” asks for at least 3 picks but allows at most 2.',
+      '“Which services?”: Max selections (2) is less than Min (3), so Max is ignored. Swap them.',
     );
   });
 
@@ -199,8 +199,17 @@ describe('lengths, files, steps', () => {
       '“Upload”: Max size 0 MB means the usual 32 MB limit. Clear it, or use 1 MB or more.',
     );
     expect(studioIssues([f({ maxFiles: 2.5 })])[0]!.message).toBe(
-      '“Upload”: Max files 2.5 counts as 2. Use a whole number, 1 or more.',
+      '“Upload”: Max files 2.5 counts as 2 files. Use a whole number, 1 or more.',
     );
+    // One file, one character (COPY-R4).
+    expect(studioIssues([f({ maxFiles: 1.5 })])[0]!.message).toBe(
+      '“Upload”: Max files 1.5 counts as 1 file. Use a whole number, 1 or more.',
+    );
+    expect(
+      studioIssues([
+        { id: 't', type: 'short_text', title: 'Name?', maxLength: 1.5 } as Question,
+      ])[0]!.message,
+    ).toBe('“Name?”: Max length 1.5 counts as 1 character.');
     // File types the filter can't read are left out, and said (R22).
     expect(kinds([f({ accept: 'pdf, jpg' })])).toEqual([]);
     expect(studioIssues([f({ accept: 'pdf, documents' })])[0]).toMatchObject({
@@ -211,10 +220,14 @@ describe('lengths, files, steps', () => {
     });
   });
 
-  it('a number step has to be more than 0', () => {
+  it('a number step of 0 is a heads-up: the form counts by 1 (STU-3)', () => {
     const n = (step: number) => ({ id: 'n', type: 'number', title: 'How many?', step }) as Question;
-    expect(kinds([n(0)])).toEqual([['bad_step', true]]);
+    expect(kinds([n(0)])).toEqual([['bad_step', false]]);
+    expect(kinds([n(-2)])).toEqual([['bad_step', false]]);
     expect(kinds([n(0.01)])).toEqual([]);
+    expect(studioIssues([n(0)])[0]!.message).toBe(
+      '“How many?”: a step of 0 can’t be used, so it counts by 1. Clear it, or use more than 0.',
+    );
   });
 });
 
@@ -233,7 +246,13 @@ describe('scale', () => {
     expect(studioIssues([scale({ max: 20000 })])[0]!.message).toBe(
       '“Rate us” has 20,001 points, more than the form can show (101). Use fewer, or the Slider style.',
     );
-    expect(kinds([scale({ step: 0 })])).toEqual([['bad_step', true]]);
+    // A step that can't count is read as 1, so it's a heads-up (STU-3)…
+    expect(kinds([scale({ step: 0 })])).toEqual([['bad_step', false]]);
+    // …and the points are counted by 1, as the form draws them.
+    expect(kinds([scale({ step: 0, max: 1000 })])).toEqual([
+      ['bad_step', false],
+      ['scale_points', true],
+    ]);
     expect(kinds([scale({ max: 20 })])).toEqual([]);
   });
 
@@ -383,8 +402,10 @@ describe('formIssues', () => {
     ];
     const issues = formIssues(qs, '2026-10-04');
     expect(issues.map((i) => [i.questionId, i.kind, i.blocking])).toEqual([
-      ['n', 'bad_bounds', true],
-      ['services', 'pick_range', true],
+      // The form ignores bounds set the wrong way round: a heads-up (STU-3).
+      ['n', 'bad_bounds', false],
+      // Max below Min: the form ignores the Max, so a heads-up (COPY-R5).
+      ['services', 'pick_range', false],
       ['x', 'dangling_condition', false],
       ['done', 'bad_redirect', true],
     ]);

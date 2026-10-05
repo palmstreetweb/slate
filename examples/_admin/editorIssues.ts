@@ -13,12 +13,18 @@
 
 import type { Option, Question, SchemaIssue, SignupSlot } from '@/index.js';
 import { OTHER_VALUE, checkSchema } from '@/index.js';
-import { isValidPrefillKey } from '@/logic/prefill.js';
+import { RESERVED_LINK_PARAMS, isValidPrefillKey } from '@/logic/prefill.js';
 import { geoCenter, geoRadiusKm } from '@/logic/geo.js';
 import { PRICE_MAX } from '@/logic/estimate.js';
-import { TYPE_LABEL } from './questionTypeMeta.js';
+import { formatDateAnswer } from '@/logic/dateValue.js';
 import { answerRemoved, conditionLeaves, indexOf, toLeaf, unfinishedReason } from './logicRules.js';
-import { schemaIssueBlocks, slotName, studioIssues, type StudioIssueKind } from './formChecks.js';
+import {
+  ownerName,
+  schemaIssueBlocks,
+  slotName,
+  studioIssues,
+  type StudioIssueKind,
+} from './formChecks.js';
 
 export type OwnerIssueKind =
   | SchemaIssue['kind']
@@ -45,14 +51,8 @@ export type OwnerIssue = {
   blocking: boolean;
 };
 
-/** “Title”, or “Untitled Location” — never the internal id. */
-export function ownerName(q: Question | undefined): string {
-  if (!q) return '“A question”';
-  const raw =
-    'title' in q && typeof q.title === 'string' ? q.title.replace(/\s+/g, ' ').trim() : '';
-  const base = raw || `Untitled ${TYPE_LABEL[q.type] ?? 'question'}`;
-  return `“${base.length > 60 ? `${base.slice(0, 59)}…` : base}”`;
-}
+/** “Title”, or “Untitled Location” — never the internal id (lives in formChecks.ts, COPY-R6). */
+export { ownerName };
 
 const priceOk = (v: unknown) =>
   typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= PRICE_MAX;
@@ -140,6 +140,24 @@ function slotSentence(n: string, q: Question | undefined): string {
     : `${n} has a slot it can’t offer. Check each one’s name, day and spots.`;
 }
 
+/**
+ * Bounds set the wrong way round, said for what the form does with them (review
+ * fixes, ENG-11 / COPY-R5): a number or a date ignores both limits, a scale is
+ * drawn from the lower number to the higher. Nobody is stuck, so it's a heads-up.
+ */
+export function boundsSentence(n: string, q: Question | undefined): string {
+  if (q?.type === 'number') {
+    return `${n} has Min (${q.min}) above Max (${q.max}), so neither limit is used. Swap them.`;
+  }
+  if (q?.type === 'scale') {
+    return `${n} has Min Value (${q.min}) above Max Value (${q.max}), so the scale runs from ${q.max} to ${q.min}. Swap them.`;
+  }
+  if (q?.type === 'date' && q.min && q.max) {
+    return `${n} has its earliest date (${formatDateAnswer(q.min, q.format)}) after its latest (${formatDateAnswer(q.max, q.format)}), so neither limit is used. Swap them.`;
+  }
+  return `${n} has a minimum above its maximum, so neither limit is used. Swap them.`;
+}
+
 function sentence(
   issue: SchemaIssue,
   q: Question | undefined,
@@ -167,20 +185,17 @@ function sentence(
       return `${n} has a rule that checks for “Other”, but that question doesn’t offer Other.`;
     case 'bad_prefill_key': {
       const key = (q as { prefillKey?: string } | undefined)?.prefillKey?.trim() ?? '';
-      return isValidPrefillKey(key)
-        ? `${n} uses the same link name as another question. Give each one its own.`
-        : `${n} has a link name that can’t be used. Use letters, numbers, - or _.`;
+      if (isValidPrefillKey(key)) {
+        return `${n} uses the same link name as another question. Give each one its own.`;
+      }
+      // Letters, numbers, - and _ already, but the link uses that name for itself (COPY-R7).
+      if (/^[A-Za-z0-9_-]{1,40}$/.test(key) && RESERVED_LINK_PARAMS.has(key.toLowerCase())) {
+        return `${n} uses “${key}” as its link name, but the link already uses that name for itself. Pick another.`;
+      }
+      return `${n} has a link name that can’t be used. Use letters, numbers, - or _.`;
     }
     case 'bad_bounds':
-      if (q?.type === 'number') {
-        return `${n} has a lowest number above its highest, so no answer fits. Swap them.`;
-      }
-      if (q?.type === 'scale')
-        return `${n} starts above where it ends, so there’s nothing to pick.`;
-      if (q?.type === 'date') {
-        return `${n} has an earliest date after its latest date, so no date fits.`;
-      }
-      return `${n} has a minimum above its maximum, so no answer fits.`;
+      return boundsSentence(n, q);
     case 'bad_price':
       return priceSentence(n, q);
     case 'area_off':

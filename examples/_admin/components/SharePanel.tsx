@@ -39,7 +39,12 @@ import { publicFillUrl } from '../neon/publicApi.js';
 import { playUiSound } from '../uiSounds.js';
 import { useToast } from '../toast.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
-import { PublishButton, usePublishIgnition } from '../delight/ignition.js';
+import {
+  PublishButton,
+  publishLanding,
+  publishMissingCopy,
+  usePublishIgnition,
+} from '../delight/ignition.js';
 import { ownerIssues, publishBlockedCopy } from '../editorIssues.js';
 import { navigate } from '../_router.js';
 
@@ -227,20 +232,14 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
       return;
     }
     const wasStale = stale;
-    // Set when the publish never reached the server; the shell says so (COPY-10).
-    let failed = false;
-    // Publishes now; the toast and the Live dot's sonar wait for the check.
-    const publish = () =>
-      Boolean(
-        publishForm(formId, {
-          onFail: () => {
-            failed = true;
-          },
-        }),
-      );
+    // Publishes now; the toast and the Live dot's sonar wait until the write has
+    // landed (STU-5). A write that fails is said by the shell (PersistErrorToasts).
+    const publish = () => {
+      const write = publishLanding();
+      return publishForm(formId, write.callbacks) ? write.landed : false;
+    };
     const ok = ignite.start(publish, {
       scope: panelRef.current,
-      failed: () => failed,
       onLive: () => {
         setIgnited(true);
         toast.push({
@@ -251,13 +250,7 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
         });
       },
     });
-    if (!ok) {
-      toast.push({
-        title: 'Couldn’t publish',
-        detail: 'Your form isn’t live yet. Check your connection and try again.',
-        tone: 'error',
-      });
-    }
+    if (!ok) toast.push({ ...publishMissingCopy(isPublished), tone: 'error' });
   };
 
   const onUnpublish = () => {
@@ -404,7 +397,10 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
               setLockDraft(e.target.value);
               setLockError(null);
             }}
-            placeholder={fillLocked ? 'New word or 6+ digits' : 'A word or 6+ digits'}
+            // Six characters for any password, word or digits (COPY-R14), as the hint says.
+            placeholder={
+              fillLocked ? 'New password, 6+ characters' : 'At least 6 letters or digits'
+            }
             aria-label="Form password"
             aria-describedby={`${titleId}-lock-hint`}
             aria-invalid={lockError ? true : undefined}
