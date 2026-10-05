@@ -13,13 +13,18 @@
 
 import type { Option, Question, SchemaIssue, SignupSlot } from '@/index.js';
 import { OTHER_VALUE, checkSchema } from '@/index.js';
-import { isValidPrefillKey } from '@/logic/prefill.js';
+import { RESERVED_LINK_PARAMS, isValidPrefillKey } from '@/logic/prefill.js';
 import { geoCenter, geoRadiusKm } from '@/logic/geo.js';
 import { PRICE_MAX } from '@/logic/estimate.js';
 import { formatDateAnswer } from '@/logic/dateValue.js';
-import { TYPE_LABEL } from './questionTypeMeta.js';
 import { answerRemoved, conditionLeaves, indexOf, toLeaf, unfinishedReason } from './logicRules.js';
-import { schemaIssueBlocks, slotName, studioIssues, type StudioIssueKind } from './formChecks.js';
+import {
+  ownerName,
+  schemaIssueBlocks,
+  slotName,
+  studioIssues,
+  type StudioIssueKind,
+} from './formChecks.js';
 
 export type OwnerIssueKind =
   | SchemaIssue['kind']
@@ -46,14 +51,8 @@ export type OwnerIssue = {
   blocking: boolean;
 };
 
-/** “Title”, or “Untitled Location” — never the internal id. */
-export function ownerName(q: Question | undefined): string {
-  if (!q) return '“A question”';
-  const raw =
-    'title' in q && typeof q.title === 'string' ? q.title.replace(/\s+/g, ' ').trim() : '';
-  const base = raw || `Untitled ${TYPE_LABEL[q.type] ?? 'question'}`;
-  return `“${base.length > 60 ? `${base.slice(0, 59)}…` : base}”`;
-}
+/** “Title”, or “Untitled Location” — never the internal id (lives in formChecks.ts, COPY-R6). */
+export { ownerName };
 
 const priceOk = (v: unknown) =>
   typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= PRICE_MAX;
@@ -186,9 +185,14 @@ function sentence(
       return `${n} has a rule that checks for “Other”, but that question doesn’t offer Other.`;
     case 'bad_prefill_key': {
       const key = (q as { prefillKey?: string } | undefined)?.prefillKey?.trim() ?? '';
-      return isValidPrefillKey(key)
-        ? `${n} uses the same link name as another question. Give each one its own.`
-        : `${n} has a link name that can’t be used. Use letters, numbers, - or _.`;
+      if (isValidPrefillKey(key)) {
+        return `${n} uses the same link name as another question. Give each one its own.`;
+      }
+      // Letters, numbers, - and _ already, but the link uses that name for itself (COPY-R7).
+      if (/^[A-Za-z0-9_-]{1,40}$/.test(key) && RESERVED_LINK_PARAMS.has(key.toLowerCase())) {
+        return `${n} uses “${key}” as its link name, but the link already uses that name for itself. Pick another.`;
+      }
+      return `${n} has a link name that can’t be used. Use letters, numbers, - or _.`;
     }
     case 'bad_bounds':
       return boundsSentence(n, q);

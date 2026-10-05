@@ -111,9 +111,58 @@ describe('plain sentences', () => {
     expect(texts).toContain(
       '“C” uses the same link name as another question. Give each one its own.',
     );
+    // "src" is letters already: the reason is that the link uses it itself (COPY-R7).
     expect(texts).toContain(
-      '“A” has a link name that can’t be used. Use letters, numbers, - or _.',
+      '“A” uses “src” as its link name, but the link already uses that name for itself. Pick another.',
     );
+  });
+
+  it('a link name with characters a link can’t carry asks for letters, numbers, - or _ (COPY-R7)', () => {
+    const texts = textOf([
+      welcome,
+      { id: 'a', type: 'short_text', title: 'A', prefillKey: 'first name!' },
+      { id: 'b', type: 'short_text', title: 'B', prefillKey: 'UTM_Source' },
+      done,
+    ]);
+    expect(texts).toEqual([
+      '“A” has a link name that can’t be used. Use letters, numbers, - or _.',
+      '“B” uses “UTM_Source” as its link name, but the link already uses that name for itself. Pick another.',
+    ]);
+  });
+
+  it('one question is named one way on every line of the banner (COPY-R6)', () => {
+    const issues = ownerIssues([
+      welcome,
+      size,
+      {
+        id: 'untitled',
+        type: 'multi_choice',
+        title: '',
+        options: [
+          { label: 'One', value: 'one' },
+          { label: '', value: 'two' },
+        ],
+        logic: [{ if: { field: 'what_size', op: 'equals', value: '' }, goTo: 'done' }],
+      },
+      done,
+    ] as Question[]).filter((i) => i.questionId === 'untitled');
+    expect(issues.map((i) => i.text)).toEqual([
+      '“Untitled Multi Choice” has an option with no name.',
+      '“Untitled Multi Choice” has an unfinished skip rule. Finish it or remove it.',
+    ]);
+    // A long title is cut the same way on every line.
+    const long = 'How did you first hear about our lawn care and seasonal cleanup services?';
+    const lines = ownerIssues([
+      welcome,
+      { id: 'l', type: 'multi_choice', title: long, options: [{ label: '', value: 'x' }], min: 3 },
+      done,
+    ] as Question[]).map((i) => i.text);
+    expect(lines.length).toBe(2);
+    for (const line of lines) {
+      expect(
+        line.startsWith('“How did you first hear about our lawn care and seasonal cle…”'),
+      ).toBe(true);
+    }
   });
 
   it('an untitled question is named by its type', () => {

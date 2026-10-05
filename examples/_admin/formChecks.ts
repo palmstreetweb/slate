@@ -25,6 +25,7 @@ import { checkSchema, type SchemaIssue } from '@/logic/schemaCheck.js';
 import { contactMode } from '@/logic/contact.js';
 import { acceptTokens } from '@/components/questions/FileUploadField.js';
 import { isPhoneCountry } from './phoneCountries.js';
+import { TYPE_LABEL } from './questionTypeMeta.js';
 
 export type StudioIssueKind =
   /** Min / Max selections (or likes) that aren't whole numbers. */
@@ -111,10 +112,22 @@ const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : 
 const short = (s: string, max = 40) =>
   s.length > max ? s.slice(0, max + 1).replace(/\s\S*$/, '') + '…' : s;
 
-/** How the owner knows a question: its title in quotes, cut short (as checkSchema words it). */
-export function questionName(q: Question, start = true): string {
-  const t = 'title' in q && typeof q.title == 'string' ? q.title.replace(/\s+/g, ' ').trim() : '';
-  return t ? `“${short(t)}”` : `${start ? 'A' : 'a'} question with no title`;
+/**
+ * How the owner knows a question, everywhere the studio lists issues: “Title”,
+ * or “Untitled Location” — never the internal id. One namer for the banner's
+ * engine, settings and rule lines, so one question reads one way (COPY-R6).
+ */
+export function ownerName(q: Question | undefined): string {
+  if (!q) return '“A question”';
+  const raw =
+    'title' in q && typeof q.title === 'string' ? q.title.replace(/\s+/g, ' ').trim() : '';
+  const base = raw || `Untitled ${TYPE_LABEL[q.type] ?? 'question'}`;
+  return `“${base.length > 60 ? `${base.slice(0, 59)}…` : base}”`;
+}
+
+/** The studio's settings checks name questions the way the banner does (`ownerName`). */
+export function questionName(q: Question): string {
+  return ownerName(q);
 }
 
 /* ---------- multi-select pick limits ---------- */
@@ -454,7 +467,7 @@ export function studioIssues(
           q,
           'bad_length',
           typeof len === 'number' && len >= 1
-            ? `${name}: Max length ${len} counts as ${Math.floor(len)} characters.`
+            ? `${name}: Max length ${len} counts as ${count(Math.floor(len), 'character', 'characters')}.`
             : `${name}: Max length ${String(len)} means no limit. Clear it, or use 1 or more.`,
           false,
         );
@@ -485,7 +498,7 @@ export function studioIssues(
           add(
             q,
             'bad_file_count',
-            `${name}: Max files ${String(files)} counts as ${counted}. Use a whole number, 1 or more.`,
+            `${name}: Max files ${String(files)} counts as ${count(counted, 'file', 'files')}. Use a whole number, 1 or more.`,
             false,
           );
         } else if (files > FILE_COUNT_MAX) {

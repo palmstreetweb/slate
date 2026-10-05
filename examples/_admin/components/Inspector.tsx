@@ -401,7 +401,7 @@ export function Inspector({
                 }
               >
                 {question.maxLength >= 1
-                  ? `Answers can be up to ${Math.floor(question.maxLength)} characters: a limit is a whole number.`
+                  ? `Answers can be up to ${plural(Math.floor(question.maxLength), 'character', 'characters')}: a limit is a whole number.`
                   : `${String(question.maxLength)} means no limit.`}
               </GuardNote>
             ) : null}
@@ -741,16 +741,8 @@ export function Inspector({
                 </Field>
                 {question.maxFiles !== undefined &&
                 !(Number.isInteger(question.maxFiles) && question.maxFiles >= 1) ? (
-                  <GuardNote
-                    action={{
-                      label: 'Use 10',
-                      onClick: () => onChange({ maxFiles: 10 } as Partial<Question>),
-                    }}
-                  >
-                    {question.maxFiles >= 1
-                      ? `This counts as ${Math.floor(question.maxFiles)} files: a limit is a whole number.`
-                      : `${String(question.maxFiles)} counts as 10, the usual limit.`}
-                  </GuardNote>
+                  // The note, the banner and the fix name one number (COPY-R4): 2.5 is 2.
+                  <MaxFilesGuard maxFiles={question.maxFiles} onChange={onChange} />
                 ) : null}
               </>
             )}
@@ -1060,6 +1052,26 @@ function AcceptGuard({
       {unread.map((t) => `“${t}”`).join(', ')}{' '}
       {unread.length === 1 ? 'isn’t a file ending' : 'aren’t file endings'} the form can read, so{' '}
       {unread.length === 1 ? 'it’s' : 'they’re'} left out. List endings like pdf, jpg or png.
+    </GuardNote>
+  );
+}
+
+/** "1 file", "2 files". */
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** A Max Files that isn't a whole number of 1 or more: what the form counts it as, and that fix. */
+function MaxFilesGuard({ maxFiles, onChange }: { maxFiles: number; onChange: Patch }) {
+  const counted = maxFiles >= 1 ? Math.floor(maxFiles) : 10;
+  return (
+    <GuardNote
+      action={{
+        label: `Use ${counted}`,
+        onClick: () => onChange({ maxFiles: counted } as Partial<Question>),
+      }}
+    >
+      {maxFiles >= 1
+        ? `This counts as ${plural(counted, 'file', 'files')}: a limit is a whole number.`
+        : `${String(maxFiles)} counts as 10, the usual limit.`}
     </GuardNote>
   );
 }

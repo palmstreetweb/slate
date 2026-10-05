@@ -382,6 +382,55 @@ describe('text and files (F9, S13, MEDIA-05)', () => {
     expect(spy).toHaveBeenLastCalledWith({ maxSizeMb: 32 });
   });
 
+  it('max files 2.5: the note, the banner and the fix all say 2 (COPY-R4)', async () => {
+    const { user, spy } = setup({
+      id: 'f',
+      type: 'file_upload',
+      title: 'Upload',
+      multiple: true,
+      maxFiles: 2.5,
+    } as Question);
+    expect(
+      screen.getByText('This counts as 2 files: a limit is a whole number.'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Use 2' }));
+    expect(spy).toHaveBeenLastCalledWith({ maxFiles: 2 });
+  });
+
+  it('max files 1.5 says one file; below 1 counts as the usual 10', async () => {
+    setup({
+      id: 'f',
+      type: 'file_upload',
+      title: 'Upload',
+      multiple: true,
+      maxFiles: 1.5,
+    } as Question);
+    expect(
+      screen.getByText('This counts as 1 file: a limit is a whole number.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use 1' })).toBeInTheDocument();
+  });
+
+  it('max files below 1 offers the usual 10', async () => {
+    const { user, spy } = setup({
+      id: 'f',
+      type: 'file_upload',
+      title: 'Upload',
+      multiple: true,
+      maxFiles: 0.5,
+    } as Question);
+    expect(screen.getByText('0.5 counts as 10, the usual limit.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Use 10' }));
+    expect(spy).toHaveBeenLastCalledWith({ maxFiles: 10 });
+  });
+
+  it('max length 1.5 says one character', () => {
+    setup({ id: 't', type: 'short_text', title: 'Name?', maxLength: 1.5 } as Question);
+    expect(
+      screen.getByText('Answers can be up to 1 character: a limit is a whole number.'),
+    ).toBeInTheDocument();
+  });
+
   it('max files can be cleared (blank = 10) and retyped', async () => {
     const { user, spy, leave } = setup({
       id: 'f',

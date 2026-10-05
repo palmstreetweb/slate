@@ -199,8 +199,17 @@ describe('lengths, files, steps', () => {
       '“Upload”: Max size 0 MB means the usual 32 MB limit. Clear it, or use 1 MB or more.',
     );
     expect(studioIssues([f({ maxFiles: 2.5 })])[0]!.message).toBe(
-      '“Upload”: Max files 2.5 counts as 2. Use a whole number, 1 or more.',
+      '“Upload”: Max files 2.5 counts as 2 files. Use a whole number, 1 or more.',
     );
+    // One file, one character (COPY-R4).
+    expect(studioIssues([f({ maxFiles: 1.5 })])[0]!.message).toBe(
+      '“Upload”: Max files 1.5 counts as 1 file. Use a whole number, 1 or more.',
+    );
+    expect(
+      studioIssues([
+        { id: 't', type: 'short_text', title: 'Name?', maxLength: 1.5 } as Question,
+      ])[0]!.message,
+    ).toBe('“Name?”: Max length 1.5 counts as 1 character.');
     // File types the filter can't read are left out, and said (R22).
     expect(kinds([f({ accept: 'pdf, jpg' })])).toEqual([]);
     expect(studioIssues([f({ accept: 'pdf, documents' })])[0]).toMatchObject({
