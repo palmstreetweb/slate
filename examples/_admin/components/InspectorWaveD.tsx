@@ -21,8 +21,10 @@ import {
   subscribe as subscribeSubmissions,
 } from '../_submissionStore.js';
 import { newSlotValue, takenCounts } from '../signupSlots.js';
+import { localToday, slotProblems, type SlotProblem } from '../formChecks.js';
 import { SlateNumberInput } from './SlateNumberInput.js';
 import { Checkbox, Field, Row } from './inspectorParts.js';
+import { GuardNote } from './inspectorGuards.js';
 
 type Patch = (patch: Partial<Question>) => void;
 
@@ -70,11 +72,21 @@ export function nextSlot(slots: ReadonlyArray<SignupSlot>): SignupSlot {
   return next;
 }
 
+/** What's off about a slot, in place (QA MEDIA-20, S17). Respondents could still pick it, so it's a heads-up. */
+function slotNote(problem: SlotProblem | null): string | null {
+  if (!problem) return null;
+  if (problem.kind === 'times') return 'It ends before it starts. Check Starts and Ends.';
+  if (problem.kind === 'past') return 'This day has passed, so nobody should sign up for it.';
+  return `Same name, day and time as slot ${problem.first + 1}.`;
+}
+
 function SlotRow({
   slot,
   index,
   count,
   taken,
+  problem,
+  today,
   onChange,
   onMove,
   onRemove,
@@ -83,10 +95,13 @@ function SlotRow({
   index: number;
   count: number;
   taken: number;
+  problem: SlotProblem | null;
+  today: string;
   onChange: (patch: Partial<SignupSlot>) => void;
   onMove: (dir: -1 | 1) => void;
   onRemove: () => void;
 }) {
+  const note = slotNote(problem);
   const over = taken > slot.capacity;
   const name = slot.label.trim() || `Slot ${index + 1}`;
   return (
@@ -137,6 +152,7 @@ function SlotRow({
             value={slot.capacity}
             min={1}
             max={SLOT_CAPACITY_MAX}
+            integer
             allowEmpty={false}
             aria-label={`Spots in ${name}`}
             onChange={(n) => {
@@ -151,7 +167,9 @@ function SlotRow({
             className="slate-input"
             type="date"
             value={slot.date ?? ''}
+            min={today}
             aria-label={`Day of ${name} (optional)`}
+            aria-invalid={problem?.kind === 'past' ? true : undefined}
             onChange={(e) => onChange({ date: e.target.value || undefined })}
           />
         </label>
@@ -172,10 +190,12 @@ function SlotRow({
             type="time"
             value={slot.end ?? ''}
             aria-label={`${name} ends (optional)`}
+            aria-invalid={problem?.kind === 'times' ? true : undefined}
             onChange={(e) => onChange({ end: e.target.value || undefined })}
           />
         </label>
       </div>
+      {note ? <GuardNote>{note}</GuardNote> : null}
       <input
         className="slate-input slate-insp-slot-note"
         value={slot.description ?? ''}
@@ -242,6 +262,8 @@ export function SignupSlotsSettings({
     setSlots(slots.filter((_, k) => k !== i));
   };
   const maxPicks = question.maxPicks ?? 1;
+  const today = localToday();
+  const problems = slotProblems(slots, today);
 
   return (
     <>
@@ -263,6 +285,8 @@ export function SignupSlotsSettings({
               index={i}
               count={slots.length}
               taken={counts.get(s.value) ?? 0}
+              problem={problems[i] ?? null}
+              today={today}
               onChange={(patch) => update(i, patch)}
               onMove={(dir) => move(i, dir)}
               onRemove={() => void remove(i)}
@@ -291,6 +315,7 @@ export function SignupSlotsSettings({
             value={question.maxPicks}
             min={1}
             max={Math.max(1, Math.min(SLOTS_MAX, slots.length))}
+            integer
             placeholder="1"
             onChange={(n) =>
               onChange({

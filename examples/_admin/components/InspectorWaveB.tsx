@@ -20,6 +20,7 @@ import type {
 import { contactMode } from '@/logic/contact.js';
 import { parseServiceAreaText, serviceAreaPrefixes, SERVICE_AREA_MAX } from '@/logic/address.js';
 import { PRICE_MAX, estimateCurrency, hasPricing } from '@/logic/estimate.js';
+import { isPhoneCountry, phoneCountryOptions } from '../phoneCountries.js';
 import { SlateNumberInput } from './SlateNumberInput.js';
 import { SlateSelect } from './SlateSelect.js';
 import { Checkbox, CollapsibleSection, Field, Row } from './inspectorParts.js';
@@ -54,9 +55,21 @@ function priceOrUndefined(n: number | undefined): number | undefined {
   return Math.max(-PRICE_MAX, Math.min(PRICE_MAX, n));
 }
 
+/** What's wrong with a low / high price pair, in plain words (QA S25); null when it works. */
+export function priceProblem(low: number | undefined, high: number | undefined): string | null {
+  if (high !== undefined && low === undefined) {
+    return 'Add the low price too, or clear the high end.';
+  }
+  if (low !== undefined && high !== undefined && high < low) {
+    return 'The high end has to be at least the low price.';
+  }
+  return null;
+}
+
 /**
  * Low / high price inputs ("$ 450 to 600"). Blank high = one price. Used for
- * option prices, a price per unit, and the base price.
+ * option prices, a price per unit, and the base price. A pair that can't work
+ * is said right under the inputs once the owner leaves them.
  */
 export function PriceInputs({
   low,
@@ -72,32 +85,85 @@ export function PriceInputs({
   label?: string;
 }) {
   const symbol = currencySymbol(currency);
+  const [editing, setEditing] = useState(false);
+  const problem = editing ? null : priceProblem(low, high);
   return (
-    <span className="slate-price-inputs">
-      <span className="slate-price-symbol" aria-hidden="true">
-        {symbol}
-      </span>
-      <SlateNumberInput
-        compact
-        value={low}
-        step={10}
-        placeholder="0"
-        aria-label={`${label}, ${currency}`}
-        onChange={(n) => {
-          const lo = priceOrUndefined(n);
-          onChange(lo, lo === undefined ? undefined : high);
+    <>
+      <span
+        className="slate-price-inputs"
+        onFocus={() => setEditing(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEditing(false);
         }}
-      />
-      <span className="slate-price-to">to</span>
-      <SlateNumberInput
-        compact
-        value={high}
-        step={10}
-        placeholder="max"
-        aria-label={`${label}, high end (optional)`}
-        onChange={(n) => onChange(low, priceOrUndefined(n))}
-      />
-    </span>
+      >
+        <span className="slate-price-symbol" aria-hidden="true">
+          {symbol}
+        </span>
+        <SlateNumberInput
+          compact
+          value={low}
+          step={10}
+          placeholder="0"
+          aria-label={`${label}, ${currency}`}
+          onChange={(n) => {
+            const lo = priceOrUndefined(n);
+            onChange(lo, lo === undefined ? undefined : high);
+          }}
+        />
+        <span className="slate-price-to">to</span>
+        <SlateNumberInput
+          compact
+          value={high}
+          step={10}
+          placeholder="max"
+          aria-label={`${label}, high end (optional)`}
+          onChange={(n) => onChange(low, priceOrUndefined(n))}
+        />
+      </span>
+      {problem ? (
+        <span className="slate-number-note" role="status">
+          {problem}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * "Country for local numbers" on phone and contact questions (QA F13, S14): a
+ * list of countries the phone check knows, so a number typed without its
+ * country code (805-555-0123) is always understood. A saved code it doesn't
+ * know (or none) shows "Pick a country" and says why.
+ */
+export function PhoneCountrySetting({
+  question,
+  onChange,
+}: {
+  question: { defaultCountry?: string };
+  onChange: Patch;
+}) {
+  const code = question.defaultCountry ?? 'US';
+  const known = isPhoneCountry(code);
+  return (
+    <>
+      <Field
+        label="Country for Local Numbers"
+        hint="For numbers typed without a country code, like (805) 555-0123."
+      >
+        <SlateSelect
+          value={known ? code : ''}
+          placeholder="Pick a country"
+          options={phoneCountryOptions()}
+          aria-label="Country for local numbers"
+          onChange={(next) => onChange({ defaultCountry: next } as Partial<Question>)}
+        />
+      </Field>
+      {known ? null : (
+        <p className="slate-help" style={{ color: 'var(--slate-warn)' }} role="status">
+          Pick a country. Until then, a number typed without its country code is turned down.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -265,16 +331,7 @@ export function ContactSettings({
         </p>
       )}
       {contactMode(question, 'phone') !== 'off' ? (
-        <Field label="Default Country (ISO 3166-1 Alpha-2)">
-          <input
-            className="slate-input"
-            value={question.defaultCountry ?? 'US'}
-            maxLength={2}
-            onChange={(e) =>
-              onChange({ defaultCountry: e.target.value.toUpperCase() } as Partial<Question>)
-            }
-          />
-        </Field>
+        <PhoneCountrySetting question={question} onChange={onChange} />
       ) : null}
     </>
   );

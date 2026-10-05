@@ -18,7 +18,11 @@ import {
 type Extra = Partial<Parameters<typeof SlateNumberInput>[0]>;
 
 /** A field wired like the inspector: the parent stores what onChange gives it. */
-function Harness({ initial, spy, ...props }: { initial?: number; spy: (n?: number) => void } & Extra) {
+function Harness({
+  initial,
+  spy,
+  ...props
+}: { initial?: number; spy: (n?: number) => void } & Extra) {
   const [value, setValue] = useState<number | undefined>(initial);
   return (
     <div data-slate-forms="" data-theme-name="slate">
@@ -47,7 +51,12 @@ function setup(initial: number | undefined, props: Extra = {}) {
 
 describe('SlateNumberInput', () => {
   it('Backspace then type replaces the number (Spots 8 → 12, not 812)', async () => {
-    const { user, input, leave, last } = setup(8, { min: 1, max: 1000, integer: true, allowEmpty: false });
+    const { user, input, leave, last } = setup(8, {
+      min: 1,
+      max: 1000,
+      integer: true,
+      allowEmpty: false,
+    });
     await user.click(input);
     await user.keyboard('{End}{Backspace}');
     expect(input).toHaveValue(null);
@@ -59,7 +68,13 @@ describe('SlateNumberInput', () => {
   });
 
   it('select-all then type keeps a first digit below the minimum (voice 60 → 30, not 5 or 50)', async () => {
-    const { user, input, leave, spy, last } = setup(60, { min: 5, max: 300, step: 15, integer: true, allowEmpty: false });
+    const { user, input, leave, spy, last } = setup(60, {
+      min: 5,
+      max: 300,
+      step: 15,
+      integer: true,
+      allowEmpty: false,
+    });
     await user.tripleClick(input);
     await user.keyboard('3');
     // "3" is below 5: it stays on screen, isn't saved, and the range shows under the field.
@@ -85,7 +100,12 @@ describe('SlateNumberInput', () => {
   });
 
   it('an emptied optional field saves "nothing" (Max Files placeholder shows the default)', async () => {
-    const { user, input, leave, last } = setup(10, { min: 1, max: 100, integer: true, placeholder: '10' });
+    const { user, input, leave, last } = setup(10, {
+      min: 1,
+      max: 100,
+      integer: true,
+      placeholder: '10',
+    });
     await user.tripleClick(input);
     await user.keyboard('{Backspace}');
     expect(last()).toBeUndefined();

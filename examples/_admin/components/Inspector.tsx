@@ -4,8 +4,15 @@
  * `question.type`. Logic sections collapse by default and open when needed.
  */
 
-import { useLayoutEffect, useRef } from 'react';
-import type { Condition, EstimateSettings, Option, PictureOption, Question } from '@/index.js';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type {
+  Condition,
+  EstimateSettings,
+  Option,
+  PictureOption,
+  Question,
+  ScaleQuestion,
+} from '@/index.js';
 import { OUT_OF_AREA_VALUE, IN_AREA_VALUE } from '@/logic/address.js';
 import { estimateCurrency } from '@/logic/estimate.js';
 import { TYPE_LABEL } from '../questionTypeMeta.js';
@@ -15,11 +22,29 @@ import { canPrefill, isValidPrefillKey, RESERVED_LINK_PARAMS } from '@/logic/pre
 import { SlateNumberInput } from './SlateNumberInput.js';
 import { SlateSelect } from './SlateSelect.js';
 import { Checkbox, CollapsibleSection, Field, Row } from './inspectorParts.js';
+import { GuardNote } from './inspectorGuards.js';
+import {
+  FILE_COUNT_MAX,
+  FILE_SIZE_MAX_MB,
+  SCALE_POINTS_MAX,
+  choiceCount,
+  hasSameValues,
+  isSwipe,
+  newOptionLabel,
+  newOptionValue,
+  normalizeRedirectUrl,
+  pickProblem,
+  pickWords,
+  scalePointCount,
+  withUniqueValues,
+  type MultiPick,
+} from '../formChecks.js';
 import {
   AddressSettings,
   CardDetails,
   ContactSettings,
   EstimateSection,
+  PhoneCountrySetting,
   PriceInputs,
   SignatureSettings,
   UnitPriceSetting,
@@ -118,7 +143,10 @@ export function Inspector({
           </Field>
         )}
 
-        {'subtitle' in question && (
+        {/* By type, not by key: a cleared subtitle is dropped on save (QA S18). */}
+        {(question.type === 'welcome' ||
+          question.type === 'thanks' ||
+          question.type === 'review') && (
           <Field label="Subtitle (Optional)">
             <AutoGrowTextarea
               key={question.id}
@@ -174,6 +202,8 @@ export function Inspector({
           question.type === 'yes_no' ||
           question.type === 'legal' ||
           question.type === 'nps' ||
+          question.type === 'scale' ||
+          question.type === 'single_choice' ||
           question.type === 'file_upload' ||
           question.type === 'matrix' ||
           (question.type === 'picture_choice' && !question.multiple)) && (
@@ -200,6 +230,7 @@ export function Inspector({
                 (question.type === 'dropdown' ||
                   question.type === 'yes_no' ||
                   question.type === 'legal' ||
+                  question.type === 'single_choice' ||
                   question.type === 'picture_choice')
               }
               onChange={(v) => onChange({ required: v } as Partial<Question>)}
@@ -331,25 +362,33 @@ export function Inspector({
         )}
 
         {(question.type === 'short_text' || question.type === 'long_text') && (
-          <Field label="Max Length (Characters)">
-            <SlateNumberInput
-              value={question.maxLength}
-              onChange={(n) => onChange({ maxLength: n } as Partial<Question>)}
-            />
-          </Field>
+          <>
+            <Field label="Max Length (Characters)" hint="Leave empty for no limit.">
+              <SlateNumberInput
+                min={1}
+                integer
+                value={question.maxLength}
+                placeholder="No limit"
+                onChange={(n) => onChange({ maxLength: n } as Partial<Question>)}
+              />
+            </Field>
+            {question.maxLength !== undefined &&
+            !(Number.isInteger(question.maxLength) && question.maxLength >= 1) ? (
+              <GuardNote
+                action={{
+                  label: 'Clear it',
+                  onClick: () => onChange({ maxLength: undefined } as Partial<Question>),
+                }}
+              >
+                With {String(question.maxLength)}, nobody could type an answer. Use a whole number, 1
+                or more, or leave it empty.
+              </GuardNote>
+            ) : null}
+          </>
         )}
 
         {question.type === 'phone' && (
-          <Field label="Default Country (ISO 3166-1 Alpha-2)">
-            <input
-              className="slate-input"
-              value={question.defaultCountry ?? 'US'}
-              maxLength={2}
-              onChange={(e) =>
-                onChange({ defaultCountry: e.target.value.toUpperCase() } as Partial<Question>)
-              }
-            />
-          </Field>
+          <PhoneCountrySetting question={question} onChange={onChange} />
         )}
 
         {question.type === 'number' && (
@@ -383,19 +422,29 @@ export function Inspector({
                 />
               </Field>
             </Row>
+            {question.min !== undefined &&
+            question.max !== undefined &&
+            question.min > question.max ? (
+              <GuardNote
+                action={{
+                  label: 'Swap them',
+                  onClick: () =>
+                    onChange({ min: question.max, max: question.min } as Partial<Question>),
+                }}
+              >
+                Min ({question.min}) is more than Max ({question.max}), so nobody could answer.
+              </GuardNote>
+            ) : null}
             <Row>
               <Field
                 label="Step"
                 hint={question.display === 'stepper' ? 'Each − / + tap' : undefined}
               >
                 <SlateNumberInput
+                  above={0}
                   value={question.step}
                   placeholder="1"
-                  onChange={(n) =>
-                    onChange({
-                      step: n !== undefined && n > 0 ? n : undefined,
-                    } as Partial<Question>)
-                  }
+                  onChange={(n) => onChange({ step: n } as Partial<Question>)}
                 />
               </Field>
               <Field label="Before / After" hint="e.g. $ … or … sq ft">
@@ -423,6 +472,16 @@ export function Inspector({
                 </span>
               </Field>
             </Row>
+            {question.step !== undefined && !(question.step > 0) ? (
+              <GuardNote
+                action={{
+                  label: 'Use 1',
+                  onClick: () => onChange({ step: undefined } as Partial<Question>),
+                }}
+              >
+                Step has to be more than 0.
+              </GuardNote>
+            ) : null}
             <UnitPriceSetting question={question} onChange={onChange} currency={currency} />
           </>
         )}
@@ -484,6 +543,7 @@ export function Inspector({
                 key={question.id}
                 options={question.items as Option[]}
                 onChange={(items) => onChange({ items } as Partial<Question>)}
+                noun={{ one: 'photo', many: 'photos' }}
               />
             </Field>
             <Checkbox
@@ -500,6 +560,7 @@ export function Inspector({
               <Field label="Min Value">
                 <SlateNumberInput
                   value={question.min}
+                  integer
                   allowEmpty={false}
                   onChange={(n) => {
                     if (n === undefined) return;
@@ -510,6 +571,7 @@ export function Inspector({
               <Field label="Max Value">
                 <SlateNumberInput
                   value={question.max}
+                  integer
                   allowEmpty={false}
                   onChange={(n) => {
                     if (n === undefined) return;
@@ -518,6 +580,7 @@ export function Inspector({
                 />
               </Field>
             </Row>
+            <ScaleGuards question={question} onChange={onChange} />
             <Row>
               <Field label="Min Label">
                 <input
@@ -562,6 +625,10 @@ export function Inspector({
                   onChange({
                     display: display === 'numbers' ? undefined : display,
                     sliderIcon: display === 'slider' ? question.sliderIcon : undefined,
+                    // Stars count from one: "1 star" saves 1 (QA F20), and 5 reads best.
+                    ...(display === 'stars' && question.display !== 'stars'
+                      ? starsRange(question)
+                      : {}),
                   } as Partial<Question>)
                 }
               />
@@ -612,21 +679,53 @@ export function Inspector({
                   }
                 />
               </Field>
-              <Field label="Max Size (MB)">
+              <Field label="Max Size (MB)" hint={`1 to ${FILE_SIZE_MAX_MB} MB.`}>
                 <SlateNumberInput
+                  min={1}
+                  max={FILE_SIZE_MAX_MB}
                   value={question.maxSizeMb}
+                  placeholder={String(FILE_SIZE_MAX_MB)}
                   onChange={(n) => onChange({ maxSizeMb: n } as Partial<Question>)}
                 />
               </Field>
             </Row>
+            {question.maxSizeMb !== undefined &&
+            !(question.maxSizeMb > 0 && question.maxSizeMb <= FILE_SIZE_MAX_MB) ? (
+              <GuardNote
+                action={{
+                  label: `Use ${FILE_SIZE_MAX_MB} MB`,
+                  onClick: () => onChange({ maxSizeMb: FILE_SIZE_MAX_MB } as Partial<Question>),
+                }}
+              >
+                {question.maxSizeMb > FILE_SIZE_MAX_MB
+                  ? `Uploads stop at ${FILE_SIZE_MAX_MB} MB, whatever this says.`
+                  : `With ${String(question.maxSizeMb)} MB, nobody could attach a file.`}
+              </GuardNote>
+            ) : null}
             {question.multiple !== false && (
-              <Field label="Max Files">
-                <SlateNumberInput
-                  min={1}
-                  value={question.maxFiles ?? 10}
-                  onChange={(n) => onChange({ maxFiles: n } as Partial<Question>)}
-                />
-              </Field>
+              <>
+                <Field label="Max Files">
+                  <SlateNumberInput
+                    min={1}
+                    max={FILE_COUNT_MAX}
+                    integer
+                    value={question.maxFiles}
+                    placeholder="10"
+                    onChange={(n) => onChange({ maxFiles: n } as Partial<Question>)}
+                  />
+                </Field>
+                {question.maxFiles !== undefined &&
+                !(Number.isInteger(question.maxFiles) && question.maxFiles >= 1) ? (
+                  <GuardNote
+                    action={{
+                      label: 'Use 10',
+                      onClick: () => onChange({ maxFiles: 10 } as Partial<Question>),
+                    }}
+                  >
+                    Max Files has to be a whole number, 1 or more.
+                  </GuardNote>
+                ) : null}
+              </>
             )}
           </>
         )}
@@ -680,7 +779,24 @@ export function Inspector({
             {question.display === 'swipe' ? null : (
               <Checkbox
                 checked={Boolean(question.multiple)}
-                onChange={(v) => onChange({ multiple: v } as Partial<Question>)}
+                onChange={(v) =>
+                  onChange(
+                    // Carry "Required" across (QA CH-08): single-select's required is
+                    // multi-select's "at least one", and back.
+                    (v
+                      ? {
+                          multiple: true,
+                          min:
+                            question.required !== false && question.min === undefined
+                              ? 1
+                              : question.min,
+                        }
+                      : {
+                          multiple: false,
+                          required: (question.min ?? 0) >= 1 ? undefined : false,
+                        }) as Partial<Question>,
+                  )
+                }
                 label="Allow Multiple Selections"
               />
             )}
@@ -695,22 +811,7 @@ export function Inspector({
             {question.display === 'swipe' ? null : (
               <OtherSetting question={question} onChange={onChange} />
             )}
-            {question.multiple && (
-              <Row>
-                <Field label={question.display === 'swipe' ? 'Min Likes' : 'Min Selections'}>
-                  <SlateNumberInput
-                    value={question.min}
-                    onChange={(n) => onChange({ min: n } as Partial<Question>)}
-                  />
-                </Field>
-                <Field label={question.display === 'swipe' ? 'Max Likes' : 'Max Selections'}>
-                  <SlateNumberInput
-                    value={question.max}
-                    onChange={(n) => onChange({ max: n } as Partial<Question>)}
-                  />
-                </Field>
-              </Row>
-            )}
+            {question.multiple && <PickLimits question={question} onChange={onChange} />}
           </>
         )}
 
@@ -725,49 +826,24 @@ export function Inspector({
               <OptionsEditor
                 options={question.rows as Option[]}
                 onChange={(rows) => onChange({ rows } as Partial<Question>)}
+                noun={{ one: 'row', many: 'rows' }}
               />
             </Field>
             <Field label="Columns">
               <OptionsEditor
                 options={question.columns as Option[]}
                 onChange={(columns) => onChange({ columns } as Partial<Question>)}
+                noun={{ one: 'column', many: 'columns' }}
               />
             </Field>
           </>
         )}
 
         {question.type === 'multi_choice' && (
-          <Row>
-            <Field label="Min Selections">
-              <SlateNumberInput
-                value={question.min}
-                onChange={(n) => onChange({ min: n } as Partial<Question>)}
-              />
-            </Field>
-            <Field label="Max Selections">
-              <SlateNumberInput
-                value={question.max}
-                onChange={(n) => onChange({ max: n } as Partial<Question>)}
-              />
-            </Field>
-          </Row>
+          <PickLimits question={question} onChange={onChange} />
         )}
 
-        {question.type === 'thanks' && (
-          <Field
-            label="Redirect URL (Optional)"
-            hint="Navigate here after a successful submit."
-          >
-            <input
-              className="slate-input"
-              value={question.redirectUrl ?? ''}
-              placeholder="https://example.com/thank-you"
-              onChange={(e) =>
-                onChange({ redirectUrl: e.target.value || undefined } as Partial<Question>)
-              }
-            />
-          </Field>
-        )}
+        {question.type === 'thanks' && <RedirectSetting question={question} onChange={onChange} />}
 
         {question.type === 'thanks' && onEstimateChange && (
           <EstimateSection
@@ -844,6 +920,232 @@ export function Inspector({
 function scalePoints(q: { min: number; max: number; step?: number }): number {
   const step = q.step && q.step > 0 ? q.step : 1;
   return q.max >= q.min ? Math.floor((q.max - q.min) / step + 1e-9) + 1 : 0;
+}
+
+type Patch = (patch: Partial<Question>) => void;
+
+const isAre = (n: number) => (n === 1 ? 'is' : 'are');
+
+/**
+ * Required, Min and Max for a multi-select (QA CH-04, CH-08, S3, GAP-09). Whole
+ * numbers only; "Required" means at least one pick; anything nobody could
+ * meet is said right under the fields, with a one-tap fix.
+ */
+function PickLimits({ question, onChange }: { question: MultiPick; onChange: Patch }) {
+  const swipe = isSwipe(question);
+  const w = pickWords(question);
+  const problem = pickProblem(question);
+  const choices = choiceCount(question);
+  const set = (patch: { min?: number; max?: number }) => onChange(patch as Partial<Question>);
+  const choicesText = `${choices} ${choices === 1 ? w.choice : w.choices}${w.other}`;
+  return (
+    <>
+      <Checkbox
+        checked={(question.min ?? 0) >= 1}
+        onChange={(v) => set({ min: v ? Math.max(1, question.min ?? 0) : undefined })}
+        label={swipe ? 'Required (At Least One Like)' : 'Required (At Least One)'}
+      />
+      <Row>
+        <Field label={swipe ? 'Min Likes' : 'Min Selections'}>
+          <SlateNumberInput
+            min={0}
+            integer
+            value={question.min}
+            placeholder="0"
+            onChange={(n) => set({ min: n })}
+          />
+        </Field>
+        <Field label={swipe ? 'Max Likes' : 'Max Selections'}>
+          <SlateNumberInput
+            min={1}
+            integer
+            value={question.max}
+            placeholder="No limit"
+            onChange={(n) => set({ max: n })}
+          />
+        </Field>
+      </Row>
+      {problem?.kind === 'max_whole' ? (
+        <GuardNote action={{ label: 'Clear Max', onClick: () => set({ max: undefined }) }}>
+          Max has to be a whole number, 1 or more.
+        </GuardNote>
+      ) : problem?.kind === 'min_whole' ? (
+        <GuardNote action={{ label: 'Clear Min', onClick: () => set({ min: undefined }) }}>
+          Min has to be a whole number, 0 or more.
+        </GuardNote>
+      ) : problem?.kind === 'min_over_choices' ? (
+        <GuardNote action={{ label: `Set Min to ${choices}`, onClick: () => set({ min: choices }) }}>
+          There {isAre(choices)} only {choicesText}, so nobody could {swipe ? 'like' : 'pick'}{' '}
+          {problem.min}.
+        </GuardNote>
+      ) : problem?.kind === 'max_under_min' ? (
+        <GuardNote
+          action={{
+            label: 'Swap them',
+            onClick: () => set({ min: problem.max, max: problem.min }),
+          }}
+        >
+          Max ({problem.max}) is less than Min ({problem.min}), so nobody could finish.
+        </GuardNote>
+      ) : problem?.kind === 'max_over_choices' ? (
+        <GuardNote quiet>
+          There {isAre(choices)} only {choicesText}, so Max {problem.max} never comes into play.
+        </GuardNote>
+      ) : null}
+    </>
+  );
+}
+
+/** Stars count from 1 ("1 star" saves 1), and 5 reads best on a phone (QA F20). */
+function starsRange(q: ScaleQuestion): { min: number; max: number } {
+  const min = q.min < 1 ? 1 : q.min;
+  const points = scalePointCount({ ...q, min });
+  return { min, max: q.max < min || points > 7 ? min + 4 : q.max };
+}
+
+/** What can't work on a scale, said under Min / Max Value with a fix (QA F7, S16, F20). */
+function ScaleGuards({ question, onChange }: { question: ScaleQuestion; onChange: Patch }) {
+  const { min, max } = question;
+  const points = scalePointCount(question);
+  if (min > max) {
+    return (
+      <GuardNote
+        action={{
+          label: 'Swap them',
+          onClick: () => onChange({ min: max, max: min } as Partial<Question>),
+        }}
+      >
+        Min Value ({min}) is more than Max Value ({max}), so there’s nothing to pick.
+      </GuardNote>
+    );
+  }
+  if (Number.isNaN(points)) {
+    return (
+      <GuardNote
+        action={{
+          label: 'Count by 1',
+          onClick: () => onChange({ step: undefined } as Partial<Question>),
+        }}
+      >
+        This scale counts in steps of {String(question.step)}, so it can’t show its points.
+      </GuardNote>
+    );
+  }
+  if (points > SCALE_POINTS_MAX) {
+    return (
+      <GuardNote
+        action={{
+          label: `Use ${min} to ${min + 10}`,
+          onClick: () => onChange({ max: min + 10, step: undefined } as Partial<Question>),
+        }}
+      >
+        That’s {points.toLocaleString('en-US')} points. A scale shows {SCALE_POINTS_MAX} at most.
+      </GuardNote>
+    );
+  }
+  if (question.display === 'stars' && min < 1) {
+    return (
+      <GuardNote
+        action={{
+          label: 'Start at 1',
+          onClick: () => onChange(starsRange(question) as Partial<Question>),
+        }}
+      >
+        Stars start at 1. Starting at {min}, the first star saves {min}.
+      </GuardNote>
+    );
+  }
+  return null;
+}
+
+/**
+ * Where to send people after they submit (QA F3, S12). A bare domain gets
+ * https:// in front; anything that can't be a web page link isn't kept, and
+ * says so in plain words.
+ */
+function RedirectSetting({
+  question,
+  onChange,
+}: {
+  question: Extract<Question, { type: 'thanks' }>;
+  onChange: Patch;
+}) {
+  const stored = question.redirectUrl ?? '';
+  const [text, setText] = useState(stored);
+  const [left, setLeft] = useState(false);
+  /** The last value this field saved, to tell its own saves from undo or another ending. */
+  const mine = useRef<string | undefined>(question.redirectUrl);
+  const save = (redirectUrl: string | undefined) => {
+    mine.current = redirectUrl;
+    onChange({ redirectUrl } as Partial<Question>);
+  };
+  useEffect(() => {
+    if (question.redirectUrl === mine.current) return;
+    mine.current = question.redirectUrl;
+    setText(question.redirectUrl ?? '');
+    setLeft(false);
+  }, [question.id, question.redirectUrl]);
+
+  const typed = text.trim();
+  const url = typed ? normalizeRedirectUrl(typed) : null;
+  const notWeb = typed !== '' && url === null && (left || typed === stored.trim());
+  const noScheme = url !== null && url !== typed && typed === stored.trim();
+  return (
+    <>
+      <Field
+        label="Redirect URL (Optional)"
+        hint={
+          notWeb
+            ? 'That isn’t a web address, so nobody is sent anywhere. Use a full one, like https://yoursite.com/thanks.'
+            : 'After they submit, send them to this page instead.'
+        }
+      >
+        <input
+          className="slate-input"
+          type="text"
+          inputMode="url"
+          spellCheck={false}
+          autoCapitalize="none"
+          autoComplete="off"
+          value={text}
+          placeholder="https://yoursite.com/thanks"
+          aria-invalid={notWeb || noScheme ? true : undefined}
+          onChange={(e) => {
+            setText(e.target.value);
+            setLeft(false);
+            const next = e.target.value.trim();
+            const u = next ? normalizeRedirectUrl(next) : null;
+            if (!next) save(undefined);
+            else if (u && u !== stored) save(u);
+          }}
+          onBlur={() => {
+            setLeft(true);
+            if (!typed) return;
+            if (url) {
+              setText(url);
+              if (url !== stored) save(url);
+            } else if (stored) {
+              // Not a web address: never keep it, and never keep sending people to the old one.
+              save(undefined);
+            }
+          }}
+        />
+      </Field>
+      {noScheme && url ? (
+        <GuardNote
+          action={{
+            label: 'Fix',
+            onClick: () => {
+              setText(url);
+              save(url);
+            },
+          }}
+        >
+          This needs https:// in front, or people land on a page that doesn’t exist.
+        </GuardNote>
+      ) : null}
+    </>
+  );
 }
 
 /** "Other: ___" (ADR-063): the respondent types their own answer. */
@@ -1041,12 +1343,41 @@ function AutoGrowTextarea({
   );
 }
 
+/**
+ * In place under an options list (QA CH-05, S5, S6): two options that tick
+ * together (a repeated value), with a one-tap fix, and options with no name.
+ */
+function OptionNotes<T extends Option>({
+  options,
+  onChange,
+  noun,
+}: {
+  options: ReadonlyArray<T>;
+  onChange: (opts: T[]) => void;
+  noun: { one: string; many: string };
+}) {
+  const blank = options.some((o) => !(o.label ?? '').trim());
+  return (
+    <>
+      {hasSameValues(options) ? (
+        <GuardNote action={{ label: 'Fix', onClick: () => onChange(withUniqueValues(options)) }}>
+          Two {noun.many} count as one: picking one picks both.
+        </GuardNote>
+      ) : null}
+      {blank ? <GuardNote>Give every {noun.one} a name, or people see an empty one.</GuardNote> : null}
+    </>
+  );
+}
+
+const OPTION_NOUN = { one: 'option', many: 'options' };
+
 function OptionsEditor({
   options,
   onChange,
   withScore = false,
   currency,
   cards = false,
+  noun = OPTION_NOUN,
 }: {
   options: Option[];
   onChange: (opts: Option[]) => void;
@@ -1056,6 +1387,8 @@ function OptionsEditor({
   currency?: string;
   /** Package cards: per-option badge, description and features. */
   cards?: boolean;
+  /** What one of these is called in notes: option, row, column, photo. */
+  noun?: { one: string; many: string };
 }) {
   // Scoring is opt-in: the points column only appears once the form actually
   // uses it (any option has a numeric score). Derived from data — no local
@@ -1067,7 +1400,10 @@ function OptionsEditor({
   const update = (i: number, patch: Partial<Option>) => {
     onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
   };
-  const remove = (i: number) => onChange(options.filter((_, idx) => idx !== i));
+  // At least one stays: a choice with nothing to choose traps respondents (QA S6).
+  const remove = (i: number) => {
+    if (options.length > 1) onChange(options.filter((_, idx) => idx !== i));
+  };
   const move = (i: number, dir: 'up' | 'down') => {
     const target = dir === 'up' ? i - 1 : i + 1;
     if (target < 0 || target >= options.length) return;
@@ -1075,12 +1411,9 @@ function OptionsEditor({
     [next[i]!, next[target]!] = [next[target]!, next[i]!];
     onChange(next);
   };
+  // A value no option has (QA CH-05): never a repeat that ticks two rows at once.
   const add = () => {
-    const i = options.length;
-    onChange([
-      ...options,
-      { label: `Option ${String.fromCharCode(65 + i)}`, value: `opt_${i + 1}` },
-    ]);
+    onChange([...options, { label: newOptionLabel(options), value: newOptionValue(options) }]);
   };
   const enableScoring = () => onChange(options.map((o) => ({ ...o, score: o.score ?? 0 })));
   const disableScoring = () =>
@@ -1107,7 +1440,9 @@ function OptionsEditor({
           <input
             className="slate-input"
             value={opt.label}
-            placeholder="Label"
+            placeholder={`Name this ${noun.one}`}
+            aria-label={`${noun.one[0]!.toUpperCase()}${noun.one.slice(1)} ${i + 1} name`}
+            aria-invalid={(opt.label ?? '').trim() ? undefined : true}
             onChange={(e) => update(i, { label: e.target.value })}
             style={{ padding: '6px 8px', fontSize: 13 }}
           />
@@ -1143,7 +1478,9 @@ function OptionsEditor({
               type="button"
               className="slate-icon-btn"
               onClick={() => remove(i)}
-              aria-label="Remove option"
+              disabled={options.length <= 1}
+              title={options.length <= 1 ? `Keep at least one ${noun.one}` : undefined}
+              aria-label={`Remove ${noun.one}`}
             >
               ×
             </button>
@@ -1170,6 +1507,7 @@ function OptionsEditor({
           ) : null}
         </div>
       ))}
+      <OptionNotes options={options} onChange={onChange} noun={noun} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
         <button
           type="button"
@@ -1225,15 +1563,18 @@ function PictureOptionsEditor({
   const update = (i: number, patch: Partial<PictureOption>) => {
     onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
   };
-  const remove = (i: number) => onChange(options.filter((_, idx) => idx !== i));
+  // At least one stays (QA S6), and a new option never repeats a value (QA CH-05).
+  const remove = (i: number) => {
+    if (options.length > 1) onChange(options.filter((_, idx) => idx !== i));
+  };
   const add = () => {
-    const i = options.length;
+    const value = newOptionValue(options);
     onChange([
       ...options,
       {
-        label: `Option ${String.fromCharCode(65 + i)}`,
-        value: `opt_${i + 1}`,
-        src: 'https://picsum.photos/seed/' + (i + 1) + '/400/300',
+        label: newOptionLabel(options),
+        value,
+        src: `https://picsum.photos/seed/${value}/400/300`,
       },
     ]);
   };
@@ -1270,7 +1611,9 @@ function PictureOptionsEditor({
             <input
               className="slate-input"
               value={opt.label}
-              placeholder="Label"
+              placeholder="Name this option"
+              aria-label={`Option ${i + 1} name`}
+              aria-invalid={(opt.label ?? '').trim() ? undefined : true}
               onChange={(e) => update(i, { label: e.target.value })}
               style={{ padding: '6px 8px', fontSize: 13 }}
             />
@@ -1287,6 +1630,8 @@ function PictureOptionsEditor({
               type="button"
               className="slate-icon-btn"
               onClick={() => remove(i)}
+              disabled={options.length <= 1}
+              title={options.length <= 1 ? 'Keep at least one option' : undefined}
               aria-label="Remove option"
             >
               ×
@@ -1310,6 +1655,7 @@ function PictureOptionsEditor({
           ) : null}
         </div>
       ))}
+      <OptionNotes options={options} onChange={onChange} noun={OPTION_NOUN} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <button
           type="button"

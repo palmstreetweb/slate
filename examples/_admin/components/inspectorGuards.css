@@ -51,6 +51,7 @@
   border-color: var(--slate-warn);
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-number:has(.slate-number-input[aria-invalid='true']) {
+[data-slate-forms][data-theme-name='slate']
+  .slate-number:has(.slate-number-input[aria-invalid='true']) {
   border-color: var(--slate-warn);
 }

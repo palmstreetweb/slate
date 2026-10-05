@@ -43,7 +43,9 @@ const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 6 
 export function allowedText({ min, max, integer, above }: Limits): string {
   const kind = integer ? 'A whole number' : 'A number';
   if (above !== undefined) {
-    return max !== undefined ? `More than ${fmt(above)}, up to ${fmt(max)}` : `More than ${fmt(above)}`;
+    return max !== undefined
+      ? `More than ${fmt(above)}, up to ${fmt(max)}`
+      : `More than ${fmt(above)}`;
   }
   if (min !== undefined && max !== undefined) return `${kind} from ${fmt(min)} to ${fmt(max)}`;
   if (min !== undefined) return `${kind}, ${fmt(min)} or more`;
