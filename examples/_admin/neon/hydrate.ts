@@ -3,6 +3,7 @@
  */
 
 import { isNeonConfigured } from './env.js';
+import { SessionNotReadyError } from './neonError.js';
 import { waitForAuthReady } from './ensureAuth.js';
 import {
   bumpFormsRemoteGeneration,
@@ -30,7 +31,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   return Promise.race([
     promise,
     new Promise<T>((_, reject) => {
-      window.setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      window.setTimeout(() => {
+        // Logged raw; neonError.ts reads a TimeoutError as a connection problem.
+        const err = new Error(`${label} timed out after ${ms}ms`);
+        err.name = 'TimeoutError';
+        reject(err);
+      }, ms);
     }),
   ]);
 }
@@ -93,9 +99,7 @@ export function hydrateStores(opts?: { force?: boolean }): Promise<void> {
       // Settle auth once, then soft-fetch both stores (no nested empty-retry loops).
       const auth = await waitForAuthReady(4);
       if (!auth.ok) {
-        throw new Error(
-          'Signed in, but the database could not resolve your user id from the session. Sign out and back in, then try again.',
-        );
+        throw new SessionNotReadyError('Slate couldn’t confirm it’s you yet.');
       }
       await withTimeout(
         Promise.all([hydrateFormsRemote({ soft: true }), hydrateSubmissionsRemote({ soft: true })]),

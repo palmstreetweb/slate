@@ -14,7 +14,7 @@ import { isNeonConfigured } from './neon/env.js';
 import { isStoresHydrated } from './neon/hydrate.js';
 import { getNeon } from './neon/client.js';
 import { ensureAuthForDataApi } from './neon/ensureAuth.js';
-import { formatNeonError } from './neon/neonError.js';
+import { formatNeonError, userNeonError } from './neon/neonError.js';
 
 export type MoveSignupResult =
   | { ok: true }
@@ -90,7 +90,8 @@ async function moveRemote(args: MoveSignupArgs): Promise<MoveSignupResult> {
     }
     return { ok: true };
   } catch (err) {
-    return { ok: false, reason: 'error', message: formatNeonError(err, 'Could not move them') };
+    console.error('[slate] slot move failed:', formatNeonError(err, 'unknown error'));
+    return { ok: false, reason: 'error', message: userNeonError(err, 'move') };
   }
 }
 
@@ -100,7 +101,7 @@ export async function moveSignupSlot(args: MoveSignupArgs): Promise<MoveSignupRe
       return {
         ok: false,
         reason: 'error',
-        message: 'Cloud sync is not ready — try again in a moment.',
+        message: 'Your responses are still loading. Try again in a moment.',
       };
     }
     return moveRemote(args);

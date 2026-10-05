@@ -255,7 +255,7 @@ function FormEditorBody({ formId }: { formId: string }) {
       const detail = (event as CustomEvent<{ kind?: string; message?: string }>).detail;
       if (detail?.kind !== 'form') return;
       // The toast comes from the shell (PersistErrorToasts); this is the inline status.
-      setSaveError(detail.message || 'Could not save to the cloud.');
+      setSaveError(detail.message || 'Your last change isn’t saved yet.');
     };
     const onPersistOk = (event: Event) => {
       const detail = (event as CustomEvent<{ kind?: string }>).detail;
@@ -631,7 +631,12 @@ function FormEditorBody({ formId }: { formId: string }) {
   const pillClosed = statusLabel === 'Closed';
 
   const needsPublish = cloud && (!isPublished || stale || ignite.phase !== 'idle');
-  const saveText = saveError ?? (savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved');
+  // The header shows a short "Not saved"; the sentence is in the tooltip and the toast.
+  const saveText = saveError
+    ? 'Not saved'
+    : savedAt
+      ? `Saved ${formatTime(savedAt)}`
+      : 'All changes saved';
 
   return (
     <AdminShell
@@ -648,7 +653,10 @@ function FormEditorBody({ formId }: { formId: string }) {
                 {statusLabel}
               </span>
             ) : null}
-            <span className={saveError ? 'slate-m-save slate-m-save--err' : 'slate-m-save'}>
+            <span
+              className={saveError ? 'slate-m-save slate-m-save--err' : 'slate-m-save'}
+              title={saveError ?? undefined}
+            >
               {saveText}
             </span>
           </>
@@ -710,9 +718,9 @@ function FormEditorBody({ formId }: { formId: string }) {
         <>
           <span
             className={`slate-save-status${saveError ? ' slate-save-status--err' : ''}`}
-            title="Edits save automatically"
+            title={saveError ?? 'Edits save automatically'}
           >
-            {saveError ?? (savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved')}
+            {saveText}
           </span>
           {statusLabel ? (
             <FlipPill

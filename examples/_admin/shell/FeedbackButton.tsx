@@ -6,8 +6,9 @@
 
 import { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { getNeon } from '../neon/env.js';
+import { getNeon, isNeonConfigured } from '../neon/env.js';
 import { ensureAuthForDataApi } from '../neon/ensureAuth.js';
+import { formatNeonError, userNeonError } from '../neon/neonError.js';
 import { useAuth } from '../neon/AuthProvider.js';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { readSlateMode } from '../slateMode.js';
@@ -65,6 +66,11 @@ export function FeedbackButton({ trigger = true }: { trigger?: boolean } = {}) {
   const send = async () => {
     const text = message.trim();
     if (!text || sending) return;
+    // The offline studio has no account to send from (and must not reach the cloud).
+    if (!isNeonConfigured()) {
+      setError('Feedback isn’t available here.');
+      return;
+    }
     setSending(true);
     setError(null);
     try {
@@ -76,9 +82,7 @@ export function FeedbackButton({ trigger = true }: { trigger?: boolean } = {}) {
         message: text,
         path: `${window.location.pathname}${window.location.search}`,
       });
-      if (insertError) {
-        throw new Error(insertError.message || 'Could not send feedback.');
-      }
+      if (insertError) throw insertError;
       setMessage('');
       setOpen(false);
       toast.push({
@@ -88,7 +92,9 @@ export function FeedbackButton({ trigger = true }: { trigger?: boolean } = {}) {
         sound: 'success',
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send feedback.');
+      // Raw text for debugging; the owner reads one plain sentence (QA COPY-01).
+      console.error('[slate] feedback failed:', formatNeonError(err, 'unknown error'));
+      setError(userNeonError(err, 'feedback'));
     } finally {
       setSending(false);
     }
