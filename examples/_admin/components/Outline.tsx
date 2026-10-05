@@ -112,6 +112,7 @@ export function Outline({
     landedId,
     didDragRef,
     beginPointerDrag,
+    beginTouchHold,
   } = useOutlineDrag(schema.questions, onMove);
 
   const toggleChecked = (id: string) => {
@@ -419,6 +420,20 @@ export function Outline({
                               '.slate-outline-row',
                             ) as HTMLButtonElement | null;
                             if (!row) return;
+                            // Phones: a swipe that starts here scrolls; a short hold lifts.
+                            if (phone && e.pointerType !== 'mouse') {
+                              if (!canDrag || e.button !== 0) return;
+                              beginTouchHold(
+                                q.id,
+                                i,
+                                e.clientX,
+                                e.clientY,
+                                row,
+                                e.pointerId,
+                                e.currentTarget,
+                              );
+                              return;
+                            }
                             startReorder(e, row);
                           }}
                         >

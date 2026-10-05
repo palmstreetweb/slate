@@ -8,6 +8,11 @@ import { playSendPip } from '@/utils/sendPip.js';
 import { playDeepPop } from '@/utils/deepPop.js';
 
 const DRAG_THRESHOLD_PX = 4;
+/** Phone outline: a finger on a grip picks the question up only after resting
+ *  this long, so a swipe that starts on a grip scrolls the list instead. */
+export const TOUCH_HOLD_MS = 250;
+/** Moving further than this before the hold ends is a scroll. */
+const TOUCH_HOLD_SLOP_PX = 8;
 const SETTLE_MS = 380;
 const CANCEL_MS = 300;
 const SETTLE_COMMIT_RATIO = 0.82;
@@ -136,6 +141,23 @@ export function useOutlineDrag(
     setLineY(measureOutlineDropLineY(list, index));
   };
 
+  /** Lift the card: the ghost appears where the row is and tracking starts. */
+  const activateDrag = (session: DragSession, clientX: number, clientY: number) => {
+    session.active = true;
+    didDragRef.current = true;
+    playSendPip();
+
+    const rowRect = session.origin;
+    session.offsetX = clientX - rowRect.x;
+    session.offsetY = clientY - rowRect.y;
+
+    dropIndexRef.current = session.sourceIndex;
+    setDropIndex(session.sourceIndex);
+    syncDropLine(session.sourceIndex);
+    writeGhost({ ...rowRect });
+    setPhase('tracking');
+  };
+
   const updateDropTarget = (clientY: number) => {
     const list = listRef.current;
     if (!list) return;
@@ -149,9 +171,11 @@ export function useOutlineDrag(
   const finishSettleRef = useRef(finishSettle);
   const resetRef = useRef(reset);
   const updateDropTargetRef = useRef(updateDropTarget);
+  const activateDragRef = useRef(activateDrag);
   finishSettleRef.current = finishSettle;
   resetRef.current = reset;
   updateDropTargetRef.current = updateDropTarget;
+  activateDragRef.current = activateDrag;
 
   questionsRef.current = questions;
   onMoveRef.current = onMove;
@@ -172,7 +196,12 @@ export function useOutlineDrag(
     setSettleAnimating(false);
     setLandedId(null);
 
-    captureTarget.setPointerCapture(pointerId);
+    try {
+      captureTarget.setPointerCapture(pointerId);
+    } catch {
+      // The pointer is already up (a hold ending as the finger lifts): no drag.
+      return;
+    }
     sessionRef.current = {
       id,
       sourceIndex,
@@ -200,6 +229,79 @@ export function useOutlineDrag(
     setSettleAnimating(false);
     writeGhost(null);
   };
+
+  const holdRef = useRef<(() => void) | null>(null);
+  const cancelTouchHold = () => {
+    holdRef.current?.();
+    holdRef.current = null;
+  };
+
+  /**
+   * Phone grip (ADR-062 §5): a finger that rests on the grip for TOUCH_HOLD_MS
+   * lifts the card; one that moves first is scrolling the list, which the grip's
+   * `touch-action: pan-y` (mobile.css) lets the browser do. Once lifted, the
+   * outline's non-passive touchmove listener keeps the page from scrolling.
+   */
+  const beginTouchHold = (
+    id: string,
+    sourceIndex: number,
+    clientX: number,
+    clientY: number,
+    row: HTMLElement,
+    pointerId: number,
+    captureTarget: HTMLButtonElement,
+  ) => {
+    cancelTouchHold();
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
+      if (Math.hypot(e.clientX - clientX, e.clientY - clientY) > TOUCH_HOLD_SLOP_PX) {
+        cancelTouchHold();
+      }
+    };
+    const onEnd = (e: PointerEvent) => {
+      if (e.pointerId === pointerId) cancelTouchHold();
+    };
+    const timer = window.setTimeout(() => {
+      cancelTouchHold();
+      beginPointerDragRef.current(
+        id,
+        sourceIndex,
+        clientX,
+        clientY,
+        row.getBoundingClientRect(),
+        pointerId,
+        captureTarget,
+      );
+      const session = sessionRef.current;
+      if (!session || session.id !== id) return;
+      navigator.vibrate?.(8);
+      activateDragRef.current(session, clientX, clientY);
+    }, TOUCH_HOLD_MS);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onEnd);
+    window.addEventListener('pointercancel', onEnd);
+    holdRef.current = () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onEnd);
+      window.removeEventListener('pointercancel', onEnd);
+    };
+  };
+
+  const beginPointerDragRef = useRef(beginPointerDrag);
+  beginPointerDragRef.current = beginPointerDrag;
+
+  // Registered before any touch starts, so its preventDefault is honored: a
+  // lifted card follows the finger instead of the page scrolling under it.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return undefined;
+    const holdPage = (e: TouchEvent) => {
+      if (sessionRef.current && e.cancelable) e.preventDefault();
+    };
+    wrap.addEventListener('touchmove', holdPage, { passive: false });
+    return () => wrap.removeEventListener('touchmove', holdPage);
+  }, []);
 
   useLayoutEffect(() => {
     if (!showDropLine || lineAnimated) return;
@@ -308,19 +410,7 @@ export function useOutlineDrag(
         if (Math.hypot(e.clientX - session.startX, e.clientY - session.startY) < DRAG_THRESHOLD_PX) {
           return;
         }
-        session.active = true;
-        didDragRef.current = true;
-        playSendPip();
-
-        const rowRect = session.origin;
-        session.offsetX = e.clientX - rowRect.x;
-        session.offsetY = e.clientY - rowRect.y;
-
-        dropIndexRef.current = session.sourceIndex;
-        setDropIndex(session.sourceIndex);
-        syncDropLine(session.sourceIndex);
-        writeGhost({ ...rowRect });
-        setPhase('tracking');
+        activateDragRef.current(session, e.clientX, e.clientY);
         return;
       }
 
@@ -384,7 +474,14 @@ export function useOutlineDrag(
     };
   }, [draggingId]);
 
-  useEffect(() => () => resetRef.current(), []);
+  useEffect(
+    () => () => {
+      holdRef.current?.();
+      holdRef.current = null;
+      resetRef.current();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!draggingId) return;
@@ -412,5 +509,6 @@ export function useOutlineDrag(
     landedId,
     didDragRef,
     beginPointerDrag,
+    beginTouchHold,
   };
 }

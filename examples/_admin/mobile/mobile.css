@@ -562,10 +562,14 @@
   min-height: var(--m-tap);
 }
 
+/* A swipe that starts on a grip scrolls the list like anywhere else; a short
+   hold on it lifts the question (useOutlineDrag's beginTouchHold). */
 [data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane .slate-outline-grip {
   width: 32px;
   min-height: var(--m-tap);
   opacity: 0.55;
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane .slate-outline-list {
