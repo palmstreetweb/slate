@@ -9,6 +9,8 @@ const MAX_BYTES = 3_000_000;
 const MAX_TEXT = 24_000;
 /** A paper form is a few pages. Anything longer is a book, and slow to parse (audit M-AI-2). */
 const MAX_PAGES = 30;
+const UNREADABLE =
+  'We couldn’t open that PDF. Try saving it again, or paste the questions instead.';
 
 export class DocumentExtractError extends Error {
   constructor(message: string) {
@@ -45,17 +47,17 @@ export function documentToPrompt(filename: string, text: string, note?: string):
 export async function extractDocumentText(doc: DocumentPayload): Promise<string> {
   const filename = doc.filename.trim() || 'document.pdf';
   const base64 = doc.base64?.trim();
-  if (!base64) throw new DocumentExtractError('That PDF was empty.');
+  if (!base64) throw new DocumentExtractError('That PDF is empty. Pick another file.');
 
   let bytes: Buffer;
   try {
     bytes = Buffer.from(base64, 'base64');
   } catch {
-    throw new DocumentExtractError('Could not read that PDF.');
+    throw new DocumentExtractError(UNREADABLE);
   }
-  if (bytes.length === 0) throw new DocumentExtractError('That PDF was empty.');
+  if (bytes.length === 0) throw new DocumentExtractError('That PDF is empty. Pick another file.');
   if (bytes.length > MAX_BYTES) {
-    throw new DocumentExtractError('Keep the PDF under 3 MB.');
+    throw new DocumentExtractError('That PDF is too big. Pick one under 3 MB.');
   }
 
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
@@ -63,23 +65,23 @@ export async function extractDocumentText(doc: DocumentPayload): Promise<string>
   const isPdf =
     ext === 'pdf' || mime === 'application/pdf' || bytes.subarray(0, 5).toString() === '%PDF-';
   if (!isPdf) {
-    throw new DocumentExtractError('Start with a PDF. Word and Pages can come later.');
+    throw new DocumentExtractError('Only PDFs work here for now. Save it as a PDF and try again.');
   }
 
   let pdf: Awaited<ReturnType<typeof getDocumentProxy>>;
   try {
     pdf = await getDocumentProxy(new Uint8Array(bytes));
   } catch {
-    throw new DocumentExtractError('Could not read that PDF.');
+    throw new DocumentExtractError(UNREADABLE);
   }
   if (pdf.numPages > MAX_PAGES) {
-    throw new DocumentExtractError(`Keep the PDF under ${MAX_PAGES} pages.`);
+    throw new DocumentExtractError(`That PDF is too long. Pick one under ${MAX_PAGES} pages.`);
   }
   const { text } = await extractText(pdf, { mergePages: true });
   const joined = (Array.isArray(text) ? text.join('\n') : text).replaceAll('\u0000', '').trim();
   if (joined.length < 20) {
     throw new DocumentExtractError(
-      'No readable text in that PDF. Paste the questions, or export a text PDF.',
+      'We couldn’t find any text in that PDF (it may be a scan). Paste the questions instead.',
     );
   }
   return joined.slice(0, MAX_TEXT);
