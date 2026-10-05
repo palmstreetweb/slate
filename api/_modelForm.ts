@@ -258,7 +258,16 @@ function imageOf(more: readonly string[]): string {
 
 type FullOption = GeneratedQuestion['options'][number];
 
-function fromModelOption(o: ModelOption): FullOption {
+/**
+ * One option's extras, read for its question's type (SRV-3). Spots, a day and
+ * times are read only on a sign-up slot, and "up to N" is a price range only
+ * on an option priced below N (the first such line). Every other line is a
+ * card feature as written, so a package card's "20 seats", "Capacity 150" or
+ * "18:00-23:00" stays on the card instead of becoming slot settings no card
+ * shows.
+ */
+function fromModelOption(o: ModelOption, type: GeneratedQuestionType): FullOption {
+  const slot = type === 'signup_slots';
   const out: FullOption = {
     label: o.label,
     value: o.value,
@@ -281,14 +290,21 @@ function fromModelOption(o: ModelOption): FullOption {
       if (!out.src) out.src = t;
     } else if ((m = /^badge\s*[:=]\s*(.+)$/i.exec(t))) {
       out.badge = m[1]!.trim();
-    } else if ((m = /^(?:up to|max)\s*[:=]?\s*\$?\s*([\d,]+(?:\.\d+)?)$/i.exec(t))) {
+    } else if (
+      !out.priceMax &&
+      o.price > 0 &&
+      (m = /^up to\s*[:=]?\s*\$?\s*([\d,]+(?:\.\d+)?)$/i.exec(t)) &&
+      numberOf(m[1]) > o.price
+    ) {
       out.priceMax = numberOf(m[1]);
     } else if (
-      (m = /^(\d{1,4})\s*(?:spots?|places?|seats?)$/i.exec(t)) ||
-      (m = /^(?:spots?|places?|seats?|capacity)\s*[:=]?\s*(\d{1,4})$/i.exec(t))
+      slot &&
+      ((m = /^(\d{1,4})\s*(?:spots?|places?|seats?)$/i.exec(t)) ||
+        (m = /^(?:spots?|places?|seats?|capacity)\s*[:=]?\s*(\d{1,4})$/i.exec(t)))
     ) {
       out.capacity = Number(m[1]);
     } else if (
+      slot &&
       (m =
         /^(\d{4}-\d{2}-\d{2})?\s*(?:(\d{1,2}:\d{2})\s*(?:(?:-|–|—|to)\s*(\d{1,2}:\d{2}))?)?$/i.exec(
           t,
@@ -305,17 +321,20 @@ function fromModelOption(o: ModelOption): FullOption {
   return out;
 }
 
-function toModelOption(o: FullOption): ModelOption {
+/** The way back for a revision: spots and times only on a sign-up slot (SRV-3). */
+function toModelOption(o: FullOption, type: GeneratedQuestionType): ModelOption {
   const more: string[] = [];
   if (o.src?.trim()) more.push(o.src.trim());
-  if (o.priceMax > 0 && o.priceMax > o.price) more.push(`up to ${o.priceMax}`);
+  if (o.price > 0 && o.priceMax > o.price) more.push(`up to ${o.priceMax}`);
   for (const f of o.features ?? []) if (f.trim()) more.push(f.trim());
   if (o.badge?.trim()) more.push(`badge: ${o.badge.trim()}`);
-  if (o.capacity > 0) more.push(`spots: ${o.capacity}`);
-  const when = [o.date?.trim(), o.start?.trim() ? [o.start, o.end].filter(Boolean).join('-') : '']
-    .filter(Boolean)
-    .join(' ');
-  if (when) more.push(when);
+  if (type === 'signup_slots') {
+    if (o.capacity > 0) more.push(`spots: ${o.capacity}`);
+    const when = [o.date?.trim(), o.start?.trim() ? [o.start, o.end].filter(Boolean).join('-') : '']
+      .filter(Boolean)
+      .join(' ');
+    if (when) more.push(when);
+  }
   return { label: o.label, value: o.value, price: o.price, more };
 }
 
@@ -397,7 +416,7 @@ function fromModelQuestion(q: ModelQuestion): GeneratedQuestion {
     declineLabel: q.type === 'legal' ? (labels[1] ?? '') : '',
     minLabel: q.type === 'scale' || q.type === 'nps' ? (labels[0] ?? '') : '',
     maxLabel: q.type === 'scale' || q.type === 'nps' ? (labels[1] ?? '') : '',
-    options: isMatrix ? [] : q.options.map(fromModelOption),
+    options: isMatrix ? [] : q.options.map((o) => fromModelOption(o, q.type)),
     rows: isMatrix
       ? q.options.map((o) => ({ label: o.label, value: o.value, src: '', alt: '' }))
       : [],
@@ -501,7 +520,7 @@ function toModelQuestion(q: GeneratedQuestion): ModelQuestion {
     options:
       q.type === 'matrix'
         ? q.rows.map((r) => ({ label: r.label, value: r.value, price: 0, more: [] }))
-        : q.options.map(toModelOption),
+        : q.options.map((o) => toModelOption(o, q.type)),
     labels,
     settings,
     showIfField: q.showIfField,

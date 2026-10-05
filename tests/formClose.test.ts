@@ -229,15 +229,19 @@ describe('per-type answer clamps (ADR-063)', () => {
       allowOther: true,
       options: [{ value: 'a' }, { value: 'b' }],
     };
-    expect(clampForQuestion(multi, ['a', 'typed one', 'typed two', 'b'])).toEqual([
+    // SRV-1 changed this on purpose: only the first entry that wasn't an option
+    // was kept. A page loaded before the owner removed an option sends that
+    // option beside the typed text, so every such entry is kept as text, once.
+    expect(clampForQuestion(multi, ['a', 'typed one', 'typed two', 'b', 'typed one'])).toEqual([
       'a',
       'typed one',
+      'typed two',
       'b',
     ]);
-    // Without allowOther only option values are kept (CH-16): text the page
-    // can't send is dropped instead of stored as an answer.
-    expect(
-      clampForQuestion({ type: 'single_choice', options: [] }, 'z'.repeat(900)),
-    ).toBeUndefined();
+    // Without allowOther the same (SRV-1; CH-16 had dropped it): a value the
+    // question doesn't list is an option removed since, cut like Other text.
+    expect(clampForQuestion({ type: 'single_choice', options: [] }, 'z'.repeat(900))).toBe(
+      'z'.repeat(OTHER_MAX),
+    );
   });
 });

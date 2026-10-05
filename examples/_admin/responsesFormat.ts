@@ -156,13 +156,14 @@ function formatAnswer(question: Question, value: unknown): string {
               ([, col]) => !(col === '' || col == null || (Array.isArray(col) && !col.length)),
             )
             .map(([rowVal, col]) => {
+              // A row or column deleted after it was answered reads so, never its code (SRV-1).
               const rowLabel =
-                question.rows.find((r) => r.value === rowVal)?.label ?? safeText(rowVal);
+                question.rows.find((r) => r.value === rowVal)?.label ?? 'Removed row';
               // Several per row: every column picked, not only the first.
               const colLabel = (Array.isArray(col) ? col : [col])
                 .map((colVal) =>
                   typeof colVal === 'string' && 'columns' in question
-                    ? (question.columns.find((c) => c.value === colVal)?.label ?? safeText(colVal))
+                    ? (question.columns.find((c) => c.value === colVal)?.label ?? 'Removed column')
                     : safeText(colVal),
                 )
                 .join(', ');

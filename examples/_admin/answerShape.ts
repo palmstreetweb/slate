@@ -17,7 +17,12 @@ import type { StoredSubmission } from './_submissionStore.js';
 
 const MAX_KEYS = 200;
 const MAX_ITEMS = 200;
-const MAX_ROW_KEYS = 100;
+/**
+ * Keys kept on one object answer. A grid keeps every published row (the submit
+ * Function, SRV-2), and its 64 KiB body holds far fewer than this many, so a
+ * stored grid is never cut; it still bounds a hostile row.
+ */
+const MAX_ROW_KEYS = 10_000;
 
 /** Keys that shadow Object.prototype (`toString`, `__proto__`, …) are never kept. */
 function isSafeKey(key: string): boolean {

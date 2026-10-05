@@ -4,6 +4,10 @@
  * rules with the engine's own clamp (CH-16), keeps every published matrix row
  * and every character the page accepted (GAP-14), and keeps typed text on a
  * voice note whose owner turned typing off (MEDIA-17).
+ * Review fixes: a value the published question no longer lists — an option,
+ * row or column the owner removed while someone was answering — is kept as
+ * text like a typed Other, never dropped in silence (SRV-1), and a grid keeps
+ * every published row, past 100 too (SRV-2).
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -33,18 +37,41 @@ describe('choice answers (CH-16)', () => {
     expect(clampForQuestion(multi({ max: 2.5 }), ['a', 'b', 'c'])).toEqual(['a', 'b']);
   });
 
-  it('dedupes and drops values that are not options when Other is off', () => {
-    expect(clampForQuestion(multi(), ['a', 'zzz', 'a', 'a'])).toEqual(['a']);
+  // SRV-1 changed this on purpose: 'zzz' was dropped. A value the question
+  // doesn't list is what a page loaded before the owner removed that option
+  // sends, so it is kept as text, once, like a typed Other.
+  it('dedupes, and keeps a value that is not an option as text when Other is off', () => {
+    expect(clampForQuestion(multi(), ['a', 'zzz', 'a', 'a'])).toEqual(['a', 'zzz']);
     expect(clampForQuestion(multi(), [])).toEqual([]);
     expect(clampForQuestion(multi(), null)).toBeUndefined();
   });
 
-  it('keeps one typed Other, capped, when the question allows it', () => {
+  it('keeps such text bounded: cut at 500 characters, once, never blank or nested', () => {
+    expect(
+      clampForQuestion(multi(), ['q'.repeat(900), 'q'.repeat(700), '  ', '', { a: 1 }, ['b'], 'b']),
+    ).toEqual(['q'.repeat(OTHER_MAX), 'b']);
+    // A list longer than the engine could send is read up to 100 entries.
+    const many = Array.from({ length: 150 }, (_, i) => `gone_${i}`);
+    expect(clampForQuestion(multi(), many)).toHaveLength(100);
+  });
+
+  it('keeps the typed Other, capped, when the question allows it', () => {
     const q = multi({ allowOther: true, max: 3 });
-    expect(clampForQuestion(q, ['a', 'x'.repeat(900), 'second typed', 'b'])).toEqual([
+    expect(clampForQuestion(q, ['a', 'x'.repeat(900), 'b'])).toEqual([
       'a',
       'x'.repeat(OTHER_MAX),
       'b',
+    ]);
+  });
+
+  // SRV-1: with Other on, an option removed since the page loaded used to take
+  // the one typed slot, and the respondent's own words were dropped.
+  it('keeps a removed option and the typed Other together', () => {
+    const q = multi({ allowOther: true });
+    expect(clampForQuestion(q, ['a', 'opt_gone01', 'my own words'])).toEqual([
+      'a',
+      'opt_gone01',
+      'my own words',
     ]);
   });
 
@@ -63,12 +90,26 @@ describe('choice answers (CH-16)', () => {
     expect(clampForQuestion(multi({ min: 2 }), ['a'])).toEqual(['a']);
   });
 
-  it('single picks are one option value', () => {
+  it('single picks are one value', () => {
     const single = { type: 'single_choice', options: opts('a', 'b') };
     expect(clampForQuestion(single, ['b', 'a'])).toBe('b');
-    expect(clampForQuestion(single, 'zzz')).toBeUndefined();
+    // SRV-1 (was dropped): an option removed while the respondent was answering.
+    expect(clampForQuestion(single, 'zzz')).toBe('zzz');
+    expect(clampForQuestion(single, '   ')).toBeUndefined();
+    expect(clampForQuestion(single, { value: 'a' })).toBeUndefined();
     expect(clampForQuestion({ ...single, type: 'dropdown' }, 'a')).toBe('a');
     expect(clampForQuestion({ ...single, allowOther: true }, 'my own')).toBe('my own');
+  });
+
+  it('a pick the owner removed and republished during the fill is kept (SRV-1)', () => {
+    const when = { type: 'single_choice', required: true, options: opts('sat_11', 'sun_10') };
+    expect(clampForQuestion(when, 'sat_10')).toBe('sat_10');
+    const extras = { type: 'multi_choice', options: opts('edging', 'repairs'), max: 3 };
+    expect(clampForQuestion(extras, ['edging', 'stripes', 'repairs'])).toEqual([
+      'edging',
+      'stripes',
+      'repairs',
+    ]);
   });
 
   it('picture choice follows its multiple setting', () => {
@@ -90,21 +131,55 @@ describe('matrix answers (GAP-14)', () => {
     expect(Object.keys(clampForQuestion(grid, answer) as object)).toHaveLength(25);
   });
 
-  it('drops rows and columns the question doesn’t have', () => {
+  // SRV-1 changed this on purpose: rows and columns the question no longer
+  // lists were dropped. A page loaded before the owner removed them sends them,
+  // so they are kept as text; unsafe keys and nested values still never are.
+  it('keeps a row or column removed since the page loaded, as text', () => {
     expect(
       clampForQuestion(grid, { r1: 'good', r2: 'meh', nope: 'bad', toString: 'good' }),
-    ).toEqual({ r1: 'good' });
-    expect(clampForQuestion(grid, { r1: 'meh' })).toBeUndefined();
+    ).toEqual({ r1: 'good', r2: 'meh', nope: 'bad' });
+    expect(clampForQuestion(grid, { r1: 'meh' })).toEqual({ r1: 'meh' });
     expect(clampForQuestion(grid, ['good'])).toBeUndefined();
+  });
+
+  it('bounds what it keeps for rows the question doesn’t list', () => {
+    const answer = JSON.parse(
+      `{"__proto__": "good", "r1": "good", "${'k'.repeat(65)}": "good", "${'k'.repeat(64)}": "bad",` +
+        ` "blank": "  ", "nested": {"a": "good"}, "empty": [], "long": "${'v'.repeat(900)}"}`,
+    ) as Record<string, unknown>;
+    expect(clampForQuestion(grid, answer)).toEqual({
+      r1: 'good',
+      ['k'.repeat(64)]: 'bad',
+      long: 'v'.repeat(OTHER_MAX),
+    });
+    expect(Object.prototype.hasOwnProperty.call(clampForQuestion(grid, answer), '__proto__')).toBe(
+      false,
+    );
+    // At most 100 rows the question doesn't list, after every published one.
+    const stale = Object.fromEntries(Array.from({ length: 150 }, (_, i) => [`old${i}`, 'good']));
+    const kept = clampForQuestion(grid, { ...stale, r25: 'bad' }) as Record<string, unknown>;
+    expect(Object.keys(kept)).toHaveLength(101);
+    expect(kept.r25).toBe('bad');
+    expect(kept.old99).toBe('good');
+    expect(kept.old100).toBeUndefined();
   });
 
   it('a matrix that takes several columns keeps a list per row', () => {
     const many = { ...grid, multiple: true };
     expect(clampForQuestion(many, { r1: ['good', 'bad', 'good', 'meh'], r2: 'bad' })).toEqual({
-      r1: ['good', 'bad'],
+      r1: ['good', 'bad', 'meh'],
       r2: ['bad'],
     });
     expect(clampForQuestion(grid, { r1: ['bad', 'good'] })).toEqual({ r1: 'bad' });
+  });
+
+  it('keeps every published row past 100 (SRV-2: it kept the first 100)', () => {
+    const wide = Array.from({ length: 120 }, (_, i) => `item_${i + 1}`);
+    const q = { type: 'matrix', rows: opts(...wide), columns: opts('have', 'need') };
+    const answer = Object.fromEntries(wide.map((r) => [r, 'need']));
+    const kept = clampForQuestion(q, answer) as Record<string, unknown>;
+    expect(Object.keys(kept)).toHaveLength(120);
+    expect(kept.item_120).toBe('need');
   });
 });
 
@@ -115,7 +190,7 @@ describe('long text (GAP-14)', () => {
   });
 });
 
-describe('through the Function (GAP-14, CH-16)', () => {
+describe('through the Function (GAP-14, CH-16, SRV-1, SRV-2)', () => {
   const FORM = 'f_clampqa00001';
   const rows = Array.from({ length: 25 }, (_, i) => `r${i + 1}`);
   const schema = {
@@ -179,5 +254,77 @@ describe('through the Function (GAP-14, CH-16)', () => {
     expect(stored.story).toBe(story);
     expect(Object.keys(stored.grid as object)).toHaveLength(25);
     expect(stored.pick).toEqual(['a', 'b']);
+  });
+
+  /** Publish `questions` on the test form, then send `answers` as a page would. */
+  async function sendTo(questions: unknown[], answers: Record<string, unknown>) {
+    db.state.forms.get(FORM)!.published_schema = { questions };
+    const res = await app.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.22' },
+      body: JSON.stringify({
+        formId: FORM,
+        answers,
+        meta: {
+          startedAt: '2026-10-05T10:00:00.000Z',
+          completedAt: '2026-10-05T10:01:00.000Z',
+          durationMs: 60000,
+          questionsVisited: Object.keys(answers),
+          hiddenFields: {},
+        },
+      }),
+    });
+    expect(res.status).toBe(200);
+    return db.state.submissions[0]!.answers as Record<string, unknown>;
+  }
+
+  it('keeps a required pick the owner removed and republished mid-fill (SRV-1)', async () => {
+    // The page loaded with Sat 10am; the owner then removed it and republished.
+    const stored = await sendTo(
+      [
+        { id: 'name', type: 'short_text', title: 'Name' },
+        {
+          id: 'when',
+          type: 'single_choice',
+          title: 'When?',
+          required: true,
+          options: opts('sat_11', 'sun_10'),
+        },
+        {
+          id: 'grid',
+          type: 'matrix',
+          title: 'Rate',
+          rows: opts('r1', 'r2'),
+          columns: opts('y', 'n'),
+        },
+      ],
+      { name: 'Ana', when: 'sat_10', grid: { r1: 'maybe', r2: 'y', r_old: 'n' } },
+    );
+    expect(stored).toEqual({
+      name: 'Ana',
+      when: 'sat_10',
+      grid: { r1: 'maybe', r2: 'y', r_old: 'n' },
+    });
+  });
+
+  it('stores all 120 rows of a 120-row grid (SRV-2: it kept 100)', async () => {
+    const wide = Array.from({ length: 120 }, (_, i) => `item_${i + 1}`);
+    const stored = await sendTo(
+      [
+        {
+          id: 'stock',
+          type: 'matrix',
+          title: 'Stock',
+          required: true,
+          rows: opts(...wide),
+          columns: opts('have', 'need'),
+        },
+      ],
+      { stock: Object.fromEntries(wide.map((r, i) => [r, i % 2 ? 'have' : 'need'])) },
+    );
+    const grid = stored.stock as Record<string, unknown>;
+    expect(Object.keys(grid)).toHaveLength(120);
+    expect(grid.item_101).toBe('need');
+    expect(grid.item_120).toBe('have');
   });
 });
