@@ -386,8 +386,10 @@ describe('formIssues', () => {
     ] as Question[];
     const blocking = Object.fromEntries(formIssues(qs).map((i) => [i.questionId, i.blocking]));
     expect(blocking).toEqual({ loop: false, shots: false, pin: false, pin2: true, slots: true });
-    expect(ownerIssues(qs).map((i) => [i.questionId, i.blocking]).sort()).toEqual(
-      Object.entries(blocking).sort(),
-    );
+    expect(
+      ownerIssues(qs)
+        .map((i) => [i.questionId, i.blocking])
+        .sort(),
+    ).toEqual(Object.entries(blocking).sort());
   });
 });

@@ -12,7 +12,7 @@ import {
 } from '../dataBackup.js';
 import { safeThemeName } from '../sanitizeUntrustedSchema.js';
 
-const count =(n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export function BackupPanel() {
   const confirm = useConfirm();
