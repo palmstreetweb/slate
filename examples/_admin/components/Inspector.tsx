@@ -801,6 +801,7 @@ export function Inspector({
                 value={question.visibleIf}
                 onChange={(visibleIf) => onChange({ visibleIf } as Partial<Question>)}
                 questions={allQuestions}
+                currentId={question.id}
               />
             </CollapsibleSection>
           </>

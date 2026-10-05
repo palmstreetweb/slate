@@ -6,345 +6,184 @@
  *     builder shows a notice instead of mangling them.
  *   - JumpRulesEditor — edits `logic: [{ if, goTo }]` rules, each with a
  *     single leaf condition and a jump-target dropdown.
+ *
+ * Both keep their rows as drafts (S7): a row reaches the form only once it is
+ * finished — a question picked, and an answer or a number that really is one —
+ * so a half-made rule never hides a question from respondents. Numbers are
+ * kept as typed ("2.", "-") while the form gets the number they make.
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Condition, LogicRule, Question } from '@/index.js';
-import { OTHER_VALUE } from '@/index.js';
-import { allowsOther, otherLabelOf } from '@/logic/other.js';
-import { IN_AREA_VALUE, OUT_OF_AREA_VALUE, checksArea, hasServiceArea } from '@/logic/address.js';
-import { WAITLIST_VALUE } from '@/logic/signupAnswer.js';
-import { offeredSlots, slotName } from '@/logic/signupView.js';
-import { SlateSelect } from './SlateSelect.js';
-
-function isCompleteJumpRule(rule: LogicRule): boolean {
-  return rule.goTo.trim().length > 0;
-}
-
-type LeafOp =
-  | 'equals'
-  | 'not_equals'
-  | 'gt'
-  | 'lt'
-  | 'gte'
-  | 'lte'
-  | 'is_empty'
-  | 'is_not_empty';
-
-type Leaf = { field: string; op: LeafOp; value: string };
-
-const OP_LABEL: Record<LeafOp, string> = {
-  equals: 'is',
-  not_equals: 'is not',
-  gt: 'is greater than',
-  lt: 'is less than',
-  gte: 'is at least',
-  lte: 'is at most',
-  is_empty: 'is blank',
-  is_not_empty: 'has an answer',
-};
-
-const NUMERIC_OPS = new Set<LeafOp>(['gt', 'lt', 'gte', 'lte']);
-const VALUELESS_OPS = new Set<LeafOp>(['is_empty', 'is_not_empty']);
-const NUMERIC_TYPES = new Set(['number', 'scale', 'nps']);
-const CHOICE_TYPES = new Set([
-  'signup_slots',
-  'single_choice',
-  'multi_choice',
-  'dropdown',
-  'yes_no',
-  'legal',
-  'picture_choice',
-  'ranking',
-]);
-
-/** Answers that are a group of parts (ADR-064, ADR-065): only "blank" / "has an answer" apply. */
-const PART_TYPES = new Set([
-  'contact_info',
-  'address',
-  'signature',
-  'image_pin',
-  'voice_note',
-  'location',
-  'photo_checklist',
-  'availability',
-]);
-
-/** `form` is every question: a ZIP typed on a location is checked against the address lists. */
-function opsForQuestion(q: Question | undefined, form: ReadonlyArray<Question> = []): LeafOp[] {
-  if (!q) return ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
-  // An address with a service area, or a location with a radius (ADR-065),
-  // can also be tested in / out of the area.
-  if ((q.type === 'address' && hasServiceArea(q)) || (q.type === 'location' && checksArea(q, form))) {
-    return ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
-  }
-  if (PART_TYPES.has(q.type)) return ['is_empty', 'is_not_empty'];
-  if (NUMERIC_TYPES.has(q.type)) {
-    return ['equals', 'not_equals', 'gt', 'lt', 'gte', 'lte', 'is_empty', 'is_not_empty'];
-  }
-  if (CHOICE_TYPES.has(q.type)) {
-    return ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
-  }
-  return ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
-}
-
-function isAnswerBearing(q: Question): boolean {
-  return q.type !== 'welcome' && q.type !== 'statement' && q.type !== 'thanks';
-}
-
-function defaultConditionField(questions: ReadonlyArray<Question>): string {
-  const bearing = questions.find(isAnswerBearing);
-  return bearing?.id ?? questions[0]?.id ?? '';
-}
-
-/** Human-readable name for a question — its title, never the internal id. */
-function displayName(q: Question): string {
-  const title = 'title' in q && typeof q.title === 'string' ? q.title.trim() : '';
-  const base = title || `Untitled ${q.type.replace(/_/g, ' ')}`;
-  return base.length > 44 ? `${base.slice(0, 43)}…` : base;
-}
+import { SlateSelect, type SlateSelectOption } from './SlateSelect.js';
+import {
+  OP_LABEL,
+  answerRemoved,
+  describeLeaf,
+  displayName,
+  fromLeaf,
+  indexOf,
+  isAnswerBearing,
+  isCompleteLeaf,
+  isLeafCondition,
+  opsForQuestion,
+  optionsFor,
+  ruleReach,
+  toLeaf,
+  unfinishedReason,
+  valueKind,
+  type Leaf,
+  type LeafOp,
+} from '../logicRules.js';
 
 /**
- * The selectable answers for a question, so logic conditions can be picked by
- * label instead of forcing the author to know the internal option value.
- * Returns null for free-form/numeric/other types (those use a plain input).
+ * Draft rows that follow `value` until the editor emits its own change. Any
+ * other change (undo, redo, another question) starts again from the form.
  */
-function optionsFor(
-  q: Question | undefined,
-  form: ReadonlyArray<Question> = [],
-): ReadonlyArray<{ label: string; value: string }> | null {
-  if (!q) return null;
-  switch (q.type) {
-    case 'single_choice':
-    case 'multi_choice':
-    case 'dropdown':
-    case 'ranking':
-    case 'picture_choice': {
-      const opts = (q.options as ReadonlyArray<{ label: string; value: string }>).map((o) => ({
-        label: o.label,
-        value: o.value,
-      }));
-      // "Picked Other" (ADR-063): matches any typed answer, never a listed option.
-      return allowsOther(q)
-        ? [...opts, { label: `${otherLabelOf(q)} (anything typed)`, value: OTHER_VALUE }]
-        : opts;
-    }
-    case 'yes_no':
-      return [
-        { label: q.yesLabel ?? 'Yes', value: 'yes' },
-        { label: q.noLabel ?? 'No', value: 'no' },
-      ];
-    case 'legal':
-      return [
-        { label: q.acceptLabel ?? 'I accept', value: 'accept' },
-        { label: q.declineLabel ?? "I don't accept", value: 'decline' },
-      ];
-    case 'signup_slots': {
-      // "Took this slot" per slot, and "joined a waitlist" when there is one (ADR-066).
-      const slots = offeredSlots(q).map((s) => ({ label: `Took: ${slotName(s)}`, value: s.value }));
-      return q.waitlist ? [...slots, { label: 'Joined a waitlist', value: WAITLIST_VALUE }] : slots;
-    }
-    case 'address':
-    case 'location':
-      // The service-area check (ADR-064, ADR-065): the ZIP against the owner's
-      // list, or the respondent's position against the radius.
-      return checksArea(q, form)
-        ? [
-            { label: 'Outside the service area', value: OUT_OF_AREA_VALUE },
-            { label: 'Inside the service area', value: IN_AREA_VALUE },
-          ]
-        : null;
-    default:
-      return null;
+function useDraft<V, D>(value: V, key: string | undefined, parse: (v: V) => D) {
+  const [state, setState] = useState(() => ({ from: value, key, draft: parse(value) }));
+  let current = state;
+  if (state.from !== value || state.key !== key) {
+    current = { from: value, key, draft: parse(value) };
+    setState(current);
   }
+  const commit = (draft: D, from: V) => setState({ from, key, draft });
+  return [current.draft, commit] as const;
 }
 
-function isLeafCondition(c: Condition): c is Extract<Condition, { field: string }> {
-  return 'field' in c;
+function sameJson(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
-/** Leaf Condition → editable row. Returns null for shapes the UI can't edit. */
-function toLeaf(c: Condition): Leaf | null {
-  if (!isLeafCondition(c)) return null;
-  if (c.op === 'in' || c.op === 'not_in') return null; // code-only
-  if (c.op === 'is_empty' || c.op === 'is_not_empty') {
-    return { field: c.field, op: c.op, value: '' };
+/** A new row: the nearest earlier answer when it takes a value, so the row starts unfinished. */
+function newLeaf(fields: ReadonlyArray<Question>, questions: ReadonlyArray<Question>): Leaf {
+  const nearest = fields[fields.length - 1];
+  if (nearest && opsForQuestion(nearest, questions).includes('equals')) {
+    return { field: nearest.id, op: 'equals', value: '' };
   }
-  // `op` isn't a unit-type discriminant, so TS can't narrow away the
-  // valueless variants above — assert the remaining shape.
-  const leaf = c as { field: string; op: LeafOp; value: string | number };
-  return { field: leaf.field, op: leaf.op, value: String(leaf.value) };
+  return { field: '', op: 'equals', value: '' };
 }
 
-/** Editable row → leaf Condition, typing the value off the target question. */
-function fromLeaf(leaf: Leaf, questions: ReadonlyArray<Question>): Condition {
-  if (VALUELESS_OPS.has(leaf.op)) {
-    return { field: leaf.field, op: leaf.op as 'is_empty' | 'is_not_empty' };
-  }
-  if (NUMERIC_OPS.has(leaf.op)) {
-    return {
-      field: leaf.field,
-      op: leaf.op as 'gt' | 'lt' | 'gte' | 'lte',
-      value: Number(leaf.value) || 0,
-    };
-  }
-  const target = questions.find((q) => q.id === leaf.field);
-  const numeric = target !== undefined && NUMERIC_TYPES.has(target.type);
-  return {
-    field: leaf.field,
-    op: leaf.op as 'equals' | 'not_equals',
-    value: numeric ? Number(leaf.value) || 0 : leaf.value,
-  };
-}
-
-type Parsed =
-  | { editable: true; combinator: 'all' | 'any'; leaves: Leaf[] }
-  | { editable: false };
-
-function parseCondition(c: Condition | undefined): Parsed {
-  if (c === undefined) return { editable: true, combinator: 'all', leaves: [] };
-  if (isLeafCondition(c)) {
-    const leaf = toLeaf(c);
-    return leaf ? { editable: true, combinator: 'all', leaves: [leaf] } : { editable: false };
-  }
-  const combinator = 'all' in c ? 'all' : 'any';
-  const children = 'all' in c ? c.all : c.any;
-  const leaves: Leaf[] = [];
-  for (const child of children) {
-    const leaf = toLeaf(child);
-    if (!leaf) return { editable: false };
-    leaves.push(leaf);
-  }
-  return { editable: true, combinator, leaves };
-}
-
-function buildCondition(
-  combinator: 'all' | 'any',
-  leaves: Leaf[],
-  questions: ReadonlyArray<Question>,
-): Condition | undefined {
-  const conds = leaves.filter((l) => l.field).map((l) => fromLeaf(l, questions));
-  if (conds.length === 0) return undefined;
-  if (conds.length === 1) return conds[0];
-  return combinator === 'all' ? { all: conds } : { any: conds };
-}
-
-function valueLabel(leaf: Leaf, questions: ReadonlyArray<Question>): string {
-  if (VALUELESS_OPS.has(leaf.op)) return '';
-  const target = questions.find((q) => q.id === leaf.field);
-  const choices = optionsFor(target, questions);
-  const match = choices?.find((o) => o.value === leaf.value);
-  return match?.label ?? (leaf.value.trim() || '…');
-}
-
-/** Plain-language summary of one rule row. */
-function describeLeaf(leaf: Leaf, questions: ReadonlyArray<Question>): string | null {
-  if (!leaf.field) return null;
-  const target = questions.find((q) => q.id === leaf.field);
-  const name = target ? displayName(target) : 'a question';
-  const op = OP_LABEL[leaf.op];
-  if (VALUELESS_OPS.has(leaf.op)) return `${name} ${op}`;
-  const value = valueLabel(leaf, questions);
-  if (!value || value === '…') return null;
-  return `${name} ${op} “${value}”`;
+function Note({ children, tone }: { children: string; tone: 'warn' | 'muted' }) {
+  return (
+    <p className={tone === 'warn' ? 'slate-logic-note slate-logic-note--warn' : 'slate-logic-note'}>
+      {children}
+    </p>
+  );
 }
 
 function LeafRow({
   leaf,
   questions,
+  fields,
+  fieldLabel,
   onChange,
   onRemove,
-  mode = 'visibility',
-  currentId,
+  heading,
+  preview,
+  warning,
 }: {
   leaf: Leaf;
   questions: ReadonlyArray<Question>;
+  /** The questions this row may test. */
+  fields: ReadonlyArray<Question>;
+  fieldLabel: string;
   onChange: (next: Leaf) => void;
   onRemove: () => void;
-  mode?: 'visibility' | 'jump';
-  currentId?: string;
+  heading?: string;
+  /** Plain summary of the finished rule, e.g. "Show when Size is “Large”". */
+  preview?: string | null;
+  /** Why this finished rule can't work as set up, or null. */
+  warning?: string | null;
 }) {
-  const fields = questions.filter(isAnswerBearing);
   const target = questions.find((q) => q.id === leaf.field);
   const choices = optionsFor(target, questions);
-  const showChoiceSelect = choices !== null && !NUMERIC_OPS.has(leaf.op);
-  const preview = describeLeaf(leaf, questions);
   const allowedOps = opsForQuestion(target, questions);
-  const safeOp = allowedOps.includes(leaf.op) ? leaf.op : allowedOps[0];
+  const safeOp: LeafOp = allowedOps.includes(leaf.op) ? leaf.op : (allowedOps[0] ?? 'equals');
+  const shown: Leaf = { ...leaf, op: safeOp };
+  const kind = valueKind(shown, questions);
+  const unfinished = unfinishedReason(shown, questions);
+
+  const fieldOptions: SlateSelectOption[] = [
+    { value: '', label: 'Pick a question…' },
+    ...fields.map((q) => ({ value: q.id, label: displayName(q) })),
+  ];
+  // A saved rule that reads a question out of reach still shows what it reads.
+  if (target && !fields.some((q) => q.id === target.id)) {
+    fieldOptions.push({ value: target.id, label: displayName(target) });
+  }
+  const answerOptions: SlateSelectOption[] = [
+    { value: '', label: 'Pick an answer…' },
+    ...(choices ?? []).map((o) => ({ value: o.value, label: o.label })),
+  ];
+  if (answerRemoved(shown, questions)) {
+    answerOptions.push({ value: leaf.value, label: 'Removed answer' });
+  }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'start' }}>
       <div style={{ display: 'grid', gap: 8 }}>
-        {mode === 'visibility' ? (
-          <p className="slate-logic-rule-head">When this is true…</p>
-        ) : null}
+        {heading ? <p className="slate-logic-rule-head">{heading}</p> : null}
+        <div>
+          <span className="slate-logic-field-label">{fieldLabel}</span>
+          <SlateSelect
+            value={leaf.field}
+            placeholder="Pick a question"
+            options={fieldOptions}
+            aria-label="Question"
+            onChange={(field) => {
+              const nextTarget = questions.find((q) => q.id === field);
+              const nextOps = opsForQuestion(nextTarget, questions);
+              const op = nextOps.includes(leaf.op) ? leaf.op : (nextOps[0] ?? 'equals');
+              // A new question means new answers: only a typed number carries over.
+              const nextKind = valueKind({ field, op, value: '' }, questions);
+              const keep = kind === 'number' && nextKind === 'number';
+              onChange({ field, op, value: keep ? leaf.value : '' });
+            }}
+          />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <div>
-            <span className="slate-logic-field-label">
-              {mode === 'jump' && leaf.field === currentId ? 'On this question' : 'Earlier answer'}
-            </span>
-            <SlateSelect
-              value={leaf.field}
-              placeholder="Pick a question"
-              options={[
-                { value: '', label: 'Pick a question…' },
-                ...fields.map((q) => ({ value: q.id, label: displayName(q) })),
-              ]}
-              aria-label="Question"
-              onChange={(field) => {
-                const nextTarget = questions.find((q) => q.id === field);
-                const nextOps = opsForQuestion(nextTarget, questions);
-                onChange({
-                  ...leaf,
-                  field,
-                  op: nextOps.includes(leaf.op) ? leaf.op : nextOps[0],
-                });
-              }}
+            <span className="slate-logic-field-label">Condition</span>
+            <SlateSelect<LeafOp>
+              value={safeOp}
+              options={allowedOps.map((op) => ({ value: op, label: OP_LABEL[op] }))}
+              aria-label="Condition"
+              onChange={(op) => onChange({ ...leaf, op })}
             />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {kind === 'none' ? null : kind === 'choice' ? (
             <div>
-              <span className="slate-logic-field-label">Condition</span>
+              <span className="slate-logic-field-label">Answer</span>
               <SlateSelect
-                value={safeOp}
-                options={allowedOps.map((op) => ({
-                  value: op,
-                  label: OP_LABEL[op],
-                }))}
-                aria-label="Condition"
-                onChange={(op) => onChange({ ...leaf, op })}
+                value={leaf.value}
+                placeholder="Pick an answer"
+                options={answerOptions}
+                aria-label="Answer"
+                onChange={(value) => onChange({ ...leaf, value })}
               />
             </div>
-            {!VALUELESS_OPS.has(safeOp) &&
-              (showChoiceSelect ? (
-                <div>
-                  <span className="slate-logic-field-label">Answer</span>
-                  <SlateSelect
-                    value={leaf.value}
-                    placeholder="Pick an answer"
-                    options={[
-                      { value: '', label: 'Pick an answer…' },
-                      ...(choices ?? []).map((o) => ({ value: o.value, label: o.label })),
-                    ]}
-                    aria-label="Answer"
-                    onChange={(value) => onChange({ ...leaf, value })}
-                  />
-                </div>
-              ) : (
-                <div>
-                  <span className="slate-logic-field-label">Value</span>
-                  <input
-                    className="slate-input"
-                    value={leaf.value}
-                    placeholder="Enter a value"
-                    onChange={(e) => onChange({ ...leaf, value: e.target.value })}
-                  />
-                </div>
-              ))}
-          </div>
-        {preview && mode === 'visibility' ? (
-          <p className="slate-logic-preview">
-            Show when <strong>{preview}</strong>
-          </p>
+          ) : (
+            <div>
+              <span className="slate-logic-field-label">Value</span>
+              <input
+                className="slate-input"
+                value={leaf.value}
+                placeholder={kind === 'number' ? 'A number' : 'Enter a value'}
+                inputMode={kind === 'number' ? 'decimal' : undefined}
+                aria-label="Value"
+                aria-invalid={kind === 'number' && leaf.value.trim() !== '' && unfinished !== null}
+                onChange={(e) => onChange({ ...leaf, value: e.target.value })}
+              />
+            </div>
+          )}
+        </div>
+        {unfinished ? (
+          <Note tone="muted">{unfinished}</Note>
+        ) : warning ? (
+          <Note tone="warn">{warning}</Note>
+        ) : preview ? (
+          <p className="slate-logic-preview">{preview}</p>
         ) : null}
       </div>
       <button type="button" className="slate-icon-btn" onClick={onRemove} aria-label="Remove rule">
@@ -354,36 +193,103 @@ function LeafRow({
   );
 }
 
+/** Why a finished "when to show" row can't work, in plain words; null when it can. */
+function visibilityWarning(
+  leaf: Leaf,
+  questions: ReadonlyArray<Question>,
+  currentId: string | undefined,
+): string | null {
+  if (currentId !== undefined && leaf.field === currentId) {
+    return 'A question can’t wait for its own answer, so it would never show. Pick an earlier question.';
+  }
+  if (currentId !== undefined) {
+    const at = indexOf(questions, currentId);
+    const used = indexOf(questions, leaf.field);
+    if (at !== -1 && used > at) {
+      return 'That question comes later, so it isn’t answered yet when this one would show. Pick an earlier question.';
+    }
+  }
+  if (answerRemoved(leaf, questions)) {
+    return 'That answer isn’t one of the choices any more. Pick another.';
+  }
+  return null;
+}
+
+type CondDraft = { editable: boolean; combinator: 'all' | 'any'; leaves: Leaf[] };
+
+function parseCondition(c: Condition | undefined): CondDraft {
+  if (c === undefined) return { editable: true, combinator: 'all', leaves: [] };
+  if (isLeafCondition(c)) {
+    const leaf = toLeaf(c);
+    return leaf
+      ? { editable: true, combinator: 'all', leaves: [leaf] }
+      : { editable: false, combinator: 'all', leaves: [] };
+  }
+  const combinator = 'all' in c ? 'all' : 'any';
+  const children = 'all' in c ? c.all : c.any;
+  const leaves: Leaf[] = [];
+  for (const child of children) {
+    const leaf = toLeaf(child);
+    if (!leaf) return { editable: false, combinator, leaves: [] };
+    leaves.push(leaf);
+  }
+  return { editable: true, combinator, leaves };
+}
+
+function buildCondition(
+  combinator: 'all' | 'any',
+  leaves: ReadonlyArray<Leaf>,
+  questions: ReadonlyArray<Question>,
+): Condition | undefined {
+  const conds = leaves
+    .filter((l) => isCompleteLeaf(l, questions))
+    .map((l) => fromLeaf(l, questions));
+  if (conds.length === 0) return undefined;
+  if (conds.length === 1) return conds[0];
+  return combinator === 'all' ? { all: conds } : { any: conds };
+}
+
 export function ConditionBuilder({
   value,
   onChange,
   questions,
+  currentId,
 }: {
   value: Condition | undefined;
   onChange: (next: Condition | undefined) => void;
   questions: ReadonlyArray<Question>;
+  /** The question these rules belong to; rules may only read answers given before it. */
+  currentId?: string;
 }) {
-  const parsed = parseCondition(value);
+  const [draft, commit] = useDraft(value, currentId, parseCondition);
+  const fields =
+    currentId === undefined
+      ? questions.filter(isAnswerBearing)
+      : ruleReach(questions, currentId).visibilityFields;
 
-  if (!parsed.editable) {
+  if (!draft.editable) {
     return (
       <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
-        This condition uses nested groups or in/not_in — edit it in the schema code, or{' '}
+        This rule was set up outside the editor, so it can’t be changed here.{' '}
         <button
           type="button"
           className="slate-btn slate-btn--ghost slate-btn--compact"
           onClick={() => onChange(undefined)}
         >
-          clear it
+          Clear it
         </button>{' '}
-        to rebuild here.
+        to start over.
       </p>
     );
   }
 
-  const { combinator, leaves } = parsed;
-  const emit = (nextCombinator: 'all' | 'any', nextLeaves: Leaf[]) =>
-    onChange(buildCondition(nextCombinator, nextLeaves, questions));
+  const { combinator, leaves } = draft;
+  const emit = (nextCombinator: 'all' | 'any', nextLeaves: Leaf[]) => {
+    const next = buildCondition(nextCombinator, nextLeaves, questions);
+    const same = sameJson(next, value);
+    commit({ editable: true, combinator: nextCombinator, leaves: nextLeaves }, same ? value : next);
+    if (!same) onChange(next);
+  };
 
   return (
     <div style={{ display: 'grid', gap: 8 }}>
@@ -393,7 +299,7 @@ export function ConditionBuilder({
       {leaves.length > 1 && (
         <div className="slate-logic-combinator">
           <span>Show when</span>
-          <SlateSelect
+          <SlateSelect<'all' | 'any'>
             className="slate-select-wrap--auto"
             value={combinator}
             options={[
@@ -406,32 +312,110 @@ export function ConditionBuilder({
           <span>rule matches:</span>
         </div>
       )}
-      {leaves.map((leaf, i) => (
-        <div key={i} className="slate-logic-rule">
-          <LeafRow
-            leaf={leaf}
-            questions={questions}
-            mode="visibility"
-            onChange={(next) => emit(combinator, leaves.map((l, idx) => (idx === i ? next : l)))}
-            onRemove={() => emit(combinator, leaves.filter((_, idx) => idx !== i))}
-          />
-        </div>
-      ))}
-      <button
-        type="button"
-        className="slate-btn slate-btn--ghost slate-btn--compact"
-        style={{ justifySelf: 'start' }}
-        onClick={() =>
-          emit(combinator, [
-            ...leaves,
-            { field: defaultConditionField(questions), op: 'equals', value: '' },
-          ])
-        }
-      >
-        <span className="slate-btn-plus">+</span> Add visibility rule
-      </button>
+      {leaves.map((leaf, i) => {
+        const summary = describeLeaf(leaf, questions);
+        return (
+          <div key={i} className="slate-logic-rule">
+            <LeafRow
+              leaf={leaf}
+              questions={questions}
+              fields={fields}
+              fieldLabel="Earlier answer"
+              heading="When this is true…"
+              preview={summary ? `Show when ${summary}` : null}
+              warning={visibilityWarning(leaf, questions, currentId)}
+              onChange={(next) =>
+                emit(
+                  combinator,
+                  leaves.map((l, idx) => (idx === i ? next : l)),
+                )
+              }
+              onRemove={() =>
+                emit(
+                  combinator,
+                  leaves.filter((_, idx) => idx !== i),
+                )
+              }
+            />
+          </div>
+        );
+      })}
+      {fields.length === 0 ? (
+        <p className="slate-logic-note">
+          Rules use answers to earlier questions, and nothing before this one has an answer yet.
+        </p>
+      ) : (
+        <button
+          type="button"
+          className="slate-btn slate-btn--ghost slate-btn--compact"
+          style={{ justifySelf: 'start' }}
+          onClick={() => emit(combinator, [...leaves, newLeaf(fields, questions)])}
+        >
+          <span className="slate-btn-plus">+</span> Add visibility rule
+        </button>
+      )}
     </div>
   );
+}
+
+/**
+ * A new skip rule tests this question's own answer, with the first condition it
+ * allows; a statement (no answer of its own) starts from the nearest earlier answer.
+ */
+function newJumpLeaf(
+  questions: ReadonlyArray<Question>,
+  currentId: string,
+  fields: ReadonlyArray<Question>,
+): Leaf {
+  const current = questions.find((q) => q.id === currentId);
+  if (!current || !isAnswerBearing(current)) return newLeaf(fields, questions);
+  const ops = opsForQuestion(current, questions);
+  return {
+    field: currentId,
+    op: ops.includes('equals') ? 'equals' : (ops[0] ?? 'equals'),
+    value: '',
+  };
+}
+
+/** One skip rule as the editor holds it: its row (null when set up outside the editor). */
+type JumpDraft = { leaf: Leaf | null; rule: LogicRule };
+
+const NO_RULES: ReadonlyArray<LogicRule> = [];
+
+function isCompleteJump(d: JumpDraft, questions: ReadonlyArray<Question>): boolean {
+  if (!d.rule.goTo.trim()) return false;
+  return d.leaf === null || isCompleteLeaf(d.leaf, questions);
+}
+
+function toRule(d: JumpDraft, questions: ReadonlyArray<Question>): LogicRule {
+  return d.leaf ? { if: fromLeaf(d.leaf, questions), goTo: d.rule.goTo } : d.rule;
+}
+
+/** Why a finished skip rule can't work, in plain words; null when it can. */
+function jumpWarning(
+  d: JumpDraft,
+  questions: ReadonlyArray<Question>,
+  currentId: string,
+): string | null {
+  const at = indexOf(questions, currentId);
+  const to = indexOf(questions, d.rule.goTo);
+  if (d.rule.goTo === currentId) {
+    return 'This rule skips to the same question, so it does nothing. Pick a later one.';
+  }
+  if (to === -1) return 'The question it skipped to was deleted. Pick another one.';
+  if (at !== -1 && to < at) {
+    return 'This goes back to an earlier question, so people could go round in circles. Pick a later one.';
+  }
+  if (d.leaf) {
+    const used = indexOf(questions, d.leaf.field);
+    if (at !== -1 && used > at) {
+      return 'That question comes later, so it isn’t answered yet when this rule runs. Pick this one or an earlier one.';
+    }
+    if (answerRemoved(d.leaf, questions)) {
+      return 'That answer isn’t one of the choices any more. Pick another.';
+    }
+  }
+  return null;
 }
 
 export function JumpRulesEditor({
@@ -445,94 +429,76 @@ export function JumpRulesEditor({
   questions: ReadonlyArray<Question>;
   currentId: string;
 }) {
-  const targets = questions.filter((q) => q.id !== currentId && q.type !== 'welcome');
-  const persisted = rules.filter(isCompleteJumpRule);
-  const [pending, setPending] = useState<LogicRule[]>([]);
+  // `logic ?? []` makes a new empty list each render; one constant keeps the drafts.
+  const value = rules.length ? rules : NO_RULES;
+  const [drafts, commit] = useDraft(value, currentId, (list: ReadonlyArray<LogicRule>) =>
+    list.map((rule): JumpDraft => ({ leaf: toLeaf(rule.if), rule })),
+  );
+  const reach = ruleReach(questions, currentId);
 
-  // Hoist any saved incomplete rules into draft UI state and drop them from schema.
-  useEffect(() => {
-    const incomplete = rules.filter((r) => !isCompleteJumpRule(r));
-    setPending(incomplete);
-    if (incomplete.length > 0) {
-      onChange(persisted.length > 0 ? persisted : undefined);
-    }
-    // Only re-run when switching questions — not on every rules edit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId]);
-
-  const displayRules = [...persisted, ...pending];
-  const emitPersisted = (next: LogicRule[]) =>
-    onChange(next.length === 0 ? undefined : next.filter(isCompleteJumpRule));
-
-  const updateRule = (index: number, patch: Partial<LogicRule>) => {
-    if (index < persisted.length) {
-      const next = persisted.map((r, idx) => (idx === index ? { ...r, ...patch } : r));
-      const updated = next[index];
-      if (updated && !isCompleteJumpRule(updated)) {
-        emitPersisted(persisted.filter((_, idx) => idx !== index));
-        setPending((prev) => [...prev, updated]);
-        return;
-      }
-      emitPersisted(next);
-      return;
-    }
-
-    const pendingIndex = index - persisted.length;
-    setPending((prev) => {
-      const next = prev.map((r, idx) => (idx === pendingIndex ? { ...r, ...patch } : r));
-      const updated = next[pendingIndex];
-      if (updated && isCompleteJumpRule(updated)) {
-        emitPersisted([...persisted, updated]);
-        return next.filter((_, idx) => idx !== pendingIndex);
-      }
-      return next;
-    });
+  const emit = (next: JumpDraft[]) => {
+    const done = next.filter((d) => isCompleteJump(d, questions)).map((d) => toRule(d, questions));
+    const same = sameJson(done, value);
+    commit(next, same ? value : done.length ? done : NO_RULES);
+    if (!same) onChange(done.length ? done : undefined);
   };
 
-  const removeRule = (index: number) => {
-    if (index < persisted.length) {
-      emitPersisted(persisted.filter((_, idx) => idx !== index));
-      return;
-    }
-    const pendingIndex = index - persisted.length;
-    setPending((prev) => prev.filter((_, idx) => idx !== pendingIndex));
-  };
+  const update = (index: number, patch: Partial<JumpDraft>) =>
+    emit(
+      drafts.map((d, i) =>
+        i === index ? { ...d, ...patch, rule: { ...d.rule, ...patch.rule } } : d,
+      ),
+    );
 
   return (
     <div style={{ display: 'grid', gap: 10 }}>
-      {displayRules.length === 0 ? (
+      {drafts.length === 0 ? (
         <p className="slate-logic-empty">
           Goes to the next question in order — add a rule to skip ahead based on their answer.
         </p>
       ) : null}
-      {displayRules.map((rule, i) => {
-        const leaf = toLeaf(rule.if);
-        const targetName = targets.find((q) => q.id === rule.goTo);
-        const conditionText = leaf ? describeLeaf(leaf, questions) : null;
-        const destination = targetName ? displayName(targetName) : null;
+      {drafts.map((d, i) => {
+        const target = questions.find((q) => q.id === d.rule.goTo);
+        const targetOptions: SlateSelectOption[] = [
+          { value: '', label: 'Pick a question…' },
+          ...reach.jumpTargets.map((q) => ({ value: q.id, label: displayName(q) })),
+        ];
+        // A saved rule that points out of reach still shows where it points.
+        if (target && !reach.jumpTargets.some((q) => q.id === target.id)) {
+          targetOptions.push({ value: target.id, label: displayName(target) });
+        }
+        const complete = isCompleteJump(d, questions);
+        const warning = complete ? jumpWarning(d, questions, currentId) : null;
+        const conditionText = d.leaf ? describeLeaf(d.leaf, questions) : null;
+        const leafDone = d.leaf === null || isCompleteLeaf(d.leaf, questions);
         return (
           <div key={i} className="slate-logic-rule">
             <p className="slate-logic-rule-head">Skip rule {i + 1}</p>
-            {leaf ? (
+            {d.leaf ? (
               <LeafRow
-                leaf={leaf}
+                leaf={d.leaf}
                 questions={questions}
-                mode="jump"
-                currentId={currentId}
-                onChange={(next) =>
-                  updateRule(i, { if: fromLeaf(next, questions) })
-                }
-                onRemove={() => removeRule(i)}
+                fields={reach.jumpFields}
+                fieldLabel={d.leaf.field === currentId ? 'On this question' : 'Earlier answer'}
+                onChange={(leaf) => update(i, { leaf })}
+                onRemove={() => emit(drafts.filter((_, idx) => idx !== i))}
               />
             ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  alignItems: 'center',
+                }}
+              >
                 <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
-                  This rule uses advanced logic — edit it in the schema code.
+                  This rule was set up outside the editor, so it can’t be changed here.
                 </p>
                 <button
                   type="button"
                   className="slate-btn slate-btn--ghost slate-btn--compact"
-                  onClick={() => removeRule(i)}
+                  onClick={() => emit(drafts.filter((_, idx) => idx !== i))}
                 >
                   Remove
                 </button>
@@ -541,37 +507,43 @@ export function JumpRulesEditor({
             <div>
               <span className="slate-logic-field-label">Then skip to</span>
               <SlateSelect
-                value={rule.goTo}
+                value={d.rule.goTo}
                 placeholder="Pick a question"
-                options={[
-                  { value: '', label: 'Pick a question…' },
-                  ...targets.map((q) => ({ value: q.id, label: displayName(q) })),
-                ]}
+                options={targetOptions}
                 aria-label="Jump target"
-                onChange={(goTo) => updateRule(i, { goTo })}
+                onChange={(goTo) => update(i, { rule: { ...d.rule, goTo } })}
               />
             </div>
-            {conditionText && destination ? (
+            {leafDone && !d.rule.goTo.trim() ? (
+              <Note tone="muted">Pick where to skip to, to finish this rule.</Note>
+            ) : warning ? (
+              <Note tone="warn">{warning}</Note>
+            ) : complete && conditionText && target ? (
               <p className="slate-logic-preview">
-                If <strong>{conditionText}</strong>, skip to <strong>{destination}</strong>.
+                If <strong>{conditionText}</strong>, skip to <strong>{displayName(target)}</strong>.
               </p>
             ) : null}
           </div>
         );
       })}
-      <button
-        type="button"
-        className="slate-btn slate-btn--ghost slate-btn--compact"
-        style={{ justifySelf: 'start' }}
-        onClick={() =>
-          setPending((prev) => [
-            ...prev,
-            { if: { field: currentId, op: 'equals', value: '' }, goTo: '' },
-          ])
-        }
-      >
-        <span className="slate-btn-plus">+</span> Add skip rule
-      </button>
+      {reach.jumpTargets.length === 0 ? (
+        <p className="slate-logic-note">This is the last step, so there’s nothing to skip to.</p>
+      ) : (
+        <button
+          type="button"
+          className="slate-btn slate-btn--ghost slate-btn--compact"
+          style={{ justifySelf: 'start' }}
+          onClick={() => {
+            const leaf = newJumpLeaf(questions, currentId, reach.jumpFields);
+            emit([
+              ...drafts,
+              { leaf, rule: { if: { field: leaf.field, op: 'is_not_empty' }, goTo: '' } },
+            ]);
+          }}
+        >
+          <span className="slate-btn-plus">+</span> Add skip rule
+        </button>
+      )}
     </div>
   );
 }

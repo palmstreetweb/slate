@@ -3195,6 +3195,24 @@ body.slate-editor-resizing * {
   color: var(--slate-text);
 }
 
+/* An unfinished rule (muted) or one that can't work as set up (warn). The
+   text stays ink-coloured so it reads at full contrast; the edge carries the tone. */
+[data-slate-forms][data-theme-name='slate'] .slate-logic-note {
+  margin: 0;
+  font-size: var(--slate-fs-sm);
+  line-height: 1.45;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-logic-note--warn {
+  padding: 8px 10px;
+  color: var(--chrome-ink);
+  border-radius: var(--slate-radius-sm);
+  border: 1px solid color-mix(in srgb, var(--slate-warn) 45%, var(--chrome-line));
+  border-left: 3px solid var(--slate-warn);
+  background: color-mix(in srgb, var(--slate-warn) 9%, var(--chrome-panel));
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-logic-field-label {
   display: block;
   margin-bottom: 4px;
