@@ -66,19 +66,26 @@ export function aboutWait(seconds: number): string {
   return h <= 1 ? 'about an hour' : `about ${h} hours`;
 }
 
-/** Too many submissions from one network (a platform 429 without the Function's own text). */
+/**
+ * The rate-limit sentences below are the Functions' own, word for word, for a
+ * 429 that arrives without them (a platform limit in front of the Function):
+ * one voice whichever answered.
+ */
+const OTHER_NETWORK = 'or try from another network (for example mobile data).';
+
+/** Too many submissions from one network. */
 export function sendRateLimited(seconds: number): string {
-  return `Too many responses from this network right now. Try again in ${aboutWait(seconds)}, or switch to mobile data.`;
+  return `Too many responses from this network right now. Please wait ${aboutWait(seconds)}, ${OTHER_NETWORK}`;
 }
 
-/** Too many uploads from one network (a 429 without the Function's own text). */
+/** Too many uploads from one network. */
 export function uploadRateLimited(seconds: number): string {
-  return `Too many uploads from this network right now. Try again in ${aboutWait(seconds)}, or switch to mobile data.`;
+  return `Too many uploads from this network right now. Please wait ${aboutWait(seconds)}, ${OTHER_NETWORK}`;
 }
 
-/** Too many password tries (a 429 without the Function's own text). */
+/** Too many password tries from one network. */
 export function gateRateLimited(seconds: number): string {
-  return `Too many tries from this network. Try again in ${aboutWait(seconds)}.`;
+  return `Too many password attempts from this network right now. Please wait ${aboutWait(seconds)}, ${OTHER_NETWORK}`;
 }
 
 /**

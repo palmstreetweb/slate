@@ -51,7 +51,8 @@ describe('unlockPublicForm 429', () => {
     respond(new Response(JSON.stringify({ retryAfterSeconds: 3600 }), { status: 429 }));
     const r = await unlockPublicForm('crew', { password: 'x' });
     expect(r).toMatchObject({
-      message: 'Too many tries from this network. Try again in about an hour.',
+      message:
+        'Too many password attempts from this network right now. Please wait about an hour, or try from another network (for example mobile data).',
     });
   });
 
@@ -59,7 +60,8 @@ describe('unlockPublicForm 429', () => {
     respond(new Response('nope', { status: 429 }));
     const r = await unlockPublicForm('crew', { password: 'x' });
     expect(r).toMatchObject({
-      message: 'Too many tries from this network. Try again in about 1 minute.',
+      message:
+        'Too many password attempts from this network right now. Please wait about 1 minute, or try from another network (for example mobile data).',
     });
   });
 });

@@ -100,7 +100,7 @@ describe('sign refusals', () => {
   it('a platform 429 names the wait in minutes, never seconds', async () => {
     server(() => new Response('slow down', { status: 429, headers: { 'Retry-After': '120' } }));
     expect(await failure()).toBe(
-      'Too many uploads from this network right now. Try again in about 2 minutes, or switch to mobile data.',
+      'Too many uploads from this network right now. Please wait about 2 minutes, or try from another network (for example mobile data).',
     );
   });
 

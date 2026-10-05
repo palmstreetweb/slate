@@ -113,7 +113,7 @@ describe('submit failures never show the reply', () => {
       new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': '3600' } }),
     );
     expect(err.message).toBe(
-      'Too many responses from this network right now. Try again in about an hour, or switch to mobile data.',
+      'Too many responses from this network right now. Please wait about an hour, or try from another network (for example mobile data).',
     );
     expect(err.message).not.toMatch(/seconds/);
   });

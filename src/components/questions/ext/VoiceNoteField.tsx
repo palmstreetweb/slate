@@ -197,7 +197,7 @@ export default function VoiceNoteField({
       const cap = voiceMaxBytes(maxSec);
       if (file.size > cap) {
         setSave('error');
-        setSaveError('That recording is too large. Try a shorter one.');
+        setSaveError('That recording is too big. Try a shorter one.');
         return;
       }
       setSave('saving');
