@@ -86,7 +86,12 @@ export function PhoneField({
       onAnswer(parsed.number);
       onAdvance();
     } catch {
-      setError('Could not parse that phone number');
+      // The number checker didn't download (a Wi-Fi blip). Keep the number as
+      // typed, like the contact block: the browser won't fetch it again in
+      // this page, so asking them to retry would trap them (X2, COPY-12).
+      setError(null);
+      onAnswer(value.trim());
+      onAdvance();
     } finally {
       submittingRef.current = false;
     }
