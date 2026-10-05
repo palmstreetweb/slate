@@ -28,6 +28,14 @@ function canAnimate(el: Element | null | undefined): el is Element {
  * when the error message itself hasn't changed.
  */
 export function shakeInvalid(el: Element | null | undefined): void {
+  // Bring the message and OK into view: an error under a long list would
+  // otherwise render off-screen and look like nothing happened.
+  requestAnimationFrame(() => {
+    const s = el?.closest('.slate-stage-content');
+    (s?.querySelector('.slate-err ~ .slate-actions') ?? s?.querySelector('.slate-err'))?.scrollIntoView?.({
+      block: 'nearest',
+    });
+  });
   if (!canAnimate(el) || motionReduced(el)) return;
   el.animate(
     [

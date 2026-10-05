@@ -458,7 +458,13 @@ export function Form<S extends Schema>({
   }, []);
 
   const questionKey = currentQuestion?.id ?? 'empty';
+  const swappedRef = useRef(false);
   useLayoutEffect(() => {
+    // A new question opens at its top: after a tall question the page would
+    // otherwise stay scrolled down, with the title and Back off-screen.
+    const w = wrapperRef.current;
+    if (swappedRef.current && w && w.getBoundingClientRect().top < 0) w.scrollIntoView?.();
+    swappedRef.current = true;
     const leaving = pendingLeaveRef.current;
     pendingLeaveRef.current = null;
     const host = leaveHostRef.current;
