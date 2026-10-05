@@ -123,6 +123,8 @@ export default function ContactInfoField({
     if (isTypewriterKey(e)) onType?.();
     if (e.key !== 'Enter' || e.shiftKey) return;
     e.preventDefault();
+    // A held Enter (key repeat) never runs through the parts and confirms (ENG-07).
+    if (e.repeat) return;
     const next = shown[shown.indexOf(f) + 1];
     if (next) refs.current[next]?.focus();
     else confirm();

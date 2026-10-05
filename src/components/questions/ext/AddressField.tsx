@@ -106,6 +106,8 @@ export default function AddressField({
     if (isTypewriterKey(e)) onType?.();
     if (e.key !== 'Enter' || e.shiftKey) return;
     e.preventDefault();
+    // A held Enter (key repeat) never runs through the parts and confirms (ENG-07).
+    if (e.repeat) return;
     const next = shown[shown.indexOf(part) + 1];
     if (next) refs.current[next]?.focus();
     else submit();

@@ -158,6 +158,8 @@ export function DropdownField({
       setHighlight((h) => Math.max(h - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      // A held Enter (key repeat) never picks or confirms (ADR-069, ENG-07).
+      if (e.repeat) return;
       const row = open ? rows[highlight] : undefined;
       if (row && (row.value !== OTHER_ROW || typedOther)) {
         choose(row.value);

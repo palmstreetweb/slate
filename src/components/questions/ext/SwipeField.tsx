@@ -588,9 +588,11 @@ function YesNoSwipe({
   const { cardRef, fling, handlers } = useSwipeCard(decide);
   useArrowKeys(fling, true);
   useEffect(() => focusAfter(groupRef.current), [question.id]);
-  // An optional card, still unanswered, can be skipped: a Skip button, and Enter (ADR-069).
+  // An optional card, still unanswered, can be skipped: a Skip button, and Enter
+  // (ADR-069) once the card has been up a moment, so a double Enter from the
+  // question before never skips it unseen (ENG-06).
   const skip = question.required === false && !answered ? onAdvance : undefined;
-  useRegisterFormConfirm(skip!, Boolean(skip));
+  useRegisterFormConfirm(skip!, Boolean(skip), 500);
 
   // Y / N (through <Form>) answer without touching the card: fling it the same way.
   const seen = useRef(answered);

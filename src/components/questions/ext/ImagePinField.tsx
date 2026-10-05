@@ -343,7 +343,7 @@ export default function ImagePinField({
                     }
                     onKeyDown={(e) => {
                       if (isTypewriterKey(e)) onType?.();
-                      if (e.key === 'Enter' && !e.shiftKey) {
+                      if (e.key === 'Enter' && !e.shiftKey && !e.repeat) {
                         e.preventDefault();
                         submit();
                       }

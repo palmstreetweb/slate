@@ -187,7 +187,10 @@ export function PictureChoiceField({
   }, [multiple, other, onSelectMulti, selectedArr, error, full]);
 
   const confirms = multiple || other.open || Boolean(skip);
-  useRegisterFormConfirm(submit, confirms);
+  // Skip on Enter waits until the question has been up a moment, like the
+  // other one-tap questions: a double Enter from the question before must not
+  // skip this one unseen (ENG-06, R14).
+  useRegisterFormConfirm(submit, confirms, skip ? 500 : 0);
   useRegisterOtherKey(onOtherTile, other.enabled);
 
   const keys = keyRange(question.options.length + (other.enabled ? 1 : 0));

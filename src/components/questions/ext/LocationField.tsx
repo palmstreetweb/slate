@@ -332,7 +332,7 @@ export default function LocationField({
                 onChange={(e) => onManual(e.target.value)}
                 onKeyDown={(e) => {
                   if (isTypewriterKey(e)) onType?.();
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && !e.repeat) {
                     e.preventDefault();
                     submit();
                   }

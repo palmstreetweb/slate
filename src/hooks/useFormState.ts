@@ -121,13 +121,11 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
         const newAnswers = { ...s.answers, [a.id]: resolved };
         const oldVisible = visibleQuestions(allQuestions, s.answers);
         const newVisible = visibleQuestions(allQuestions, newAnswers);
+        // Stay on the question shown, wherever the answer moved it in the list.
         const currentId = oldVisible[Math.min(s.step, Math.max(oldVisible.length - 1, 0))]?.id;
-        let newStep = Math.min(s.step, Math.max(newVisible.length - 1, 0));
-        if (currentId) {
-          const idx = newVisible.findIndex((q) => q.id === currentId);
-          newStep = idx >= 0 ? idx : Math.min(s.step, Math.max(newVisible.length - 1, 0));
-        }
-        return { ...s, answers: newAnswers, step: newStep };
+        const idx = newVisible.findIndex((q) => q.id === currentId);
+        const step = idx >= 0 ? idx : Math.min(s.step, Math.max(newVisible.length - 1, 0));
+        return { ...s, answers: newAnswers, step };
       }
       case 'go_next': {
         const visible = visibleQuestions(allQuestions, s.answers);
@@ -174,17 +172,13 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
       }
       case 'go_back': {
         if (s.history.length === 0 && s.step === 0) return s;
-        const visible = visibleQuestions(allQuestions, s.answers);
-        const popped = s.history.length > 0 ? s.history[s.history.length - 1] : undefined;
-        let target = Math.max(s.step - 1, 0);
-        if (popped) {
-          const idx = visible.findIndex((q) => q.id === popped);
-          if (idx >= 0) target = idx;
-        }
+        // Back to the step the respondent came from, if it's still shown; else the one before.
+        const popped = s.history[s.history.length - 1];
+        const idx = visibleQuestions(allQuestions, s.answers).findIndex((q) => q.id === popped);
         return {
           ...s,
           history: s.history.slice(0, -1),
-          step: target,
+          step: idx >= 0 ? idx : Math.max(s.step - 1, 0),
           direction: 'backward',
           isAnimating: true,
         };
