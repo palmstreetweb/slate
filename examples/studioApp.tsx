@@ -44,6 +44,7 @@ import {
 } from './_admin/neon/neonError.js';
 import { installAdminUiSounds } from './_admin/uiSounds.js';
 import { enableSafeAreaViewport } from './_admin/mobile/viewport.js';
+import { detectAdminUiTheme } from './_admin/adminUiTheme.js';
 
 import './_admin/slateChromeTokens.css';
 import '@/styles/toggle.css';
@@ -235,11 +236,14 @@ function AdminCloudBootstrap() {
         data-slate-forms=""
         data-theme-name="slate"
         data-theme="dark"
+        // The chrome tokens hang off data-admin-ui; without it the buttons had no style.
+        data-admin-ui={detectAdminUiTheme()}
         className="slate-empty"
         style={{
           minHeight: '100dvh',
           display: 'grid',
           placeContent: 'center',
+          justifyItems: 'center',
           gap: 16,
           padding: 24,
           textAlign: 'center',
