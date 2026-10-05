@@ -190,6 +190,14 @@ describe('an edit whose write failed is kept and sent again (STU-8)', () => {
     expect(events.at(-1)).toEqual({ type: 'persist-ok', detail: { kind: 'form', formId: 'f_1' } });
   });
 
+  it('a trash that failed put itself back: nothing is left unsaved', async () => {
+    db.fail = true;
+    remote.trashFormRemoteSync('f_1');
+    await flush();
+    expect(remote.getFormRemote('f_1')).not.toBeNull();
+    expect(remote.hasUnsavedFormEditRemote('f_1')).toBe(false);
+  });
+
   it('a form deleted elsewhere doesn’t come back for an unsaved edit', async () => {
     db.fail = true;
     remote.updateFormRemoteSync('f_1', { name: 'Typed offline' });

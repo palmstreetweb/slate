@@ -517,12 +517,15 @@ function enqueueFormUpsert(form: FormRecord, waiter?: WriteWaiter): void {
           emitPersistOk('form', form.id);
           for (const w of waiters) w.onLanded?.();
         } catch (err) {
-          // The cache stays ahead of the server until a write of this form lands (STU-8).
-          unsavedFormIds.add(form.id);
-          resendWhenOnline();
           for (const w of waiters) w.onFail?.();
           // A trash or restore names itself; an edit says the change isn't saved.
           const own = waiters.find((w) => w.failTitle)?.failTitle;
+          // An edit's change stays in the cache, ahead of the server, until a write of
+          // this form lands (STU-8). A trash or restore put itself back just now.
+          if (!own) {
+            unsavedFormIds.add(form.id);
+            resendWhenOnline();
+          }
           reportFormFailure(err, own ? 'delete' : 'save', own, form.id);
           throw err;
         }

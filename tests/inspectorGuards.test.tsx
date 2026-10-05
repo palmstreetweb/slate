@@ -218,6 +218,13 @@ describe('numbers (F7, F11)', () => {
     expect(spy).toHaveBeenLastCalledWith({ min: 2, max: 10 });
   });
 
+  it('a step of 0 says what the form does with it, with Use 1 (STU-3)', async () => {
+    const { user, spy } = setup({ id: 'n', type: 'number', title: 'Amount?', step: 0 } as Question);
+    expect(screen.getByText('A step of 0 can’t be used, so it counts by 1.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Use 1' }));
+    expect(spy).toHaveBeenLastCalledWith({ step: undefined });
+  });
+
   it('Step 0.01 is saved as 0.01', async () => {
     const { user, spy, leave } = setup({ id: 'n', type: 'number', title: 'Amount?' });
     await user.click(numberIn('Step'));
@@ -291,6 +298,15 @@ describe('scale (F6, F7, F20, S16, S22)', () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Use 0 to 10' }));
     expect(spy).toHaveBeenLastCalledWith({ max: 10, step: undefined });
+  });
+
+  it('a scale step of 0 says it counts by 1, with Count by 1 (STU-3)', async () => {
+    const { user, spy } = setup({ ...scale, step: 0 } as Question);
+    expect(
+      screen.getByText('A step of 0 can’t be used, so this scale counts by 1.'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Count by 1' }));
+    expect(spy).toHaveBeenLastCalledWith({ step: undefined });
   });
 
   it('a 0–100 slider draws no cells: no points note (R4, R10)', () => {

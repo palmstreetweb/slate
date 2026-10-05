@@ -500,7 +500,7 @@ export function Inspector({
                   onClick: () => onChange({ step: undefined } as Partial<Question>),
                 }}
               >
-                Step has to be more than 0.
+                {`A step of ${String(question.step)} can’t be used, so it counts by 1.`}
               </GuardNote>
             ) : null}
             <UnitPriceSetting question={question} onChange={onChange} currency={currency} />
@@ -1129,7 +1129,7 @@ function ScaleGuards({ question, onChange }: { question: ScaleQuestion; onChange
           onClick: () => onChange({ step: undefined } as Partial<Question>),
         }}
       >
-        This scale counts in steps of {String(question.step)}, so it can’t show its points.
+        A step of {String(question.step)} can’t be used, so this scale counts by 1.
       </GuardNote>
     );
   }
