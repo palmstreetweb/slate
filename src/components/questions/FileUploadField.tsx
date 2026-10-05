@@ -95,42 +95,57 @@ function dragHasFiles(e: DragEvent | React.DragEvent): boolean {
 }
 
 /** Owners' words for a kind of file, as the filter reads them. */
-const KIND_WORDS: Record<string, string> = {
-  image: 'image/*',
-  images: 'image/*',
-  photo: 'image/*',
-  photos: 'image/*',
-  picture: 'image/*',
-  pictures: 'image/*',
-  video: 'video/*',
-  videos: 'video/*',
-  audio: 'audio/*',
-  pdfs: '.pdf',
+const KIND_WORDS: Record<string, string[]> = {
+  image: ['image/*'],
+  images: ['image/*'],
+  photo: ['image/*'],
+  photos: ['image/*'],
+  picture: ['image/*'],
+  pictures: ['image/*'],
+  video: ['video/*'],
+  videos: ['video/*'],
+  audio: ['audio/*'],
+  pdfs: ['.pdf'],
+  word: ['.doc', '.docx'],
+  excel: ['.xls', '.xlsx'],
+  powerpoint: ['.ppt', '.pptx'],
 };
+
+/**
+ * File endings the filter reads without their dot. A word that isn't one
+ * ("any", "files", "docs") is not a file ending: read as one, it would refuse
+ * every real file (CON-03).
+ */
+const BARE_ENDINGS = new Set(
+  (
+    'pdf doc docx xls xlsx csv txt rtf odt ods odp ppt pptx key pages numbers ' +
+    'jpg jpeg png gif webp heic heif tif tiff bmp svg ' +
+    'mp4 mov m4v avi webm mp3 m4a wav aac ogg flac zip json xml'
+  ).split(' '),
+);
 
 /** One spelling for file endings that mean the same type. */
 const SAME_ENDING: Record<string, string> = { '.jpeg': '.jpg', '.tiff': '.tif', '.heif': '.heic' };
 
 /**
  * The owner's `accept` list as the filter reads it, lower-cased and forgiving
- * (QA retest): "pdf" is ".pdf", "images" is "image/*", ".jpeg" and ".jpg" are
- * one type, and a word it can't read ("documents") is left out rather than
- * refusing every file. `.pdf`, `image/*` and `application/pdf` read as written.
+ * (QA retest): "pdf" is ".pdf", "images" is "image/*", "Word" is ".doc" and
+ * ".docx", ".jpeg" and ".jpg" are one type, and a word it can't read
+ * ("documents", "any") is left out rather than refusing every file (CON-03).
+ * `.pdf`, `image/*` and `application/pdf` read as written.
  */
 export function acceptTokens(accept: string | undefined): string[] {
   const out: string[] = [];
   for (const raw of (accept ?? '').split(',')) {
     const t = raw.trim().toLowerCase();
-    const token = KIND_WORDS[t]
-      ? KIND_WORDS[t]
-      : /^\.?[a-z0-9]{1,5}$/.test(t)
-        ? t.startsWith('.')
-          ? t
-          : `.${t}`
-        : /^[a-z]+\/(\*|[a-z0-9.+-]+)$/.test(t)
-          ? t
-          : '';
-    if (token && !out.includes(token)) out.push(token);
+    const tokens =
+      KIND_WORDS[t] ??
+      (/^\.[a-z0-9]{1,8}$/.test(t) || /^[a-z]+\/(\*|[a-z0-9.+-]+)$/.test(t)
+        ? [t]
+        : BARE_ENDINGS.has(t)
+          ? [`.${t}`]
+          : []);
+    for (const token of tokens) if (!out.includes(token)) out.push(token);
   }
   return out;
 }
@@ -153,7 +168,8 @@ const ending = (name: string) => {
  * Does the file fit the owner's file types? The picker filters by itself, but
  * a drop or the picker's "All files" doesn't (MEDIA-08). With no type the
  * filter can read, every file fits: a filter that refused everything would
- * trap anyone asked for a file.
+ * trap anyone asked for a file. `image/*` takes every image the picker offers
+ * for it, an SVG logo too (CON-03); only the photo pipelines refuse SVG.
  */
 export function matchesAccept(file: File, accept: string | undefined): boolean {
   const tokens = acceptTokens(accept);
@@ -164,7 +180,7 @@ export function matchesAccept(file: File, accept: string | undefined): boolean {
     t.startsWith('.')
       ? end === (SAME_ENDING[t] ?? t)
       : t === 'image/*'
-        ? isLikelyImageFile(file)
+        ? isLikelyImageFile(file) || type.startsWith('image/')
         : t.endsWith('/*')
           ? type.startsWith(t.slice(0, -1))
           : type === t,
@@ -176,21 +192,38 @@ const KIND: Record<string, string> = {
   'video/*': 'videos',
   'audio/*': 'audio files',
   'application/pdf': 'PDFs',
+  '.pdf': 'PDFs',
 };
 
-/** What the owner's file types are, in words: "photos", "PDFs", "DOCX or XLSX files". */
+/** Photo endings, as SAME_ENDING spells them: named, never just "photos" (COPY-R2). */
+const PHOTO_ENDING = /^\.(jpg|png|gif|webp|heic|tif|bmp)$/;
+
+/** "JPG", "JPG or PNG", "JPG, PNG or HEIC". */
+const orList = (items: Set<string>) => {
+  const all = [...items];
+  return all.length > 2
+    ? `${all.slice(0, -1).join(', ')} or ${all[all.length - 1]}`
+    : all.join(' or ');
+};
+
+/**
+ * What the owner's file types are, in words: "photos" (any image), "PDFs",
+ * "JPG or PNG photos", "DOCX or XLSX files". A photo of another kind is never
+ * refused with "this question takes photos only" (COPY-R2).
+ */
 export function acceptLabel(accept: string | undefined): string | null {
   const words = new Set<string>();
-  const exts: string[] = [];
+  const photos = new Set<string>();
+  const exts = new Set<string>();
   for (const t of acceptTokens(accept)) {
-    if (KIND[t]) words.add(KIND[t]);
-    else if (/^\.(jpe?g|png|gif|webp|heic|heif)$/.test(t)) words.add('photos');
-    else if (t === '.pdf') words.add('PDFs');
-    else if (t.startsWith('.')) exts.push(t.slice(1).toUpperCase());
-    else return null;
+    const e = SAME_ENDING[t] ?? t;
+    if (KIND[e]) words.add(KIND[e]);
+    else if (!e.startsWith('.')) return null;
+    else (PHOTO_ENDING.test(e) ? photos : exts).add(e.slice(1).toUpperCase());
   }
-  if (exts.length) words.add(`${exts.join(' or ')} files`);
-  return words.size ? [...words].join(' or ') : null;
+  if (photos.size && !words.has('photos')) words.add(`${orList(photos)} photos`);
+  if (exts.size) words.add(`${orList(exts)} files`);
+  return words.size ? orList(words) : null;
 }
 
 /** "notes.txt" for one file, "2 files" for more. */

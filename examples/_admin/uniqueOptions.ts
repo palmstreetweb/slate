@@ -25,6 +25,8 @@ const LIST_KEYS = ['options', 'rows', 'columns', 'items'] as const;
 
 /** The question with each option, row, column and checklist photo kept once (the same object when nothing repeats). */
 export function withoutRepeats<Q extends Question>(q: Q): Q {
+  // Something that isn't a question (a crafted link's null) is left as it is (SEC-3).
+  if (q === null || typeof q !== 'object') return q;
   let out: Q | null = null;
   for (const key of LIST_KEYS) {
     const list = (q as Record<string, unknown>)[key];

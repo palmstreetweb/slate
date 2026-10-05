@@ -61,6 +61,8 @@ const num = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 20
 
 /**
  * "Enter a number from $10 to $500", in the question's own prefix and unit.
+ * The owner's unit is a plural, so it follows any bound but 1: "Enter 2
+ * guests or more", "Enter 1 or more", never "Enter 1 guests" (COPY-R15).
  * Bounds set the wrong way round are ignored, so a live form never asks for
  * a number nobody can give.
  */
@@ -72,17 +74,17 @@ function rangeError(
   unit = '',
 ): ValidationError | null {
   if (min > max || (n >= min && n <= max)) return null;
-  const u = unit && ' ' + unit;
+  const at = (b: number) => prefix + num(b) + (unit && Math.abs(b) !== 1 ? ' ' + unit : '');
   return {
     code: n < min ? 'min' : 'max',
     message:
       max === Infinity
-        ? `Enter ${prefix + num(min) + u} or more`
+        ? `Enter ${at(min)} or more`
         : min === -Infinity
-          ? `Enter ${prefix + num(max) + u} or less`
+          ? `Enter ${at(max)} or less`
           : min === max
-            ? `Enter ${prefix + num(min) + u}`
-            : `Enter a number from ${prefix + num(min)} to ${prefix + num(max) + u}`,
+            ? `Enter ${at(min)}`
+            : `Enter a number from ${prefix + num(min)} to ${at(max)}`,
   };
 }
 
@@ -294,7 +296,8 @@ export function validate(question: Question, answer: unknown): ValidationResult 
       // Default ON when unset (ADR-032) — set `multiple: false` for single-file.
       if (question.multiple !== false) {
         const arr = Array.isArray(answer) ? answer : isFileItem(answer) ? [answer] : [];
-        const maxFiles = question.maxFiles ?? 10;
+        // Below 1 is the usual 10, as the field and the server read it (ENG-02).
+        const maxFiles = question.maxFiles! >= 1 ? Math.floor(question.maxFiles!) : 10;
         if (question.required && arr.length === 0) {
           return { code: 'required', message: 'Please choose at least one file' };
         }
@@ -577,7 +580,8 @@ export function validate(question: Question, answer: unknown): ValidationResult 
           ? null
           : { code: 'required', message: 'Please pick one' };
       }
-      const max = question.maxPicks ?? 1;
+      // Below 1 is 1, as the field reads it (`signupMaxPicks`, ENG-02).
+      const max = question.maxPicks! >= 1 ? question.maxPicks! : 1;
       if (picks.length > max) return { code: 'max_selections', message: `Pick up to ${max}` };
       if (
         (wait.length && !question.waitlist) ||

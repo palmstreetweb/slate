@@ -9,7 +9,7 @@
 
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
-import { validate } from './validation.js';
+import { pickLimits, validate, type PickRule } from './validation.js';
 import { allowsOther, resolveOtherText } from './other.js';
 
 /** Longest prefilled value, in characters. */
@@ -113,10 +113,11 @@ function coerce(q: Question, text: string): LooseAnswers[string] {
         }
       }
       if (!many) return picked[0] ?? other;
-      // More picks than the question takes: keep the first ones, not none (GAP-23).
+      // More picks than the question takes: keep the first ones, not none
+      // (GAP-23), up to the maximum the question really holds people to (ENG-04).
       const all = (other !== undefined ? [...picked, other] : picked).slice(
         0,
-        (q as { max?: number }).max,
+        pickLimits(q as PickRule)[1],
       );
       return all.length ? all : undefined;
     }

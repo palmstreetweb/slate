@@ -2,12 +2,17 @@
  * Save-and-resume (ADR-017).
  *
  * Persists in-progress sessions to `localStorage` under
- * `slate-forms-resume:<formId>` — or, with `tab`, to `sessionStorage`: this
- * tab only, surviving a reload or back / forward but never reaching another
- * tab or a later visit (ADR-017 addendum). On mount, a previously saved
- * session (if any) is surfaced so the Form can offer a "resume where you left
- * off?" prompt. The save is cleared on successful submit or when the user
- * declines.
+ * `slate-forms-resume:<formId>` — or, with `tab`, to `sessionStorage`: it
+ * survives a reload or back / forward, and goes with the tab when the browser
+ * copies it (a duplicated tab, a closed tab reopened, a restored session).
+ * A tab's save is offered back only within 30 minutes of the last answer, so
+ * on a shared device the next person rarely meets it (ADR-017 addendum). On
+ * mount, a previously saved session (if any) is surfaced so the Form can
+ * offer a "resume where you left off?" prompt. The save is cleared on
+ * successful submit or when the user declines (Start over).
+ *
+ * The save carries the fill's id (`fill`), so a reload and Resume send the
+ * same fill again rather than a second one (ADR-069).
  *
  * `File` answers can't be serialized — they're stripped from the snapshot
  * (the question will simply be unanswered after resuming).
@@ -30,6 +35,11 @@ function storageKey(formId: string): string {
 /** This tab's storage, or the browser's. */
 const store = (tab?: boolean): Storage => (tab ? window.sessionStorage : window.localStorage);
 
+/**
+ * The save, if it can be offered back. A tab's save is offered for 30 minutes
+ * (18e5 ms) after the last answer (SEC-2); after that, or with no time we can
+ * read, it is deleted instead.
+ */
 function readSession(formId: string, tab?: boolean): SavedSession | null {
   try {
     const raw = store(tab).getItem(storageKey(formId));
@@ -42,6 +52,10 @@ function readSession(formId: string, tab?: boolean): SavedSession | null {
       'step' in parsed &&
       'visitedIds' in parsed
     ) {
+      if (tab && !(Date.now() - Date.parse((parsed as SavedSession).savedAt) < 18e5)) {
+        store(tab).removeItem(storageKey(formId));
+        return null;
+      }
       return parsed as SavedSession;
     }
     return null;
@@ -74,6 +88,8 @@ type Opts = {
   answers: LooseAnswers;
   step: number;
   visitedIds: string[];
+  /** This fill's id (`SubmitMeta.fillId`), saved with the answers. */
+  fill?: string;
 };
 
 type Api = {
@@ -87,7 +103,7 @@ type Api = {
   clear: () => void;
 };
 
-export function useAutosave({ enabled, tab, formId, answers, step, visitedIds }: Opts): Api {
+export function useAutosave({ enabled, tab, formId, answers, step, visitedIds, fill }: Opts): Api {
   const [savedSession, setSavedSession] = useState<ResumeSnapshot | null>(() => {
     if (!enabled || typeof window === 'undefined') return null;
     return readSession(formId, tab);
@@ -105,13 +121,14 @@ export function useAutosave({ enabled, tab, formId, answers, step, visitedIds }:
         answers: serializableAnswers(answers),
         step,
         visitedIds,
+        fill,
         savedAt: new Date().toISOString(),
       };
       store(tab).setItem(storageKey(formId), JSON.stringify(session));
     } catch {
       // Storage full / blocked — autosave silently degrades.
     }
-  }, [enabled, tab, formId, answers, step, visitedIds]);
+  }, [enabled, tab, formId, answers, step, visitedIds, fill]);
 
   const clear = useCallback(() => {
     try {

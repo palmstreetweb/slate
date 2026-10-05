@@ -258,3 +258,93 @@ describe('Review (GAP-02, GAP-19, CH-13)', () => {
     expect(onSubmit.mock.calls[0]![0]).toEqual({ rate: { r1: 'c1', r2: 'c2' }, pets: 'yes' });
   });
 });
+
+describe('an edit from Review that changes where the form goes (ENG-01)', () => {
+  // adult = no jumps to the "sorry" ending, past Review and the usual ending.
+  const ageGate = defineSchema({
+    brand: { name: 'Test' },
+    theme: 'editorial',
+    themeMode: 'light',
+    questions: [
+      {
+        id: 'adult',
+        type: 'single_choice',
+        title: 'Are you 18 or older?',
+        options: [
+          { label: 'Yes', value: 'yes' },
+          { label: 'No', value: 'no' },
+        ],
+        logic: [{ if: { field: 'adult', op: 'equals', value: 'no' }, goTo: 'sorry' }],
+      },
+      { id: 'name', type: 'short_text', title: 'Your name?' },
+      { id: 'check', type: 'review', title: 'Check your answers' },
+      { id: 'done', type: 'thanks', title: 'All set.' },
+      { id: 'sorry', type: 'thanks', title: 'Sorry, adults only.' },
+    ],
+  });
+
+  it('goes to the ending the new answer leads to, not back to Review', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<Form schema={ageGate} onSubmit={onSubmit} />);
+    await user.click(screen.getByRole('radio', { name: /yes/i }));
+    await user.type(await screen.findByRole('textbox'), 'Ann{Enter}');
+    await user.click(await screen.findByRole('button', { name: /edit are you 18/i }));
+    await user.click(await screen.findByRole('radio', { name: /no/i }));
+    expect(await screen.findByText('Sorry, adults only.')).toBeInTheDocument();
+    expect(screen.queryByText('Check your answers')).not.toBeInTheDocument();
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]![0]).toEqual({ adult: 'no' });
+  });
+
+  it('an edit that keeps the way to Review still comes back to it', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<Form schema={ageGate} onSubmit={onSubmit} />);
+    await user.click(screen.getByRole('radio', { name: /yes/i }));
+    await user.type(await screen.findByRole('textbox'), 'Ann{Enter}');
+    await user.click(await screen.findByRole('button', { name: /edit your name/i }));
+    const box = await screen.findByRole('textbox');
+    await user.clear(box);
+    await user.type(box, 'Bea{Enter}');
+    await user.click(await screen.findByRole('button', { name: /looks good/i }));
+    expect(await screen.findByText('All set.')).toBeInTheDocument();
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]![0]).toEqual({ adult: 'yes', name: 'Bea' });
+  });
+
+  it('a revealed question with its own jump goes where that jump leads', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <Form
+        schema={schemaOf([
+          {
+            id: 'a',
+            type: 'single_choice',
+            title: 'Which one?',
+            options: [
+              { label: 'X', value: 'x' },
+              { label: 'Y', value: 'y' },
+            ],
+            visibleIf: { field: 'b', op: 'equals', value: 'yes' },
+            logic: [{ if: { field: 'a', op: 'equals', value: 'x' }, goTo: 'd' }],
+          },
+          { id: 'b', type: 'yes_no', title: 'Any pets?' },
+          { id: 'c', type: 'short_text', title: 'Question C?' },
+          { id: 'd', type: 'short_text', title: 'Question D?' },
+        ])}
+        onSubmit={onSubmit}
+      />,
+    );
+    await user.click(screen.getByRole('radio', { name: /yes/i }));
+    // The revealed question comes first; its jump then goes to D, not to C.
+    await user.click(await screen.findByRole('radio', { name: /X/ }));
+    expect(await screen.findByText('Question D?')).toBeInTheDocument();
+    expect(screen.queryByText('Question C?')).not.toBeInTheDocument();
+    await user.type(screen.getByRole('textbox'), 'dd{Enter}');
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    // The answer that showed the question is on the path the respondent took, so it is sent.
+    expect(onSubmit.mock.calls[0]![0]).toEqual({ b: 'yes', a: 'x', d: 'dd' });
+  });
+});

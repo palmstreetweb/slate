@@ -53,6 +53,7 @@ import { motionReduced, shakeInvalid } from '@/utils/motion.js';
 import { ChoiceBadge } from '../ChoiceBadge.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import { sayAgain } from './fieldMessage.js';
 import '@/styles/extensions.css';
 import '@/styles/extensions-d.css';
 
@@ -151,10 +152,15 @@ export default function SignupSlotsField({
     }
   };
 
-  /** Say why a tap can't be taken, right under the slot tapped. */
+  /**
+   * Say why a tap can't be taken, right under the slot tapped. A screen reader
+   * hears it from the region that's always there (a live region created with
+   * its text often isn't read), a repeated tap too (COPY-R8).
+   */
   const refuse = (s: SignupSlot, text: string) => {
     setError(null);
-    setNote({ slot: s.value, text }); // the note is its own polite live region
+    setNote({ slot: s.value, text });
+    setSaid(sayAgain(text));
     // Offered slot values are letters, digits, _ and - (SLOT_VALUE_RE): safe in a selector.
     shakeInvalid(listRef.current?.querySelector(`[data-slot="${s.value}"]`));
   };
@@ -433,9 +439,7 @@ export default function SignupSlotsField({
                     ) : null}
                   </button>
                   {note?.slot === s.value ? (
-                    <p className="slate-err slate-slot-note" aria-live="polite">
-                      {note.text}
-                    </p>
+                    <p className="slate-err slate-slot-note">{note.text}</p>
                   ) : null}
                 </Fragment>
               );

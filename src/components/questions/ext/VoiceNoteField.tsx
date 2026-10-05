@@ -505,7 +505,7 @@ export default function VoiceNoteField({
             }}
             onKeyDown={(e) => {
               if (isTypewriterKey(e)) onType?.();
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.repeat) {
                 e.preventDefault();
                 submit();
               }

@@ -17,6 +17,7 @@ import { hostFileUpload } from '../hostFileUpload.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
 import { setUploadContext, clearUploadContext } from '../uploadContext.js';
 import { withoutRepeatedOptionsIn } from '../uniqueOptions.js';
+import { withWebRedirects } from '../redirectUrl.js';
 
 type Props = { formId: string };
 
@@ -36,7 +37,10 @@ export function FormPreview({ formId }: Props) {
   );
 
   // A form saved before options got their own values shows each value once (CH-05).
-  const shownSchema = useMemo(() => (form ? withoutRepeatedOptionsIn(form.schema) : null), [form]);
+  const shownSchema = useMemo(
+    () => (form ? withWebRedirects(withoutRepeatedOptionsIn(form.schema)) : null),
+    [form],
+  );
 
   // The frame scrolls (a tall question reaches OK); each new question starts at
   // its top, like the public page. The first question is already there.

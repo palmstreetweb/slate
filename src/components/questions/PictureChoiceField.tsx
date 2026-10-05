@@ -25,6 +25,7 @@ import { shakeInvalid } from '@/utils/motion.js';
 import { ChoiceBadge } from './ChoiceBadge.js';
 import { OTHER_EMPTY, OtherTextBox, keyRange, useOtherChoice } from './OtherChoice.js';
 import { resolveTitle } from './_resolveTitle.js';
+import { FieldError, sayAgain } from './ext/fieldMessage.js';
 
 type Props = {
   question: PictureChoiceQuestion;
@@ -80,8 +81,10 @@ export function PictureChoiceField({
   // Several picks: at the most picks, the tiles left step back (the open Other box counts).
   const max = pickLimits(question)[1];
   const full = multiple && selectedArr.length + (other.open ? 1 : 0) >= max;
+  // The message slot is always in the page, so a refusal is announced, a
+  // repeated one too (COPY-R8).
   const refuse = (el: Element | null | undefined) => {
-    setError(`You can pick up to ${max}. Tap one of your picks to let it go.`);
+    setError(sayAgain(`You can pick up to ${max}. Tap one of your picks to let it go.`));
     shakeInvalid(el);
   };
 
@@ -187,7 +190,10 @@ export function PictureChoiceField({
   }, [multiple, other, onSelectMulti, selectedArr, error, full]);
 
   const confirms = multiple || other.open || Boolean(skip);
-  useRegisterFormConfirm(submit, confirms);
+  // Skip on Enter waits until the question has been up a moment, like the
+  // other one-tap questions: a double Enter from the question before must not
+  // skip this one unseen (ENG-06, R14).
+  useRegisterFormConfirm(submit, confirms, skip ? 500 : 0);
   useRegisterOtherKey(onOtherTile, other.enabled);
 
   const keys = keyRange(question.options.length + (other.enabled ? 1 : 0));
@@ -263,11 +269,7 @@ export function PictureChoiceField({
       </div>
       <OtherTextBox other={other} onEnter={submit} onType={onType} />
 
-      {other.error || error ? (
-        <p className="slate-err" aria-live="polite">
-          {other.error ?? error}
-        </p>
-      ) : null}
+      <FieldError error={other.error ?? error} />
 
       {confirms ? (
         <div className="slate-actions">

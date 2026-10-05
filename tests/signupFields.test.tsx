@@ -145,7 +145,12 @@ describe('sign-up slots: picking', () => {
     render(<Form schema={schemaWith(swim)} slotsLeft={LEFT} onSubmit={vi.fn()} />);
     await toSlots(user);
     await user.click(await screen.findByRole('radio', { name: /^Late morning/ }));
-    expect(screen.getByText(/Late morning is full\. Please pick another\./)).toBeInTheDocument();
+    // Under the slot, and said by the region that's always there (COPY-R8).
+    for (const where of ['.slate-slot-note', '.slate-sr']) {
+      expect(
+        screen.getByText(/Late morning is full\. Please pick another\./, { selector: where }),
+      ).toBeInTheDocument();
+    }
     expect(slot(/^Late morning/)).toHaveAttribute('aria-checked', 'false');
   });
 
@@ -181,7 +186,9 @@ describe('sign-up slots: picking', () => {
     await user.click(slot(/^Morning swim/));
     await user.click(slot(/^Sunday/));
     await user.click(slot(/^Lunch swim/));
-    expect(screen.getByText(/You can pick up to 2/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/You can pick up to 2/, { selector: '.slate-slot-note' }),
+    ).toBeInTheDocument();
     await user.click(slot(/^Morning swim/)); // let it go
     await user.click(slot(/^Lunch swim/));
     await user.click(screen.getByRole('button', { name: /OK/ }));

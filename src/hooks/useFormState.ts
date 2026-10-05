@@ -15,13 +15,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import type { Schema } from '@/types/Schema.js';
 import type { Question } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
-import {
-  isChrome,
-  pathOf,
-  resolveJumpTarget,
-  visibleAnswersForSubmit,
-  visibleQuestions,
-} from '@/logic/progress.js';
+import { isChrome, pathOf, visibleQuestions } from '@/logic/progress.js';
 import { otherIndex } from '@/logic/other.js';
 import { areaIndex } from '@/logic/address.js';
 
@@ -32,6 +26,11 @@ export type FormState = {
   step: number;
   /** The visible-questions list (chrome screens included). */
   visible: Question[];
+  /**
+   * The visible questions on the respondent's path (ADR-069), in order:
+   * what `getSubmitAnswers` sends and what the Review step lists.
+   */
+  path: Question[];
   /** All answers, including those for now-hidden questions (per ADR-005). */
   answers: LooseAnswers;
   /** Stack of question IDs for back navigation. */
@@ -90,11 +89,7 @@ type RawState = {
   direction: AnimDirection;
   isAnimating: boolean;
   visitedIds: string[];
-  /**
-   * Where the next advance returns to (ADR-069): Review, after an edit from
-   * it; or where the respondent was going when an answer revealed questions
-   * before the current one, which are asked first.
-   */
+  /** Where the next advance returns to (ADR-069): Review, after an edit from it. */
   returnTo?: string;
 };
 
@@ -103,6 +98,8 @@ export type ResumeSnapshot = {
   answers: LooseAnswers;
   step: number;
   visitedIds: string[];
+  /** The fill's id (`SubmitMeta.fillId`, ADR-069); saves made before it have none. */
+  fill?: string;
 };
 
 type Action =
@@ -124,62 +121,64 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
         const newAnswers = { ...s.answers, [a.id]: resolved };
         const oldVisible = visibleQuestions(allQuestions, s.answers);
         const newVisible = visibleQuestions(allQuestions, newAnswers);
+        // Stay on the question shown, wherever the answer moved it in the list.
         const currentId = oldVisible[Math.min(s.step, Math.max(oldVisible.length - 1, 0))]?.id;
-        let newStep = Math.min(s.step, Math.max(newVisible.length - 1, 0));
-        if (currentId) {
-          const idx = newVisible.findIndex((q) => q.id === currentId);
-          newStep = idx >= 0 ? idx : Math.min(s.step, Math.max(newVisible.length - 1, 0));
-        }
-        return { ...s, answers: newAnswers, step: newStep };
+        const idx = newVisible.findIndex((q) => q.id === currentId);
+        const step = idx >= 0 ? idx : Math.min(s.step, Math.max(newVisible.length - 1, 0));
+        return { ...s, answers: newAnswers, step };
       }
       case 'go_next': {
         const visible = visibleQuestions(allQuestions, s.answers);
-        const others = otherIndex(allQuestions);
-        const areas = areaIndex(allQuestions);
         const cur = Math.min(s.step, visible.length - 1);
         const current = visible[cur];
-        // Logic jumps (ADR-015): first matching rule on the current question
-        // overrides the default step+1. Back-nav still works — the jump
-        // origin is pushed onto history like any other advance.
-        const jump = current ? resolveJumpTarget(current, visible, s.answers, others, areas) : null;
-        let next =
-          jump !== null && jump !== s.step ? jump : Math.min(s.step + 1, visible.length - 1);
-        // An edit from Review goes back to Review (ADR-069).
-        const back = visible.findIndex((q) => q.id === s.returnTo);
-        if (back > cur) next = back;
-        // A question on the path before that the respondent hasn't seen comes
-        // first: one revealed by a later answer, or put on the path by an edit.
-        const owed = pathOf(visible, s.answers, others, areas).find(
-          (i) =>
-            i < next &&
-            i !== cur &&
-            !isChrome(visible[i]!) &&
-            !s.visitedIds.includes(visible[i]!.id),
+        if (!current) return s;
+        // The respondent's path (ADR-069) is where an advance goes: logic
+        // jumps (ADR-015), then any question a later answer revealed. Back
+        // still works — the step left is pushed onto history like any other.
+        const path = pathOf(
+          visible,
+          s.answers,
+          otherIndex(allQuestions),
+          areaIndex(allQuestions),
+          initial.answers,
         );
-        const to = owed ?? next;
-        if (to === s.step) return s;
+        const at = path.indexOf(cur);
+        // An edit from Review goes back to Review while the answers still lead
+        // there — a jump past it wins — after any question the edit put on
+        // the path that the respondent hasn't seen.
+        const back = path.indexOf(visible.findIndex((q) => q.id === s.returnTo));
+        const owed =
+          at >= 0 && back > at
+            ? path
+                .slice(at + 1, back)
+                .find((i) => !isChrome(visible[i]!) && !s.visitedIds.includes(visible[i]!.id))
+            : undefined;
+        // Off the path (Back after an edit moved it), on along it.
+        const to =
+          at < 0
+            ? (path.find((i) => i > cur) ?? path[path.length - 1]!)
+            : back > at
+              ? (owed ?? path[back]!)
+              : (path[at + 1] ?? path.next);
+        if (to === s.step || !visible[to]) return s;
         return {
           ...s,
-          history: current ? [...s.history, current.id] : s.history,
+          history: [...s.history, current.id],
           step: to,
           direction: to > s.step ? 'forward' : 'backward',
           isAnimating: true,
-          returnTo: owed === undefined ? undefined : (s.returnTo ?? visible[next]!.id),
+          returnTo: owed === undefined ? undefined : s.returnTo,
         };
       }
       case 'go_back': {
         if (s.history.length === 0 && s.step === 0) return s;
-        const visible = visibleQuestions(allQuestions, s.answers);
-        const popped = s.history.length > 0 ? s.history[s.history.length - 1] : undefined;
-        let target = Math.max(s.step - 1, 0);
-        if (popped) {
-          const idx = visible.findIndex((q) => q.id === popped);
-          if (idx >= 0) target = idx;
-        }
+        // Back to the step the respondent came from, if it's still shown; else the one before.
+        const popped = s.history[s.history.length - 1];
+        const idx = visibleQuestions(allQuestions, s.answers).findIndex((q) => q.id === popped);
         return {
           ...s,
           history: s.history.slice(0, -1),
-          step: target,
+          step: idx >= 0 ? idx : Math.max(s.step - 1, 0),
           direction: 'backward',
           isAnimating: true,
         };
@@ -303,20 +302,32 @@ export function useFormState(schema: Schema, opts: UseFormStateOptions = {}): Us
     dispatch({ type: 'hydrate', snapshot });
   }, []);
 
-  const getSubmitAnswers = useCallback(
+  // The respondent's path (ADR-069), with the same indexes and prefill as
+  // navigation: what is sent, and what the Review step lists.
+  const path = useMemo(
     () =>
-      visibleAnswersForSubmit(
+      pathOf(
         visible,
         raw.answers,
         otherIndex(schema.questions),
         areaIndex(schema.questions),
-      ),
-    [visible, raw.answers, schema.questions],
+        initial.answers,
+      ).map((i) => visible[i]!),
+    [visible, raw.answers, schema.questions, initial],
   );
+
+  const getSubmitAnswers = useCallback(() => {
+    const out: LooseAnswers = {};
+    for (const q of path) {
+      if (!isChrome(q) && raw.answers[q.id] !== undefined) out[q.id] = raw.answers[q.id];
+    }
+    return out;
+  }, [path, raw.answers]);
 
   const state: FormState = {
     step: safeStep,
     visible,
+    path,
     answers: raw.answers,
     history: raw.history,
     direction: raw.direction,

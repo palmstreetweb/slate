@@ -151,12 +151,42 @@ describe('stars and faces (F4, F20, GAP-11)', () => {
 });
 
 describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
+  // Optional is `required: false`, which the studio writes when Required is
+  // unticked; a rating with no `required` stays one-tap (CON-04, below).
   it('an optional numbers scale shows Skip, and Enter moves on', async () => {
-    const { advance } = renderField({ id: 's', type: 'scale', title: 'S', min: 0, max: 10 });
+    const { advance } = renderField({
+      id: 's',
+      type: 'scale',
+      title: 'S',
+      min: 0,
+      max: 10,
+      required: false,
+    });
     fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
     expect(advance).toHaveBeenCalledTimes(1);
     await enter();
     expect(advance).toHaveBeenCalledTimes(2);
+  });
+
+  it('a rating saved without Required (before the studio offered it) has no Skip, as before (CON-04)', async () => {
+    for (const q of [
+      { id: 's', type: 'scale', title: 'S', min: 0, max: 10 },
+      { id: 'n', type: 'nps', title: 'N' },
+      { id: 'st', type: 'scale', title: 'Stars', min: 1, max: 5, display: 'stars' },
+      { id: 'f', type: 'scale', title: 'Faces', min: 1, max: 5, display: 'emoji' },
+    ] as Question[]) {
+      const { advance, unmount } = renderField(q);
+      await screen.findAllByRole('radio');
+      expect(screen.queryByRole('button', { name: 'Skip' })).toBeNull();
+      await enter();
+      expect(
+        screen.getByText(
+          q.type === 'scale' && q.display ? 'Please pick a rating' : 'Please pick a number',
+        ),
+      ).toBeInTheDocument();
+      expect(advance).not.toHaveBeenCalled();
+      unmount();
+    }
   });
 
   it('a required scale says "Please pick a number" on Enter', async () => {
@@ -186,7 +216,7 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
   });
 
   it('NPS: optional skips; required asks for a number', async () => {
-    const first = renderField({ id: 'n', type: 'nps', title: 'N' });
+    const first = renderField({ id: 'n', type: 'nps', title: 'N', required: false });
     fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
     expect(first.advance).toHaveBeenCalledTimes(1);
     first.unmount();
@@ -743,21 +773,29 @@ describe('availability (GAP-18, GAP-26)', () => {
   });
 });
 
-describe('thank-you redirect (F3)', () => {
-  it('a link without https:// goes to that site, not to a page here', async () => {
+describe('thank-you redirect (F3, CON-06, ENG-10)', () => {
+  // The engine follows a redirect the way a link on the host's page does, as
+  // before the QA pass; Slate's own pages hand it the full https:// address of
+  // one typed without it (`withWebRedirects`, tested with the public fill).
+  it('resolves like a link on the page, and only ever opens a web page', async () => {
     const { Form } = await import('@/index.js');
     const assign = vi.fn();
     const getter = vi.spyOn(window, 'location', 'get').mockReturnValue({
       ...window.location,
-      href: 'https://slateforms.vercel.app/forms/12345678',
+      href: 'https://wildwash.com/quote/',
       assign,
     } as unknown as Location);
     try {
       for (const [redirectUrl, expected] of [
-        ['example.com/thank-you', 'https://example.com/thank-you'],
-        ['www.example.com', 'https://www.example.com/'],
-        ['/done', 'https://slateforms.vercel.app/done'],
+        ['thank-you', 'https://wildwash.com/quote/thank-you'],
+        ['thanks.html', 'https://wildwash.com/quote/thanks.html'],
+        ['success?ref=quote', 'https://wildwash.com/quote/success?ref=quote'],
+        ['?thanks=1', 'https://wildwash.com/quote/?thanks=1'],
+        ['#done', 'https://wildwash.com/quote/#done'],
+        ['/done', 'https://wildwash.com/done'],
+        ['https://example.com/thank-you', 'https://example.com/thank-you'],
         ['javascript:alert(1)', null],
+        ['mailto:a@b.co', null],
       ] as const) {
         assign.mockClear();
         const { unmount } = render(

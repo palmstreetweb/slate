@@ -35,6 +35,7 @@ import { clearFillUnlockToken, readFillUnlockToken, writeFillUnlockToken } from 
 import { routeSearchParams } from '../_router.js';
 import { FORM_UNAVAILABLE, LOAD_LATER, LOAD_OFFLINE, SEND_TOO_LONG_HERE } from '../fillCopy.js';
 import { withoutRepeatedOptionsIn } from '../uniqueOptions.js';
+import { withWebRedirects } from '../redirectUrl.js';
 
 type Props = { slug: string };
 
@@ -124,8 +125,9 @@ export function PublicFill({ slug }: Props) {
   /** Honeypot input (ADR-052). Read at submit, never rendered from state. */
   const trapRef = useRef<HTMLInputElement>(null);
   /**
-   * This fill's retry key (ADR-067): kept until a submit goes through, so pressing
-   * Retry after a lost reply returns the stored response instead of a duplicate.
+   * This fill's retry key (ADR-067) where the engine has no `meta.fillId` (a page
+   * not served over https): kept until a submit goes through, so pressing Retry
+   * after a lost reply returns the stored response instead of a duplicate.
    */
   const submitIdRef = useRef<string | undefined>(undefined);
   const [embed] = useState(readEmbedMode);
@@ -200,7 +202,9 @@ export function PublicFill({ slug }: Props) {
   const fillSchema = useMemo(
     // Each option value once (CH-05): a form published before options got
     // their own values never ticks two rows at once or asks for picks nobody has.
-    () => (form ? { ...withoutRepeatedOptionsIn(form.schema), id: form.id } : null),
+    // A redirect typed without https:// opens that site, as the editor said (CON-06).
+    () =>
+      form ? { ...withWebRedirects(withoutRepeatedOptionsIn(form.schema)), id: form.id } : null,
     [form],
   );
 
@@ -347,11 +351,14 @@ export function PublicFill({ slug }: Props) {
           // Filled trap = bot. Flag it and let the Function drop it before any
           // DB work (ADR-058); the respondent sees the same thanks screen either way.
           const trapped = Boolean(trapRef.current?.value.trim());
-          submitIdRef.current ??= newSubmitId();
+          // The engine's id for this fill, kept with the tab's answers: a reload and
+          // Resume send it again, so a reply lost on the way is never stored twice
+          // (ENG-03, SEC-1). This page's own key where the browser can't make one.
+          const submitId = meta.fillId ?? (submitIdRef.current ??= newSubmitId());
           try {
             await submitPublicResponse({
               formId: form.id,
-              submitId: submitIdRef.current,
+              submitId,
               answers,
               meta: trapped
                 ? { ...payloadMeta, hiddenFields: { ...payloadMeta.hiddenFields, _hp: '1' } }

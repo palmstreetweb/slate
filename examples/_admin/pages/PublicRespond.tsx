@@ -58,11 +58,25 @@ export function PublicRespond({ token }: Props) {
   const payload = useMemo(() => {
     const decoded = decodePortableSchema(token);
     if (!decoded) return null;
-    // Anyone can mint this link — treat the schema as hostile (ADR-046).
-    const schema = sanitizeUntrustedSchema(decoded.schema);
-    const formId = decoded.formId ?? tokenId(token);
-    // With an id, answers survive a reload or back / forward in this tab only (GAP-05).
-    return { ...decoded, formId, schema: { ...schema, id: formId } };
+    // On the live site a portable link can never reach the owner (it is the
+    // unpublished preview's link): say so before anyone types (GAPV-X2,
+    // COPY-05), without reading anything else in it (SEC-3). That holds for
+    // a device-only link too: its answers would stay on the respondent's own
+    // device, where the owner never sees them.
+    if (isNeonConfigured()) return 'preview' as const;
+    try {
+      // Anyone can mint this link — treat the schema as hostile (ADR-046).
+      const schema = sanitizeUntrustedSchema(decoded.schema);
+      // Nothing in it is a question: the link is broken.
+      if (!schema.questions.length) return null;
+      const formId = decoded.formId ?? tokenId(token);
+      // With an id, answers survive a reload or back / forward in this tab only (GAP-05).
+      return { ...decoded, formId, schema: { ...schema, id: formId } };
+    } catch (err) {
+      // A crafted link the sanitizer still can't read is a broken link, never a blank page.
+      console.error('[slate] portable link', err);
+      return null;
+    }
   }, [token]);
   const [prefill] = useState(readPrefill);
   /**
@@ -73,11 +87,7 @@ export function PublicRespond({ token }: Props) {
 
   // Portable links never expire: one that can't be read was cut short or mistyped.
   if (!payload) return <Notice text={LINK_BROKEN} />;
-  // On the live site a portable link can never reach the owner (it is the
-  // unpublished preview's link): say so before anyone types (GAPV-X2, COPY-05).
-  // That holds for a device-only link too: its answers would stay on the
-  // respondent's own device, where the owner never sees them.
-  if (isNeonConfigured()) return <Notice text={LINK_PREVIEW_ONLY} />;
+  if (payload === 'preview') return <Notice text={LINK_PREVIEW_ONLY} />;
 
   const { schema, formId, name } = payload;
 

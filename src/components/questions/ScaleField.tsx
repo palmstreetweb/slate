@@ -1,7 +1,12 @@
 /**
  * The numbers scale: one button per value, min to max by step. A tap answers
- * and moves on; Skip (when optional) or OK (once answered) moves on without
- * one. Loaded on demand with the other long-standing fields (CoreFieldsExt).
+ * and moves on; Skip (when the owner made it optional) or OK (once answered)
+ * moves on without one. Loaded on demand with the other long-standing fields
+ * (CoreFieldsExt).
+ *
+ * Skip needs `required: false` set: a rating saved before the studio offered
+ * Required on it has no `required`, and stays one-tap as it always was
+ * (CON-04, ADR-069). Enter then says what to do instead of skipping.
  */
 
 'use client';
@@ -30,6 +35,7 @@ export function ScaleField({ question, answers, initialValue, onAnswer, onAdvanc
   const rowRef = useRef<HTMLDivElement>(null);
   // Rounded values, a usable step and at most 101 cells, whatever the schema says.
   const cells = scaleValues(question);
+  const required = question.required !== false;
 
   return (
     <div>
@@ -71,8 +77,8 @@ export function ScaleField({ question, answers, initialValue, onAnswer, onAdvanc
 
       <TapActions
         answered={initialValue !== undefined}
-        required={question.required === true}
-        check={() => validate(question, initialValue)?.message ?? null}
+        required={required}
+        check={() => validate({ ...question, required }, initialValue)?.message ?? null}
         onAdvance={onAdvance}
         target={rowRef}
         errorId={errId}

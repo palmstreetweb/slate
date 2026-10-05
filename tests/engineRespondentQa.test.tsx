@@ -69,7 +69,7 @@ describe('Thank You screen (GAPV-X1)', () => {
 });
 
 describe('a question whose part didn’t download (GAP-06, F12)', () => {
-  function Harness({ question }: { question: Question }) {
+  function Harness({ question, resume }: { question: Question; resume?: boolean }) {
     const confirmRef = useRef<(() => void) | null>(null);
     return (
       <FormConfirmRefContext.Provider value={confirmRef}>
@@ -85,22 +85,39 @@ describe('a question whose part didn’t download (GAP-06, F12)', () => {
           onRetrySubmit={vi.fn()}
           onRestart={vi.fn()}
           allQuestions={[question]}
+          resume={resume}
         />
       </FormConfirmRefContext.Provider>
     );
   }
 
-  it('says so plainly, and Try again reloads the page (the only retry that refetches)', async () => {
+  it('says so plainly; with resume on, Try again reloads the page (the answers come back)', async () => {
     const reload = vi.fn();
     vi.stubGlobal('location', { ...window.location, reload });
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<Harness question={{ id: 'site', type: 'url', title: 'Your website?' }} />);
+    render(<Harness question={{ id: 'site', type: 'url', title: 'Your website?' }} resume />);
     expect(
       await screen.findByText('This question didn’t load. Check your connection and try again.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Your website?' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('never reloads a page that keeps no answers: Try again asks again in place, and the page can be reloaded by hand (CON-05, SEC-4)', async () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...window.location, reload });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<Harness question={{ id: 'nps', type: 'nps', title: 'Recommend us?' }} />);
+    const said =
+      'This question didn’t load. Check your connection and try again, or reload the page.';
+    expect(await screen.findByText(said)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    // Asked again in place (this chunk still can't load), never a reload.
+    expect(await screen.findByText(said)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(reload).not.toHaveBeenCalled();
   });
 });
 
@@ -142,7 +159,13 @@ describe('<Form resume="tab"> (GAP-05)', () => {
   it('Start over deletes this tab’s save', async () => {
     window.sessionStorage.setItem(
       KEY,
-      JSON.stringify({ answers: { name: 'Ada' }, step: 1, visitedIds: ['name'], savedAt: '' }),
+      JSON.stringify({
+        answers: { name: 'Ada' },
+        step: 1,
+        visitedIds: ['name'],
+        // A save the engine wrote (it always has a time; one without is no longer offered, SEC-2).
+        savedAt: new Date().toISOString(),
+      }),
     );
     const user = userEvent.setup();
     render(<Form schema={schema()} resume="tab" onSubmit={vi.fn()} />);

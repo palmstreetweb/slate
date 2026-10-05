@@ -8,6 +8,8 @@
  * after the commit beat, and the form's number keys still work. Focus starts
  * on the group, not the first star, so an Enter pressed out of habit picks
  * nothing: an optional rating moves on (Skip), a required one says what to do.
+ * Optional means `required: false`: a rating saved before the studio offered
+ * Required on it has none, and stays one-tap as it always was (CON-04).
  * Each star is named by its value ("4.5 stars"), which is what is stored.
  *
  * The slider is a native range input, so screen readers and keyboards get its
@@ -185,10 +187,10 @@ function ScaleIcons({
       </div>
       <TapActions
         answered={picked !== undefined}
-        required={question.required === true}
+        required={question.required !== false}
         check={() =>
           picked === undefined
-            ? question.required
+            ? question.required !== false
               ? 'Please pick a rating'
               : null
             : (validate(question, picked)?.message ?? null)
@@ -280,7 +282,8 @@ function ScaleSlider({
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      submit();
+      // A held Enter (key repeat) never confirms (ADR-069, ENG-07).
+      if (!e.repeat) submit();
       return;
     }
     // Number keys pick a value here too (the form's own handler skips inputs),

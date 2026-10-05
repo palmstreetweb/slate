@@ -9,20 +9,22 @@ import { convertHeicToJpegFile, jpgName } from './heicToJpeg.js';
 import { tooBigMessage } from './fileUploadAccept.js';
 import { NOT_A_PHOTO, isHeicLike, withInferredImageMime } from './imageFileTypes.js';
 
+/**
+ * `default`: the photo profile. Long edge + byte cap keep uploads quick on
+ * cellular; quality steps down until under maxBytes.
+ *
+ * `pin`: the photo on a pin-the-spot question (ADR-065). It travels inside the
+ * published schema, so it is small: 1,200 px on the long edge, ~110 KB.
+ *
+ * (Notes sit here, not inside the object: the published build isn't minified
+ * and would ship them.)
+ */
 const PROFILES = {
-  /**
-   * Default photo profile. Long edge + byte cap keep uploads quick on cellular;
-   * quality steps down until under maxBytes.
-   */
   default: {
     maxEdge: 1920,
     maxBytes: 450_000,
     qualityStart: 0.75,
   },
-  /**
-   * The photo on a pin-the-spot question (ADR-065). It travels inside the
-   * published schema, so it is small: 1,200 px on the long edge, ~110 KB.
-   */
   pin: {
     maxEdge: 1200,
     maxBytes: 110_000,

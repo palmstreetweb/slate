@@ -310,7 +310,8 @@ describe('a reload after the submit never offers to resume onto it (R12)', () =>
         answers: { name: 'Ada' },
         step: 2,
         visitedIds: ['hi', 'name', 'done'],
-        savedAt: '',
+        // A save with a time the page can read (one without is no longer offered, SEC-2).
+        savedAt: new Date().toISOString(),
       }),
     );
     const onSubmit = vi.fn();
@@ -325,7 +326,8 @@ describe('a reload after the submit never offers to resume onto it (R12)', () =>
 /* ---------- Enter on one-tap questions ---------- */
 
 describe('a double or held Enter never skips a one-tap question (QA retest)', () => {
-  const nps: Question = { id: 'n', type: 'nps', title: 'How likely?' };
+  // An optional NPS: the owner unticked Required (CON-04).
+  const nps: Question = { id: 'n', type: 'nps', title: 'How likely?', required: false };
 
   it('an Enter in the first moment after the question appears does nothing; later it skips', async () => {
     const { advance } = renderLive(nps);
@@ -446,11 +448,16 @@ describe('a tap past the most picks says why (R5)', () => {
     const c = screen.getByRole('checkbox', { name: /Option C/ });
     expect(c).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(c);
-    const note = screen.getByText('You can pick up to 2. Tap one of your picks to let it go.');
+    const why = 'You can pick up to 2. Tap one of your picks to let it go.';
+    const note = screen.getByText(why, { selector: '.slate-choice-note' });
     expect(c.nextElementSibling).toBe(note);
+    // Said by a region that's always there, not the note created with it (COPY-R8).
+    expect(screen.getByText(why, { selector: '.slate-sr' })).toHaveAttribute('aria-live', 'polite');
     expect(onSet).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByRole('checkbox', { name: /Option A/ }));
-    expect(screen.queryByText(/You can pick up to 2/)).toBeNull();
+    expect(
+      screen.queryByText(/You can pick up to 2/, { selector: '.slate-choice-note' }),
+    ).toBeNull();
   });
 
   it('picture choice: the reason shows under the grid', async () => {
