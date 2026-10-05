@@ -102,6 +102,17 @@ describe('numbers a crafted link can’t abuse (F14, decision 1)', () => {
     expect(scale({ min: 1, max: 5, step: -1 })).not.toHaveProperty('step');
     expect(scale({ min: 0, max: 2_000_000 })).toMatchObject({ min: 0, max: 100 });
     expect(scale({ min: 0, max: 1000, step: 0.5 })).toMatchObject({ min: 0, max: 50, step: 0.5 });
+    // A slider draws no cells: its ends stay, and only a step too fine to land on is coarsened (R4, R11).
+    expect(scale({ min: 0, max: 100, step: 0.5, display: 'slider' })).toMatchObject({
+      min: 0,
+      max: 100,
+      step: 0.5,
+    });
+    expect(scale({ min: 0, max: 2_000_000, display: 'slider' })).toMatchObject({
+      min: 0,
+      max: 2_000_000,
+      step: 2000,
+    });
     expect(scale({ min: 9, max: 1 })).toMatchObject({ min: 1, max: 9 });
     expect(scale({ min: 'x', max: null })).toMatchObject({ min: 0, max: 10 });
     // What a fair link asked for stays exactly as it was.
@@ -115,7 +126,7 @@ describe('numbers a crafted link can’t abuse (F14, decision 1)', () => {
     const { MAX_CELLS } = await import('../src/components/questions/ext/scaleCells.js');
     const q = scale({ min: 0, max: 2_000_000, step: 0 });
     // The link is capped at 0–100 here, and the numbers scale itself draws at
-    // most MAX_CELLS (21) cells whatever a schema says (QA w2b), so the first 21.
+    // most MAX_CELLS (101) cells whatever a schema says, so all of 0–100 (R11).
     expect(q).toMatchObject({ min: 0, max: 100 });
     const { container } = render(
       createElement(ScaleField, {
@@ -129,7 +140,7 @@ describe('numbers a crafted link can’t abuse (F14, decision 1)', () => {
     const cells = container.querySelectorAll('[role="radio"]');
     expect(cells).toHaveLength(MAX_CELLS);
     expect(cells[0]!.textContent).toBe('0');
-    expect(cells[MAX_CELLS - 1]!.textContent).toBe('20');
+    expect(cells[MAX_CELLS - 1]!.textContent).toBe('100');
   });
 
   it('bounds that leave no answer, and boxes that can’t hold a letter, go', () => {

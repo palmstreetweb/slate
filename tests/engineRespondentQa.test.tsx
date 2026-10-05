@@ -96,9 +96,7 @@ describe('a question whose part didn’t download (GAP-06, F12)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     render(<Harness question={{ id: 'site', type: 'url', title: 'Your website?' }} />);
     expect(
-      await screen.findByText(
-        '! This question didn’t load. Check your connection, then tap Try again.',
-      ),
+      await screen.findByText('This question didn’t load. Check your connection and try again.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Your website?' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));

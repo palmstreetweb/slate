@@ -10,11 +10,7 @@
  * See ADR-026 / ADR-033.
  */
 
-import {
-  SLATE_IMAGE_TYPE_HINT,
-  isHeicLike,
-  withInferredImageMime,
-} from './imageFileTypes.js';
+import { NOT_A_PHOTO, isHeicLike, withInferredImageMime } from './imageFileTypes.js';
 
 /** A picked photo's own name as a JPEG: IMG_2041.HEIC → IMG_2041.jpg (or photo.jpg). */
 export function jpgName(sourceName: string): string {
@@ -118,9 +114,7 @@ async function tryHeic2Any(file: File): Promise<File | null> {
     const raw = Array.isArray(result) ? result[0]! : result;
     if (!raw || raw.size === 0) return null;
     const blob =
-      raw.type && raw.type.startsWith('image/')
-        ? raw
-        : new Blob([raw], { type: 'image/jpeg' });
+      raw.type && raw.type.startsWith('image/') ? raw : new Blob([raw], { type: 'image/jpeg' });
     return jpegFileFromBlob(await assertJpegMagic(blob), file.name);
   } catch (e) {
     console.warn('[heic2any]', e);
@@ -155,11 +149,8 @@ export async function normalizePickedImageFile(file: File): Promise<File> {
   if (isHeicLike(typed)) {
     return convertHeicToJpegFile(typed);
   }
-  if (!typed.type.startsWith('image/')) {
-    throw new Error(`That file is not a recognized image. ${SLATE_IMAGE_TYPE_HINT}`);
-  }
-  if (typed.type === 'image/svg+xml') {
-    throw new Error(`SVG is not supported for photos. ${SLATE_IMAGE_TYPE_HINT}`);
+  if (!typed.type.startsWith('image/') || typed.type === 'image/svg+xml') {
+    throw new Error(NOT_A_PHOTO);
   }
   return typed;
 }

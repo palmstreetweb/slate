@@ -9,8 +9,11 @@
 export const SLATE_IMAGE_INPUT_ACCEPT =
   'image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.heic,.heif';
 
-/** User-facing hint when a pick is rejected */
-export const SLATE_IMAGE_TYPE_HINT = 'Use JPG, PNG, WebP, GIF, or iPhone HEIC/HEIF.';
+/** User-facing hint when a pick is rejected (plain words, no file-format names). */
+export const SLATE_IMAGE_TYPE_HINT = 'Try a different photo.';
+
+/** A pick that isn't a photo the form can use (an SVG drawing, a PDF, a renamed text file). */
+export const NOT_A_PHOTO = `That file isn’t a photo we can open. ${SLATE_IMAGE_TYPE_HINT}`;
 
 const EXT_TO_MIME: readonly [ext: string, mime: string][] = [
   ['.jpg', 'image/jpeg'],

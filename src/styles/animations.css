@@ -112,23 +112,26 @@
   animation: slate-q-child-in 480ms cubic-bezier(0.16, 1, 0.3, 1) 200ms both;
 }
 
+/* Each choice fills `backwards` only: hidden until its turn, then its own
+   styles again. Held at the last keyframe (`both`), its opacity 1 would
+   outrank the dimmed look of options past the most picks (R5). */
 [data-slate-forms] .slate-q-enter .slate-choice:nth-child(1) {
-  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 160ms backwards;
 }
 [data-slate-forms] .slate-q-enter .slate-choice:nth-child(2) {
-  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 200ms both;
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 200ms backwards;
 }
 [data-slate-forms] .slate-q-enter .slate-choice:nth-child(3) {
-  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 240ms both;
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 240ms backwards;
 }
 [data-slate-forms] .slate-q-enter .slate-choice:nth-child(4) {
-  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 280ms both;
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 280ms backwards;
 }
 [data-slate-forms] .slate-q-enter .slate-choice:nth-child(5) {
-  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 320ms both;
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 320ms backwards;
 }
 [data-slate-forms] .slate-q-enter .slate-choice:nth-child(n + 6) {
-  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 360ms both;
+  animation: slate-q-child-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 360ms backwards;
 }
 
 /* Swiss is snappier — 380ms in / 180ms out, slightly less Y travel. */

@@ -28,7 +28,7 @@ export function ScaleField({ question, answers, initialValue, onAnswer, onAdvanc
   const labelId = useId();
   const errId = `${labelId}-err`;
   const rowRef = useRef<HTMLDivElement>(null);
-  // Rounded values, a usable step and at most 21 cells, whatever the schema says.
+  // Rounded values, a usable step and at most 101 cells, whatever the schema says.
   const cells = scaleValues(question);
 
   return (

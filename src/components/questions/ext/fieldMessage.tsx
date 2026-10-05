@@ -12,7 +12,7 @@
 export function FieldError({ id, error }: { id?: string; error: string | null }) {
   return (
     <p id={id} className="slate-err" aria-live="polite">
-      {error && `! ${error}`}
+      {error}
     </p>
   );
 }

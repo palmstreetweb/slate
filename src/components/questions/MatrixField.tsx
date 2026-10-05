@@ -1,8 +1,9 @@
 /**
  * Matrix — rows x columns grid. Radio semantics per row by default,
  * checkboxes with `multiple: true`. Desktop renders a grid; narrow
- * viewports stack each row (CSS). Answer shape per ADR-013:
- * `Record<rowValue, columnValue | columnValue[]>`.
+ * viewports stack each row (CSS), and so does a grid whose column headers
+ * can't fit their words side by side, measured here (R7). Answer shape per
+ * ADR-013: `Record<rowValue, columnValue | columnValue[]>`.
  *
  * When a required grid is sent with gaps, the message names what's missing
  * and those rows are marked, so a respondent at the foot of a tall grid
@@ -11,7 +12,7 @@
 
 'use client';
 
-import { useCallback, useId, useRef, useState } from 'react';
+import { useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { MatrixQuestion } from '@/types/Question.js';
 import type { LooseAnswers, MatrixAnswer } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
@@ -86,6 +87,33 @@ export function MatrixField({ question, answers, initialValue, onAnswer, onAdvan
 
   const colCount = question.columns.length;
 
+  // Stack when a column header's word is wider than its column, measured on
+  // the side-by-side layout, and again whenever the grid's width changes.
+  const heads = question.columns.map((c) => c.label).join('\u0000');
+  useLayoutEffect(() => {
+    const el = matrixRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    let width = -1;
+    const check = () => {
+      el.classList.remove('slate-matrix--stack');
+      const tight = Array.from(el.querySelectorAll<HTMLElement>('.slate-matrix-colhead')).some(
+        (h) => h.offsetParent !== null && h.scrollWidth > h.clientWidth + 1,
+      );
+      el.classList.toggle('slate-matrix--stack', tight);
+    };
+    const ro = new ResizeObserver(([entry]) => {
+      // Stacking changes only the height: re-measure on a new width alone.
+      const w = entry?.contentRect.width ?? 0;
+      if (w !== width) {
+        width = w;
+        check();
+      }
+    });
+    ro.observe(el);
+    void document.fonts?.ready.then(check);
+    return () => ro.disconnect();
+  }, [heads]);
+
   return (
     <div>
       <h1 id={labelId} className="slate-title">
@@ -142,7 +170,7 @@ export function MatrixField({ question, answers, initialValue, onAnswer, onAdvan
 
       {error && (
         <p className="slate-err" aria-live="polite">
-          ! {error}
+          {error}
         </p>
       )}
       <div className="slate-actions">

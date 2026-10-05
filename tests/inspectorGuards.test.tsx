@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Question, SignupSlotsQuestion } from '@/index.js';
 import { Inspector } from '../examples/_admin/components/Inspector.js';
@@ -43,7 +43,11 @@ function setup(question: Question) {
   const spy = vi.fn();
   const user = userEvent.setup();
   render(<Live initial={question} spy={spy} />);
-  const leave = () => user.click(screen.getByRole('button', { name: 'elsewhere' }));
+  // A number field settles its draft a frame after the blur (S4: a focus handed straight back isn't leaving).
+  const leave = async () => {
+    await user.click(screen.getByRole('button', { name: 'elsewhere' }));
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+  };
   return { spy, user, leave };
 }
 

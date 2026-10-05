@@ -186,7 +186,7 @@ export default function ChoiceCardsField({
       <OtherTextBox other={other} onEnter={commitOther} onType={onType} />
       {other.error ? (
         <p className="slate-err" aria-live="polite">
-          ! {other.error}
+          {other.error}
         </p>
       ) : null}
       {confirm ? (

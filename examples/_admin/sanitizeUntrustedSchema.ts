@@ -6,6 +6,7 @@
 
 import type { Schema, ThemeName } from '@/index.js';
 import { themes } from '@/index.js';
+import { withoutRepeatedOptions } from './uniqueOptions.js';
 
 const MAX_TEXT = 2000;
 
@@ -218,6 +219,8 @@ function sanitizeWaveD(next: Record<string, unknown>): void {
 
 /** Most cells a scale from a link may draw: a 0–2,000,000 scale left the tab unresponsive (F14). */
 const SCALE_CELLS_MAX = 101;
+/** A slider draws no cells: it keeps its ends, and its step grows past this many stops. */
+const SLIDER_STOPS_MAX = 1001;
 
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
@@ -231,12 +234,15 @@ function sanitizeBounds(next: Record<string, unknown>): void {
     let min = finite(next.min) ? next.min : 0;
     let max = finite(next.max) ? next.max : 10;
     if (min > max) [min, max] = [max, min];
-    if (finite(next.step) && next.step > 0) {
-      if ((max - min) / next.step > SCALE_CELLS_MAX - 1)
-        max = min + next.step * (SCALE_CELLS_MAX - 1);
-    } else {
-      delete next.step;
-      if (max - min > SCALE_CELLS_MAX - 1) max = min + SCALE_CELLS_MAX - 1;
+    if (!(finite(next.step) && next.step > 0)) delete next.step;
+    const step = (next.step as number | undefined) ?? 1;
+    if (next.display === 'slider') {
+      // A 0–100 slider in steps of 0.5 stays exactly that; only a step so fine
+      // the thumb couldn't land on it is coarsened (the ends never move).
+      if ((max - min) / step > SLIDER_STOPS_MAX - 1)
+        next.step = (max - min) / (SLIDER_STOPS_MAX - 1);
+    } else if ((max - min) / step > SCALE_CELLS_MAX - 1) {
+      max = min + step * (SCALE_CELLS_MAX - 1);
     }
     next.min = min;
     next.max = max;
@@ -346,8 +352,11 @@ function sanitizeOptions(next: Record<string, unknown>): void {
 }
 
 export function sanitizeUntrustedSchema(schema: Schema): Schema {
-  const questions = (schema.questions ?? []).map((q) => {
+  const questions = withoutRepeatedOptions(schema.questions ?? []).map((q) => {
     const next: Record<string, unknown> = { ...(q as Record<string, unknown>) };
+    // A pattern from JSON is a string or {}, never a RegExp: the engine can't
+    // test it, and a crafted one could hang the tab (NEW-01).
+    delete next.pattern;
     for (const key of ['title', 'subtitle', 'description', 'placeholder', 'cta', 'label']) {
       if (key in next) next[key] = clampText(next[key]);
     }

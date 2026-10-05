@@ -181,7 +181,7 @@ export default function ContactInfoField({
               />
               {err ? (
                 <span id={errId} className="slate-err slate-part-err" aria-live="polite">
-                  ! {err}
+                  {err}
                 </span>
               ) : null}
             </label>

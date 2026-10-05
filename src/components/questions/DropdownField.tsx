@@ -255,7 +255,7 @@ export function DropdownField({
         )}
         {error && (
           <p className="slate-err" aria-live="polite">
-            ! {error}
+            {error}
           </p>
         )}
         <div className="slate-actions">

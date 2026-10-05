@@ -434,7 +434,7 @@ export default function SignupSlotsField({
                   </button>
                   {note?.slot === s.value ? (
                     <p className="slate-err slate-slot-note" aria-live="polite">
-                      ! {note.text}
+                      {note.text}
                     </p>
                   ) : null}
                 </Fragment>
@@ -449,7 +449,7 @@ export default function SignupSlotsField({
       </p>
       {error ? (
         <p className="slate-err" aria-live="polite">
-          ! {error}
+          {error}
         </p>
       ) : null}
       <div className="slate-actions">

@@ -69,9 +69,13 @@ function renderField(question: Question, answers: LooseAnswers = {}) {
 }
 
 // On-demand fields register their OK / Enter handler in an effect: let it run first.
+// One-tap questions take Enter once they have been up for a moment (a double
+// Enter from the question before must not skip them), so the key comes later.
 const enter = async () => {
   await act(async () => {});
+  const later = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600);
   fireEvent.keyDown(window, { key: 'Enter' });
+  later.mockRestore();
 };
 
 afterEach(() => {
@@ -95,7 +99,7 @@ describe('stars and faces (F4, F20, GAP-11)', () => {
     await enter();
     expect(setAnswer).not.toHaveBeenCalled();
     expect(advance).not.toHaveBeenCalled();
-    expect(screen.getByText('! Please pick a rating')).toBeInTheDocument();
+    expect(screen.getByText('Please pick a rating')).toBeInTheDocument();
     // There is nothing to skip on a required rating.
     expect(screen.queryByRole('button', { name: /skip/i })).toBeNull();
   });
@@ -167,7 +171,7 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
     await screen.findAllByRole('radio');
     expect(screen.queryByRole('button', { name: 'Skip' })).toBeNull();
     await enter();
-    expect(screen.getByText('! Please pick a number')).toBeInTheDocument();
+    expect(screen.getByText('Please pick a number')).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
   });
 
@@ -189,7 +193,7 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
     const second = renderField({ id: 'n', type: 'nps', title: 'N', required: true });
     await screen.findAllByRole('radio');
     await enter();
-    expect(screen.getByText('! Please pick a number')).toBeInTheDocument();
+    expect(screen.getByText('Please pick a number')).toBeInTheDocument();
     expect(second.advance).not.toHaveBeenCalled();
   });
 
@@ -197,7 +201,7 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
     const first = renderField({ id: 'l', type: 'legal', title: 'Terms?' });
     await screen.findAllByRole('radio');
     await enter();
-    expect(screen.getByText('! Please choose an option')).toBeInTheDocument();
+    expect(screen.getByText('Please choose an option')).toBeInTheDocument();
     expect(first.advance).not.toHaveBeenCalled();
     first.unmount();
     const second = renderField({ id: 'l', type: 'legal', title: 'Terms?', required: false });
@@ -225,10 +229,20 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
 
   it('a step of 0, a huge range or min above max never hangs or empties the scale (S16, F14)', async () => {
     expect(scaleValues({ min: 1, max: 5, step: 0 })).toEqual([1, 2, 3, 4, 5]);
-    expect(scaleValues({ min: 0, max: 2_000_000 })).toHaveLength(21);
+    expect(scaleValues({ min: 0, max: 2_000_000 })).toHaveLength(101);
     expect(scaleValues({ min: 5, max: 1 })).toEqual([1, 2, 3, 4, 5]);
     renderField({ id: 's', type: 'scale', title: 'S', min: 0, max: 20000 });
-    expect(await screen.findAllByRole('radio')).toHaveLength(21);
+    expect(await screen.findAllByRole('radio')).toHaveLength(101);
+  });
+
+  it('a 0–100 or 1–30 numbers scale saved before the 21-point check draws every value (R11)', async () => {
+    expect(scaleValues({ min: 0, max: 100 })).toHaveLength(101);
+    expect(scaleValues({ min: 1, max: 30 }).at(-1)).toBe(30);
+    const { setAnswer } = renderField({ id: 's', type: 'scale', title: 'S', min: 0, max: 100 });
+    const radios = await screen.findAllByRole('radio');
+    expect(radios.at(-1)).toHaveTextContent('100');
+    fireEvent.click(radios.at(-1)!);
+    expect(setAnswer).toHaveBeenCalledWith('s', 100);
   });
 });
 
@@ -255,7 +269,7 @@ describe('slider (SCROLL-10, GAP-10, F24)', () => {
     expect(container.querySelector('.slate-slider-value')).toHaveTextContent('–');
     expect(slider).toHaveAttribute('aria-valuetext', expect.stringMatching(/not answered yet/i));
     await enter();
-    expect(screen.getByText('! Move the slider to choose a number')).toBeInTheDocument();
+    expect(screen.getByText('Move the slider to choose a number')).toBeInTheDocument();
   });
 
   it('a tap where the thumb sits still answers', async () => {
@@ -303,7 +317,7 @@ describe('typed numbers (F16, F17)', () => {
     const box = await screen.findByRole('textbox');
     fireEvent.change(box, { target: { value: '0x0A' } });
     fireEvent.keyDown(box, { key: 'Enter' });
-    expect(screen.getByText('! Please use numbers only, like 1500')).toBeInTheDocument();
+    expect(screen.getByText('Please use numbers only, like 1500')).toBeInTheDocument();
     fireEvent.change(box, { target: { value: '1,000' } });
     fireEvent.keyDown(box, { key: 'Enter' });
     expect(setAnswer).toHaveBeenCalledWith('n', 1000);
@@ -374,7 +388,7 @@ describe('number stepper (X-3, F19)', () => {
     const box = (await screen.findByRole('spinbutton')) as HTMLInputElement;
     fireEvent.keyDown(box, { key: '-' });
     expect(box).toHaveValue('0');
-    expect(screen.getByText('! Enter a number from 0 to 5')).toBeInTheDocument();
+    expect(screen.getByText('Enter a number from 0 to 5')).toBeInTheDocument();
     // The number is selected, so the 2 typed next replaces it.
     expect([box.selectionStart, box.selectionEnd]).toEqual([0, 1]);
   });
@@ -414,7 +428,7 @@ describe('dates (F5, F29, F17, COPY-09)', () => {
     renderField({ ...d, format: 'DD/MM/YYYY' });
     fireEvent.change(await screen.findByLabelText('Month'), { target: { value: '10' } });
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(screen.getByText('! Please finish the date (DD/MM/YYYY)')).toBeInTheDocument();
+    expect(screen.getByText('Please finish the date (DD/MM/YYYY)')).toBeInTheDocument();
   });
 
   it('"3/7/2026" typed in one go fills the boxes', () => {
@@ -455,11 +469,11 @@ describe('dates (F5, F29, F17, COPY-09)', () => {
     fireEvent.change(screen.getByLabelText('Hour'), { target: { value: '25' } });
     fireEvent.change(screen.getByLabelText('Minutes'), { target: { value: '00' } });
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(screen.getByText('! Hours run from 0 to 23')).toBeInTheDocument();
+    expect(screen.getByText('Hours run from 0 to 23')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Hour'), { target: { value: '09' } });
     fireEvent.change(screen.getByLabelText('Minutes'), { target: { value: '75' } });
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(screen.getByText('! Minutes run from 00 to 59')).toBeInTheDocument();
+    expect(screen.getByText('Minutes run from 00 to 59')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Minutes'), { target: { value: '30' } });
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(setAnswer).toHaveBeenCalledWith('d', '2026-10-03T09:30');
@@ -480,7 +494,7 @@ describe('typed text (F9, F18, GAP-21)', () => {
     expect(box).toHaveValue('PASTED-LONG-TEXT-123456');
     expect(screen.getByText('23 / 10')).toHaveClass('slate-count--over');
     fireEvent.keyDown(box, { key: 'Enter' });
-    expect(screen.getByText('! Keep it to 10 characters or fewer')).toBeInTheDocument();
+    expect(screen.getByText('Keep it to 10 characters or fewer')).toBeInTheDocument();
     expect(setAnswer).not.toHaveBeenCalled();
   });
 
@@ -526,8 +540,8 @@ describe('typed text (F9, F18, GAP-21)', () => {
     expect(slot).toBeEmptyDOMElement();
     fireEvent.change(box, { target: { value: 'nope' } });
     fireEvent.keyDown(box, { key: 'Enter' });
-    expect(slot).toHaveTextContent("! That doesn't look like a valid email");
-    expect(box).toHaveAccessibleDescription("! That doesn't look like a valid email");
+    expect(slot).toHaveTextContent("That doesn't look like a valid email");
+    expect(box).toHaveAccessibleDescription("That doesn't look like a valid email");
   });
 });
 
@@ -555,7 +569,7 @@ describe('phone numbers (F13, F22)', () => {
     fireEvent.keyDown(box, { key: 'Enter' });
     expect(
       await screen.findByText(
-        '! Please check the number, including the area code. For a number outside the United Kingdom, start with + and the country code.',
+        'Please check the number, including the area code. For a number outside the United Kingdom, start with + and the country code.',
       ),
     ).toBeInTheDocument();
   });
@@ -612,7 +626,7 @@ describe('signature (F23, SCROLL-12)', () => {
     renderField(sig);
     fireEvent.click(await screen.findByRole('button', { name: /type your name instead/i }));
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(screen.getByText('! Please type your full name')).toBeInTheDocument();
+    expect(screen.getByText('Please type your full name')).toBeInTheDocument();
   });
 
   it('an optional signature with only a dot says Clear skips it', async () => {
@@ -623,7 +637,7 @@ describe('signature (F23, SCROLL-12)', () => {
     fireEvent.pointerUp(canvas, { pointerId: 1 });
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(
-      screen.getByText('! That’s only a dot. Sign your full name, or tap Clear to skip.'),
+      screen.getByText('That’s only a dot. Sign your full name, or tap Clear to skip.'),
     ).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
   });
@@ -679,12 +693,10 @@ describe('location (MEDIA-15)', () => {
   it('the required message points at what is on screen', async () => {
     renderField(loc);
     fireEvent.click(await screen.findByRole('button', { name: /ok/i }));
-    expect(
-      screen.getByText('! Please share your location, or type it instead'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Please share your location, or type it instead')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Type it instead' }));
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(screen.getByText('! Please type your town or ZIP code')).toBeInTheDocument();
+    expect(screen.getByText('Please type your town or ZIP code')).toBeInTheDocument();
   });
 });
 

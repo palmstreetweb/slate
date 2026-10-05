@@ -53,6 +53,24 @@ const isPhoto = (file: File) =>
   file.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif|avif)$/i.test(file.name);
 
 /**
+ * Can this browser draw it? A text file renamed photo.jpg passes `isPhoto`
+ * by its name, then uploads as a broken picture (MEDIA-08). HEIC is converted
+ * by the upload itself (most browsers can't draw it), so it isn't tried here;
+ * nor is anything where the browser can't tell (no createImageBitmap).
+ */
+async function drawable(file: File): Promise<boolean> {
+  if (typeof createImageBitmap !== 'function' || /hei[cf]/i.test(file.type + file.name)) {
+    return true;
+  }
+  try {
+    (await createImageBitmap(file)).close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The host's own sentence (a plain Error), or plain words — never a browser's
  * or a server's technical text (MEDIA-06).
  */
@@ -170,6 +188,10 @@ export default function PhotoChecklistField({
       }
       if (file.size > PHOTO_MAX_BYTES * 3) {
         fail('That photo is too big. Try a different one.');
+        return;
+      }
+      if (!(await drawable(file))) {
+        if (alive.current) fail('That file isn’t a photo. Take or choose a photo.');
         return;
       }
       const thumb = URL.createObjectURL(file);
@@ -364,14 +386,14 @@ export default function PhotoChecklistField({
       </p>
       {error ? (
         <p className="slate-err" aria-live="polite">
-          ! {error}
+          {error}
         </p>
       ) : null}
       <div className="slate-actions">
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>
         </button>
-        <span className="slate-hint">press Enter ↵</span>
+        <span className="slate-hint slate-keys">press Enter ↵</span>
       </div>
     </div>
   );

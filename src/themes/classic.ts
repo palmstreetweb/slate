@@ -6,6 +6,12 @@
  * Uses Inter at a medium weight and comfortable reading size — distinct from
  * the Swiss theme (Inter 900, lowercase, display-scale). Token values mirror
  * src/styles/tokens.css. If you change one, change both.
+ *
+ * The title is a readable medium headline, not a dramatic display size: old
+ * Typeform questions sat comfortably mid-viewport rather than shouting. Dark
+ * mode is a slatey charcoal rather than pure black, the classic Typeform dark
+ * feel. (Notes live up here: a comment inside the theme object ships in the
+ * engine bundle.)
  */
 
 import type { Theme } from '@/types/Theme.js';
@@ -23,8 +29,6 @@ export const classic: Theme = {
     titleWeight: 500,
     titleTracking: '-0.01em',
     titleLineHeight: 1.3,
-    // Readable medium headline, not a dramatic display size — old Typeform
-    // questions sat comfortably mid-viewport rather than shouting.
     titleSize: 'clamp(1.6rem, 3.6vw, 2.4rem)',
     transform: 'none',
   },
@@ -44,7 +48,6 @@ export const classic: Theme = {
     colorScheme: 'light',
   },
   dark: {
-    // Slatey charcoal rather than pure black — the classic Typeform dark feel.
     bg: '#2A2D34',
     bg2: '#313640',
     bg3: '#3A404B',

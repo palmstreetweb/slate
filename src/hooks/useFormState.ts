@@ -190,6 +190,7 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
         if (target === s.step) return s;
         const current = visible[Math.min(s.step, visible.length - 1)];
         const cut = a.rewind ? s.history.lastIndexOf(visible[target]!.id) : -1;
+        // An edit from Review comes back to it (ADR-069): returnTo.
         return {
           ...s,
           history: a.rewind
@@ -202,7 +203,6 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
           step: target,
           direction: a.direction,
           isAnimating: true,
-          // An edit from Review comes back to it (ADR-069).
           returnTo: !a.rewind && current?.type === 'review' ? current.id : s.returnTo,
         };
       }
@@ -211,7 +211,9 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
       case 'hydrate': {
         const answers = a.snapshot.answers;
         const visible = visibleQuestions(allQuestions, answers);
-        const step = Math.max(0, Math.min(a.snapshot.step, Math.max(visible.length - 1, 0)));
+        let step = Math.max(0, Math.min(a.snapshot.step, Math.max(visible.length - 1, 0)));
+        // Never resume onto an ending: arriving there would send the answers again.
+        if (visible[step]?.type === 'thanks' && step) step--;
         return {
           ...s,
           answers,

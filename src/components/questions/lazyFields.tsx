@@ -261,7 +261,7 @@ class ExtFieldBoundary extends Component<BoundaryProps, { failed: boolean }> {
       <div>
         <h1 className="slate-title">{this.props.title}</h1>
         <p className="slate-err" role="alert">
-          ! This question didn’t load. Check your connection, then tap Try again.
+          This question didn’t load. Check your connection and try again.
         </p>
         <div className="slate-actions">
           <button type="button" className="slate-ok-btn" onClick={() => location.reload()}>

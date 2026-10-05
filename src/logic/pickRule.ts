@@ -5,12 +5,9 @@
  * `pickLimits` in validation.ts, which the core needs.
  */
 
-import { pickLimits, type PickRule } from './validation.js';
+import { pickChoices, pickLimits, type PickRule } from './validation.js';
 
-/** The choices on offer, Other included. */
-export function pickChoices(q: PickRule): number {
-  return q.options.length + (q.allowOther ? 1 : 0);
-}
+export { pickChoices };
 
 /**
  * "Pick up to 3", "Pick at least 2", "Pick 2", "Pick at least 1, up to 3",

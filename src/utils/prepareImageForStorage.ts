@@ -7,11 +7,7 @@
 
 import { convertHeicToJpegFile, jpgName } from './heicToJpeg.js';
 import { tooBigMessage } from './fileUploadAccept.js';
-import {
-  SLATE_IMAGE_TYPE_HINT,
-  isHeicLike,
-  withInferredImageMime,
-} from './imageFileTypes.js';
+import { NOT_A_PHOTO, isHeicLike, withInferredImageMime } from './imageFileTypes.js';
 
 const PROFILES = {
   /**
@@ -48,14 +44,11 @@ export async function prepareImageForStorage(
   profile: ImageStorageProfile = 'default',
 ): Promise<File> {
   const typed = withInferredImageMime(file);
-  if (!typed.type.startsWith('image/') && !isHeicLike(typed)) {
-    throw new Error(`That file is not a recognized image. ${SLATE_IMAGE_TYPE_HINT}`);
+  if ((!typed.type.startsWith('image/') && !isHeicLike(typed)) || typed.type === 'image/svg+xml') {
+    throw new Error(NOT_A_PHOTO);
   }
   if (typed.size > INPUT_CAP_BYTES) {
     throw new Error(tooBigMessage(32));
-  }
-  if (typed.type === 'image/svg+xml') {
-    throw new Error(`SVG images are not supported. ${SLATE_IMAGE_TYPE_HINT}`);
   }
 
   let source = typed;

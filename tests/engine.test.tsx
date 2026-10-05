@@ -190,7 +190,9 @@ describe('useFormState — hydrate (save-and-resume, ADR-017)', () => {
         visitedIds: ['welcome'],
       }),
     );
-    expect(result.current.currentQuestion?.id).toBe('done');
+    // The last step is the ending; resuming never lands there, because arriving
+    // on it sends the answers (again) — R12. It lands on the question before.
+    expect(result.current.currentQuestion?.id).toBe('state');
   });
 });
 

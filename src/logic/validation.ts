@@ -45,12 +45,19 @@ const URL_RE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i;
 
 /**
  * The longest text a short or long text answer takes: the question's own
- * limit when it is 1 or more (a 0 or negative one would trap everyone, so it
- * counts as unset), else what the server keeps (10,000 characters).
+ * limit when it is 1 or more, in whole characters (a 0 or negative one would
+ * trap everyone, so it counts as unset; 2.5 is 2), else what the server keeps
+ * (10,000 characters).
  */
 export function textMax(q: { maxLength?: number }): number {
-  return (q.maxLength ?? 0) >= 1 ? q.maxLength! : 1e4;
+  return (q.maxLength ?? 0) >= 1 ? Math.floor(q.maxLength!) : 1e4;
 }
+
+/** Characters as people count them: an emoji is one, not two. */
+export const charCount = (s: string): number => [...s].length;
+
+/** "1,000,000", "0.25": numbers in messages read as people write them. */
+const num = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 20 });
 
 /**
  * "Enter a number from $10 to $500", in the question's own prefix and unit.
@@ -70,10 +77,12 @@ function rangeError(
     code: n < min ? 'min' : 'max',
     message:
       max === Infinity
-        ? `Enter ${prefix + min + u} or more`
+        ? `Enter ${prefix + num(min) + u} or more`
         : min === -Infinity
-          ? `Enter ${prefix + max + u} or less`
-          : `Enter a number from ${prefix + min} to ${prefix + max + u}`,
+          ? `Enter ${prefix + num(max) + u} or less`
+          : min === max
+            ? `Enter ${prefix + num(min) + u}`
+            : `Enter a number from ${prefix + num(min)} to ${prefix + num(max) + u}`,
   };
 }
 
@@ -134,11 +143,15 @@ function isMissingValue(v: unknown): boolean {
 }
 
 export type PickRule = {
-  options: ReadonlyArray<unknown>;
+  options: ReadonlyArray<{ value: unknown }>;
   allowOther?: boolean;
   min?: number;
   max?: number;
 };
+
+/** The choices on offer: options with different values (two with one value tick as one), and Other. */
+export const pickChoices = (q: PickRule): number =>
+  new Set(q.options.map((o) => o.value)).size + (q.allowOther ? 1 : 0);
 
 /**
  * The picks a multi choice (or a picture choice with `multiple`) asks for, as
@@ -146,10 +159,10 @@ export type PickRule = {
  * number and at most the choices on offer (Other counts as one), and a maximum
  * below 1 or below that minimum is dropped (Infinity: no maximum). The studio
  * keeps owners from saving such limits; this keeps forms saved before that
- * answerable.
+ * answerable. The server's clamp counts choices the same way (CH-05).
  */
 export function pickLimits(q: PickRule): [number, number] {
-  const min = Math.min(Math.ceil(q.min ?? 0), q.options.length + (q.allowOther ? 1 : 0));
+  const min = Math.min(Math.ceil(q.min ?? 0), pickChoices(q));
   return [min, q.max! >= Math.max(min, 1) ? Math.floor(q.max!) : Infinity];
 }
 
@@ -178,18 +191,20 @@ export function validate(question: Question, answer: unknown): ValidationResult 
       }
       if (typeof answer === 'string') {
         const max = textMax(question);
-        if (answer.length > max) {
-          return { code: 'too_long', message: `Keep it to ${max} characters or fewer` };
+        if (charCount(answer) > max) {
+          return {
+            code: 'too_long',
+            message: `Keep it to ${num(max)} character${max === 1 ? '' : 's'} or fewer`,
+          };
         }
-        if (
-          question.type === 'short_text' &&
-          question.pattern &&
-          answer &&
-          !question.pattern.test(answer)
-        ) {
+        // A pattern from JSON (a link, a stored form) is a string or {}, not a
+        // RegExp: it can't be tested, so it's ignored rather than throwing (NEW-01).
+        const re = question.type === 'short_text' ? question.pattern : undefined;
+        if (answer && typeof re?.test == 'function' && !re.test(answer)) {
           return {
             code: 'pattern',
-            message: question.patternError ?? 'Please check the format',
+            message:
+              (question as { patternError?: string }).patternError ?? 'Please check the format',
           };
         }
       }

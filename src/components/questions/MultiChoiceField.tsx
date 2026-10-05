@@ -4,14 +4,15 @@
  *
  * The pick rule is said up front ("Pick up to 3", "Pick at least 2"), from
  * the limits a respondent can actually meet (`pickLimits`). Once the most
- * picks are made, the other options step back and a tap on one only shakes
- * it: there is never a surprise "too many" after OK. An error clears as soon
- * as the picks change, by tap or by key.
+ * picks are made, the other options step back, and a tap on one shakes it and
+ * says why right under it (on a phone the rule above can be off-screen):
+ * there is never a surprise "too many" after OK. An error clears as soon as
+ * the picks change, by tap or by key.
  */
 
 'use client';
 
-import { useCallback, useId, useRef, useState } from 'react';
+import { Fragment, useCallback, useId, useRef, useState } from 'react';
 import type { MultiChoiceQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { pickLimits, validate } from '@/logic/validation.js';
@@ -35,6 +36,9 @@ type Props = {
 
 const NONE: string[] = [];
 
+/** Stands for "Other" in the note under a refused tap. */
+const OTHER_KEY = '\u0000other';
+
 /**
  * Long lists of short labels sit in two columns (utils/choiceLayout.ts, the
  * single choice's rule). Spelled out here so this on-demand chunk doesn't
@@ -57,6 +61,8 @@ export function MultiChoiceField({
 }: Props) {
   const labelId = useId();
   const [error, setError] = useState<string | null>(null);
+  /** The option tapped while the most picks were made: its note says why. */
+  const [refused, setRefused] = useState<string | null>(null);
   const choicesRef = useRef<HTMLDivElement>(null);
   const other = useOtherChoice(question, selected, labelId);
   const picked = other.enabled ? splitOther(question.options, selected).picked : selected;
@@ -69,6 +75,7 @@ export function MultiChoiceField({
   if (selected !== seen) {
     setSeen(selected);
     if (error) setError(null);
+    if (refused) setRefused(null);
   }
 
   /** The answer: picked options, then the typed text while the Other box is open. */
@@ -86,7 +93,8 @@ export function MultiChoiceField({
     if (picked.includes(value)) {
       onSelect(withOther(picked.filter((v) => v !== value)));
     } else if (full) {
-      // At the most picks: the rule is shown above; untick one first.
+      // At the most picks: untick one first, says the note under this option.
+      setRefused(value);
       shakeInvalid(el);
       return;
     } else {
@@ -100,7 +108,8 @@ export function MultiChoiceField({
       other.close();
       onSelect(picked);
     } else if (full) {
-      shakeInvalid(choicesRef.current?.lastElementChild);
+      setRefused(OTHER_KEY);
+      shakeInvalid(choicesRef.current?.querySelector('.slate-choice--other'));
       return;
     } else {
       other.openBox();
@@ -137,6 +146,12 @@ export function MultiChoiceField({
   useRegisterFormConfirm(submit);
   useRegisterOtherKey(toggleOther, other.enabled);
 
+  const note = (
+    <p className="slate-err slate-choice-note" aria-live="polite">
+      You can pick up to {max}. Tap one of your picks to let it go.
+    </p>
+  );
+
   return (
     <div>
       <h1 id={labelId} className="slate-title">
@@ -156,21 +171,23 @@ export function MultiChoiceField({
         {question.options.map((opt, i) => {
           const isSelected = picked.includes(opt.value);
           return (
-            <button
-              key={opt.value}
-              type="button"
-              role="checkbox"
-              aria-checked={isSelected}
-              aria-disabled={full && !isSelected ? true : undefined}
-              onClick={(e) => toggle(opt.value, e.currentTarget)}
-              className={`slate-choice${isSelected ? ' slate-choice--selected' : ''}`}
-            >
-              <span className="slate-choice-badge">{CHOICE_LETTERS[i] ?? ''}</span>
-              <span>
-                {opt.label}
-                {opt.description && <span className="slate-choice-desc">{opt.description}</span>}
-              </span>
-            </button>
+            <Fragment key={opt.value}>
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={isSelected}
+                aria-disabled={full && !isSelected ? true : undefined}
+                onClick={(e) => toggle(opt.value, e.currentTarget)}
+                className={`slate-choice${isSelected ? ' slate-choice--selected' : ''}`}
+              >
+                <span className="slate-choice-badge">{CHOICE_LETTERS[i] ?? ''}</span>
+                <span>
+                  {opt.label}
+                  {opt.description && <span className="slate-choice-desc">{opt.description}</span>}
+                </span>
+              </button>
+              {refused === opt.value ? note : null}
+            </Fragment>
           );
         })}
         {other.enabled ? (
@@ -187,12 +204,13 @@ export function MultiChoiceField({
             <span>{other.label}</span>
           </button>
         ) : null}
+        {refused === OTHER_KEY ? note : null}
       </div>
       <OtherTextBox other={other} onEnter={submit} onType={onType} />
 
       {other.error || error ? (
         <p className="slate-err" aria-live="polite">
-          ! {other.error ?? error}
+          {other.error ?? error}
         </p>
       ) : null}
 

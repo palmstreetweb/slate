@@ -5,6 +5,12 @@
  * geometric SVG compositions in saturated primary palette behind each step.
  *
  * Token values mirror src/styles/tokens.css. If you change one, change both.
+ *
+ * Fonts: Inter (variable, opsz axis) as a free Akzidenz-Grotesk substitute —
+ * see DECISIONS.md ADR-009. Closer poster-grade letterforms than the beta's
+ * Archivo Black; not the real Berthold typeface but the most honest free
+ * approximation we can ship. (Notes live up here: a comment inside the theme
+ * object ships in the engine bundle.)
  */
 
 import type { Theme } from '@/types/Theme.js';
@@ -14,10 +20,6 @@ export const swiss: Theme = {
   tagline: 'Bold geometric · poster energy',
   decoration: 'shapes',
   static: {
-    // Inter (variable, opsz axis) as a free Akzidenz-Grotesk substitute —
-    // see DECISIONS.md ADR-009. Closer poster-grade letterforms than the
-    // beta's Archivo Black; not the real Berthold typeface but the most
-    // honest free approximation we can ship.
     fontDisplay: "'Inter', system-ui, sans-serif",
     fontBody: "'Inter', system-ui, sans-serif",
     fontMono: "'Inter', system-ui, sans-serif",

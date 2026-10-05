@@ -316,7 +316,7 @@ describe('field interactions', () => {
     });
     await user.type(screen.getByRole('textbox'), '50');
     await user.click(screen.getByRole('button', { name: /ok/i }));
-    expect(await screen.findByText('! Enter 100 or more')).toBeInTheDocument();
+    expect(await screen.findByText('Enter 100 or more')).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
   });
 
@@ -360,7 +360,7 @@ describe('field interactions', () => {
     await user.type(year, '2026');
     await user.click(screen.getByRole('button', { name: /ok/i }));
     expect(
-      await screen.findByText('! February 2026 has only 28 days. Please check the day.'),
+      await screen.findByText('February 2026 has only 28 days. Please check the day.'),
     ).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
 
@@ -651,7 +651,7 @@ describe('phase 3 question types', () => {
 
     await user.click(screen.getByRole('button', { name: /ok/i }));
     // The message names the row still empty, and that row is marked (ADR-069).
-    expect(await screen.findByText('! Please answer “Speed” too.')).toBeInTheDocument();
+    expect(await screen.findByText('Please answer “Speed” too.')).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: 'Speed' })).toHaveClass(
       'slate-matrix-row--missing',
     );

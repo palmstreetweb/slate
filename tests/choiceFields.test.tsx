@@ -111,7 +111,7 @@ describe('dropdown: Enter picks only a row the respondent moved to', () => {
     fireEvent.focus(input);
     expect(input).toHaveAttribute('aria-expanded', 'false');
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(await screen.findByText('! Please pick one')).toBeInTheDocument();
+    expect(await screen.findByText('Please pick one')).toBeInTheDocument();
     expect(onSet).not.toHaveBeenCalled();
     expect(advance).not.toHaveBeenCalled();
   });
@@ -193,9 +193,9 @@ describe('picture choice: limits up front, and Skip when optional', () => {
     const { advance } = renderLive(q);
     expect(await screen.findByText('Pick at least 1, up to 2')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('confirm'));
-    expect(screen.getByText('! Please pick at least one')).toBeInTheDocument();
+    expect(screen.getByText('Please pick at least one')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: /red/i }));
-    expect(screen.queryByText('! Please pick at least one')).not.toBeInTheDocument();
+    expect(screen.queryByText('Please pick at least one')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: /green/i }));
     const blue = screen.getByRole('checkbox', { name: /blue/i });
     expect(blue).toHaveAttribute('aria-disabled', 'true');
@@ -295,7 +295,7 @@ describe('swipe cards with Max Likes (CH-11, GAP-17)', () => {
     expect(likeFarm).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(likeFarm);
     expect(
-      screen.getByText('! You can like up to 1. Pass on this one, or undo a like.'),
+      screen.getByText('You can like up to 1. Pass on this one, or undo a like.'),
     ).toBeInTheDocument();
     // Still on Farmhouse: nothing was decided.
     expect(screen.getByRole('button', { name: 'Like Farmhouse' })).toBeInTheDocument();
@@ -364,7 +364,7 @@ describe('sign-up slots (MEDIA-07, GAP-16)', () => {
       await screen.findByText('Sorry, every spot is taken. You can still send the rest.'),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: /^Morning/ }));
-    expect(screen.getByText('! Sorry, every spot is taken.')).toBeInTheDocument();
+    expect(screen.getByText('Sorry, every spot is taken.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^ok/i }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0]![0]).toEqual({});
@@ -377,7 +377,7 @@ describe('sign-up slots (MEDIA-07, GAP-16)', () => {
     await user.click(screen.getByRole('checkbox', { name: /^Noon/ }));
     const evening = screen.getByRole('checkbox', { name: /^Evening/ });
     await user.click(evening);
-    const note = screen.getByText('! You can pick up to 2. Tap one of your picks to let it go.');
+    const note = screen.getByText('You can pick up to 2. Tap one of your picks to let it go.');
     expect(evening.nextElementSibling).toBe(note);
     // A tap that works clears it.
     await user.click(screen.getByRole('checkbox', { name: /^Noon/ }));
@@ -404,7 +404,7 @@ describe('sign-up slots (MEDIA-07, GAP-16)', () => {
     expect(await screen.findByText('press A–C, or click to choose')).toBeInTheDocument();
     const noon = screen.getByRole('radio', { name: /^Noon/ });
     await user.click(noon);
-    expect(noon.nextElementSibling).toHaveTextContent('! Noon is full. Please pick another.');
+    expect(noon.nextElementSibling).toHaveTextContent('Noon is full. Please pick another.');
   });
 });
 
@@ -445,7 +445,8 @@ describe('ranking (GAP-15, S23)', () => {
     expect(screen.getByRole('button', { name: /^ok$/i })).toBeInTheDocument();
   });
 
-  it('a finger drags by the grip; elsewhere on the row it scrolls the page', async () => {
+  it('a finger drags by the grip after resting on it; a swipe from the grip or the row scrolls', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     renderLive(rank);
     await screen.findByRole('button', { name: 'Move Alpha up' });
     const rows = Array.from(document.querySelectorAll<HTMLElement>('.slate-ranking-row'));
@@ -464,12 +465,44 @@ describe('ranking (GAP-15, S23)', () => {
     fireEvent.pointerDown(rows[0]!, { pointerId: 1, pointerType: 'touch', clientY: 25 });
     fireEvent.pointerMove(rows[0]!, { pointerId: 1, pointerType: 'touch', clientY: 150 });
     expect(order()).toEqual(['Alpha', 'Beta', 'Gamma']);
-    // The grip drags.
     const grip = rows[0]!.querySelector('.slate-ranking-grip')!;
+    // A swipe that starts on the grip (no rest) scrolls the page: nothing moves (retest).
     fireEvent.pointerDown(grip, { pointerId: 2, pointerType: 'touch', clientY: 25 });
+    fireEvent.pointerMove(grip, { pointerId: 2, pointerType: 'touch', clientY: 60 });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     fireEvent.pointerMove(grip, { pointerId: 2, pointerType: 'touch', clientY: 150 });
     fireEvent.pointerUp(grip, { pointerId: 2, pointerType: 'touch', clientY: 150 });
+    expect(order()).toEqual(['Alpha', 'Beta', 'Gamma']);
+    // Resting on the grip lifts the row; then it follows the finger.
+    fireEvent.pointerDown(grip, { pointerId: 3, pointerType: 'touch', clientY: 25 });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    fireEvent.pointerMove(grip, { pointerId: 3, pointerType: 'touch', clientY: 150 });
+    fireEvent.pointerUp(grip, { pointerId: 3, pointerType: 'touch', clientY: 150 });
     expect(order()).toEqual(['Beta', 'Gamma', 'Alpha']);
+    vi.useRealTimers();
+  });
+
+  it('tapping ↑ twice at the same spot moves the same item twice (GAP-15 retest)', async () => {
+    renderLive({
+      ...rank,
+      options: [...rank.options, { label: 'Delta', value: 'd' }],
+    });
+    const up = await screen.findByRole('button', { name: 'Move Delta up' });
+    // A finger's tap is a click with detail 1; the second lands on the row that slid in.
+    fireEvent.click(up, { detail: 1 });
+    expect(order()).toEqual(['Alpha', 'Beta', 'Delta', 'Gamma']);
+    const underFinger = screen.getByRole('button', { name: 'Move Gamma up' });
+    fireEvent.click(underFinger, { detail: 1 });
+    expect(order()).toEqual(['Alpha', 'Delta', 'Beta', 'Gamma']);
+    // A tap somewhere else is its own move.
+    fireEvent.click(screen.getByRole('button', { name: 'Move Beta down' }), { detail: 1 });
+    expect(order()).toEqual(['Alpha', 'Delta', 'Gamma', 'Beta']);
+    fireEvent.click(screen.getByRole('button', { name: 'Move Alpha down' }), { detail: 1 });
+    expect(order()).toEqual(['Delta', 'Alpha', 'Gamma', 'Beta']);
   });
 
   it('options edited in the studio keep the order of those still there (S23)', () => {
@@ -526,7 +559,7 @@ describe('grid (CH-15, GAP-28)', () => {
     });
     await screen.findByRole('radio', { name: 'Speed: Good' });
     fireEvent.click(screen.getByTestId('confirm'));
-    expect(screen.getByText('! Please answer every row. 3 are still empty.')).toBeInTheDocument();
+    expect(screen.getByText('Please answer every row. 3 are still empty.')).toBeInTheDocument();
   });
 });
 

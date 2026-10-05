@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   SlateNumberInput,
@@ -45,7 +45,11 @@ function setup(initial: number | undefined, props: Extra = {}) {
   const user = userEvent.setup();
   render(<Harness initial={initial} spy={spy} {...props} />);
   const input = screen.getByRole('spinbutton', { name: 'Field' }) as HTMLInputElement;
-  const leave = () => user.click(screen.getByRole('button', { name: 'elsewhere' }));
+  // Leaving settles the draft a frame after the blur (a focus handed straight back isn't leaving).
+  const leave = async () => {
+    await user.click(screen.getByRole('button', { name: 'elsewhere' }));
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+  };
   return { spy, user, input, leave, last: () => spy.mock.calls.at(-1)?.[0] };
 }
 

@@ -385,11 +385,20 @@ describe('Review reads answers in words', () => {
 describe('piping never shows a stored file ref (MEDIA-04)', () => {
   const files: Question = { id: 'f', type: 'file_upload', title: 'Files' };
 
-  it('names files from the cloud, and says "Uploaded file" for local ones', () => {
+  it('names files from the cloud, and counts local ones, which carry no name', () => {
     expect(formatAnswerFor(files, ['slate-file://storage:public/f_1/1b2c/photo.jpg'])).toBe(
       'photo.jpg',
     );
-    expect(formatAnswerFor(files, 'slate-file://97118808')).toBe('Uploaded file');
+    expect(formatAnswerFor(files, 'slate-file://97118808')).toBe('1 file');
+    // Never "Uploaded file, Uploaded file and Uploaded file" (MEDIA-04 retest).
+    expect(
+      pipe(
+        'You sent {{field:f}}',
+        { f: ['slate-file://1', 'slate-file://2', 'slate-file://3'] },
+        0,
+        [files],
+      ),
+    ).toBe('You sent 3 files');
     expect(
       pipe('You sent {{field:f}}', { f: ['slate-file://storage:public/f/u/a.pdf'] }, 0, [files]),
     ).toBe('You sent a.pdf');

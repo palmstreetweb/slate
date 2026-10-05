@@ -112,12 +112,14 @@ describe('multi choice: errors clear when fixed with the letter keys (CH-07)', (
         onSubmit={vi.fn()}
       />,
     );
+    // The rule line above the choices says it up front; the message under them says it again on OK.
     await screen.findByText('Pick at least 2');
+    const message = () => document.querySelector('.slate-err');
     key('Enter');
-    expect(await screen.findByText('! Pick at least 2')).toBeInTheDocument();
+    await waitFor(() => expect(message()).toHaveTextContent('Pick at least 2'));
     key('a');
     key('b');
-    await waitFor(() => expect(screen.queryByText('! Pick at least 2')).not.toBeInTheDocument());
+    await waitFor(() => expect(message()).toBeNull());
   });
 });
 
@@ -144,7 +146,7 @@ describe('multi choice: Other naming a picked option (CH-12)', () => {
     await user.type(screen.getByRole('textbox'), 'cheese');
     await user.click(screen.getByRole('button', { name: /^ok/i }));
     expect(
-      await screen.findByText('! You already picked “Cheese”. Type something different.'),
+      await screen.findByText('You already picked “Cheese”. Type something different.'),
     ).toBeInTheDocument();
   });
 });

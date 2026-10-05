@@ -22,10 +22,10 @@ type Props = {
 export function ThemeToggle({ mode, onToggle, ref }: Props) {
   const ariaLabel = mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
 
+  // Scale wrapper (ADR-020): shrinks the verbatim PSW toggle ~15% via a
+  // uniform transform so toggle.css stays a 1:1 port and the toggle's own
+  // :active / morph transforms aren't disturbed.
   return (
-    // Scale wrapper (ADR-020): shrinks the verbatim PSW toggle ~15% via a
-    // uniform transform so toggle.css stays a 1:1 port and the toggle's own
-    // :active / morph transforms aren't disturbed.
     <span className="slate-toggle-scale">
       <button
         ref={ref}

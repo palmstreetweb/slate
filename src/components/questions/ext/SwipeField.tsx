@@ -69,6 +69,15 @@ function useSwipeCard(onDecided: (dir: Dir) => void, refuse?: (dir: Dir) => bool
     moved: boolean;
   } | null>(null);
   const busy = useRef(false);
+  // A fling still in the air when the card leaves (Back pressed mid-flight)
+  // decides nothing: the question it belonged to is gone (EXTRA-1).
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   const setLean = (el: HTMLElement, dx: number) => {
     const like = Math.max(0, Math.min(1, dx / 90));
@@ -113,7 +122,7 @@ function useSwipeCard(onDecided: (dir: Dir) => void, refuse?: (dir: Dir) => bool
       busy.current = true;
       const done = () => {
         busy.current = false;
-        onDecided(dir);
+        if (alive.current) onDecided(dir);
       };
       if (!el) {
         done();
@@ -320,11 +329,14 @@ function PictureSwipe({
     [options, decisions, onAnswer, ping],
   );
 
-  // At the most likes, a like comes back with a word on why (ADR-069).
+  // At the most likes, a like comes back with a word on why (ADR-069),
+  // brought into view: under a tall deck it would land below the fold (R9).
+  const likeRef = useRef<HTMLButtonElement>(null);
   const refuse = useCallback(
     (dir: Dir) => {
       if (dir !== 'like' || liked.length < max) return false;
       setError(`You can like up to ${max}. Pass on this one, or undo a like.`);
+      shakeInvalid(likeRef.current);
       return true;
     },
     [liked.length, max],
@@ -370,8 +382,9 @@ function PictureSwipe({
     if (err) {
       // In the deck's own words: likes, and how to fix it from here.
       setError(
+        // The rule is already above and in the end title: say only how (copy QA).
         err.code === 'min_selections'
-          ? `Like at least ${min} to go on. Tap Swipe again to look again.`
+          ? 'Tap Swipe again, or Undo last, to like more.'
           : err.code === 'max_selections'
             ? `You can like up to ${max}. Tap a picture to let it go.`
             : err.message,
@@ -463,6 +476,7 @@ function PictureSwipe({
               Undo
             </button>
             <button
+              ref={likeRef}
               type="button"
               className="slate-swipe-btn slate-swipe-btn--like"
               aria-label={`Like ${current?.label ?? 'this card'}`}
@@ -524,7 +538,7 @@ function PictureSwipe({
       </p>
       {error ? (
         <p className="slate-err" aria-live="polite">
-          ! {error}
+          {error}
         </p>
       ) : null}
       {done ? (
@@ -532,7 +546,7 @@ function PictureSwipe({
           <button ref={okRef} type="button" className="slate-ok-btn" onClick={submit}>
             OK <span aria-hidden>✓</span>
           </button>
-          <span className="slate-hint">press Enter ↵</span>
+          <span className="slate-hint slate-keys">press Enter ↵</span>
         </div>
       ) : null}
     </div>

@@ -133,9 +133,8 @@ describe('swipe cards on picture choice', () => {
     expect(screen.queryByText('None of these? That’s an answer too.')).not.toBeInTheDocument();
     expect(screen.getByText('Like at least 1 to go on.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(
-      screen.getByText('! Like at least 1 to go on. Tap Swipe again to look again.'),
-    ).toBeInTheDocument();
+    // The rule is already in the title above: the message says only how (copy QA).
+    expect(screen.getByText('Tap Swipe again, or Undo last, to like more.')).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
   });
 

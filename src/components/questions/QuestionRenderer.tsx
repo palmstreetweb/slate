@@ -136,6 +136,7 @@ export function QuestionRenderer({
   };
 
   const extKey = extFieldKey(question);
+  // The Review step's rows carry piped titles, as the questions showed them.
   if (extKey) {
     const id = question.id;
     return (
@@ -167,7 +168,8 @@ export function QuestionRenderer({
               ? {
                   rows: pathOf(visibleList ?? [], answers)
                     .map((i) => visibleList![i]!)
-                    .filter((q) => !isChrome(q)),
+                    .filter((q) => !isChrome(q))
+                    .map((q) => pipeQuestionCopy(q, answers, score, allQuestions, estimateText)),
                   format: formatAnswerFor,
                   onEdit: (id) => onEditQuestion?.(id),
                 }

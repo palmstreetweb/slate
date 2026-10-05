@@ -179,11 +179,22 @@
   animation: none;
 }
 
+/* The "!" before a message is drawn, not read out: the announced text is the
+   sentence alone. Browsers without alt text for generated content keep the
+   first declaration (and read the "!", as before). */
+[data-slate-forms] .slate-err:not(:empty)::before {
+  content: '! ';
+  content: '! ' / '';
+}
+
 /* Phones have no keys to press (GAP-26): the "press Enter" beside a typed
-   box's OK, and hints marked keyboard-only (.slate-keys), step aside. Hints
-   that say something else (a file's size limit, "drag rows") stay. */
+   box's OK, inside the Welcome and Statement buttons, and hints marked
+   keyboard-only (.slate-keys), step aside, as does the upload zone's "or drag
+   and drop". Hints that say something else (a file's size limit) stay. */
 @media (hover: none) {
   [data-slate-forms] .slate-input ~ .slate-actions > .slate-hint,
+  [data-slate-forms] .slate-cta-hint,
+  [data-slate-forms] .slate-upload-hint,
   [data-slate-forms] .slate-keys {
     display: none;
   }
@@ -449,11 +460,17 @@
   margin-top: 20px;
 }
 
-/* At the most picks, the options left step back; a tap only shakes one. */
+/* At the most picks, the options left step back; a tap shakes one and says
+   why right under it, across the whole row of a two-column list or grid. */
 [data-slate-forms] .slate-choices > .slate-choice[aria-disabled='true'],
 [data-slate-forms] .slate-picture-grid > .slate-picture[aria-disabled='true'] {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+[data-slate-forms] .slate-choice-note {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 /* Letter-key hints mean nothing without a keyboard: phones and tablets hide them. */
@@ -745,6 +762,9 @@
   margin: 0 0 12px;
   padding: 0;
   display: grid;
+  /* One column no wider than the form: a long unbroken file name ends in "…"
+     instead of pushing the chip, and its ×, off a phone's screen (GAP-12). */
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -755,6 +775,7 @@
 [data-slate-forms] .slate-upload-file {
   display: flex;
   align-items: center;
+  min-width: 0;
   gap: 12px;
   padding: 10px 12px 10px 10px;
   border: var(--slate-border-width) solid var(--slate-border-md);
@@ -1098,8 +1119,10 @@
   cursor: default;
 }
 
-/* Touch (ADR-069): a long press drags instead of selecting text, the grip
-   drags without stealing the page's scroll, and the buttons are 44 px. */
+/* Touch (ADR-069): a long press drags instead of selecting text, and the
+   buttons are 44 px. A swipe that starts on the grip still scrolls the page
+   (pan-y); a finger that rests on it ~250 ms lifts the row, and from then on
+   the field holds the page still itself (RankingField). */
 [data-slate-forms] .slate-ranking-row {
   -webkit-user-select: none;
   user-select: none;
@@ -1117,7 +1140,7 @@
   line-height: 1;
   color: var(--slate-muted);
   cursor: grab;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 @media (pointer: coarse) {
@@ -1129,6 +1152,28 @@
   [data-slate-forms] .slate-ranking-btn {
     width: 44px;
     height: 44px;
+  }
+}
+
+/* A narrow phone (320–375 px): the ↑ ↓ pair stands in one column and the row
+   tightens, so a label keeps room for whole words ("Comprehensive", never
+   "Compre/hensive"; R8). */
+[data-slate-forms] .slate-ranking {
+  container-type: inline-size;
+}
+
+[data-slate-forms] .slate-ranking-label {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+@container (max-width: 350px) {
+  [data-slate-forms] .slate-ranking-row {
+    gap: 8px;
+  }
+
+  [data-slate-forms] .slate-ranking-controls {
+    flex-direction: column;
   }
 }
 
@@ -1179,8 +1224,8 @@
   padding-bottom: 4px;
   text-transform: var(--slate-transform);
   min-width: 0;
-  overflow-wrap: anywhere;
-  hyphens: auto;
+  overflow-wrap: normal;
+  hyphens: manual;
 }
 
 [data-slate-forms] .slate-matrix-rowlabel {
@@ -1266,39 +1311,32 @@
   }
 }
 
-/* Eight or more columns don't fit side by side in under ~700 px (a landscape
-   phone, a desktop at 200% zoom): such a matrix stacks as it does on phones,
-   each answer labelled, instead of squeezing its headers (GAP-13). */
-[data-slate-forms] .slate-matrix {
-  container-type: inline-size;
+/* A grid whose column headers can't fit their longest word side by side (a
+   10-point scale on a laptop, 7 columns at 600 px, a landscape phone, 200%
+   zoom) stacks as it does on phones, each answer labelled: MatrixField
+   measures the headers and sets .slate-matrix--stack (R7). Headers wrap only
+   between words, never inside one ("Strongl/y"). */
+[data-slate-forms] .slate-matrix--stack .slate-matrix-head {
+  display: none;
 }
 
-@container (max-width: 700px) {
-  [data-slate-forms] .slate-matrix:has(.slate-matrix-head > :nth-child(9)) .slate-matrix-head {
-    display: none;
-  }
+[data-slate-forms] .slate-matrix--stack .slate-matrix-row {
+  grid-template-columns: 1fr;
+  margin-bottom: 10px;
+}
 
-  [data-slate-forms] .slate-matrix:has(.slate-matrix-head > :nth-child(9)) .slate-matrix-row {
-    grid-template-columns: 1fr;
-    margin-bottom: 10px;
-  }
+[data-slate-forms] .slate-matrix--stack .slate-matrix-cell {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+}
 
-  [data-slate-forms] .slate-matrix:has(.slate-matrix-head > :nth-child(9)) .slate-matrix-cell {
-    justify-content: flex-start;
-    gap: 10px;
-    padding: 10px 14px;
-  }
+[data-slate-forms] .slate-matrix--stack .slate-matrix-cell-label {
+  display: inline;
+}
 
-  [data-slate-forms] .slate-matrix:has(.slate-matrix-head > :nth-child(9)) .slate-matrix-cell-label {
-    display: inline;
-  }
-
-  [data-slate-forms]
-    .slate-matrix:has(.slate-matrix-head > :nth-child(9))
-    .slate-matrix-cell--selected
-    .slate-matrix-cell-label {
-    color: var(--slate-on-accent);
-  }
+[data-slate-forms] .slate-matrix--stack .slate-matrix-cell--selected .slate-matrix-cell-label {
+  color: var(--slate-on-accent);
 }
 
 /* ---------- thanks confirmation chip ---------- */
@@ -1522,8 +1560,12 @@
 /* Selected/hover badges must beat decoration + mono default-surface
    overrides above (same specificity, later source order). Swiss keeps its
    inverted badge (cream-on-black / black-on-cream) — excluded here. */
-[data-slate-forms][data-has-decoration]:not([data-theme-name='swiss']) .slate-choice--selected .slate-choice-badge,
-[data-slate-forms][data-has-decoration]:not([data-theme-name='swiss']) .slate-picture--selected .slate-choice-badge {
+[data-slate-forms][data-has-decoration]:not([data-theme-name='swiss'])
+  .slate-choice--selected
+  .slate-choice-badge,
+[data-slate-forms][data-has-decoration]:not([data-theme-name='swiss'])
+  .slate-picture--selected
+  .slate-choice-badge {
   background: var(--slate-accent);
   border-color: var(--slate-accent);
   color: var(--slate-on-accent);

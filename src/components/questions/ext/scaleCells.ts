@@ -4,8 +4,13 @@
  * (a core module's exports all ship up front, AGENTS.md).
  */
 
-/** More cells than this and a scale is clearly misconfigured; draw the first ones only. */
-export const MAX_CELLS = 21;
+/**
+ * The most cells a scale draws: 0–100 in full (the rows wrap), so a numbers
+ * scale saved before the studio's 21-point check keeps its top values (R11).
+ * Past this a schema is clearly broken; only the first cells are drawn, and
+ * the studio holds Publish back.
+ */
+export const MAX_CELLS = 101;
 
 type Range = { min: number; max: number; step?: number };
 

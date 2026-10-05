@@ -403,21 +403,34 @@
   border: 1px solid var(--slate-border-md);
   border-radius: var(--slate-radius);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  /* One line where it fits; on a phone the buttons go under the sentence,
+     never squeezed to a letter per line (R2: the wrapper's
+     overflow-wrap: anywhere let them shrink below a word). */
+  width: max-content;
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
+  flex-wrap: wrap;
+  justify-content: center;
+  overflow-wrap: normal;
 }
 
 [data-slate-forms] .slate-resume-text {
   font-family: var(--slate-font-body);
   font-size: 14px;
   color: var(--slate-text);
-  white-space: nowrap;
+  min-width: 0;
+  text-align: center;
 }
 
 [data-slate-forms] .slate-resume-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 8px;
 }
 
 [data-slate-forms] .slate-resume-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 6px 14px;
   font-family: var(--slate-font-mono);
   font-size: 11px;

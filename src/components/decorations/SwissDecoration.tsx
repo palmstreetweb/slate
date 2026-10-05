@@ -21,21 +21,18 @@ const BLUE = 'var(--slate-deco-blue)';
 const INK = 'var(--slate-deco-ink)';
 
 const COMPOSITIONS: ReadonlyArray<() => ReactElement> = [
-  // 0 — welcome
   () => (
     <>
       <circle cx="1050" cy="-50" r="420" fill={RED} />
       <rect x="-30" y="780" width="200" height="200" fill={YELLOW} />
     </>
   ),
-  // 1
   () => (
     <>
       <rect x="-50" y="600" width="500" height="500" fill={YELLOW} />
       <rect x="850" y="-20" width="220" height="220" fill={INK} />
     </>
   ),
-  // 2
   () => (
     <>
       <rect x="-50" y="50" width="800" height="40" fill={INK} transform="rotate(-12 200 100)" />
@@ -43,14 +40,12 @@ const COMPOSITIONS: ReadonlyArray<() => ReactElement> = [
       <circle cx="900" cy="850" r="120" fill={YELLOW} />
     </>
   ),
-  // 3
   () => (
     <>
       <circle cx="0" cy="1050" r="500" fill={BLUE} />
       <rect x="700" y="0" width="400" height="120" fill={YELLOW} />
     </>
   ),
-  // 4
   () => (
     <>
       <circle cx="-100" cy="500" r="450" fill="none" stroke={RED} strokeWidth="50" />
@@ -59,14 +54,12 @@ const COMPOSITIONS: ReadonlyArray<() => ReactElement> = [
       <rect x="900" y="700" width="180" height="180" fill={INK} />
     </>
   ),
-  // 5
   () => (
     <>
       <polygon points="1080,1080 1080,400 400,1080" fill={YELLOW} />
       <circle cx="120" cy="120" r="80" fill={RED} />
     </>
   ),
-  // 6
   () => (
     <>
       <rect x="-50" y="850" width="1180" height="100" fill={RED} />
@@ -74,7 +67,6 @@ const COMPOSITIONS: ReadonlyArray<() => ReactElement> = [
       <circle cx="950" cy="200" r="100" fill={YELLOW} />
     </>
   ),
-  // 7
   () => (
     <>
       <circle cx="120" cy="900" r="160" fill={BLUE} />
@@ -82,7 +74,6 @@ const COMPOSITIONS: ReadonlyArray<() => ReactElement> = [
       <polygon points="500,1000 700,1080 500,1080" fill={INK} />
     </>
   ),
-  // 8 — thanks
   () => (
     <>
       <circle cx="950" cy="150" r="200" fill={RED} />

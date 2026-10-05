@@ -72,12 +72,15 @@ describe('layout (GAP-12, GAP-13, GAP-29, GAP-21)', () => {
     );
   });
 
-  it('a matrix with eight or more columns stacks when it is under ~700 px wide', () => {
+  it('a matrix whose headers can’t fit their words stacks, and headers never break inside a word (R7)', () => {
     const sheet = css('questions.css');
-    expect(sheet).toMatch(/\[data-slate-forms\] \.slate-matrix \{\s*container-type: inline-size;/);
+    // MatrixField measures the headers and sets .slate-matrix--stack (any column count, any width).
     expect(sheet).toMatch(
-      /@container \(max-width: 700px\) \{\s*\[data-slate-forms\] \.slate-matrix:has\(\.slate-matrix-head > :nth-child\(9\)\) \.slate-matrix-head \{\s*display: none;/,
+      /\[data-slate-forms\] \.slate-matrix--stack \.slate-matrix-head \{\s*display: none;/,
     );
+    const head = /\[data-slate-forms\] \.slate-matrix-colhead \{[^}]*\}/.exec(sheet)![0];
+    expect(head).toMatch(/overflow-wrap: normal;/);
+    expect(head).not.toMatch(/anywhere/);
   });
 
   it('AM / PM wraps under the time on a very narrow screen', () => {
@@ -91,8 +94,26 @@ describe('layout (GAP-12, GAP-13, GAP-29, GAP-21)', () => {
   });
 
   it('keyboard-only hints step aside on touch screens', () => {
+    const rule = /@media \(hover: none\) \{\s*([^{]+)\{\s*display: none;/.exec(
+      css('questions.css'),
+    );
+    expect(rule).not.toBeNull();
+    const selectors = rule![1]!.split(',').map((x) => x.trim());
+    // GAP-26: the Welcome / Statement buttons' "press Enter" and the upload
+    // zone's "or drag and drop" too, beside the typed boxes' and .slate-keys.
+    for (const sel of [
+      '[data-slate-forms] .slate-input ~ .slate-actions > .slate-hint',
+      '[data-slate-forms] .slate-cta-hint',
+      '[data-slate-forms] .slate-upload-hint',
+      '[data-slate-forms] .slate-keys',
+    ]) {
+      expect(selectors).toContain(sel);
+    }
+  });
+
+  it('the "!" before a message is drawn, with empty alt text, never part of the sentence', () => {
     expect(css('questions.css')).toMatch(
-      /@media \(hover: none\) \{\s*\[data-slate-forms\] \.slate-input ~ \.slate-actions > \.slate-hint,\s*\[data-slate-forms\] \.slate-keys \{\s*display: none;/,
+      /\.slate-err:not\(:empty\)::before \{\s*content: '! ';\s*content: '! ' \/ '';/,
     );
   });
 });
@@ -111,13 +132,19 @@ describe('phone keyboard (GAP-04)', () => {
     return { vv, fire: () => listeners.forEach((fn) => fn()), listeners };
   }
 
-  it('the keyboard opening brings the OK row back into view; a pinch-zoom doesn’t', () => {
-    const { vv, fire, listeners } = stubViewport();
+  function stage() {
     document.body.innerHTML =
-      '<div class="slate-stage-content"><input id="box"><p class="slate-err"></p><div class="slate-actions"><button>OK</button></div></div>';
+      '<div class="slate-stage-content"><input id="box"><div id="grid" tabindex="-1"></div><p class="slate-err"></p><div class="slate-actions"><button>OK</button></div></div>';
     const actions = document.querySelector('.slate-actions') as HTMLElement;
     actions.scrollIntoView = vi.fn();
+    return actions;
+  }
+
+  it('the keyboard opening brings the OK row back into view; a pinch-zoom doesn’t', () => {
+    const { vv, fire, listeners } = stubViewport();
+    const actions = stage();
     const stop = focusAfter(document.getElementById('box'));
+    document.getElementById('box')!.focus();
     vv.height = 314;
     fire();
     expect(actions.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
@@ -126,6 +153,33 @@ describe('phone keyboard (GAP-04)', () => {
     expect(actions.scrollIntoView).toHaveBeenCalledTimes(1);
     stop();
     expect(listeners).toHaveLength(0);
+    delete (window as { visualViewport?: unknown }).visualViewport;
+  });
+
+  it('only a keyboard: no text box focused, a toolbar-sized change or a taller viewport never scroll (R3)', () => {
+    const { vv, fire } = stubViewport();
+    const actions = stage();
+    const stop = focusAfter(document.getElementById('grid'));
+    // A field with no text box (a grid, a photo list): its own focus never arms the reveal.
+    document.getElementById('grid')!.focus();
+    vv.height = 300;
+    fire();
+    expect(actions.scrollIntoView).not.toHaveBeenCalled();
+    // A text box in the question: a browser bar sliding away (70 px) or back is not a keyboard.
+    vv.height = 667;
+    document.getElementById('box')!.focus();
+    vv.height = 597;
+    fire();
+    vv.height = 737;
+    fire();
+    expect(actions.scrollIntoView).not.toHaveBeenCalled();
+    // A keyboard (well over 150 px gone, same width): once per focus.
+    vv.height = 400;
+    fire();
+    vv.height = 380;
+    fire();
+    expect(actions.scrollIntoView).toHaveBeenCalledTimes(1);
+    stop();
     delete (window as { visualViewport?: unknown }).visualViewport;
   });
 });

@@ -714,6 +714,7 @@ exports[`question types render > email 1`] = `
         aria-labelledby="_r_2_"
         autocomplete="email"
         class="slate-input"
+        enterkeyhint="next"
         inputmode="email"
         placeholder="name@example.com"
         type="email"
@@ -1121,7 +1122,7 @@ exports[`question types render > nps 1`] = `
       class="slate-actions"
     >
       <button
-        class="slate-ok-btn"
+        class="slate-ok-btn slate-ok-btn--skip"
         type="button"
       >
         Skip
@@ -1356,7 +1357,7 @@ exports[`question types render > scale 1`] = `
       class="slate-actions"
     >
       <button
-        class="slate-ok-btn"
+        class="slate-ok-btn slate-ok-btn--skip"
         type="button"
       >
         Skip
@@ -1401,6 +1402,7 @@ exports[`question types render > short_text 1`] = `
         aria-labelledby="_r_0_"
         autocomplete="off"
         class="slate-input"
+        enterkeyhint="next"
         placeholder="Jane"
         type="text"
         value=""

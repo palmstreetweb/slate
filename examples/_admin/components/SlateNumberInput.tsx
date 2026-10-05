@@ -7,6 +7,9 @@
  * is typed; anything else waits until the field is left (or Enter), when it is
  * rounded and pulled into range — or the last saved number comes back. While
  * the typed number doesn't fit, a short line under the field says what does.
+ * A focus taken and handed straight back (the live preview, S4) isn't leaving
+ * the field: the draft is settled a frame after the blur, only if the field
+ * didn't get its focus back.
  */
 
 'use client';
@@ -197,7 +200,11 @@ export function SlateNumberInput({
             const n = Number(raw);
             if (fitsLimits(n, limits)) commit(n);
           }}
-          onBlur={finish}
+          onBlur={() => {
+            requestAnimationFrame(() => {
+              if (document.activeElement !== inputRef.current) finish();
+            });
+          }}
         />
         <div className="slate-number-step" aria-hidden={false}>
           <button type="button" tabIndex={-1} aria-label="Decrease" onClick={() => bump(-1)}>

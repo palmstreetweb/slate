@@ -174,6 +174,8 @@ export function GrowthDecoration({ step, complete = false }: Props) {
         <Leaf key={`l${i}`} x={x} y={y} side={i % 2 === 0 ? 1 : -1} />
       ))}
 
+      {/* Until the plant is fully grown, a closed bud at the growing tip, keyed by
+          tip so it re-forms at each new node. */}
       {fullyGrown ? (
         <>
           <Flower x={tip[0]} y={tip[1]} scale={1.15} delayMs={380} />
@@ -181,8 +183,6 @@ export function GrowthDecoration({ step, complete = false }: Props) {
           <Flower x={NODES[4]![0]} y={NODES[4]![1]} scale={0.7} delayMs={740} />
         </>
       ) : (
-        // A closed bud at the growing tip until the plant is fully grown.
-        // Keyed by tip so it re-forms at each new node.
         <g key={`bud${grown}`} className="slate-deco-grow" style={originAt(tip[0], tip[1], 320)}>
           <ellipse cx={tip[0]} cy={tip[1] - 8} rx={10} ry={16} fill={PETAL} opacity="0.85" />
           <circle cx={tip[0]} cy={tip[1] - 16} r={5} fill={CENTER} opacity="0.9" />

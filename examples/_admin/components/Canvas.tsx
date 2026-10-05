@@ -76,7 +76,10 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
   const [tryKey, setTryKey] = useState(0);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const setAnswer = useCallback(
-    (id: string, value: LooseAnswers[string] | ((prev: LooseAnswers[string]) => LooseAnswers[string])) =>
+    (
+      id: string,
+      value: LooseAnswers[string] | ((prev: LooseAnswers[string]) => LooseAnswers[string]),
+    ) =>
       setAnswers((prev) => ({
         ...prev,
         [id]: typeof value === 'function' ? value(prev[id]) : value,
@@ -197,6 +200,9 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
       <div className="slate-canvas-frame" {...focusGuard}>
         <div
           data-slate-forms=""
+          // The engine's fields don't focus themselves here: picking a question
+          // never moves the keyboard out of the inspector (S4, S15).
+          data-slate-preview=""
           data-theme-name={schema.theme}
           data-theme={mode}
           {...(hasStepDecorationBackdrop(decoration) ? { 'data-has-decoration': '' } : {})}
@@ -221,36 +227,40 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
             onBack={noop}
           />
 
-          <div className="slate-stage" style={{ minHeight: 'auto', padding: '48px 24px 120px' }}>
-            <div
-              key={`${selectedQuestion.id}:${tryKey}`}
-              className="slate-stage-content"
-              style={{ minHeight: 'auto' }}
-            >
-              <QuestionRenderer
-                question={selectedQuestion}
-                answers={answers}
-                setAnswer={setAnswer}
-                advance={restartTry}
-                stepNumber={stepNumber}
-                totalSteps={totalSteps}
-                submitStatus={selectedQuestion.type === 'thanks' ? 'success' : 'idle'}
-                submitError={null}
-                onRetrySubmit={noop}
-                onRestart={noop}
-                onFileUpload={hostFileUpload}
-                resolveFileUploadMeta={resolveUploadMeta}
-                allQuestions={schema.questions}
-                estimate={previewEstimate}
-                estimateSettings={schema.estimate}
-                slotsLeft={slotsLeft}
-              />
+          {/* The counter sits at the foot of the question, as on the public page (where
+              the form's box grows with it), not over its options (CH-02, MEDIA-02b). */}
+          <div style={{ position: 'relative', minHeight: '100%' }}>
+            <div className="slate-stage" style={{ minHeight: 'auto', padding: '48px 24px 120px' }}>
+              <div
+                key={`${selectedQuestion.id}:${tryKey}`}
+                className="slate-stage-content"
+                style={{ minHeight: 'auto' }}
+              >
+                <QuestionRenderer
+                  question={selectedQuestion}
+                  answers={answers}
+                  setAnswer={setAnswer}
+                  advance={restartTry}
+                  stepNumber={stepNumber}
+                  totalSteps={totalSteps}
+                  submitStatus={selectedQuestion.type === 'thanks' ? 'success' : 'idle'}
+                  submitError={null}
+                  onRetrySubmit={noop}
+                  onRestart={noop}
+                  onFileUpload={hostFileUpload}
+                  resolveFileUploadMeta={resolveUploadMeta}
+                  allQuestions={schema.questions}
+                  estimate={previewEstimate}
+                  estimateSettings={schema.estimate}
+                  slotsLeft={slotsLeft}
+                />
+              </div>
             </div>
-          </div>
 
-          {isAnswerBearing && totalSteps > 0 && (
-            <FooterCounter current={stepNumber} total={totalSteps} />
-          )}
+            {isAnswerBearing && totalSteps > 0 && (
+              <FooterCounter current={stepNumber} total={totalSteps} />
+            )}
+          </div>
         </div>
       </div>
     </section>

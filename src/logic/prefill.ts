@@ -72,12 +72,21 @@ function coerce(q: Question, text: string): LooseAnswers[string] {
     case 'email':
     case 'phone':
     case 'url':
-    case 'date':
       return text;
+    case 'date':
+      // As typed into the boxes (GAP-23): "10/20/2026", or "20.10.26" day first; 26 is 2026.
+      return text.replace(
+        /^(\d\d?)[/.-](\d\d?)[/.-](\d\d|\d{4})$/,
+        (_, a: string, b: string, y: string) => {
+          const d = q.format === 'DD/MM/YYYY';
+          return `${y[2] ? y : '20' + y}-${(d ? b : a).padStart(2, '0')}-${(d ? a : b).padStart(2, '0')}`;
+        },
+      );
     case 'number':
     case 'scale':
     case 'nps':
-      return toNumber(text);
+      // "1,000" and "$1,500" read as typed into the box (GAP-23).
+      return toNumber(text.replace(/^\$|,(?=\d{3}\b)/g, ''));
     case 'yes_no': {
       const t = text.toLowerCase();
       if (YES.has(t) || t === (q.yesLabel ?? '').trim().toLowerCase()) return 'yes';

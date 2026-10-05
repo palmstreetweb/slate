@@ -5,8 +5,9 @@
  * last tile opens a text box under the grid.
  *
  * Several picks work like a multi choice (ADR-069): the rule is said up
- * front, the maximum blocks extra picks, and an error clears as soon as the
- * picks change. An optional single picture choice can be skipped.
+ * front, the maximum blocks extra picks (a tap on another tile says why under
+ * the grid, brought into view), and an error clears as soon as the picks
+ * change. An optional single picture choice can be skipped.
  */
 
 'use client';
@@ -77,7 +78,12 @@ export function PictureChoiceField({
       : [];
   const selectedArr = other.enabled ? splitOther(question.options, raw).picked : raw;
   // Several picks: at the most picks, the tiles left step back (the open Other box counts).
-  const full = multiple && selectedArr.length + (other.open ? 1 : 0) >= pickLimits(question)[1];
+  const max = pickLimits(question)[1];
+  const full = multiple && selectedArr.length + (other.open ? 1 : 0) >= max;
+  const refuse = (el: Element | null | undefined) => {
+    setError(`You can pick up to ${max}. Tap one of your picks to let it go.`);
+    shakeInvalid(el);
+  };
 
   // A new pick (tap or letter key) clears the error; in single mode a listed
   // option also closes the Other box.
@@ -103,8 +109,8 @@ export function PictureChoiceField({
     if (selectedArr.includes(value)) {
       onSelectMulti(withOther(selectedArr.filter((v) => v !== value)));
     } else if (full) {
-      // At the most picks: the rule is shown above; untick one first.
-      shakeInvalid(el);
+      // At the most picks: untick one first, and the message says so.
+      refuse(el);
       return;
     } else {
       onSelectMulti(withOther([...selectedArr, value]));
@@ -170,12 +176,14 @@ export function PictureChoiceField({
       other.close();
       onSelectMulti(selectedArr);
     } else if (full) {
-      shakeInvalid(gridRef.current?.lastElementChild);
+      refuse(gridRef.current?.lastElementChild);
       return;
     } else {
       other.openBox();
     }
     if (error) setError(null);
+    // refuse is the same on every render but for `max`, which `full` follows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [multiple, other, onSelectMulti, selectedArr, error, full]);
 
   const confirms = multiple || other.open || Boolean(skip);
@@ -253,7 +261,7 @@ export function PictureChoiceField({
 
       {other.error || error ? (
         <p className="slate-err" aria-live="polite">
-          ! {other.error ?? error}
+          {other.error ?? error}
         </p>
       ) : null}
 

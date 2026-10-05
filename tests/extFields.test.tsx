@@ -257,7 +257,7 @@ describe('number stepper', () => {
     expect(box).toHaveValue('1');
     fireEvent.change(box, { target: { value: '12' } });
     fireEvent.keyDown(box, { key: 'Enter' });
-    expect(screen.getByText('! Enter a number from 0 to 3 windows')).toBeInTheDocument();
+    expect(screen.getByText('Enter a number from 0 to 3 windows')).toBeInTheDocument();
     fireEvent.change(box, { target: { value: 'lots' } });
     fireEvent.keyDown(box, { key: 'Enter' });
     expect(screen.getByText(/please use numbers only, like 1500/i)).toBeInTheDocument();

@@ -136,8 +136,10 @@ export function Form<S extends Schema>({
   /* ---------- save-and-resume (ADR-017) ---------- */
 
   const resumeEnabled = Boolean(resume && schema.id);
+  // Nothing is saved once an ending is reached: a reload after the submit
+  // must not offer to resume onto it and send the answers twice (R12).
   const autosave = useAutosave({
-    enabled: resumeEnabled,
+    enabled: resumeEnabled && currentQuestion?.type !== 'thanks',
     tab: resume === 'tab',
     formId: schema.id ?? '',
     answers: state.answers,

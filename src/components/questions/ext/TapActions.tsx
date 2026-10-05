@@ -5,6 +5,10 @@
  * shows Skip, a required one says what to do when Enter is pressed, and one
  * already answered (after Back) shows OK to keep the answer as it is.
  * On demand only, like the fields that use it.
+ *
+ * Enter waits until the question has been up for a moment: a double Enter
+ * from the question before would otherwise skip this one before anyone saw
+ * it (QA). A held Enter (key repeat) never confirms anything (useKeyboardNav).
  */
 
 'use client';
@@ -13,6 +17,9 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObjec
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import { FieldError } from './fieldMessage.js';
+
+/** How long a question is up before Enter can skip or confirm it. */
+const ENTER_WAIT_MS = 500;
 
 type Props = {
   /** Why the question can't move on yet (required and unanswered), or null. */
@@ -41,6 +48,7 @@ export function TapActions({
 }: Props) {
   const [error, setError] = useState<string | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+  const shownAt = useRef(Date.now());
 
   // A pick answers the message.
   useEffect(() => {
@@ -58,14 +66,24 @@ export function TapActions({
     onAdvance();
   }, [check, onAdvance, pickFocused, target]);
 
-  useRegisterFormConfirm(go);
+  const enter = useCallback(() => {
+    if (Date.now() - shownAt.current < ENTER_WAIT_MS) return;
+    go();
+  }, [go]);
+
+  useRegisterFormConfirm(enter);
 
   return (
     <>
       <FieldError id={errorId} error={error} />
       <div ref={rowRef} className="slate-actions">
         {answered || !required ? (
-          <button type="button" className="slate-ok-btn" onClick={go}>
+          <button
+            type="button"
+            // Skip is the quiet, outlined button the choice questions use; OK is the main one.
+            className={answered ? 'slate-ok-btn' : 'slate-ok-btn slate-ok-btn--skip'}
+            onClick={go}
+          >
             {answered ? (
               <>
                 OK <span aria-hidden>✓</span>

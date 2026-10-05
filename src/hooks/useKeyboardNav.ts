@@ -84,7 +84,8 @@ export function useKeyboardNav({
       const typing = isTypingTarget(e.target);
 
       // Enter — chrome screens advance; OK steps confirm via the registered handler.
-      if (e.key === 'Enter' && !e.shiftKey && !typing) {
+      // A held Enter (key repeat) does neither: it would run through the form.
+      if (e.key === 'Enter' && !e.shiftKey && !typing && !e.repeat) {
         if (
           currentQ.type === 'welcome' ||
           currentQ.type === 'statement' ||

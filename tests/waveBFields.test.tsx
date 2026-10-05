@@ -141,7 +141,7 @@ describe('contact block', () => {
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(
       await screen.findByText(
-        '! Please check the number, including the area code. For a number outside the United States, start with + and the country code.',
+        'Please check the number, including the area code. For a number outside the United States, start with + and the country code.',
       ),
     ).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
@@ -251,12 +251,12 @@ describe('signature', () => {
     const canvas = await screen.findByRole('img', { name: /signature pad/i });
     fakeRect(canvas);
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(await screen.findByText('! Please sign here')).toBeInTheDocument();
+    expect(await screen.findByText('Please sign here')).toBeInTheDocument();
 
     draw(canvas, [[100, 100]]);
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(
-      await screen.findByText('! That’s only a dot. Please sign your full name.'),
+      await screen.findByText('That’s only a dot. Please sign your full name.'),
     ).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
 

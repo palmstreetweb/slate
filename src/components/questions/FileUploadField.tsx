@@ -14,7 +14,7 @@ import {
   type FileUploadMeta,
 } from '@/utils/fileUploadRef.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
-import { formatFileUploadError, resolveFileInputAccept } from '@/utils/fileUploadAccept.js';
+import { formatFileUploadError } from '@/utils/fileUploadAccept.js';
 import { inferFileMimeType } from '@/utils/fileMimeTypes.js';
 import { isHeicLike, isLikelyImageFile } from '@/utils/imageFileTypes.js';
 import { convertHeicToJpegFile } from '@/utils/heicToJpeg.js';
@@ -94,26 +94,75 @@ function dragHasFiles(e: DragEvent | React.DragEvent): boolean {
   return Array.from(types as ArrayLike<string>).includes('Files');
 }
 
-/** The owner's `accept` list, lower-cased: `.pdf`, `image/*`, `application/pdf`. */
-function acceptTokens(accept: string | undefined): string[] {
-  return (accept ?? '')
-    .split(',')
-    .map((t) => t.trim().toLowerCase())
-    .filter(Boolean);
+/** Owners' words for a kind of file, as the filter reads them. */
+const KIND_WORDS: Record<string, string> = {
+  image: 'image/*',
+  images: 'image/*',
+  photo: 'image/*',
+  photos: 'image/*',
+  picture: 'image/*',
+  pictures: 'image/*',
+  video: 'video/*',
+  videos: 'video/*',
+  audio: 'audio/*',
+  pdfs: '.pdf',
+};
+
+/** One spelling for file endings that mean the same type. */
+const SAME_ENDING: Record<string, string> = { '.jpeg': '.jpg', '.tiff': '.tif', '.heif': '.heic' };
+
+/**
+ * The owner's `accept` list as the filter reads it, lower-cased and forgiving
+ * (QA retest): "pdf" is ".pdf", "images" is "image/*", ".jpeg" and ".jpg" are
+ * one type, and a word it can't read ("documents") is left out rather than
+ * refusing every file. `.pdf`, `image/*` and `application/pdf` read as written.
+ */
+export function acceptTokens(accept: string | undefined): string[] {
+  const out: string[] = [];
+  for (const raw of (accept ?? '').split(',')) {
+    const t = raw.trim().toLowerCase();
+    const token = KIND_WORDS[t]
+      ? KIND_WORDS[t]
+      : /^\.?[a-z0-9]{1,5}$/.test(t)
+        ? t.startsWith('.')
+          ? t
+          : `.${t}`
+        : /^[a-z]+\/(\*|[a-z0-9.+-]+)$/.test(t)
+          ? t
+          : '';
+    if (token && !out.includes(token)) out.push(token);
+  }
+  return out;
 }
+
+/** What the file picker is told to show: the readable types, jpg and jpeg both. */
+function pickerAccept(accept: string | undefined): string | undefined {
+  const list = acceptTokens(accept).flatMap((t) =>
+    t === '.jpg' || t === '.jpeg' ? ['.jpg', '.jpeg'] : [t],
+  );
+  return list.length ? [...new Set(list)].join(',') : undefined;
+}
+
+const ending = (name: string) => {
+  const dot = name.lastIndexOf('.');
+  const e = dot < 0 ? '' : name.slice(dot).toLowerCase();
+  return SAME_ENDING[e] ?? e;
+};
 
 /**
  * Does the file fit the owner's file types? The picker filters by itself, but
- * a drop or the picker's "All files" doesn't (MEDIA-08).
+ * a drop or the picker's "All files" doesn't (MEDIA-08). With no type the
+ * filter can read, every file fits: a filter that refused everything would
+ * trap anyone asked for a file.
  */
 export function matchesAccept(file: File, accept: string | undefined): boolean {
   const tokens = acceptTokens(accept);
   if (!tokens.length) return true;
-  const name = file.name.toLowerCase();
+  const end = ending(file.name);
   const type = (inferFileMimeType(file) ?? '').toLowerCase();
   return tokens.some((t) =>
     t.startsWith('.')
-      ? name.endsWith(t)
+      ? end === (SAME_ENDING[t] ?? t)
       : t === 'image/*'
         ? isLikelyImageFile(file)
         : t.endsWith('/*')
@@ -168,9 +217,7 @@ export function FileUploadField({
     typeof question.maxSizeMb === 'number' && question.maxSizeMb > 0
       ? question.maxSizeMb
       : undefined;
-  const [items, setItems] = useState<FileAnswerItem[]>(() =>
-    asItemList(initialValue, multiple),
-  );
+  const [items, setItems] = useState<FileAnswerItem[]>(() => asItemList(initialValue, multiple));
   const [pending, setPending] = useState<PendingFile[]>([]);
   const [previewByKey, setPreviewByKey] = useState<Record<string, string>>({});
   const [metaByKey, setMetaByKey] = useState<Record<string, FileUploadMeta>>({});
@@ -412,10 +459,7 @@ export function FileUploadField({
           const live = pendingRef.current.find((p) => p.id === entry.id);
           const previewUrl = live?.previewUrl ?? entry.previewUrl;
           if (previewUrl) {
-            rememberPreview(
-              typeof ref === 'string' ? ref : itemKey(ref, 0),
-              previewUrl,
-            );
+            rememberPreview(typeof ref === 'string' ? ref : itemKey(ref, 0), previewUrl);
           }
           if (resolveFileUploadMeta && isFileUploadRef(ref)) {
             const meta = await resolveFileUploadMeta(ref);
@@ -507,12 +551,14 @@ export function FileUploadField({
     };
   }, [canAcceptDrop]);
 
+  // A note about the last pick ("notes.txt wasn’t added") goes once the files change.
   const removeAt = (index: number) => {
     const key = itemKey(items[index]!, index);
     forgetPreview(key);
     if (typeof items[index] === 'string') forgetPreview(items[index] as string);
     const next = items.filter((_, i) => i !== index);
     commit(next);
+    setError(null);
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -522,6 +568,7 @@ export function FileUploadField({
       if (typeof item === 'string') forgetPreview(item);
     }
     commit([]);
+    setError(null);
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -544,10 +591,7 @@ export function FileUploadField({
 
   useRegisterFormConfirm(submit);
 
-  const showZone =
-    !uploading &&
-    pending.length === 0 &&
-    (multiple || items.length === 0);
+  const showZone = !uploading && pending.length === 0 && (multiple || items.length === 0);
   const zoneLabel = multiple
     ? items.length > 0
       ? 'add another file'
@@ -595,9 +639,7 @@ export function FileUploadField({
           ref={inputRef}
           type="file"
           multiple={multiple}
-          {...(resolveFileInputAccept(question.accept)
-            ? { accept: resolveFileInputAccept(question.accept) }
-            : {})}
+          {...(pickerAccept(question.accept) ? { accept: pickerAccept(question.accept) } : {})}
           aria-labelledby={labelId}
           style={{ display: 'none' }}
           onChange={(e) => {
@@ -610,11 +652,12 @@ export function FileUploadField({
           <ul className={`slate-upload-list${multiple ? '' : ' slate-upload-list--single'}`}>
             {items.map((item, index) => {
               const key = itemKey(item, index);
-              const meta = typeof item === 'string' ? metaByKey[item] ?? null : null;
+              const meta = typeof item === 'string' ? (metaByKey[item] ?? null) : null;
               const label = describeFileUploadAnswer(item, meta) ?? 'File';
               const name =
                 typeof item === 'string'
-                  ? meta?.name ?? (isFileUploadRef(item) ? 'File' : item.split('/').pop() ?? 'File')
+                  ? (meta?.name ??
+                    (isFileUploadRef(item) ? 'File' : (item.split('/').pop() ?? 'File')))
                   : item.name;
               const preview =
                 previewByKey[key] ??
@@ -648,12 +691,7 @@ export function FileUploadField({
               const label = `${entry.file.name} (${entry.phase === 'optimize' ? 'optimizing…' : 'uploading…'})`;
               return (
                 <li key={entry.id} className="slate-upload-file slate-upload-file--pending">
-                  {renderThumb(
-                    entry.previewUrl,
-                    label,
-                    extBadge(entry.file.name),
-                    true,
-                  )}
+                  {renderThumb(entry.previewUrl, label, extBadge(entry.file.name), true)}
                   <span className="slate-upload-name">{label}</span>
                 </li>
               );
@@ -689,7 +727,7 @@ export function FileUploadField({
 
         {error && (
           <p className="slate-err" aria-live="polite">
-            ! {error}
+            {error}
           </p>
         )}
         <div className="slate-actions">

@@ -24,7 +24,7 @@ import {
 } from 'react';
 import type { EmailQuestion, LongTextQuestion, ShortTextQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
-import { textMax, validate } from '@/logic/validation.js';
+import { charCount, textMax, validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import { focusAfter } from '@/utils/focus.js';
@@ -69,7 +69,7 @@ export function TextAnswer({
   // The longest answer. Nothing is cut: near the limit a counter shows
   // "9410 / 10000", past it in the error colour, and OK says how long it may be.
   const max = textMax(question as { maxLength?: number });
-  const n = value.length;
+  const n = charCount(value);
 
   useEffect(() => {
     return focusAfter(inputRef.current);
@@ -95,7 +95,13 @@ export function TextAnswer({
     // Shift+Enter is a new line in a textarea (browser default); plain Enter
     // submits — except a textarea on a phone, where Return is the only way to
     // start a new line and OK is right there (its Shift hint is hidden too).
-    if (e.key === 'Enter' && !e.shiftKey && !(multiline && matchMedia('(hover: none)').matches)) {
+    // A held Enter (key repeat) never submits: it would run through the questions after.
+    if (
+      e.key === 'Enter' &&
+      !e.shiftKey &&
+      !e.repeat &&
+      !(multiline && matchMedia('(hover: none)').matches)
+    ) {
       e.preventDefault();
       submit();
     }
@@ -109,6 +115,8 @@ export function TextAnswer({
       <div style={{ marginTop: 24 }}>
         <Box
           ref={inputRef}
+          // Return on a phone keyboard says "next" (GAP-04); a long answer's makes a new line.
+          enterKeyHint={multiline ? undefined : 'next'}
           {...box}
           value={value}
           onChange={(e) => {
@@ -122,7 +130,7 @@ export function TextAnswer({
           className={`slate-input${error ? ' slate-input--error' : ''}`}
         />
         <p id={errId} className="slate-err" aria-live="polite">
-          {error && `! ${error}`}
+          {error}
         </p>
         <div className="slate-actions">
           <button type="button" className="slate-ok-btn" onClick={submit}>
