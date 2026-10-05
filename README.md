@@ -79,7 +79,7 @@ export default function QuotePage() {
 | `hiddenFields` | `Record<string, unknown>` |  | Passed through to `meta.hiddenFields`. Never rendered. |
 | `errorMessage` | `string` |  | Fallback shown when `onSubmit` rejects (default: "Something went wrong submitting your form. Please try again."). |
 | `onFileUpload` | `(file, questionId) => Promise<string>` |  | Host-controlled storage for `file_upload` questions. Resolved string is stored as the answer; omit it to receive raw `File` objects in `onSubmit`. See `DECISIONS.md` ADR-012. |
-| `resume` | `boolean \| 'tab'` |  | Save-and-resume (ADR-017). Autosaves progress to `localStorage` under `slate-forms-resume:<schema.id>`, prompts to resume on remount, clears on submit. `'tab'` uses `sessionStorage` instead: it survives a reload in the same tab, never another tab or visit. Requires `schema.id`. |
+| `resume` | `boolean \| 'tab'` |  | Save-and-resume (ADR-017). Autosaves progress to `localStorage` under `slate-forms-resume:<schema.id>`, prompts to resume on remount (Resume or Start over), clears on submit. `'tab'` uses `sessionStorage` instead: it survives a reload, back / forward and a phone discarding the tab, and goes with the tab when the browser copies it (a duplicated tab, a closed tab reopened, a restored session); it is offered back only within 30 minutes of the last answer. Requires `schema.id`. With either, a question whose part didn't download reloads the page when the respondent taps Try again (the answers come back); without `resume` the form never reloads your page — Try again asks for the part again in place, and the message says the page can be reloaded. |
 | `onPartialChange` | `(answers, meta) => void` |  | Fires on every answer change with the visibility-filtered answers — abandonment capture. `meta` carries `startedAt`, `lastQuestionId`, `questionsVisited`, `hiddenFields`, `score`. |
 
 ### `defineSchema(schema)`
@@ -128,7 +128,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `url` | `title`, `placeholder?`, `required?` | website shape; bare domains get `https://` prefixed | `string` |
 | `number` | `title`, `placeholder?`, `min?`, `max?`, `step?`, `required?`, `display?` (`'input'` \| `'stepper'`), `prefix?`, `unit?` | range ("1,000" and "$150" read as typed; bounds set the wrong way round are ignored) | `number` |
 | `date` | `title`, `required?`, `format?` (`'MM/DD/YYYY'` default), `min?`, `max?` (ISO), `includeTime?`, `range?` | real calendar date + bounds, said in the form's own format (set the wrong way round, ignored); range in order; a 2-digit year is 20xx, years before 1900 are refused | `string`: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM` with a time, `start/end` for a range |
-| `file_upload` | `title`, `required?`, `accept?`, `maxSizeMb?`, `multiple?`, `maxFiles?` | presence + size; max files when multiple | `File` / `string`, or `(File \| string)[]` when `multiple` |
+| `file_upload` | `title`, `required?`, `accept?`, `maxSizeMb?`, `multiple?`, `maxFiles?` | presence + size; max files when multiple (below 1 is 10); `accept` reads endings with or without the dot (`pdf, jpg`), MIME types (`image/*`) and the words "photos", "Word", "Excel" — a word it can't read is left out | `File` / `string`, or `(File \| string)[]` when `multiple` |
 | `single_choice` | `title`, `options: Option[]`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` (option value, or the typed Other text) |
 | `multi_choice` | `title`, `options: Option[]`, `min?`, `max?`, `allowOther?`, `otherLabel?` | min/max selections, eased when nobody could meet them (ADR-069) | `string[]` (plus at most one typed Other text) |
 | `dropdown` | `title`, `options: Option[]`, `placeholder?`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` |
@@ -180,7 +180,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 
 Stars, faces, the slider, the stepper, date ranges / times, the file field, picture choice, ranking, the matrix, package cards, the contact block, the address, the signature pad, the estimate reveal, every Wave C UI, sign-up slots, the dropdown, plain date, number, phone, website, consent and NPS fields, multi choice and the Review step load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
 
-**Pick limits (ADR-069).** A multiple-pick question (multi choice, picture choice with `multiple`, swipe cards) says its rule above the choices ("Pick up to 3", "Pick at least 2"), and once the most picks are made the other choices step back. A respondent is never held to a limit they can't meet: `min` counts at most the choices on offer (Other included) and rounds to whole picks, and a `max` below 1 or below `min` is ignored. Optional single choice, yes / no and single picture choice offer **Skip** (and Enter) while nothing is picked.
+**Pick limits (ADR-069).** A multiple-pick question (multi choice, picture choice with `multiple`, swipe cards) says its rule above the choices ("Pick up to 3", "Pick at least 2"), and once the most picks are made the other choices step back. A respondent is never held to a limit they can't meet: `min` counts at most the choices on offer (Other included) and rounds to whole picks, and a `max` below 1 or below `min` is ignored. Single choice, yes / no, single picture choice and package cards, and the numbers scale, NPS, legal consent, stars and faces offer **Skip** (and Enter, once the question has been up a moment) while nothing is picked — only with `required: false` set; a question with no `required` stays one-tap, as forms made before ADR-069 expect.
 
 ### Answer piping
 
@@ -242,7 +242,9 @@ const issues = checkSchema(schema.questions); // [] when clean
 
 ### Scoring and multiple endings
 
-Give options a `score` and the engine accumulates a total — available in piping as `{{score}}` and delivered in `SubmitMeta.score` (ADR-016). Several `thanks` screens can coexist, each gated by `visibleIf`; the first visible one is shown. A `redirectUrl` on a thanks screen navigates there after `onSubmit` resolves (a link with no scheme, like `example.com/thanks`, is https; `/path` stays on the page's own site).
+Give options a `score` and the engine accumulates a total — available in piping as `{{score}}` and delivered in `SubmitMeta.score` (ADR-016); it counts the answers that are sent. Several `thanks` screens can coexist, each gated by `visibleIf`; the first visible one is shown. A `redirectUrl` on a thanks screen navigates there after `onSubmit` resolves. It resolves the way a link on your page does — `thanks`, `/thanks`, `?done` and `#done` stay on your site — so another site needs its full address (`https://example.com/thanks`); only http and https are followed. (Slate's own pages turn an address an owner typed without `https://` into the full one before the form is shown.)
+
+Logic jumps decide each step on what had been answered by then: a rule that reads a later answer never moves the path behind it, and a question shown only by a later answer is asked right after that answer. `onSubmit` receives the answers on the respondent's path, the same questions the Review step lists (ADR-069).
 
 ### `SubmitMeta`
 
@@ -259,6 +261,14 @@ type SubmitMeta = {
   score: number;
   /** The instant estimate, when the schema has prices (ADR-064). */
   estimate?: { low: number; high: number; currency: string; lines: EstimateLine[] };
+  /**
+   * One UUID per fill: the same on Retry, on a question the submit sent the
+   * respondent back to, and (with `resume`) after a reload and Resume; new for
+   * "Submit another" and Start over. Store it as a retry key so a submit
+   * whose reply was lost is never stored twice. Missing on a page not served
+   * over https.
+   */
+  fillId?: string;
 };
 ```
 
@@ -266,7 +276,7 @@ type SubmitMeta = {
 
 | Key | Action |
 |---|---|
-| `Enter` | Advance from welcome / statement; submit text-type fields; on an optional rating, NPS or legal question with no answer, skip it (ADR-069) |
+| `Enter` | Advance from welcome / statement; submit text-type fields; on an optional (`required: false`) rating, NPS, legal or choice question with no answer, skip it (ADR-069). A held Enter (key repeat) never confirms |
 | `Shift + Enter` | New line in `long_text` (on touch screens Return is a new line; OK submits) |
 | `A`–`F` | Select choice option (also `picture_choice` and `legal` accept/decline) |
 | `Y` / `N` | Answer `yes_no` questions |
