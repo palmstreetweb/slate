@@ -351,8 +351,18 @@ function sanitizeOptions(next: Record<string, unknown>): void {
   }
 }
 
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/** A question the form can show at all: an object with an id and a type (SEC-3). */
+const isQuestionLike = (q: unknown): q is Schema['questions'][number] =>
+  isObject(q) && typeof q.id === 'string' && typeof q.type === 'string';
+
 export function sanitizeUntrustedSchema(schema: Schema): Schema {
-  const questions = withoutRepeatedOptions(schema.questions ?? []).map((q) => {
+  // Anything in the list that isn't a question (null, a string, no id or type)
+  // is left out: it would only crash the page (SEC-3).
+  const listed = (Array.isArray(schema.questions) ? schema.questions : []).filter(isQuestionLike);
+  const questions = withoutRepeatedOptions(listed).map((q) => {
     const next: Record<string, unknown> = { ...(q as Record<string, unknown>) };
     // A pattern from JSON is a string or {}, never a RegExp: the engine can't
     // test it, and a crafted one could hang the tab (NEW-01).
@@ -371,7 +381,7 @@ export function sanitizeUntrustedSchema(schema: Schema): Schema {
       else delete next.redirectUrl;
     }
     if (Array.isArray(next.options)) {
-      next.options = (next.options as Record<string, unknown>[]).map((opt) => {
+      next.options = (next.options as unknown[]).filter(isObject).map((opt) => {
         const o = { ...opt };
         if ('src' in o) {
           const safe = httpsOnly(o.src);
