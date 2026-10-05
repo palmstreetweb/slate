@@ -118,6 +118,7 @@ export function neonFailureKind(err: unknown): NeonFailure {
 /** Which studio action failed — the words change with it. */
 export type NeonAction =
   | 'save'
+  /** Trash, restore, delete: a one-off the owner can simply repeat. */
   | 'delete'
   | 'load'
   | 'password'

@@ -470,7 +470,9 @@ function enqueueFormUpsert(form: FormRecord, onFail?: () => void, failTitle?: st
           emitPersistOk('form');
         } catch (err) {
           if (latest === form) onFail?.();
-          reportFormFailure(err, 'save', latest === form ? failTitle : undefined);
+          // A trash or restore names itself; an edit says the change isn't saved.
+          const own = latest === form && failTitle;
+          reportFormFailure(err, own ? 'delete' : 'save', own ? failTitle : undefined);
           throw err;
         }
       }

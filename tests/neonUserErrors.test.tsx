@@ -216,6 +216,17 @@ describe('form saves report plain words', () => {
     });
   });
 
+  it('a trash that never left the device says to try again, not that an edit is unsaved', async () => {
+    db.upsertError = FETCH_FAILED;
+    trashFormRemoteSync('f_1');
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+    expect(events[0]).toEqual({
+      kind: 'form',
+      title: 'Couldn’t move that form to Trash',
+      message: 'Check your connection and try again.',
+    });
+  });
+
   it('the password lock: offline and a missing switch, both plain', async () => {
     db.rpcError = FETCH_FAILED;
     await expect(setFormFillPasswordRemote('f_1', 'harvest')).resolves.toEqual({
