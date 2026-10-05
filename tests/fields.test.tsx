@@ -646,7 +646,11 @@ describe('phase 3 question types', () => {
     expect(setAnswer).toHaveBeenCalledWith('rate', { quality: 'great' });
 
     await user.click(screen.getByRole('button', { name: /ok/i }));
-    expect(await screen.findByText(/answer every row/i)).toBeInTheDocument();
+    // The message names the row still empty, and that row is marked (ADR-069).
+    expect(await screen.findByText('! Please answer “Speed” too.')).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Speed' })).toHaveClass(
+      'slate-matrix-row--missing',
+    );
     expect(advance).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('radio', { name: 'Speed: Poor' }));

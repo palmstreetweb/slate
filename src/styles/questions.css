@@ -1049,6 +1049,57 @@
   cursor: default;
 }
 
+/* Touch (ADR-069): a long press drags instead of selecting text, the grip
+   drags without stealing the page's scroll, and the buttons are 44 px. */
+[data-slate-forms] .slate-ranking-row {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+[data-slate-forms] .slate-ranking-grip {
+  flex-shrink: 0;
+  width: 28px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--slate-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+@media (pointer: coarse) {
+  [data-slate-forms] .slate-ranking-row {
+    cursor: default;
+    padding: 8px 10px 8px 14px;
+  }
+
+  [data-slate-forms] .slate-ranking-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The row a ↑ / ↓ just moved flashes, so the eye can follow it. */
+  [data-slate-forms]:not([data-reduced-motion]) .slate-ranking-row--moved {
+    animation: slate-rank-moved 520ms ease-out;
+  }
+}
+
+/* Transform only (ADR-059): a small lift that settles. */
+@keyframes slate-rank-moved {
+  from {
+    transform: scale(1.025);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
 /* ---------- matrix ---------- */
 
 [data-slate-forms] .slate-matrix {
@@ -1082,6 +1133,11 @@
   align-items: center;
   font-size: clamp(0.95rem, 1.6vw, 1.05rem);
   text-transform: var(--slate-transform);
+}
+
+/* A required row still empty after OK (ADR-069). */
+[data-slate-forms] .slate-matrix-row--missing .slate-matrix-rowlabel {
+  color: var(--slate-error);
 }
 
 [data-slate-forms] .slate-matrix-cell {

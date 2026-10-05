@@ -6,6 +6,13 @@
  * With `allowOther` (ADR-063) the list ends with "Other: “…”": whatever the
  * respondent typed that isn't an option becomes their answer, from the list
  * or with Enter / OK.
+ *
+ * Enter picks a row only after the respondent moved to it (arrow keys,
+ * typing, or the pointer moving over it); a bare Enter is OK, which keeps
+ * what the box shows (a prefilled answer too) or asks for a pick (QA CH-10,
+ * GAP-01). The list opens on a tap, a click, typing or ↓, never by itself on
+ * arrival, and phones aren't focused on arrival, so the keyboard doesn't
+ * cover the list before the respondent asks for it.
  */
 
 'use client';
@@ -49,7 +56,8 @@ export function DropdownField({
     selectedOption?.label ?? (withOther && typeof selected === 'string' ? selected : ''),
   );
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
+  /** The row Enter picks; -1 until the respondent moves to one. */
+  const [highlight, setHighlight] = useState(-1);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const labelId = useId();
@@ -59,6 +67,8 @@ export function DropdownField({
   const { schedule: scheduleAutoAdvance } = useAutoAdvanceTimer(question.id);
 
   useEffect(() => {
+    // A phone would open its keyboard over the list before anyone asked for it.
+    if (window.matchMedia?.('(pointer: coarse)').matches) return undefined;
     return focusAfter(inputRef.current);
   }, [question.id]);
 
@@ -144,16 +154,19 @@ export function DropdownField({
       setHighlight((h) => Math.min(h + 1, rows.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      setOpen(true);
       setHighlight((h) => Math.max(h - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (open && rows[highlight] && (rows[highlight].value !== OTHER_ROW || typedOther)) {
-        choose(rows[highlight].value);
+      const row = open ? rows[highlight] : undefined;
+      if (row && (row.value !== OTHER_ROW || typedOther)) {
+        choose(row.value);
       } else {
         submit();
       }
     } else if (e.key === 'Escape') {
       setOpen(false);
+      setHighlight(-1);
     }
   };
 
@@ -179,7 +192,8 @@ export function DropdownField({
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
-            setHighlight(0);
+            // Typing filters; Enter then takes the first match.
+            setHighlight(e.target.value.trim() ? 0 : -1);
             if (error) setError(null);
             if (selectedOption && e.target.value !== selectedOption.label) {
               onSelect('');
@@ -193,7 +207,7 @@ export function DropdownField({
               onSelect('');
             }
           }}
-          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
           onKeyDown={handleKey}
           placeholder={question.placeholder ?? 'Type or select an option...'}
           className={`slate-input${error ? ' slate-input--error' : ''}`}
@@ -218,7 +232,10 @@ export function DropdownField({
                     className={`slate-dropdown-item${isHighlighted ? ' slate-dropdown-item--hl' : ''}${
                       isSelected ? ' slate-dropdown-item--selected' : ''
                     }${isOther ? ' slate-dropdown-item--other' : ''}`}
-                    onMouseEnter={() => setHighlight(i)}
+                    // Only a pointer that moves: a list opening under a resting cursor picks nothing.
+                    onMouseMove={() => {
+                      if (highlight !== i) setHighlight(i);
+                    }}
                     onClick={() => choose(opt.value)}
                   >
                     {opt.label}
@@ -233,7 +250,7 @@ export function DropdownField({
         )}
         {open && rows.length === 0 && (
           <p className="slate-hint" style={{ marginTop: 12 }}>
-            no matches
+            no matches — try fewer letters
           </p>
         )}
         {error && (
@@ -245,7 +262,7 @@ export function DropdownField({
           <button type="button" className="slate-ok-btn" onClick={submit}>
             OK <span aria-hidden>✓</span>
           </button>
-          <span className="slate-hint">type to filter, ↑↓ + Enter to select</span>
+          <span className="slate-hint slate-key-hint">type to search, or use ↑ ↓ and Enter</span>
         </div>
       </div>
     </div>

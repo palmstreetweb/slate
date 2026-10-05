@@ -49,7 +49,9 @@ export function ReviewScreen({ question, rows, answers, format, onEdit, onAdvanc
         {rows.map((q) => {
           // Labels and words, never stored codes (ADR-063, ADR-069).
           const value = reviewText(q, answers[q.id], format);
-          const missing = value === '' && validate(q, answers[q.id]) !== null;
+          // A sign-up can be left empty when every spot is gone (MEDIA-07): not flagged.
+          const missing =
+            value === '' && q.type !== 'signup_slots' && validate(q, answers[q.id]) !== null;
           return (
             <div key={q.id} className="slate-review-row">
               <dt className="slate-review-q">{titleOf(q, answers)}</dt>

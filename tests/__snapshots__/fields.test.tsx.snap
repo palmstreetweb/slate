@@ -221,6 +221,11 @@ exports[`phase 3 question types > matrix renders + snapshot, single-select per r
           ✓
         </span>
       </button>
+      <span
+        class="slate-hint slate-key-hint"
+      >
+        press Enter ↵
+      </span>
     </div>
   </div>
 </div>
@@ -326,10 +331,12 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
       </button>
     </div>
     <p
-      class="slate-hint"
+      class="slate-hint slate-key-hint"
       style="margin-top: 20px;"
     >
-      tap a key (A, B, C) or click to select
+      press 
+      A–C
+      , or click to choose
     </p>
   </div>
 </div>
@@ -362,7 +369,7 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
     >
       <li
         class="slate-ranking-row"
-        draggable="true"
+        data-rank="a"
       >
         <span
           class="slate-ranking-pos"
@@ -393,10 +400,16 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
             ↓
           </button>
         </span>
+        <span
+          aria-hidden="true"
+          class="slate-ranking-grip"
+        >
+          ⠿
+        </span>
       </li>
       <li
         class="slate-ranking-row"
-        draggable="true"
+        data-rank="b"
       >
         <span
           class="slate-ranking-pos"
@@ -426,10 +439,16 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
             ↓
           </button>
         </span>
+        <span
+          aria-hidden="true"
+          class="slate-ranking-grip"
+        >
+          ⠿
+        </span>
       </li>
       <li
         class="slate-ranking-row"
-        draggable="true"
+        data-rank="c"
       >
         <span
           class="slate-ranking-pos"
@@ -460,6 +479,12 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
             ↓
           </button>
         </span>
+        <span
+          aria-hidden="true"
+          class="slate-ranking-grip"
+        >
+          ⠿
+        </span>
       </li>
     </ol>
     <div
@@ -469,7 +494,8 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
         class="slate-ok-btn"
         type="button"
       >
-        OK 
+        Keep this order
+         
         <span
           aria-hidden="true"
         >
@@ -479,7 +505,12 @@ exports[`phase 3 question types > ranking renders + snapshot, reorders via butto
       <span
         class="slate-hint"
       >
-        drag rows or use ↑↓, press Enter ↵
+        drag ⠿ or use ↑ ↓ to reorder
+        <span
+          class="slate-key-hint"
+        >
+          , then press Enter ↵
+        </span>
       </span>
     </div>
   </div>
@@ -632,9 +663,9 @@ exports[`question types render > dropdown 1`] = `
           </span>
         </button>
         <span
-          class="slate-hint"
+          class="slate-hint slate-key-hint"
         >
-          type to filter, ↑↓ + Enter to select
+          type to search, or use ↑ ↓ and Enter
         </span>
       </div>
     </div>

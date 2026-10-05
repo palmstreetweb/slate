@@ -356,6 +356,34 @@
   padding-left: 0;
 }
 
+/* The end screen (ADR-069): a liked picture is a button that lets it go. */
+[data-slate-forms] .slate-swipe-unlike {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-slate-forms] .slate-swipe-unlike:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 3px;
+}
+
+[data-slate-forms] .slate-swipe-unlike-hint {
+  margin: 0 0 6px;
+}
+
+/* At the most likes, the heart steps back (a like there springs back). */
+[data-slate-forms] .slate-swipe-btn[aria-disabled='true'] {
+  opacity: 0.45;
+}
+
 /* ============================================================
    Pin the spot
    ============================================================ */

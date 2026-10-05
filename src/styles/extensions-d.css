@@ -35,6 +35,11 @@
   gap: 8px;
 }
 
+/* Why a tap wasn't taken, right under the slot tapped (ADR-069). */
+[data-slate-forms] .slate-slot-note {
+  margin: 0 0 4px;
+}
+
 [data-slate-forms] .slate-slot-day-label {
   margin: 0 0 2px;
   font-family: var(--slate-font-mono);
