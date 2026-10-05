@@ -124,10 +124,10 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `short_text` | `title`, `placeholder?`, `required?`, `maxLength?`, `pattern?`, `patternError?` | required + length (never cut: a counter near the limit; 10,000 when unset) + pattern | `string` |
 | `long_text` | `title`, `placeholder?`, `required?`, `maxLength?` | required + length (never cut: a counter near the limit; 10,000 when unset) | `string` |
 | `email` | `title`, `placeholder?`, `required?` | RFC-lite regex | `string` |
-| `phone` | `title`, `placeholder?`, `required?`, `defaultCountry?` (default `'US'`) | E.164 normalization via `libphonenumber-js` | `string` (E.164) |
+| `phone` | `title`, `placeholder?`, `required?`, `defaultCountry?` (default `'US'`; a blank or unknown one reads local numbers as US) | E.164 normalization via `libphonenumber-js`; if the checker can't download, a number with 7+ digits is kept as typed | `string` (E.164) |
 | `url` | `title`, `placeholder?`, `required?` | website shape; bare domains get `https://` prefixed | `string` |
-| `number` | `title`, `placeholder?`, `min?`, `max?`, `step?`, `required?`, `display?` (`'input'` \| `'stepper'`), `prefix?`, `unit?` | range | `number` |
-| `date` | `title`, `required?`, `format?` (`'MM/DD/YYYY'` default), `min?`, `max?` (ISO), `includeTime?`, `range?` | real calendar date + bounds; range in order | `string`: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM` with a time, `start/end` for a range |
+| `number` | `title`, `placeholder?`, `min?`, `max?`, `step?`, `required?`, `display?` (`'input'` \| `'stepper'`), `prefix?`, `unit?` | range ("1,000" and "$150" read as typed; bounds set the wrong way round are ignored) | `number` |
+| `date` | `title`, `required?`, `format?` (`'MM/DD/YYYY'` default), `min?`, `max?` (ISO), `includeTime?`, `range?` | real calendar date + bounds, said in the form's own format (set the wrong way round, ignored); range in order; a 2-digit year is 20xx, years before 1900 are refused | `string`: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM` with a time, `start/end` for a range |
 | `file_upload` | `title`, `required?`, `accept?`, `maxSizeMb?`, `multiple?`, `maxFiles?` | presence + size; max files when multiple | `File` / `string`, or `(File \| string)[]` when `multiple` |
 | `single_choice` | `title`, `options: Option[]`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` (option value, or the typed Other text) |
 | `multi_choice` | `title`, `options: Option[]`, `min?`, `max?`, `allowOther?`, `otherLabel?` | min/max selections, eased when nobody could meet them (ADR-069) | `string[]` (plus at most one typed Other text) |
@@ -137,7 +137,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `matrix` | `title`, `rows: Option[]`, `columns: Option[]`, `multiple?`, `required?` | all rows when required | `Record<row, col \| col[]>` |
 | `yes_no` | `title`, `yesLabel?`, `noLabel?`, `required?` (default `true`), `display?` (`'buttons'` \| `'swipe'`) | required | `'yes' \| 'no'` |
 | `legal` | `title`, `body?`, `acceptLabel?`, `declineLabel?`, `required?` (default `true`) | required | `'accept' \| 'decline'` |
-| `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?`, `display?` (`'numbers'` \| `'stars'` \| `'emoji'` \| `'slider'`), `sliderIcon?` | range | `number` |
+| `scale` | `title`, `min`, `max`, `minLabel?`, `maxLabel?`, `step?`, `required?`, `display?` (`'numbers'` \| `'stars'` \| `'emoji'` \| `'slider'`), `sliderIcon?` | range (min and max set the wrong way round read in order; the cells draw at most 21 points) | `number` |
 | `nps` | `title`, `minLabel?`, `maxLabel?`, `required?` | 0–10 | `number` |
 | `contact_info` | `title`, `fields?` (`name` / `email` / `phone`: `'required'` \| `'optional'` \| `'off'`; default name + email required, phone optional), `defaultCountry?` | per part: required, email shape, phone parses | `{ name?, email?, phone? }` (phone as E.164) |
 | `address` | `title`, `required?`, `line2?` (default `true`), `country?`, `format?` (`'us'` \| `'international'`), `serviceArea?` (ZIP codes or prefixes) | complete once started; 5-digit ZIP (US) | `{ street, line2?, city, region?, postal, country? }` |
@@ -233,7 +233,7 @@ Back returns to the jump origin. The respondent's path is replayed from the curr
 
 ### Schema sanity checking
 
-`checkSchema(questions)` is a pure helper that returns `SchemaIssue[]` — duplicate ids, `visibleIf`/jump conditions referencing unknown questions, and dangling or self jump targets. The engine is forgiving at runtime (bad refs fall through to normal flow); use this in CI or on save to catch authoring mistakes early. Slate surfaces these in an editor banner.
+`checkSchema(questions)` is a pure helper that returns `SchemaIssue[]` — duplicate ids, `visibleIf`/jump conditions referencing unknown questions, and dangling or self jump targets. The engine is forgiving at runtime (bad refs fall through to normal flow); use this in CI or on save to catch authoring mistakes early. Each `message` is written for the form's owner: it names the question by its title and says what to do (ADR-069), so match on `kind`, never on the text. Slate's editor lists these in plain words with its own settings and logic-rule checks, and holds Publish back only for the ones that would stop people finishing the form.
 
 ```ts
 import { checkSchema } from '@palmstreetweb/slate';
@@ -242,7 +242,7 @@ const issues = checkSchema(schema.questions); // [] when clean
 
 ### Scoring and multiple endings
 
-Give options a `score` and the engine accumulates a total — available in piping as `{{score}}` and delivered in `SubmitMeta.score` (ADR-016). Several `thanks` screens can coexist, each gated by `visibleIf`; the first visible one is shown. A `redirectUrl` on a thanks screen navigates there after `onSubmit` resolves.
+Give options a `score` and the engine accumulates a total — available in piping as `{{score}}` and delivered in `SubmitMeta.score` (ADR-016). Several `thanks` screens can coexist, each gated by `visibleIf`; the first visible one is shown. A `redirectUrl` on a thanks screen navigates there after `onSubmit` resolves (a link with no scheme, like `example.com/thanks`, is https; `/path` stays on the page's own site).
 
 ### `SubmitMeta`
 
@@ -346,7 +346,7 @@ Motion follows BUILD_BRIEF §10 and ADR-059, and all of it lives in `styles.css`
 The `examples/` folder isn't published. It hosts **Slate**, a supported internal dev tool (ADR-018) for building and previewing forms:
 
 - Dashboard listing locally-stored form definitions (with two seed schemas).
-- Three-pane editor (outline / canvas / inspector) with drag-and-drop reordering, duplication, bulk delete, a visual logic editor (conditions, jumps, scores), and a schema-issue banner powered by `checkSchema`.
+- Three-pane editor (outline / canvas / inspector) with drag-and-drop reordering, duplication, bulk delete, a visual logic editor (conditions, jumps, scores), and an issues banner in plain words (`checkSchema`, settings checks and rule checks; Publish waits only for what would trap respondents, ADR-069).
 - **Share panel** — copy link + QR for dev preview; optional public URL when `VITE_PUBLIC_FORM_BASE` is set (see `.env.example`).
 - Live `<Form>` preview (with save-and-resume on) and a responses inbox with CSV export and per-question summaries, all backed by `localStorage`.
 - **Motion gallery** at `/motion` — every animation above with a Replay button, in all twelve themes, with a Reduce-motion preview switch. Built-in demo schemas; no sign-in, nothing submitted.
