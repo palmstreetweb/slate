@@ -5061,6 +5061,24 @@ body.slate-editor-resizing * {
   gap: 14px;
 }
 
+/* Saving would close the form right now (S11): say so before it happens. */
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-now {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--slate-error) 40%, var(--chrome-line));
+  border-left: 3px solid var(--slate-error);
+  border-radius: var(--slate-radius-sm);
+  background: color-mix(in srgb, var(--slate-error) 7%, var(--chrome-panel));
+  font-size: var(--slate-fs-sm);
+  line-height: 1.45;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-now p {
+  margin: 0;
+}
+
 /* Grid/flex children keep their content width unless told otherwise: without this a
    long row of chips widens the whole panel instead of scrolling sideways. */
 [data-slate-forms][data-theme-name='slate'] .slate-share-track,
