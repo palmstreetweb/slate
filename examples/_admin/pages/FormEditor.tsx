@@ -726,10 +726,11 @@ function FormEditorBody({ formId }: { formId: string }) {
   // the owner pauses, and a question just added waits until they move on.
   const issues = ownerIssues(schema.questions);
   if (editingId === null) settledIssuesRef.current = issues;
+  const editingExists = schema.questions.some((q) => q.id === editingId);
   const shownIssues = sortIssues(
     [
       ...issues.filter((i) => i.questionId !== editingId),
-      ...settledIssuesRef.current.filter((i) => i.questionId === editingId),
+      ...(editingExists ? settledIssuesRef.current.filter((i) => i.questionId === editingId) : []),
     ].filter((i) => i.questionId !== freshId),
     schema.questions,
   );

@@ -268,6 +268,22 @@ describe('the issues banner (S9)', () => {
     expect(banner()!.textContent).toContain('needs a photo to mark');
   });
 
+  it('waits for a pause before flagging the question being edited', async () => {
+    const user = userEvent.setup();
+    state.cloud = false;
+    seed([welcome, { id: 'qty', type: 'number', title: 'How many?', min: 1, max: 20 }, done]);
+    renderEditor();
+    await user.click(row('How many?'));
+    const min = screen.getByLabelText('Min') as HTMLInputElement;
+    await user.clear(min);
+    await user.type(min, '30');
+    // Min 30 is above max 20, but the owner is mid-edit (maybe about to raise the max).
+    expect(banner()).toBeNull();
+    await waitFor(() => expect(banner()?.textContent).toContain('“How many?” has a lowest'), {
+      timeout: 3000,
+    });
+  });
+
   it('a new Location question raises nothing (no half-set service area)', async () => {
     const user = userEvent.setup();
     state.cloud = false;
