@@ -323,12 +323,19 @@ export async function setFormFillPassword(
   formId: string,
   password: string,
 ): Promise<{ ok: true; locked: boolean } | { ok: false; message: string }> {
-  if (!useRemote()) return { ok: false, message: 'Password lock needs the cloud backend.' };
+  if (!useRemote()) {
+    return { ok: false, message: 'Passwords work once you’re signed in to Slate.' };
+  }
   return remote.setFormFillPasswordRemote(formId, password);
 }
 
-export function publishForm(formId: string): FormRecord | null {
-  if (useRemote()) return remote.publishFormRemoteSync(formId);
+/**
+ * Publish the current draft. In the cloud the write lands in the background:
+ * `onFail` runs if it never reaches the server, after the form is put back to
+ * how it was (COPY-10).
+ */
+export function publishForm(formId: string, opts: { onFail?: () => void } = {}): FormRecord | null {
+  if (useRemote()) return remote.publishFormRemoteSync(formId, opts.onFail);
   const form = getForm(formId);
   if (!form) return null;
   const [updated] = updateForm(formId, {

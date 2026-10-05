@@ -27,6 +27,13 @@ export const IGNITION_LEAVE_MS = 220;
 type StartOptions = {
   /** Fires on the check beat (or at once with calm motion). */
   onLive?: () => void;
+  /**
+   * True once the publish is known not to have reached the server. Asked on the
+   * check beat: then there's no check and no `onLive`, `onFailed` runs instead,
+   * and the button goes back to Publish (the shell has said what went wrong).
+   */
+  failed?: () => boolean;
+  onFailed?: () => void;
   /** Element whose wrapper decides calm motion (defaults to the OS setting). */
   scope?: Element | null;
 };
@@ -66,6 +73,12 @@ export function usePublishIgnition() {
       timers.current.push(window.setTimeout(fn, ms));
     };
     const fireLive = () => {
+      if (opts.failed?.()) {
+        timers.current.splice(0).forEach((t) => window.clearTimeout(t));
+        set('idle');
+        opts.onFailed?.();
+        return;
+      }
       set('done');
       opts.onLive?.();
     };

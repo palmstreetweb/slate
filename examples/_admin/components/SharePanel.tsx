@@ -40,6 +40,8 @@ import { playUiSound } from '../uiSounds.js';
 import { useToast } from '../toast.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
 import { PublishButton, usePublishIgnition } from '../delight/ignition.js';
+import { ownerIssues, publishBlockedCopy } from '../editorIssues.js';
+import { navigate } from '../_router.js';
 
 type Props = {
   open: boolean;
@@ -47,9 +49,14 @@ type Props = {
   formId: string;
   formName: string;
   schema: Schema;
+  /**
+   * Opens a question in the editor: the "Show me" when publishing has to wait
+   * (S10). Without it (Dashboard, Responses) "Show me" opens the editor.
+   */
+  onShowQuestion?: (questionId: string) => void;
 };
 
-export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
+export function SharePanel({ open, onClose, formId, formName, schema, onShowQuestion }: Props) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
@@ -70,11 +77,14 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   /** Tracked link on show (ADR-063): its `src`, or null for the main link. */
   const [trackSrc, setTrackSrc] = useState<string | null>(null);
   const [, setTick] = useState(0);
+  /** Times Publish was pressed while it has to wait; the notice says so again. */
+  const [blockedTries, setBlockedTries] = useState(0);
 
   useEffect(() => {
     if (open) return;
     setIgnited(false);
     setTrackSrc(null);
+    setBlockedTries(0);
     // Never keep a typed password around after the sheet closes.
     setLockEditing(false);
     setLockDraft('');
@@ -146,8 +156,9 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
+          console.error('[slate] QR code failed:', err);
           setQr(null);
-          setQrError(err instanceof Error ? err.message : 'Could not render QR code');
+          setQrError('Couldn’t make a QR code. Copy the link instead.');
         }
       });
     return () => {
@@ -193,12 +204,41 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
     }
   }, [qr]);
 
+  /** What would stop people finishing the form: publishing waits for these (S10). */
+  const blockingIssues = () =>
+    ownerIssues((getForm(formId)?.schema ?? schema).questions).filter((i) => i.blocking);
+
+  const showQuestion = (questionId: string) => {
+    if (onShowQuestion) {
+      onShowQuestion(questionId);
+      return;
+    }
+    onClose();
+    navigate(`/forms/${formId}/edit`);
+  };
+
   const onPublish = () => {
     if (ignite.phase !== 'idle') return;
+    if (blockingIssues().length > 0) {
+      setBlockedTries((n) => n + 1);
+      playUiSound('danger');
+      return;
+    }
     const wasStale = stale;
+    // Set when the publish never reached the server; the shell says so (COPY-10).
+    let failed = false;
     // Publishes now; the toast and the Live dot's sonar wait for the check.
-    const ok = ignite.start(() => Boolean(publishForm(formId)), {
+    const publish = () =>
+      Boolean(
+        publishForm(formId, {
+          onFail: () => {
+            failed = true;
+          },
+        }),
+      );
+    const ok = ignite.start(publish, {
       scope: panelRef.current,
+      failed: () => failed,
       onLive: () => {
         setIgnited(true);
         toast.push({
@@ -211,8 +251,8 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
     });
     if (!ok) {
       toast.push({
-        title: 'Could not publish',
-        detail: 'Check your connection and try again.',
+        title: 'Couldn’t publish',
+        detail: 'Your form isn’t live yet. Check your connection and try again.',
         tone: 'error',
       });
     }
@@ -236,8 +276,12 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
 
   const applyLock = async (password: string) => {
     if (lockBusy) return;
-    if (password && (password.length < 6 || password.length > 72)) {
-      setLockError('Use 6 to 72 characters.');
+    if (password && password.length < 6) {
+      setLockError('Use at least 6 characters.');
+      return;
+    }
+    if (password.length > 72) {
+      setLockError('Use 72 characters or fewer.');
       return;
     }
     setLockBusy(true);
@@ -312,6 +356,32 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
   const uiTheme = detectAdminUiTheme();
   const cloud = isNeonConfigured();
 
+  // Shown beside Publish while publishing has to wait (S10): what to fix, and a way there.
+  const blocked = cloud && (!isPublished || stale) ? blockingIssues() : [];
+  const blockedCopy = blocked.length > 0 ? publishBlockedCopy(blocked) : null;
+  const blockNotice = blockedCopy ? (
+    <section
+      key={blockedTries}
+      className={`slate-share-block${blockedTries > 0 ? ' slate-share-block--again' : ''}`}
+      role={blockedTries > 0 ? 'alert' : 'status'}
+      aria-label="Before you publish"
+    >
+      <p className="slate-share-block-title">{blockedCopy.title}</p>
+      <ul className="slate-share-block-list">
+        {blockedCopy.lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        className="slate-share-lock-link"
+        onClick={() => showQuestion(blocked[0]!.questionId)}
+      >
+        Show me
+      </button>
+    </section>
+  ) : null;
+
   const lockRow = cloud ? (
     <section className="slate-share-lock" aria-label="Password">
       {lockEditing ? (
@@ -330,8 +400,9 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
               setLockDraft(e.target.value);
               setLockError(null);
             }}
-            placeholder={fillLocked ? 'New word or PIN' : 'Word or PIN'}
+            placeholder={fillLocked ? 'New word or 6+ digits' : 'A word or 6+ digits'}
             aria-label="Form password"
+            aria-describedby={`${titleId}-lock-hint`}
             aria-invalid={lockError ? true : undefined}
             minLength={6}
             maxLength={72}
@@ -346,7 +417,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
           <button
             type="submit"
             className="slate-btn slate-btn--primary slate-btn--compact"
-            disabled={lockBusy || lockDraft.trim().length < 6}
+            disabled={lockBusy || lockDraft.trim().length === 0}
           >
             {lockBusy ? 'Saving…' : 'Set'}
           </button>
@@ -402,8 +473,13 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
         </div>
       )}
       {lockError ? (
-        <p className="slate-share-lock-error" role="alert">
+        <p className="slate-share-lock-error" role="alert" id={`${titleId}-lock-hint`}>
           {lockError}
+        </p>
+      ) : lockEditing ? (
+        // The rule up front, so a short password isn't a mystery (S26).
+        <p className="slate-share-lock-hint" id={`${titleId}-lock-hint`}>
+          At least 6 characters. People type it once per visit.
         </p>
       ) : null}
     </section>
@@ -509,6 +585,8 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                   </div>
                 </section>
 
+                {blockNotice}
+
                 {trackedRow}
 
                 {lockRow}
@@ -590,6 +668,7 @@ export function SharePanel({ open, onClose, formId, formName, schema }: Props) {
                     </PublishButton>
                   ) : null}
                 </div>
+                {blockNotice}
                 {lockRow}
                 {closeRow}
               </>

@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormSound, Question, QuestionType, Schema, ThemeMode, ThemeName } from '@/index.js';
-import { checkSchema, defineSchema } from '@/index.js';
+import { defineSchema } from '@/index.js';
 import { playFormSound } from '@/utils/formSounds.js';
 import {
   createFormAsync,
@@ -61,6 +61,15 @@ import { FlipPill, PublishButton, usePublishIgnition } from '../delight/ignition
 import { closedReason } from '../formClose.js';
 import { countSubmissions } from '../_submissionStore.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
+import { IssuesBanner } from '../components/IssuesBanner.js';
+import {
+  ownerIssues,
+  ownerName,
+  publishBlockedCopy,
+  sortIssues,
+  type OwnerIssue,
+} from '../editorIssues.js';
+import { dropRulesUsing, isAnswerBearing, questionsUsing } from '../logicRules.js';
 
 type Props = {
   formId: string | null;
@@ -68,14 +77,24 @@ type Props = {
 
 export function FormEditor({ formId }: Props) {
   const creatingRef = useRef(false);
+  /** Still on the page. StrictMode's rehearsal unmount turns it straight back on (S28). */
+  const aliveRef = useRef(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
   // /forms/new → create + redirect (await cloud write so hydrate can't race).
+  // Not a per-run `cancelled` flag: StrictMode runs this twice and cancels the
+  // first run, which is the one creating the form, so it never navigated (S28).
   useEffect(() => {
     if (formId !== null) return;
     if (creatingRef.current) return;
     creatingRef.current = true;
-    let cancelled = false;
     void (async () => {
       try {
         const created = await createFormAsync({
@@ -96,14 +115,14 @@ export function FormEditor({ formId }: Props) {
             ],
           }),
         });
-        if (cancelled) return;
+        if (!aliveRef.current) return;
         if (created) {
           navigate(`/forms/${created.id}/edit`);
           return;
         }
-        setCreateError('Could not create the form. Check your connection and try again.');
+        setCreateError('Couldn’t create your form. Check your connection and try again.');
       } catch (err) {
-        if (cancelled) return;
+        if (!aliveRef.current) return;
         if (isFormQuotaError(err)) {
           const q = quotaFromUnknown(err);
           setCreateError(
@@ -113,14 +132,11 @@ export function FormEditor({ formId }: Props) {
             }),
           );
         } else {
-          setCreateError('Could not create the form. Check your connection and try again.');
+          setCreateError('Couldn’t create your form. Check your connection and try again.');
         }
       }
       creatingRef.current = false;
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [formId]);
 
   if (formId === null) {
@@ -184,6 +200,30 @@ function FormEditorBody({ formId }: { formId: string }) {
   const seededRef = useRef(Boolean(seed));
   const cloud = isNeonConfigured();
   const [liveForm, setLiveForm] = useState(() => getForm(formId));
+  /**
+   * What the last write sent. Opening the editor, or undoing back to it, writes
+   * nothing: a write per open cost a request and, on shaky Wi-Fi, a "Couldn't
+   * save" before the owner touched anything (COPY-X2).
+   */
+  const lastSavedRef = useRef<string | null>(
+    seed ? saveKey(seed.name, seed.slug, seed.schema) : null,
+  );
+  /** One "couldn't save" toast per failing run in local mode, not one per keystroke. */
+  const localSaveWarnedRef = useRef(false);
+  /**
+   * The question being edited right now. Its issues wait until the owner pauses,
+   * so the banner doesn't flash while a min and max are typed (S9).
+   */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const settleTimerRef = useRef<number | undefined>(undefined);
+  const settledIssuesRef = useRef<OwnerIssue[]>([]);
+  /** A question just added and still open: its setup issues wait until the owner moves on. */
+  const [freshId, setFreshId] = useState<string | null>(null);
+
+  useEffect(() => () => window.clearTimeout(settleTimerRef.current), []);
+  useEffect(() => {
+    if (freshId !== null && selectedId !== freshId) setFreshId(null);
+  }, [selectedId, freshId]);
 
   useEffect(() => {
     const sync = () => {
@@ -196,6 +236,7 @@ function FormEditorBody({ formId }: { formId: string }) {
       setLiveForm(form);
       if (seededRef.current) return;
       seededRef.current = true;
+      lastSavedRef.current = saveKey(form.name, form.slug, form.schema);
       const sanitized = sanitizeSchemaLogic(form.schema);
       setName(form.name);
       setSlug(form.slug?.trim() ? slugify(form.slug) : slugify(form.name));
@@ -230,25 +271,38 @@ function FormEditorBody({ formId }: { formId: string }) {
   });
 
   // SYNCHRONOUS auto-save — every change writes immediately, so clicking
-  // Preview right after a setting change never reads stale localStorage.
+  // Preview right after a setting change never reads a stale copy.
   useEffect(() => {
     if (!schema) return;
+    const key = saveKey(name, slug, schema);
+    if (key === lastSavedRef.current) return;
     const [updated, persisted] = updateForm(formId, {
       name,
       slug: slug || undefined,
       schema,
     });
     if (!updated) {
-      setSaveError('This form was deleted or could not be found.');
+      setSaveError('This form isn’t available any more. Go back to your forms.');
       return;
     }
     if (persisted) {
+      lastSavedRef.current = key;
+      localSaveWarnedRef.current = false;
       setSavedAt(new Date());
       setSaveError(null);
     } else {
-      setSaveError('Could not save — localStorage may be full or unavailable.');
+      setSaveError(LOCAL_SAVE_FAILED);
+      if (!localSaveWarnedRef.current) {
+        localSaveWarnedRef.current = true;
+        toast.push({
+          title: 'Couldn’t save your last change',
+          detail:
+            'This browser may be out of space. Export a backup, then delete old forms or responses.',
+          tone: 'error',
+        });
+      }
     }
-  }, [name, slug, schema, formId]);
+  }, [name, slug, schema, formId, toast]);
 
   useEffect(() => {
     const onPersistError = (event: Event) => {
@@ -392,12 +446,48 @@ function FormEditorBody({ formId }: { formId: string }) {
   };
   handleShareRef.current = handleShare;
 
+  /** Open a question from the banner or a "Show me": on a phone, its settings come into view. */
+  const openQuestion = (id: string) => {
+    setSelectedId(id);
+    if (!phone) return;
+    setPhoneTab('edit');
+    window.requestAnimationFrame(() => {
+      document.querySelector('.slate-m-editor-pane')?.scrollTo?.({ top: 0 });
+    });
+  };
+
+  /** Publish waits while something would stop people finishing the form (S10). */
+  const showPublishBlocked = async (blocking: ReadonlyArray<OwnerIssue>) => {
+    const copy = publishBlockedCopy(blocking);
+    const show = await confirm({
+      title: copy.title,
+      message: (
+        <>
+          <p style={{ margin: '0 0 8px' }}>{copy.lead}</p>
+          <ul className="slate-dialog-list">
+            {copy.lines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </>
+      ),
+      confirmLabel: 'Show me',
+      cancelLabel: 'Not now',
+    });
+    if (show && blocking[0]) openQuestion(blocking[0].questionId);
+  };
+
   const quickPublish = () => {
     if (!cloud) {
       void handleShare();
       return;
     }
     if (ignite.phase !== 'idle') return;
+    const blocking = ownerIssues(schema.questions).filter((i) => i.blocking);
+    if (blocking.length > 0) {
+      void showPublishBlocked(blocking);
+      return;
+    }
     const wasStale =
       Boolean(liveForm) &&
       hasUnpublishedChanges({
@@ -406,14 +496,24 @@ function FormEditorBody({ formId }: { formId: string }) {
         schema,
       });
     pinnedLabelRef.current = statusLabelRef.current;
+    // Set when the publish never reached the server; the shell says so (COPY-10).
+    let failed = false;
     // Publishes now; the check beat brings the toast and flips the pill.
     const ok = ignite.start(
       () => {
-        const next = publishForm(formId);
+        const next = publishForm(formId, {
+          onFail: () => {
+            failed = true;
+          },
+        });
         if (next) setLiveForm(next);
         return Boolean(next);
       },
       {
+        failed: () => failed,
+        onFailed: () => {
+          pinnedLabelRef.current = null;
+        },
         onLive: () => {
           pinnedLabelRef.current = null;
           playUiSound('success');
@@ -429,14 +529,17 @@ function FormEditorBody({ formId }: { formId: string }) {
     if (!ok) {
       pinnedLabelRef.current = null;
       toast.push({
-        title: 'Could not publish',
-        detail: 'Check your connection and try again.',
+        title: 'Couldn’t publish',
+        detail: 'Your form isn’t live yet. Check your connection and try again.',
         tone: 'error',
       });
     }
   };
 
   const updateQuestion = (id: string, patch: Partial<Question>) => {
+    setEditingId(id);
+    window.clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = window.setTimeout(() => setEditingId(null), ISSUE_SETTLE_MS);
     pushHistory();
     setSchema((s) => {
       if (!s) return s;
@@ -473,7 +576,12 @@ function FormEditorBody({ formId }: { formId: string }) {
       if (q.type === 'thanks' && s.questions.filter((item) => item.type === 'thanks').length < 2) {
         return s;
       }
-      return { ...s, questions: s.questions.filter((item) => item.id !== id) };
+      // Rules that used it would hide a question for good, or skip nowhere (S8).
+      const questions = dropRulesUsing(
+        s.questions.filter((item) => item.id !== id),
+        new Set([id]),
+      );
+      return { ...s, questions };
     });
   };
 
@@ -518,27 +626,41 @@ function FormEditorBody({ formId }: { formId: string }) {
   };
 
   const duplicateQuestion = (id: string) => {
+    const idx = schema.questions.findIndex((q) => q.id === id);
+    const original = schema.questions[idx];
+    if (!original || original.type === 'welcome' || original.type === 'thanks') return;
+    const title =
+      typeof original.title === 'string' ? `${original.title} (copy)` : 'Question (copy)';
+    const copyId = uniqueQuestionId(title, new Set(schema.questions.map((q) => q.id)));
+    const copy = cloneQuestion(original, copyId);
     pushHistory();
     setSchema((s) => {
       if (!s) return s;
-      const idx = s.questions.findIndex((q) => q.id === id);
-      const original = s.questions[idx];
-      if (!original || original.type === 'welcome' || original.type === 'thanks') return s;
-      const title =
-        typeof original.title === 'string' ? `${original.title} (copy)` : 'Question (copy)';
-      const copyId = uniqueQuestionId(title, new Set(s.questions.map((q) => q.id)));
+      const at = s.questions.findIndex((q) => q.id === id);
+      if (at === -1) return s;
       const next = [...s.questions];
-      next.splice(idx + 1, 0, cloneQuestion(original, copyId));
-      setSelectedId(copyId);
+      next.splice(at + 1, 0, copy);
       return { ...s, questions: next };
     });
+    setSelectedId(copyId);
+    setFreshId(copyId);
   };
 
   const bulkDelete = async (ids: string[]): Promise<boolean> => {
     if (ids.length === 0) return false;
+    const one = ids.length === 1;
+    const gone = new Set(ids);
+    const users = questionsUsing(schema.questions, gone);
     const ok = await confirm({
-      title: `Delete ${ids.length} ${ids.length === 1 ? 'question' : 'questions'}?`,
-      message: 'Removes them from this form. Existing responses keep their data in localStorage.',
+      title: `Delete ${ids.length} ${one ? 'question' : 'questions'}?`,
+      message: (
+        <>
+          {one
+            ? 'Removes it from this form. Responses you already have keep its answers.'
+            : 'Removes them from this form. Responses you already have keep their answers.'}
+          {users.length > 0 ? ` ${rulesUsingText(users, one ? 'it' : 'one of them')}` : null}
+        </>
+      ),
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -546,12 +668,10 @@ function FormEditorBody({ formId }: { formId: string }) {
     pushHistory();
     setSchema((s) => {
       if (!s) return s;
-      return {
-        ...s,
-        questions: s.questions.filter(
-          (q) => q.type === 'welcome' || q.type === 'thanks' || !ids.includes(q.id),
-        ),
-      };
+      const kept = s.questions.filter(
+        (q) => q.type === 'welcome' || q.type === 'thanks' || !gone.has(q.id),
+      );
+      return { ...s, questions: dropRulesUsing(kept, gone) };
     });
     return true;
   };
@@ -596,13 +716,23 @@ function FormEditorBody({ formId }: { formId: string }) {
       return { ...s, questions: next };
     });
     setSelectedId(newQ.id);
+    setFreshId(newQ.id);
   };
 
   /* ---------- render ---------- */
 
-  // Schema sanity (roadmap Phase 6) — recomputed on every change since
-  // saving is synchronous; surfaces dangling visibleIf / jump references.
-  const issues = checkSchema(schema.questions);
+  // Things to fix (S9): plain sentences, recomputed on every change. The
+  // question being edited shows its issues as they were before this edit until
+  // the owner pauses, and a question just added waits until they move on.
+  const issues = ownerIssues(schema.questions);
+  if (editingId === null) settledIssuesRef.current = issues;
+  const shownIssues = sortIssues(
+    [
+      ...issues.filter((i) => i.questionId !== editingId),
+      ...settledIssuesRef.current.filter((i) => i.questionId === editingId),
+    ].filter((i) => i.questionId !== freshId),
+    schema.questions,
+  );
   const isPublished = liveForm?.status === 'published';
   const stale =
     Boolean(liveForm) &&
@@ -631,7 +761,12 @@ function FormEditorBody({ formId }: { formId: string }) {
   const pillClosed = statusLabel === 'Closed';
 
   const needsPublish = cloud && (!isPublished || stale || ignite.phase !== 'idle');
-  const saveText = saveError ?? (savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved');
+  // The header has room for a short state; the sentence is in the tooltip and the toast (COPY-X1).
+  const saveText = saveError
+    ? 'Not saved'
+    : savedAt
+      ? `Saved ${formatTime(savedAt)}`
+      : 'All changes saved';
 
   return (
     <AdminShell
@@ -648,7 +783,10 @@ function FormEditorBody({ formId }: { formId: string }) {
                 {statusLabel}
               </span>
             ) : null}
-            <span className={saveError ? 'slate-m-save slate-m-save--err' : 'slate-m-save'}>
+            <span
+              className={saveError ? 'slate-m-save slate-m-save--err' : 'slate-m-save'}
+              title={saveError ?? undefined}
+            >
               {saveText}
             </span>
           </>
@@ -710,9 +848,10 @@ function FormEditorBody({ formId }: { formId: string }) {
         <>
           <span
             className={`slate-save-status${saveError ? ' slate-save-status--err' : ''}`}
-            title="Edits save automatically"
+            title={saveError ?? 'Edits save automatically'}
+            role="status"
           >
-            {saveError ?? (savedAt ? `Saved ${formatTime(savedAt)}` : 'All changes saved')}
+            {saveText}
           </span>
           {statusLabel ? (
             <FlipPill
@@ -780,6 +919,10 @@ function FormEditorBody({ formId }: { formId: string }) {
         formId={formId}
         formName={name}
         schema={schema}
+        onShowQuestion={(id) => {
+          setShareOpen(false);
+          openQuestion(id);
+        }}
       />
       {shortcutsOpen ? (
         <div
@@ -865,27 +1008,7 @@ function FormEditorBody({ formId }: { formId: string }) {
             </button>
           </div>
         )}
-        {issues.length > 0 && (
-          <div className="slate-editor-alert" role="alert">
-            <strong>
-              {issues.length} schema {issues.length === 1 ? 'issue' : 'issues'}:
-            </strong>
-            {issues.map((issue, i) => (
-              <button
-                key={i}
-                type="button"
-                className="slate-link"
-                style={{ fontSize: 13 }}
-                onClick={() => {
-                  setSelectedId(issue.questionId);
-                  if (phone) setPhoneTab('edit');
-                }}
-              >
-                {issue.message}
-              </button>
-            ))}
-          </div>
-        )}
+        <IssuesBanner issues={shownIssues} phone={phone} cloud={cloud} onPick={openQuestion} />
 
         <EditorLayoutShell
           phoneTab={phone ? phoneTab : undefined}
@@ -932,16 +1055,19 @@ function FormEditorBody({ formId }: { formId: string }) {
               onAddOutOfAreaEnding={addOutOfAreaEnding}
               formId={formId}
               onDelete={async () => {
-                const titleText =
-                  'title' in selectedQuestion && typeof selectedQuestion.title === 'string'
-                    ? selectedQuestion.title
-                    : selectedQuestion.id;
+                const answers = isAnswerBearing(selectedQuestion);
+                const users = questionsUsing(schema.questions, new Set([selectedQuestion.id]));
                 const ok = await confirm({
-                  title: 'Delete this item?',
+                  title: answers
+                    ? 'Delete this question?'
+                    : selectedQuestion.type === 'thanks'
+                      ? 'Delete this ending?'
+                      : 'Delete this screen?',
                   message: (
                     <>
-                      Removes <strong>{titleText}</strong> from this form. Existing responses for it
-                      stay in localStorage but won&apos;t be collected anymore.
+                      Removes <strong>{ownerName(selectedQuestion)}</strong> from this form.
+                      {answers ? ' Responses you already have keep their answers.' : null}
+                      {users.length > 0 ? ` ${rulesUsingText(users, 'it')}` : null}
                     </>
                   ),
                   confirmLabel: 'Delete',
@@ -971,7 +1097,34 @@ function cloneQuestion(q: Question, id: string): Question {
       : v;
   }
   cloned.id = id;
+  // Two questions can't share a link name; the owner turns it on for the copy if wanted (S24).
+  delete cloned.prefillKey;
   return cloned as unknown as Question;
+}
+
+/** What the auto-save writes, as one comparable string. */
+function saveKey(name: string, slug: string | undefined, schema: Schema): string {
+  return JSON.stringify([name, slug || null, schema]);
+}
+
+/** How long the question being edited keeps its old issues after the last change (S9). */
+const ISSUE_SETTLE_MS = 1500;
+
+const LOCAL_SAVE_FAILED =
+  'Couldn’t save your last change. This browser may be out of space: export a backup, then delete old forms or responses.';
+
+/** "“Details?” has a rule that uses it. Deleting removes that rule too." (S8) */
+function rulesUsingText(users: ReadonlyArray<Question>, it: string): string {
+  const names = users.map((q) => ownerName(q));
+  const list =
+    names.length === 1
+      ? names[0]!
+      : names.length <= 3
+        ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+        : `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+  return users.length === 1
+    ? `${list} has a rule that uses ${it}. Deleting removes that rule too.`
+    : `${list} have rules that use ${it}. Deleting removes those rules too.`;
 }
 
 function formatTime(d: Date): string {
@@ -1136,7 +1289,8 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
         maxSeconds: 60,
       };
     case 'location':
-      return { id, type, title: 'Where’s the job?', required: true, radius: 25, radiusUnit: 'mi' };
+      // No radius until there's a business location: half a service area is an issue (S9).
+      return { id, type, title: 'Where’s the job?', required: true, radiusUnit: 'mi' };
     case 'photo_checklist':
       return {
         id,
