@@ -13,13 +13,19 @@
  * direct manipulation), tilts, stamps LIKE / NOPE, and flings off with a
  * little physics; calm motion keeps the follow but drops the tilt and the
  * fling, and the next card simply appears.
+ *
+ * Min / Max Likes (ADR-069): the rule is shown over the deck ("Like up to
+ * 3"); at the most likes a like springs back and says so; the end screen
+ * says what's still needed, and a liked picture there can be let go with a
+ * tap. An optional yes / no card can be skipped.
  */
 
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import type { PictureChoiceQuestion, YesNoQuestion } from '@/types/Question.js';
-import { validate } from '@/logic/validation.js';
+import { pickLimits, validate } from '@/logic/validation.js';
+import { pickChoices, pickHint } from '@/logic/pickRule.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { motionReduced, shakeInvalid } from '@/utils/motion.js';
@@ -52,7 +58,7 @@ function park(el: HTMLElement, transform: string) {
  * card and `fling(dir)` for the buttons and keys; `onDecided` runs once the
  * card has left (at once with calm motion).
  */
-function useSwipeCard(onDecided: (dir: Dir) => void) {
+function useSwipeCard(onDecided: (dir: Dir) => void, refuse?: (dir: Dir) => boolean) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{
     id: number;
@@ -85,10 +91,25 @@ function useSwipeCard(onDecided: (dir: Dir) => void) {
     setLean(el, 0);
   };
 
+  const springBack = (el: HTMLElement) => {
+    const from = el.style.transform;
+    reset(el);
+    if (!from || motionReduced(el) || typeof el.animate !== 'function') return;
+    el.animate([{ transform: from }, { transform: 'translate3d(0, 0, 0) rotate(0deg)' }], {
+      duration: 420,
+      easing: 'cubic-bezier(0.2, 1.5, 0.4, 1)',
+    });
+  };
+
   const fling = useCallback(
     (dir: Dir) => {
       const el = cardRef.current;
       if (busy.current) return;
+      // Refused (a like past the maximum): the card comes back, nothing is decided.
+      if (refuse?.(dir)) {
+        if (el) springBack(el);
+        return;
+      }
       busy.current = true;
       const done = () => {
         busy.current = false;
@@ -129,18 +150,10 @@ function useSwipeCard(onDecided: (dir: Dir) => void) {
       const backstop = window.setTimeout(finish, 420);
       anim.finished.then(finish, finish);
     },
-    [onDecided],
+    // springBack is the same on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onDecided, refuse],
   );
-
-  const springBack = (el: HTMLElement) => {
-    const from = el.style.transform;
-    reset(el);
-    if (!from || motionReduced(el) || typeof el.animate !== 'function') return;
-    el.animate([{ transform: from }, { transform: 'translate3d(0, 0, 0) rotate(0deg)' }], {
-      duration: 420,
-      easing: 'cubic-bezier(0.2, 1.5, 0.4, 1)',
-    });
-  };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (busy.current || (e.pointerType === 'mouse' && e.button !== 0)) return;
@@ -276,6 +289,9 @@ function PictureSwipe({
   const index = decisions.length;
   const done = index >= options.length;
   const liked = options.filter((_, i) => decisions[i] === 'like');
+  const [min, max] = pickLimits(question);
+  // The rule over the deck, when there is one ("Like up to 3", "Like at least 2").
+  const rule = min > 0 || max < pickChoices(question) ? pickHint(question, 'Like') : '';
 
   useEffect(
     () => focusAfter(done ? okRef.current : deckRef.current),
@@ -304,8 +320,28 @@ function PictureSwipe({
     [options, decisions, onAnswer, ping],
   );
 
-  const { cardRef, fling, handlers } = useSwipeCard(decide);
+  // At the most likes, a like comes back with a word on why (ADR-069).
+  const refuse = useCallback(
+    (dir: Dir) => {
+      if (dir !== 'like' || liked.length < max) return false;
+      setError(`You can like up to ${max}. Pass on this one, or undo a like.`);
+      return true;
+    },
+    [liked.length, max],
+  );
+
+  const { cardRef, fling, handlers } = useSwipeCard(decide, refuse);
   useArrowKeys(fling, !done);
+
+  /** On the end screen, a tap lets a liked picture go. */
+  const unlike = (value: string) => {
+    const at = options.findIndex((o) => o.value === value);
+    const next = decisions.map((d, i) => (i === at ? 'nope' : d));
+    setDecisions(next);
+    setError(null);
+    onAnswer(options.filter((_, i) => next[i] === 'like').map((o) => o.value));
+    setSaid(`${options[at]?.label ?? 'That one'} let go.`);
+  };
 
   const undo = () => {
     if (decisions.length === 0) return;
@@ -332,13 +368,20 @@ function PictureSwipe({
     const picks = liked.map((o) => o.value);
     const err = validate(question, picks);
     if (err) {
-      setError(err.message);
+      // In the deck's own words: likes, and how to fix it from here.
+      setError(
+        err.code === 'min_selections'
+          ? `Like at least ${min} to go on. Tap Swipe again to look again.`
+          : err.code === 'max_selections'
+            ? `You can like up to ${max}. Tap a picture to let it go.`
+            : err.message,
+      );
       shakeInvalid(okRef.current);
       return;
     }
     onAnswer(picks);
     onAdvance();
-  }, [done, liked, question, onAnswer, onAdvance]);
+  }, [done, liked, question, onAnswer, onAdvance, min, max]);
 
   useRegisterFormConfirm(submit);
 
@@ -348,6 +391,7 @@ function PictureSwipe({
       <h1 id={titleId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
+      {rule ? <p className="slate-pick-hint">{rule}</p> : null}
 
       {!done ? (
         <>
@@ -423,18 +467,23 @@ function PictureSwipe({
               className="slate-swipe-btn slate-swipe-btn--like"
               aria-label={`Like ${current?.label ?? 'this card'}`}
               aria-keyshortcuts="ArrowRight"
+              aria-disabled={liked.length >= max ? true : undefined}
               onClick={() => fling('like')}
             >
               <HeartIcon />
             </button>
           </div>
-          <p className="slate-hint slate-swipe-hint">swipe, tap ✕ / ♥, or use ← →</p>
+          <p className="slate-hint slate-swipe-hint">
+            swipe, or tap ✕ / ♥<span className="slate-key-hint">, or use ← →</span>
+          </p>
         </>
       ) : (
         <div className="slate-swipe-done">
           <p className="slate-swipe-done-title">
             {liked.length === 0
-              ? 'None of these? That’s an answer too.'
+              ? min > 0
+                ? `Like at least ${min} to go on.`
+                : 'None of these? That’s an answer too.'
               : `You liked ${liked.length} of ${options.length}`}
           </p>
           {liked.length > 0 ? (
@@ -445,14 +494,27 @@ function PictureSwipe({
                   className="slate-swipe-liked-item"
                   style={{ '--slate-i': i } as CSSProperties}
                 >
-                  <img src={o.src} alt="" referrerPolicy="no-referrer" draggable={false} />
-                  <span>{o.label}</span>
+                  <button
+                    type="button"
+                    className="slate-swipe-unlike"
+                    onClick={() => unlike(o.value)}
+                    aria-label={`Let ${o.label} go`}
+                  >
+                    <img src={o.src} alt="" referrerPolicy="no-referrer" draggable={false} />
+                    <span>{o.label}</span>
+                  </button>
                 </li>
               ))}
             </ul>
           ) : null}
+          {liked.length > 0 ? (
+            <p className="slate-hint slate-swipe-unlike-hint">tap a picture to let it go</p>
+          ) : null}
           <button type="button" className="slate-swipe-again" onClick={again}>
             Swipe again
+          </button>
+          <button type="button" className="slate-swipe-undo" onClick={undo}>
+            Undo last
           </button>
         </div>
       )}
@@ -479,7 +541,13 @@ function PictureSwipe({
 
 /* ---------- yes / no: one "this or that" card ---------- */
 
-function YesNoSwipe({ question, answers, value, onCommit }: ExtFieldProps<YesNoQuestion>) {
+function YesNoSwipe({
+  question,
+  answers,
+  value,
+  onCommit,
+  onAdvance,
+}: ExtFieldProps<YesNoQuestion>) {
   const titleId = useId();
   const yes = question.yesLabel ?? 'Yes';
   const no = question.noLabel ?? 'No';
@@ -501,6 +569,9 @@ function YesNoSwipe({ question, answers, value, onCommit }: ExtFieldProps<YesNoQ
   const { cardRef, fling, handlers } = useSwipeCard(decide);
   useArrowKeys(fling, true);
   useEffect(() => focusAfter(groupRef.current), [question.id]);
+  // An optional card, still unanswered, can be skipped: a Skip button, and Enter (ADR-069).
+  const skip = question.required === false && !answered ? onAdvance : undefined;
+  useRegisterFormConfirm(skip!, Boolean(skip));
 
   // Y / N (through <Form>) answer without touching the card: fling it the same way.
   const seen = useRef(answered);
@@ -571,7 +642,16 @@ function YesNoSwipe({ question, answers, value, onCommit }: ExtFieldProps<YesNoQ
           <span className="slate-swipe-btn-text">{yes}</span>
         </button>
       </div>
-      <p className="slate-hint slate-swipe-hint">swipe, tap, or press Y / N</p>
+      <p className="slate-hint slate-swipe-hint">
+        swipe, or tap<span className="slate-key-hint">, or press Y / N</span>
+      </p>
+      {skip ? (
+        <div className="slate-actions">
+          <button type="button" className="slate-ok-btn slate-ok-btn--skip" onClick={skip}>
+            Skip
+          </button>
+        </div>
+      ) : null}
       <p className="slate-sr" aria-live="polite">
         {said}
       </p>

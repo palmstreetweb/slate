@@ -128,3 +128,8 @@ export function OtherTextBox({ other, onEnter, onType }: BoxProps) {
 
 /** Message for an open, empty Other box. */
 export const OTHER_EMPTY = 'Please type your answer';
+
+/** "A", "A–D" or "A–Z": the letter keys a list of `count` choices answers to. */
+export function keyRange(count: number): string {
+  return count > 1 ? `A–${CHOICE_LETTERS[Math.min(count, 26) - 1]}` : 'A';
+}

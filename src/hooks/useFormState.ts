@@ -15,7 +15,13 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import type { Schema } from '@/types/Schema.js';
 import type { Question } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
-import { resolveJumpTarget, visibleAnswersForSubmit, visibleQuestions } from '@/logic/progress.js';
+import {
+  isChrome,
+  pathOf,
+  resolveJumpTarget,
+  visibleAnswersForSubmit,
+  visibleQuestions,
+} from '@/logic/progress.js';
 import { otherIndex } from '@/logic/other.js';
 import { areaIndex } from '@/logic/address.js';
 
@@ -84,6 +90,12 @@ type RawState = {
   direction: AnimDirection;
   isAnimating: boolean;
   visitedIds: string[];
+  /**
+   * Where the next advance returns to (ADR-069): Review, after an edit from
+   * it; or where the respondent was going when an answer revealed questions
+   * before the current one, which are asked first.
+   */
+  returnTo?: string;
 };
 
 /** Snapshot shape used by save-and-resume (ADR-017). */
@@ -122,28 +134,37 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
       }
       case 'go_next': {
         const visible = visibleQuestions(allQuestions, s.answers);
-        const current = visible[Math.min(s.step, visible.length - 1)];
+        const others = otherIndex(allQuestions);
+        const areas = areaIndex(allQuestions);
+        const cur = Math.min(s.step, visible.length - 1);
+        const current = visible[cur];
         // Logic jumps (ADR-015): first matching rule on the current question
         // overrides the default step+1. Back-nav still works — the jump
         // origin is pushed onto history like any other advance.
-        const jump = current
-          ? resolveJumpTarget(
-              current,
-              visible,
-              s.answers,
-              otherIndex(allQuestions),
-              areaIndex(allQuestions),
-            )
-          : null;
-        const next =
+        const jump = current ? resolveJumpTarget(current, visible, s.answers, others, areas) : null;
+        let next =
           jump !== null && jump !== s.step ? jump : Math.min(s.step + 1, visible.length - 1);
-        if (next === s.step) return s;
+        // An edit from Review goes back to Review (ADR-069).
+        const back = visible.findIndex((q) => q.id === s.returnTo);
+        if (back > cur) next = back;
+        // A question on the path before that the respondent hasn't seen comes
+        // first: one revealed by a later answer, or put on the path by an edit.
+        const owed = pathOf(visible, s.answers, others, areas).find(
+          (i) =>
+            i < next &&
+            i !== cur &&
+            !isChrome(visible[i]!) &&
+            !s.visitedIds.includes(visible[i]!.id),
+        );
+        const to = owed ?? next;
+        if (to === s.step) return s;
         return {
           ...s,
           history: current ? [...s.history, current.id] : s.history,
-          step: next,
-          direction: next > s.step ? 'forward' : 'backward',
+          step: to,
+          direction: to > s.step ? 'forward' : 'backward',
           isAnimating: true,
+          returnTo: owed === undefined ? undefined : (s.returnTo ?? visible[next]!.id),
         };
       }
       case 'go_back': {
@@ -181,6 +202,8 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
           step: target,
           direction: a.direction,
           isAnimating: true,
+          // An edit from Review comes back to it (ADR-069).
+          returnTo: !a.rewind && current?.type === 'review' ? current.id : s.returnTo,
         };
       }
       case 'animation_end':
@@ -197,6 +220,7 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
           history: [],
           direction: 'forward',
           isAnimating: false,
+          returnTo: undefined,
         };
       }
       case 'record_visited': {
@@ -278,8 +302,14 @@ export function useFormState(schema: Schema, opts: UseFormStateOptions = {}): Us
   }, []);
 
   const getSubmitAnswers = useCallback(
-    () => visibleAnswersForSubmit(visible, raw.answers),
-    [visible, raw.answers],
+    () =>
+      visibleAnswersForSubmit(
+        visible,
+        raw.answers,
+        otherIndex(schema.questions),
+        areaIndex(schema.questions),
+      ),
+    [visible, raw.answers, schema.questions],
   );
 
   const state: FormState = {

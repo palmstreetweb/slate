@@ -21,7 +21,7 @@ import { resolveOtherText } from '@/logic/other.js';
 import { formatMoney, formatPrice } from '@/logic/estimate.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import { ChoiceBadge } from '../ChoiceBadge.js';
-import { OTHER_EMPTY, OtherTextBox, useOtherChoice } from '../OtherChoice.js';
+import { OTHER_EMPTY, OtherTextBox, keyRange, useOtherChoice } from '../OtherChoice.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
 import '@/styles/extensions.css';
@@ -49,6 +49,7 @@ export default function ChoiceCardsField({
   answers,
   value,
   onCommit,
+  onAdvance,
   onType,
   currency = 'USD',
 }: ExtFieldProps<SingleChoiceQuestion>) {
@@ -78,7 +79,10 @@ export default function ChoiceCardsField({
     onCommit(v);
   }, [other, question.options, markCommitted, onCommit]);
 
-  useRegisterFormConfirm(commitOther, other.open);
+  // OK commits the typed Other; an optional, unanswered question can be skipped.
+  const skip = !other.open && question.required === false && !selected ? onAdvance : undefined;
+  const confirm = other.open ? commitOther : skip;
+  useRegisterFormConfirm(confirm!, Boolean(confirm));
   useRegisterOtherKey(other.openBox, other.enabled);
 
   const count = question.options.length + (other.enabled ? 1 : 0);
@@ -185,16 +189,22 @@ export default function ChoiceCardsField({
           ! {other.error}
         </p>
       ) : null}
-      {other.open ? (
+      {confirm ? (
         <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={commitOther}>
-            OK <span aria-hidden>✓</span>
-          </button>
-          <span className="slate-hint">press Enter ↵</span>
+          {skip ? (
+            <button type="button" className="slate-ok-btn slate-ok-btn--skip" onClick={skip}>
+              Skip
+            </button>
+          ) : (
+            <button type="button" className="slate-ok-btn" onClick={commitOther}>
+              OK <span aria-hidden>✓</span>
+            </button>
+          )}
+          <span className="slate-hint slate-key-hint">press Enter ↵</span>
         </div>
       ) : (
-        <p className="slate-hint" style={{ marginTop: 20 }}>
-          tap a key ({CHOICE_LETTERS.slice(0, Math.min(3, count)).join(', ')}) or click to choose
+        <p className="slate-hint slate-key-hint" style={{ marginTop: 20 }}>
+          press {keyRange(count)}, or click to choose
         </p>
       )}
     </div>

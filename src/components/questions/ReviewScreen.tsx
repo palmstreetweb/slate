@@ -1,36 +1,42 @@
 /**
- * Review screen (roadmap Phase 5) — chrome step listing every visible,
- * answer-bearing question with its formatted answer and a jump-to-edit
- * button. Confirm CTA advances (usually into `thanks`, firing onSubmit).
+ * Review screen (roadmap Phase 5) — chrome step listing the answer-bearing
+ * questions on the respondent's path with their answers in words and a
+ * jump-to-edit button; an edit comes back here (ADR-069). A required
+ * question still unanswered is marked. Confirm CTA advances (usually into
+ * `thanks`, firing onSubmit).
+ *
+ * Loads on demand through ext/ReviewExt.tsx: the core passes in the rows
+ * and its answer formatter, so this chunk imports none of the core's own
+ * modules (only `validate`, which every on-demand field shares).
  */
 
 'use client';
 
 import { useId } from 'react';
-import type { Question, ReviewQuestion } from '@/types/Question.js';
+import type { DynamicTitle, Question, ReviewQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
-import { formatAnswerFor } from '@/logic/piping.js';
-
-const CHROME = new Set(['welcome', 'statement', 'review', 'thanks']);
+import { validate } from '@/logic/validation.js';
+import { reviewText } from '@/logic/reviewText.js';
 
 type Props = {
   question: ReviewQuestion;
-  /** The currently visible questions list (chrome included). */
-  visible: ReadonlyArray<Question>;
+  /** The answer-bearing questions on the respondent's path, in order. */
+  rows: ReadonlyArray<Question>;
   answers: LooseAnswers;
+  /** The core's answer formatter (`formatAnswerFor`). */
+  format: (q: Question, v: unknown) => string;
   /** Jump back to a question for editing. */
   onEdit: (questionId: string) => void;
   onAdvance: () => void;
 };
 
 function titleOf(q: Question, answers: LooseAnswers): string {
-  const t = (q as { title: string | ((a: LooseAnswers) => string) }).title;
+  const t = (q as { title: DynamicTitle }).title;
   return typeof t === 'function' ? t(answers) : t;
 }
 
-export function ReviewScreen({ question, visible, answers, onEdit, onAdvance }: Props) {
+export function ReviewScreen({ question, rows, answers, format, onEdit, onAdvance }: Props) {
   const labelId = useId();
-  const rows = visible.filter((q) => !CHROME.has(q.type));
 
   return (
     <div>
@@ -41,14 +47,25 @@ export function ReviewScreen({ question, visible, answers, onEdit, onAdvance }: 
 
       <dl className="slate-review" aria-labelledby={labelId}>
         {rows.map((q) => {
-          // Labels, not stored values; typed Other text and dates read as entered (ADR-063).
-          const value = formatAnswerFor(q, answers[q.id]);
+          // Labels and words, never stored codes (ADR-063, ADR-069).
+          const value = reviewText(q, answers[q.id], format);
+          // A sign-up can be left empty when every spot is gone (MEDIA-07): not flagged.
+          const missing =
+            value === '' && q.type !== 'signup_slots' && validate(q, answers[q.id]) !== null;
           return (
             <div key={q.id} className="slate-review-row">
               <dt className="slate-review-q">{titleOf(q, answers)}</dt>
               <dd className="slate-review-a">
-                <span className={value === '' ? 'slate-review-empty' : undefined}>
-                  {value === '' ? 'Not answered' : value}
+                <span
+                  className={
+                    missing
+                      ? 'slate-review-empty slate-review-missing'
+                      : value === ''
+                        ? 'slate-review-empty'
+                        : undefined
+                  }
+                >
+                  {missing ? 'Needs an answer' : value === '' ? 'Not answered' : value}
                 </span>
                 <button
                   type="button"
@@ -68,7 +85,7 @@ export function ReviewScreen({ question, visible, answers, onEdit, onAdvance }: 
         <button type="button" className="slate-ok-btn" onClick={onAdvance}>
           {question.cta ?? 'Looks good'} <span aria-hidden>✓</span>
         </button>
-        <span className="slate-hint">
+        <span className="slate-hint slate-key-hint">
           press <strong>Enter ↵</strong>
         </span>
       </div>

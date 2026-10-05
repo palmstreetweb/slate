@@ -123,14 +123,29 @@ describe('swipe cards on picture choice', () => {
     expect(lastAnswer(setAnswer)).toBeUndefined();
   });
 
-  it('min likes are checked on OK; liking nothing is an answer', async () => {
+  it('min likes are checked on OK, in the deck’s own words (CH-11)', async () => {
     const { advance } = renderField({ ...q, min: 1 } as Question);
+    await screen.findByRole('button', { name: 'Like Craftsman' });
+    // The rule is shown over the deck.
+    expect(screen.getByText('Like at least 1')).toBeInTheDocument();
+    for (let i = 0; i < 3; i++) fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    // Never "That's an answer too" above an error that says it isn't.
+    expect(screen.queryByText('None of these? That’s an answer too.')).not.toBeInTheDocument();
+    expect(screen.getByText('Like at least 1 to go on.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /ok/i }));
+    expect(
+      screen.getByText('! Like at least 1 to go on. Tap Swipe again to look again.'),
+    ).toBeInTheDocument();
+    expect(advance).not.toHaveBeenCalled();
+  });
+
+  it('with no minimum, liking nothing is an answer', async () => {
+    const { advance } = renderField(q);
     await screen.findByRole('button', { name: 'Like Craftsman' });
     for (let i = 0; i < 3; i++) fireEvent.keyDown(window, { key: 'ArrowLeft' });
     expect(screen.getByText('None of these? That’s an answer too.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(screen.getByText(/pick at least one/i)).toBeInTheDocument();
-    expect(advance).not.toHaveBeenCalled();
+    expect(advance).toHaveBeenCalled();
   });
 
   it('a drag past the edge decides; a short drag springs back', async () => {

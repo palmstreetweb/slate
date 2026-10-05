@@ -14,12 +14,13 @@
 
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
-import { formatDateAnswer } from './dateValue.js';
+import { formatDateAnswer, formatTime12 } from './dateValue.js';
 import { formatAddress } from './address.js';
 import { signaturePathOf, signatureTypedOf } from './signature.js';
 import { formatPins } from './pins.js';
 import { formatPhotoCount, formatVoiceNote } from './media.js';
 import { signupPicks } from './signupAnswer.js';
+import { describeFileUploadAnswers } from '@/utils/fileUploadRef.js';
 
 const PIPE_RE = /\{\{\s*(score|estimate|field:[\w-]+)\s*\}\}/g;
 
@@ -108,27 +109,38 @@ export function formatAnswerFor(q: Question | undefined, v: unknown): string {
     case 'photo_checklist':
       return formatPhotoCount(q, v);
     case 'availability': {
-      // Compact on purpose (the engine budget): "Mon 09:00–11:30, 14:00–16:00; Wed …".
-      // Responses read the answer in full with `formatAvailability`.
+      // Compact on purpose (the engine budget), on a 12-hour clock:
+      // "Mon 9:00 AM–11:30 AM, 2:00 PM–4:00 PM; Wed …". Responses and the
+      // Review step read it in full with `formatAvailability`.
       if (typeof v !== 'object' || Array.isArray(v)) return formatAnswer(v);
       const a = v as Record<string, unknown>;
       return (q.days?.length ? q.days : Object.keys(a))
         .filter((d) => typeof a[d] === 'string' && a[d] !== '')
         .map(
           (d) =>
-            `${d[0]!.toUpperCase()}${d.slice(1)} ${(a[d] as string).replace(/,/g, ', ').replace(/-/g, '–')}`,
+            `${d[0]!.toUpperCase()}${d.slice(1)} ${(a[d] as string)
+              .replace(/,/g, ', ')
+              .replace(/-/g, '–')
+              // A day that runs to midnight ends at 24:00, which reads 12:00 AM.
+              .replace(/\d\d:\d\d/g, (t) => formatTime12(t === '24:00' ? '00:00' : t))}`,
         )
         .join('; ');
     }
     case 'signup_slots': {
-      // "Sat 10–11am, Sun 2–3pm (waitlist)" — a slot's label, else its day and time (ADR-066).
+      // "Sat 10–11am, Sun 2–3pm (waitlist)" — a slot's label, else its day and
+      // time as the date question reads them, "10/10/2026 9:00 AM" (ADR-066).
       const { slots, wait } = signupPicks(v);
       const name = (x: string) => {
         const s = q.slots.find((o) => o.value === x);
-        return s?.label?.trim() || [s?.date, s?.start].filter(Boolean).join(' ') || x;
+        return (
+          s?.label?.trim() || formatDateAnswer([s?.date, s?.start].filter(Boolean).join('T')) || x
+        );
       };
       return [...slots.map(name), ...wait.map((x) => `${name(x)} (waitlist)`)].join(', ');
     }
+    case 'file_upload':
+      // File names, never the stored `slate-file://` refs (ADR-069).
+      return describeFileUploadAnswers(v as string[]) ?? '';
     default:
       return formatAnswer(v);
   }

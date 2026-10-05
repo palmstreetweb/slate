@@ -308,9 +308,10 @@ describe('multi choice with Other', () => {
     allowOther: true,
   };
 
-  it('stores picked options plus the typed text on OK', () => {
+  // Multi choice loads on demand (ADR-069): each test waits for the field.
+  it('stores picked options plus the typed text on OK', async () => {
     const { setAnswer, advance } = renderField(q, { svc: ['google'] });
-    const otherBox = screen.getByRole('checkbox', { name: /other/i });
+    const otherBox = await screen.findByRole('checkbox', { name: /other/i });
     fireEvent.click(otherBox);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Referral' } });
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
@@ -318,25 +319,25 @@ describe('multi choice with Other', () => {
     expect(advance).toHaveBeenCalledTimes(1);
   });
 
-  it('an open, empty Other box blocks OK', () => {
+  it('an open, empty Other box blocks OK', async () => {
     const { advance } = renderField(q);
-    fireEvent.click(screen.getByRole('checkbox', { name: /other/i }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /other/i }));
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
     expect(screen.getByText(/please type your answer/i)).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
   });
 
-  it('unticking Other drops the typed text from the answer', () => {
+  it('unticking Other drops the typed text from the answer', async () => {
     const { setAnswer } = renderField(q, { svc: ['flyer', 'Referral'] });
-    const other = screen.getByRole('checkbox', { name: /other/i });
+    const other = await screen.findByRole('checkbox', { name: /other/i });
     expect(other).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(other);
     expect(setAnswer).toHaveBeenLastCalledWith('svc', ['flyer']);
   });
 
-  it('toggling an option keeps the typed text', () => {
+  it('toggling an option keeps the typed text', async () => {
     const { setAnswer } = renderField(q, { svc: ['Referral'] });
-    fireEvent.click(screen.getByRole('checkbox', { name: /google/i }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /google/i }));
     expect(setAnswer).toHaveBeenLastCalledWith('svc', ['google', 'Referral']);
   });
 });

@@ -14,20 +14,19 @@ import { useMemo } from 'react';
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
 import type { Estimate, EstimateSettings } from '@/types/Estimate.js';
-import { pipeQuestionCopy } from '@/logic/piping.js';
+import { formatAnswerFor, pipeQuestionCopy } from '@/logic/piping.js';
+import { isChrome, pathOf } from '@/logic/progress.js';
 import { estimateCurrency, formatEstimate } from '@/logic/estimate.js';
 import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 
 import { WelcomeScreen } from './WelcomeScreen.js';
 import { StatementScreen } from './StatementScreen.js';
-import { ReviewScreen } from './ReviewScreen.js';
 import { ThanksScreen } from './ThanksScreen.js';
 import { ShortTextField } from './ShortTextField.js';
 import { LongTextField } from './LongTextField.js';
 import { EmailField } from './EmailField.js';
 import { ScaleField } from './ScaleField.js';
 import { SingleChoiceField } from './SingleChoiceField.js';
-import { MultiChoiceField } from './MultiChoiceField.js';
 import { YesNoField } from './YesNoField.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
 import type { FileUploadMeta } from '@/utils/fileUploadRef.js';
@@ -56,7 +55,7 @@ export type QuestionRendererProps = {
   resolveFileUploadMeta?: (ref: string) => Promise<FileUploadMeta | null>;
   /** Running score total, available in piping as `{{score}}` (ADR-016). */
   score?: number;
-  /** Currently visible questions — feeds the review screen's answer list. */
+  /** Currently visible questions — the Review step lists those on the respondent's path. */
   visibleList?: ReadonlyArray<Question>;
   /** Jump back to a question for editing (review screen). */
   onEditQuestion?: (questionId: string) => void;
@@ -170,6 +169,17 @@ export function QuestionRenderer({
           currency={estimateCurrency(estimateSettings)}
           allQuestions={allQuestions}
           slotsLeft={slotsLeft}
+          review={
+            question.type === 'review'
+              ? {
+                  rows: pathOf(visibleList ?? [], answers)
+                    .map((i) => visibleList![i]!)
+                    .filter((q) => !isChrome(q)),
+                  format: formatAnswerFor,
+                  onEdit: (id) => onEditQuestion?.(id),
+                }
+              : undefined
+          }
         />
       </>
     );
@@ -186,17 +196,6 @@ export function QuestionRenderer({
           advance={advanceWithSound}
           stepBadge={stepNumber}
           totalSteps={totalSteps}
-        />
-      );
-
-    case 'review':
-      return (
-        <ReviewScreen
-          question={question}
-          visible={visibleList ?? []}
-          answers={answers}
-          onEdit={(id) => onEditQuestion?.(id)}
-          onAdvance={advanceWithSound}
         />
       );
 
@@ -280,24 +279,7 @@ export function QuestionRenderer({
             answers={answers}
             selected={answers[question.id] as string | undefined}
             onSelect={(v) => selectAndAdvance(question.id, v)}
-            onType={playTypingSound}
-          />
-        </>
-      );
-
-    case 'multi_choice':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <MultiChoiceField
-            question={question}
-            answers={answers}
-            selected={(answers[question.id] as string[] | undefined) ?? []}
-            onSelect={(vs) => {
-              ping();
-              setAnswer(question.id, vs);
-            }}
-            onAdvance={advanceWithSound}
+            onSkip={advanceWithSound}
             onType={playTypingSound}
           />
         </>
@@ -312,10 +294,13 @@ export function QuestionRenderer({
             answers={answers}
             selected={answers[question.id] as string | undefined}
             onSelect={(v) => selectAndAdvance(question.id, v)}
+            onSkip={advanceWithSound}
           />
         </>
       );
 
+    case 'review':
+    case 'multi_choice':
     case 'dropdown':
     case 'url':
     case 'number':

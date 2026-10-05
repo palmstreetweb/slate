@@ -3,6 +3,10 @@
  * renderer passes a select-and-advance callback); `multiple: true`
  * toggles selections and confirms with OK. With `allowOther` (ADR-063) a
  * last tile opens a text box under the grid.
+ *
+ * Several picks work like a multi choice (ADR-069): the rule is said up
+ * front, the maximum blocks extra picks, and an error clears as soon as the
+ * picks change. An optional single picture choice can be skipped.
  */
 
 'use client';
@@ -10,14 +14,15 @@
 import { useCallback, useId, useRef, useState } from 'react';
 import type { PictureChoiceQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
-import { validate } from '@/logic/validation.js';
+import { pickLimits, validate } from '@/logic/validation.js';
+import { pickHint } from '@/logic/pickRule.js';
 import { resolveOtherText, splitOther } from '@/logic/other.js';
 import { useRegisterFormConfirm, useRegisterOtherKey } from '@/hooks/useRegisterFormConfirm.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
 import { useChoiceCommit } from '@/hooks/useChoiceCommit.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import { ChoiceBadge } from './ChoiceBadge.js';
-import { OTHER_EMPTY, OtherTextBox, useOtherChoice } from './OtherChoice.js';
+import { OTHER_EMPTY, OtherTextBox, keyRange, useOtherChoice } from './OtherChoice.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -71,11 +76,15 @@ export function PictureChoiceField({
       ? [selected]
       : [];
   const selectedArr = other.enabled ? splitOther(question.options, raw).picked : raw;
+  // Several picks: at the most picks, the tiles left step back (the open Other box counts).
+  const full = multiple && selectedArr.length + (other.open ? 1 : 0) >= pickLimits(question)[1];
 
-  // Single mode: a new pick of a listed option closes the Other box.
+  // A new pick (tap or letter key) clears the error; in single mode a listed
+  // option also closes the Other box.
   const [seen, setSeen] = useState(selected);
   if (selected !== seen) {
     setSeen(selected);
+    if (error) setError(null);
     if (!multiple && other.open && isOption(selected)) other.close();
   }
   const otherCommitted = !multiple && other.open && committed !== null && !isOption(committed);
@@ -90,13 +99,24 @@ export function PictureChoiceField({
     [other.open, other.text, question.options],
   );
 
-  const toggle = (value: string) => {
-    const next = selectedArr.includes(value)
-      ? selectedArr.filter((v) => v !== value)
-      : [...selectedArr, value];
-    onSelectMulti(withOther(next));
+  const toggle = (value: string, el: HTMLElement) => {
+    if (selectedArr.includes(value)) {
+      onSelectMulti(withOther(selectedArr.filter((v) => v !== value)));
+    } else if (full) {
+      // At the most picks: the rule is shown above; untick one first.
+      shakeInvalid(el);
+      return;
+    } else {
+      onSelectMulti(withOther([...selectedArr, value]));
+    }
     if (error) setError(null);
   };
+
+  /** An optional single picture choice, still unanswered, can be skipped. */
+  const skip =
+    !multiple && !other.open && question.required === false && !selectedArr.length
+      ? onAdvance
+      : undefined;
 
   const submit = useCallback(() => {
     if (other.open && !other.text.trim()) {
@@ -108,6 +128,18 @@ export function PictureChoiceField({
       const { value } = resolveOtherText(question.options, other.text);
       markCommitted(value);
       onSelectSingle(value);
+      return;
+    }
+    if (skip) {
+      skip();
+      return;
+    }
+    // Typed text that names a tile already picked would count once, not twice.
+    const typed = other.open ? resolveOtherText(question.options, other.text) : null;
+    if (typed?.isOption && selectedArr.includes(typed.value)) {
+      const label = question.options.find((o) => o.value === typed.value)?.label ?? typed.value;
+      other.setError(`You already picked “${label}”. Type something different.`);
+      shakeInvalid(other.inputRef.current);
       return;
     }
     const final = withOther(selectedArr);
@@ -130,32 +162,45 @@ export function PictureChoiceField({
     onSelectSingle,
     onSelectMulti,
     onAdvance,
+    skip,
   ]);
 
   const onOtherTile = useCallback(() => {
     if (multiple && other.open) {
       other.close();
       onSelectMulti(selectedArr);
+    } else if (full) {
+      shakeInvalid(gridRef.current?.lastElementChild);
+      return;
     } else {
       other.openBox();
     }
     if (error) setError(null);
-  }, [multiple, other, onSelectMulti, selectedArr, error]);
+  }, [multiple, other, onSelectMulti, selectedArr, error, full]);
 
-  useRegisterFormConfirm(submit, multiple || other.open);
+  const confirms = multiple || other.open || Boolean(skip);
+  useRegisterFormConfirm(submit, confirms);
   useRegisterOtherKey(onOtherTile, other.enabled);
+
+  const keys = keyRange(question.options.length + (other.enabled ? 1 : 0));
 
   return (
     <div>
       <h1 id={labelId} className="slate-title">
         {resolveTitle(question.title, answers)}
       </h1>
+      {multiple ? (
+        <p className="slate-pick-hint" id={`${labelId}-rule`}>
+          {pickHint(question)}
+        </p>
+      ) : null}
 
       <div
         ref={gridRef}
         className={`slate-picture-grid${committed ? ' slate-picture-grid--committed' : ''}`}
         role={multiple ? 'group' : 'radiogroup'}
         aria-labelledby={labelId}
+        aria-describedby={multiple ? `${labelId}-rule` : undefined}
       >
         {question.options.map((opt, i) => {
           const isSelected = selectedArr.includes(opt.value) && (multiple || !other.open);
@@ -166,9 +211,10 @@ export function PictureChoiceField({
               type="button"
               role={multiple ? 'checkbox' : 'radio'}
               aria-checked={isSelected}
-              onClick={() => {
+              aria-disabled={full && !isSelected ? true : undefined}
+              onClick={(e) => {
                 if (multiple) {
-                  toggle(opt.value);
+                  toggle(opt.value, e.currentTarget);
                   return;
                 }
                 other.close();
@@ -190,6 +236,7 @@ export function PictureChoiceField({
             type="button"
             role={multiple ? 'checkbox' : 'radio'}
             aria-checked={other.open}
+            aria-disabled={full && !other.open ? true : undefined}
             aria-controls={other.open ? other.boxId : undefined}
             onClick={onOtherTile}
             className={`slate-picture slate-picture--other${other.open ? ' slate-picture--selected' : ''}${otherCommitted ? ' slate-picture--committed' : ''}`}
@@ -210,18 +257,24 @@ export function PictureChoiceField({
         </p>
       ) : null}
 
-      {multiple || other.open ? (
+      {confirms ? (
         <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={submit}>
-            OK <span aria-hidden>✓</span>
-          </button>
-          <span className="slate-hint">
-            {multiple ? 'tap keys to toggle, press Enter ↵' : 'press Enter ↵'}
+          {skip ? (
+            <button type="button" className="slate-ok-btn slate-ok-btn--skip" onClick={skip}>
+              Skip
+            </button>
+          ) : (
+            <button type="button" className="slate-ok-btn" onClick={submit}>
+              OK <span aria-hidden>✓</span>
+            </button>
+          )}
+          <span className="slate-hint slate-key-hint">
+            {multiple ? `press ${keys} to pick, then Enter ↵` : 'press Enter ↵'}
           </span>
         </div>
       ) : (
-        <p className="slate-hint" style={{ marginTop: 20 }}>
-          tap a key (A, B, C) or click to select
+        <p className="slate-hint slate-key-hint" style={{ marginTop: 20 }}>
+          press {keys}, or click to choose
         </p>
       )}
     </div>

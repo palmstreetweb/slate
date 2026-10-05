@@ -270,18 +270,17 @@ describe('<Form> — piping, scoring, multiple endings (Phase 4)', () => {
     await user.type(screen.getByRole('textbox'), 'Ada');
     await user.click(screen.getByRole('button', { name: /ok/i }));
 
-    // Review lists the question + answer.
+    // Review lists the question + answer (the step loads on demand, ADR-069).
     expect(await screen.findByText('Everything correct?')).toBeInTheDocument();
-    expect(screen.getByText('Ada')).toBeInTheDocument();
+    expect(await screen.findByText('Ada')).toBeInTheDocument();
 
     // Edit jumps back to the question.
     await user.click(screen.getByRole('button', { name: /edit your name/i }));
     expect(await screen.findByText('Your name?')).toBeInTheDocument();
 
-    // Walk forward again and confirm.
+    // OK on the edited question comes straight back to Review (ADR-069).
     await user.click(screen.getByRole('button', { name: /ok/i }));
-    await screen.findByText('Everything correct?');
-    await user.click(screen.getByRole('button', { name: /looks good/i }));
+    await user.click(await screen.findByRole('button', { name: /looks good/i }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     // Chrome review step contributes nothing to the answers payload.
     expect(onSubmit.mock.calls[0]![0]).toEqual({ name: 'Ada' });

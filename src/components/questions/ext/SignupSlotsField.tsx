@@ -16,11 +16,17 @@
  * commit beat), several wait for OK. Grabbing the last spot gets its own
  * moment: the meter fills, a stamp lands and a few sparks fly (calm motion
  * shows the stamp, still).
+ *
+ * A tap that can't be taken (a full slot, or one past the most picks) is
+ * answered right under that slot, not at the foot of a long list (QA
+ * GAP-16). When every slot is full and there's no waitlist, the question
+ * says so and OK moves on without a pick, so nobody is stuck (QA MEDIA-07).
  */
 
 'use client';
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useId,
@@ -105,6 +111,8 @@ export default function SignupSlotsField({
   const selectedOne = single ? (picks.slots[0] ?? picks.wait[0]) : undefined;
   const { committed, markCommitted } = useChoiceCommit(selectedOne);
   const [error, setError] = useState<string | null>(null);
+  /** A tap that couldn't be taken, answered under that slot. */
+  const [note, setNote] = useState<{ slot: string; text: string } | null>(null);
   const [said, setSaid] = useState('');
   /** The slot whose last spot was just taken here (the celebration plays once). */
   const [lastGrab, setLastGrab] = useState<string | null>(null);
@@ -132,6 +140,9 @@ export default function SignupSlotsField({
   );
 
   const conflicts = slots.filter((s) => stateOf(s).conflict);
+  // Every spot gone and no waitlist: nothing can be picked, so nothing is asked
+  // for. A pick of this respondent's that filled up meanwhile counts as gone too.
+  const allFull = !waitlist && slots.length > 0 && slots.every((s) => stateOf(s).full);
 
   const clearAdvance = () => {
     if (advanceTimer.current !== null) {
@@ -140,10 +151,19 @@ export default function SignupSlotsField({
     }
   };
 
+  /** Say why a tap can't be taken, right under the slot tapped. */
+  const refuse = (s: SignupSlot, text: string) => {
+    setError(null);
+    setNote({ slot: s.value, text }); // the note is its own polite live region
+    // Offered slot values are letters, digits, _ and - (SLOT_VALUE_RE): safe in a selector.
+    shakeInvalid(listRef.current?.querySelector(`[data-slot="${s.value}"]`));
+  };
+
   const choose = (s: SignupSlot) => {
     const st = stateOf(s);
     const name = slotName(s);
     setError(null);
+    setNote(null);
     clearAdvance();
 
     // Picked, but it filled up meanwhile: tapping it lets it go.
@@ -174,15 +194,12 @@ export default function SignupSlotsField({
       return;
     }
     if (st.full && !waitlist) {
-      setSaid(`${name} is full.`);
-      setError(`${name} is full. Please pick another.`);
-      shakeInvalid(listRef.current);
+      refuse(s, allFull ? 'Sorry, every spot is taken.' : `${name} is full. Please pick another.`);
       return;
     }
     const joinWait = st.full;
     if (!single && picks.slots.length + picks.wait.length >= max) {
-      setError(`You can pick up to ${max}. Tap one to let it go first.`);
-      shakeInvalid(listRef.current);
+      refuse(s, `You can pick up to ${max}. Tap one of your picks to let it go.`);
       return;
     }
     const next = single
@@ -222,6 +239,15 @@ export default function SignupSlotsField({
 
   const submit = useCallback(() => {
     clearAdvance();
+    setNote(null);
+    if (allFull) {
+      // Nothing left to pick: the rest of the form can still be sent. A pick
+      // that filled up meanwhile can't be kept (the server would refuse it).
+      if (picks.slots.length) onAnswer(undefined);
+      setError(null);
+      onAdvance();
+      return;
+    }
     if (conflicts.length) {
       setError(
         `${slotName(conflicts[0])} just filled up. Please pick another${waitlist ? ', or join its waitlist' : ''}.`,
@@ -238,7 +264,7 @@ export default function SignupSlotsField({
     }
     setError(null);
     onAdvance();
-  }, [conflicts, picks.slots, picks.wait, question, waitlist, onAdvance]);
+  }, [conflicts, picks.slots, picks.wait, question, waitlist, onAdvance, onAnswer, allFull]);
 
   useRegisterFormConfirm(submit);
 
@@ -259,7 +285,11 @@ export default function SignupSlotsField({
   }, [slots]);
 
   const title = resolveTitle(question.title, answers);
-  const hint = single ? 'Pick one' : `Pick up to ${max}`;
+  const hint = allFull
+    ? 'Sorry, every spot is taken. You can still send the rest.'
+    : single
+      ? 'Pick one'
+      : `Pick up to ${max}`;
   let index = -1;
 
   return (
@@ -268,7 +298,7 @@ export default function SignupSlotsField({
         {title}
       </h1>
       {question.body ? <p className="slate-subtitle slate-slots-body">{question.body}</p> : null}
-      <p className="slate-slots-hint">
+      <p className="slate-slots-hint" role={allFull ? 'status' : undefined}>
         {hint}
         {waitlist ? ' · full ones have a waitlist' : ''}
       </p>
@@ -333,74 +363,81 @@ export default function SignupSlotsField({
                 .join(', ');
               const descId = s.description ? `${titleId}-d${i}` : undefined;
               return (
-                <button
-                  key={s.value}
-                  type="button"
-                  role={single ? 'radio' : 'checkbox'}
-                  aria-checked={st.taken || st.waiting}
-                  aria-disabled={blocked || undefined}
-                  aria-label={label}
-                  aria-describedby={descId}
-                  onClick={() => choose(s)}
-                  className={[
-                    'slate-choice slate-slot',
-                    // A pick that filled up reads as a problem, not as chosen.
-                    (st.taken && !st.conflict) || st.waiting ? 'slate-choice--selected' : '',
-                    isCommitted ? 'slate-choice--committed' : '',
-                    st.full && !st.taken ? 'slate-slot--full' : '',
-                    st.waiting ? 'slate-slot--waiting' : '',
-                    st.conflict ? 'slate-slot--conflict' : '',
-                    last ? 'slate-slot--last' : '',
-                    last && lastGrab === s.value ? 'slate-slot--grabbed' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  style={{ '--slate-i': i, '--slate-fill': fill } as CSSProperties}
-                >
-                  {single ? (
-                    <ChoiceBadge letter={letterOf(i)} committed={isCommitted} />
-                  ) : (
-                    <span className="slate-choice-badge" aria-hidden="true">
-                      {st.taken || st.waiting ? (
-                        <svg className="slate-slot-tick" viewBox="0 0 24 24" focusable="false">
-                          <path d="M5 12.5l4.5 4.5L19 7.5" />
-                        </svg>
-                      ) : (
-                        letterOf(i)
-                      )}
+                <Fragment key={s.value}>
+                  <button
+                    data-slot={s.value}
+                    type="button"
+                    role={single ? 'radio' : 'checkbox'}
+                    aria-checked={st.taken || st.waiting}
+                    aria-disabled={blocked || undefined}
+                    aria-label={label}
+                    aria-describedby={descId}
+                    onClick={() => choose(s)}
+                    className={[
+                      'slate-choice slate-slot',
+                      // A pick that filled up reads as a problem, not as chosen.
+                      (st.taken && !st.conflict) || st.waiting ? 'slate-choice--selected' : '',
+                      isCommitted ? 'slate-choice--committed' : '',
+                      st.full && !st.taken ? 'slate-slot--full' : '',
+                      st.waiting ? 'slate-slot--waiting' : '',
+                      st.conflict ? 'slate-slot--conflict' : '',
+                      last ? 'slate-slot--last' : '',
+                      last && lastGrab === s.value ? 'slate-slot--grabbed' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    style={{ '--slate-i': i, '--slate-fill': fill } as CSSProperties}
+                  >
+                    {single ? (
+                      <ChoiceBadge letter={letterOf(i)} committed={isCommitted} />
+                    ) : (
+                      <span className="slate-choice-badge" aria-hidden="true">
+                        {st.taken || st.waiting ? (
+                          <svg className="slate-slot-tick" viewBox="0 0 24 24" focusable="false">
+                            <path d="M5 12.5l4.5 4.5L19 7.5" />
+                          </svg>
+                        ) : (
+                          letterOf(i)
+                        )}
+                      </span>
+                    )}
+                    <span className="slate-slot-main" aria-hidden="true">
+                      <span className="slate-slot-name">{name}</span>
+                      {secondary ? <span className="slate-slot-when">{secondary}</span> : null}
+                      {s.description ? (
+                        <span id={descId} className="slate-slot-desc">
+                          {s.description}
+                        </span>
+                      ) : null}
                     </span>
-                  )}
-                  <span className="slate-slot-main" aria-hidden="true">
-                    <span className="slate-slot-name">{name}</span>
-                    {secondary ? <span className="slate-slot-when">{secondary}</span> : null}
-                    {s.description ? (
-                      <span id={descId} className="slate-slot-desc">
-                        {s.description}
+                    <span className="slate-slot-side" aria-hidden="true">
+                      {status ? <span className="slate-slot-status">{status}</span> : null}
+                      {count ? <span className="slate-slot-count">{count}</span> : null}
+                      {st.left !== undefined && showLeft ? (
+                        <span className="slate-slot-meter">
+                          <span className="slate-slot-meter-fill" />
+                        </span>
+                      ) : null}
+                    </span>
+                    {last ? (
+                      <span className="slate-slot-stamp" aria-hidden="true">
+                        Last spot!
+                        {SPARKS.map((a) => (
+                          <span
+                            key={a}
+                            className="slate-slot-spark"
+                            style={{ '--slate-a': `${a}deg` } as CSSProperties}
+                          />
+                        ))}
                       </span>
                     ) : null}
-                  </span>
-                  <span className="slate-slot-side" aria-hidden="true">
-                    {status ? <span className="slate-slot-status">{status}</span> : null}
-                    {count ? <span className="slate-slot-count">{count}</span> : null}
-                    {st.left !== undefined && showLeft ? (
-                      <span className="slate-slot-meter">
-                        <span className="slate-slot-meter-fill" />
-                      </span>
-                    ) : null}
-                  </span>
-                  {last ? (
-                    <span className="slate-slot-stamp" aria-hidden="true">
-                      Last spot!
-                      {SPARKS.map((a) => (
-                        <span
-                          key={a}
-                          className="slate-slot-spark"
-                          style={{ '--slate-a': `${a}deg` } as CSSProperties}
-                        />
-                      ))}
-                    </span>
+                  </button>
+                  {note?.slot === s.value ? (
+                    <p className="slate-err slate-slot-note" aria-live="polite">
+                      ! {note.text}
+                    </p>
                   ) : null}
-                </button>
+                </Fragment>
               );
             })}
           </div>
@@ -419,13 +456,12 @@ export default function SignupSlotsField({
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>
         </button>
-        <span className="slate-hint">
-          {slots.length
-            ? `tap a key (${slots
-                .slice(0, 3)
-                .map((_, k) => letterOf(k))
-                .join(', ')}) or click`
-            : ''}
+        <span className="slate-hint slate-key-hint">
+          {slots.length > 1
+            ? `press A–${letterOf(Math.min(slots.length, 26) - 1)}, or click to choose`
+            : slots.length
+              ? 'press A, or click to choose'
+              : ''}
         </span>
       </div>
     </div>

@@ -35,6 +35,11 @@
   gap: 8px;
 }
 
+/* Why a tap wasn't taken, right under the slot tapped (ADR-069). */
+[data-slate-forms] .slate-slot-note {
+  margin: 0 0 4px;
+}
+
 [data-slate-forms] .slate-slot-day-label {
   margin: 0 0 2px;
   font-family: var(--slate-font-mono);
@@ -130,9 +135,14 @@
   .slate-slot-meter-fill,
 [data-slate-forms][data-theme-name='mono']
   .slate-slot.slate-choice--selected
-  .slate-slot-meter-fill,
-[data-slate-forms][data-theme-name='swiss'] .slate-slot:hover .slate-slot-meter-fill {
+  .slate-slot-meter-fill {
   background: currentColor;
+}
+
+@media (hover: hover) {
+  [data-slate-forms][data-theme-name='swiss'] .slate-slot:hover .slate-slot-meter-fill {
+    background: currentColor;
+  }
 }
 
 [data-slate-forms] .slate-slot-tick {

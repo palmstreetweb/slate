@@ -10,7 +10,7 @@ import { useRegisterFormConfirm, useRegisterOtherKey } from '@/hooks/useRegister
 import { resolveOtherText } from '@/logic/other.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import { ChoiceBadge } from './ChoiceBadge.js';
-import { OTHER_EMPTY, OtherTextBox, useOtherChoice } from './OtherChoice.js';
+import { OTHER_EMPTY, OtherTextBox, keyRange, useOtherChoice } from './OtherChoice.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -19,10 +19,19 @@ type Props = {
   selected: string | undefined;
   /** Store the value and auto-advance. Typed "Other" text arrives here too (ADR-063). */
   onSelect: (value: string) => void;
+  /** Move on without picking: an optional question offers Skip (and Enter). */
+  onSkip?: () => void;
   onType?: () => void;
 };
 
-export function SingleChoiceField({ question, answers, selected, onSelect, onType }: Props) {
+export function SingleChoiceField({
+  question,
+  answers,
+  selected,
+  onSelect,
+  onSkip,
+  onType,
+}: Props) {
   const labelId = useId();
   const { committed, markCommitted } = useChoiceCommit(selected);
   const other = useOtherChoice(question, selected, labelId);
@@ -49,7 +58,10 @@ export function SingleChoiceField({ question, answers, selected, onSelect, onTyp
     onSelect(value);
   }, [other, question.options, markCommitted, onSelect]);
 
-  useRegisterFormConfirm(commitOther, other.open);
+  // OK commits the typed Other; an optional, unanswered question can be skipped.
+  const skip = !other.open && question.required === false && !selected ? onSkip : undefined;
+  const confirm = other.open ? commitOther : skip;
+  useRegisterFormConfirm(confirm!, Boolean(confirm));
   useRegisterOtherKey(other.openBox, other.enabled);
 
   return (
@@ -108,16 +120,22 @@ export function SingleChoiceField({ question, answers, selected, onSelect, onTyp
           ! {other.error}
         </p>
       ) : null}
-      {other.open ? (
+      {confirm ? (
         <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={commitOther}>
-            OK <span aria-hidden>✓</span>
-          </button>
-          <span className="slate-hint">press Enter ↵</span>
+          {skip ? (
+            <button type="button" className="slate-ok-btn slate-ok-btn--skip" onClick={skip}>
+              Skip
+            </button>
+          ) : (
+            <button type="button" className="slate-ok-btn" onClick={commitOther}>
+              OK <span aria-hidden>✓</span>
+            </button>
+          )}
+          <span className="slate-hint slate-key-hint">press Enter ↵</span>
         </div>
       ) : (
-        <p className="slate-hint" style={{ marginTop: 20 }}>
-          tap a key (A, B, C, D) or click to select
+        <p className="slate-hint slate-key-hint" style={{ marginTop: 20 }}>
+          press {keyRange(question.options.length + (other.enabled ? 1 : 0))}, or click to choose
         </p>
       )}
     </div>
