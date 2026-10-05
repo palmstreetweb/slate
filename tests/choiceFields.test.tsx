@@ -393,7 +393,7 @@ describe('sign-up slots (MEDIA-07, GAP-16)', () => {
     expect(region.textContent).toBe(why);
     // A second tap is said again: the region's text changes (COPY-R8).
     await user.click(evening);
-    expect(region.textContent).toBe(`${why} `);
+    expect(region.textContent).toBe(`${why}\u00a0`);
     // A tap that works clears it.
     await user.click(screen.getByRole('checkbox', { name: /^Noon/ }));
     expect(note).not.toBeInTheDocument();

@@ -26,4 +26,4 @@ export function FieldError({ id, error }: { id?: string; error: string | null })
 export const sayAgain =
   (text: string) =>
   (cur: string | null): string =>
-    cur === text ? `${text} ` : text;
+    cur === text ? `${text}\u00a0` : text;
