@@ -27,6 +27,8 @@ export type StoredSubmission = {
   };
   /** ISO timestamp when moved to trash; omitted while active. */
   deletedAt?: string;
+  /** The fill's retry key (`SubmitMeta.fillId`, ADR-067): the same fill sent again is this response. */
+  submitKey?: string;
 };
 
 type Listener = (subs: StoredSubmission[]) => void;
@@ -133,6 +135,11 @@ export function addSubmission(
     // In practice a portable link to a cloud form (QA COPY-05): it can't send answers.
     throw new Error(PREVIEW_LINK_MESSAGE);
   }
+  // A fill sent again (its first reply lost, then a reload and Resume) is the
+  // response already stored, as the submit Function keys it (ADR-067, ENG-03).
+  const key = meta.fillId;
+  const stored = key ? read().find((s) => s.formId === formId && s.submitKey === key) : undefined;
+  if (stored) return stored;
   const sub: StoredSubmission = {
     id: makeId(),
     formId,
@@ -147,6 +154,7 @@ export function addSubmission(
       score: meta.score,
       ...(meta.estimate ? { estimate: meta.estimate } : {}),
     },
+    ...(key ? { submitKey: key } : {}),
   };
   write([sub, ...read()]);
   return sub;
