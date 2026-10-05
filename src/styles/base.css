@@ -389,7 +389,8 @@
   top: 64px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 5;
+  /* Above the stage (5, later in the page), or its buttons can't be tapped. */
+  z-index: 11;
   display: flex;
   align-items: center;
   gap: 16px;

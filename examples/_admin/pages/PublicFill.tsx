@@ -33,7 +33,7 @@ import { FormClosedScreen } from '../components/FormClosedScreen.js';
 import { prefillFromSearch, trackingFromSearch } from '../trackedLinks.js';
 import { clearFillUnlockToken, readFillUnlockToken, writeFillUnlockToken } from '../fillUnlock.js';
 import { routeSearchParams } from '../_router.js';
-import { FORM_UNAVAILABLE, SEND_TOO_LONG_HERE } from '../fillCopy.js';
+import { FORM_UNAVAILABLE, LOAD_LATER, LOAD_OFFLINE, SEND_TOO_LONG_HERE } from '../fillCopy.js';
 
 type Props = { slug: string };
 
@@ -173,8 +173,13 @@ export function PublicFill({ slug }: Props) {
         }
       } catch (err: unknown) {
         if (cancelled) return;
-        // publicForm.ts throws only plain sentences; "not available" can't be helped by a retry.
-        const text = err instanceof Error && err.message ? err.message : FORM_UNAVAILABLE;
+        // publicForm.ts throws plain sentences (or the Function's "Too many…" copy);
+        // anything else is a bug, shown as "try again" and logged, never as its text.
+        const raw = err instanceof Error ? err.message : '';
+        const known = [FORM_UNAVAILABLE, LOAD_OFFLINE, LOAD_LATER].includes(raw);
+        if (!known && !raw.startsWith('Too many')) console.error('[slate] form load failed', err);
+        const text = known || raw.startsWith('Too many') ? raw : LOAD_LATER;
+        // "Not available" can't be helped by trying again.
         setError({ text, retry: text !== FORM_UNAVAILABLE });
       }
       if (!cancelled) setLoading(false);
