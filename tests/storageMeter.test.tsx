@@ -41,6 +41,22 @@ describe('storage numbers and copy', () => {
     expect(formatStorage(Number.NaN)).toBe('0 KB');
   });
 
+  it('edges read right: a first tiny file, and the step up to the next unit (S29)', () => {
+    // Not "0 KB" beside a bar that shows 1 %.
+    expect(formatStorage(300)).toBe('Under 1 KB');
+    expect(storageMeterText({ used: 300, max: 2 * GB, pending: 0, files: 1 })).toBe(
+      'Under 1 KB of 2 GB',
+    );
+    expect(storagePercent({ used: 300, max: 2 * GB, pending: 0, files: 1 })).toBe(1);
+    // Never "1000 MB" or "1023 KB": the unit moves up once the number reaches 1000.
+    expect(formatStorage(999.6 * MB)).toBe('1 GB');
+    expect(storageMeterText({ used: 999.6 * MB, max: 2 * GB, pending: 0, files: 9 })).toBe(
+      '1 GB of 2 GB',
+    );
+    expect(formatStorage(1023 * 1024)).toBe('1 MB');
+    expect(formatStorage(999 * 1024)).toBe('999 KB');
+  });
+
   it('levels: ok below 80 %, near from 80 %, full at the limit', () => {
     expect(storageLevel(q(0))).toBe('ok');
     expect(storageLevel(q(0.79 * GB))).toBe('ok');

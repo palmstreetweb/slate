@@ -1,8 +1,9 @@
 /**
- * Owner-side form checks (studio only, so no engine bytes). `formIssues` is what
- * the editor lists: the engine's `checkSchema`, plus checks on settings only the
- * studio edits — pick limits, options, lengths, file limits, the scale, the
- * redirect, the phone country, sign-up slot times.
+ * Owner-side form checks (studio only, so no engine bytes). `formIssues` is the
+ * engine's `checkSchema` plus checks on settings only the studio edits — pick
+ * limits, options, lengths, file limits, the scale, the redirect, the phone
+ * country, sign-up slot times. The editor's banner (`ownerIssues` in
+ * editorIssues.ts) lists these `studioIssues` too, beside its logic-rule checks.
  *
  * Every issue says whether it is `blocking`: it would trap or break
  * respondents (a pick count nobody can meet, a question with nothing to
@@ -69,17 +70,33 @@ export const FILE_SIZE_MAX_MB = 32;
 /** The server keeps at most this many files per answer. */
 export const FILE_COUNT_MAX = 100;
 
-/** Engine checks that would trap or break respondents. */
-const BLOCKING_SCHEMA_KINDS: ReadonlySet<SchemaIssue['kind']> = new Set<SchemaIssue['kind']>([
-  'duplicate_id',
-  'self_jump',
-  'bad_bounds',
-  'no_image',
-  'no_items',
-  'bad_grid',
-  'no_slots',
-  'no_fields',
-]);
+/**
+ * Would this engine check stop people finishing the form? Only those hold
+ * Publish back (decision 4). A skip to itself falls through to the next
+ * question, and an empty checklist or contact block asks for nothing, so those
+ * are heads-ups; a photo to mark, a grid or sign-up slots with nothing to use
+ * trap people only when the question insists on an answer.
+ */
+export function schemaIssueBlocks(kind: SchemaIssue['kind'], q: Question | undefined): boolean {
+  if (!q) return false;
+  const required = (q as { required?: boolean }).required;
+  switch (kind) {
+    // Two questions share one answer slot: answers mix, and Back goes to the wrong one.
+    case 'duplicate_id':
+      return true;
+    // No answer fits (a number, scale or date can never be valid).
+    case 'bad_bounds':
+      return q.type === 'number' || q.type === 'scale' || q.type === 'date';
+    // Nothing to tap, paint or pick, and the question insists.
+    case 'no_image':
+    case 'bad_grid':
+      return required === true;
+    case 'no_slots':
+      return required !== false;
+    default:
+      return false;
+  }
+}
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -513,8 +530,12 @@ export function formIssues(
   questions: ReadonlyArray<Question>,
   today: string = localToday(),
 ): FormIssue[] {
+  const byId = new Map(questions.map((q) => [q.id, q] as const));
   const all: FormIssue[] = [
-    ...checkSchema(questions).map((i) => ({ ...i, blocking: BLOCKING_SCHEMA_KINDS.has(i.kind) })),
+    ...checkSchema(questions).map((i) => ({
+      ...i,
+      blocking: schemaIssueBlocks(i.kind, byId.get(i.questionId)),
+    })),
     ...studioIssues(questions, today),
   ];
   const order = new Map<string, number>();

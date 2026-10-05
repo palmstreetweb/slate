@@ -56,6 +56,8 @@ import { closedReason, formatCloseTime } from '../formClose.js';
 import { Odometer } from '../delight/Odometer.js';
 import { StorageBanner, StorageMeter, useStorageQuota } from '../components/StorageMeter.js';
 
+const DRAFT_NOT_SAVED = 'Couldn’t save the draft. Check your connection and try again.';
+
 export function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>(() => listForms());
   const [trashed, setTrashed] = useState<FormRecord[]>(() => listTrashedForms());
@@ -199,8 +201,8 @@ export function Dashboard() {
           return;
         }
         await confirm({
-          title: 'Could not create form',
-          message: 'The cloud did not save the new form. Check your connection and try again.',
+          title: 'Couldn’t create your form',
+          message: 'Check your connection and try again.',
           confirmLabel: 'OK',
           danger: false,
         });
@@ -210,8 +212,8 @@ export function Dashboard() {
           return;
         }
         await confirm({
-          title: 'Could not create form',
-          message: 'The cloud did not save the new form. Check your connection and try again.',
+          title: 'Couldn’t create your form',
+          message: 'Check your connection and try again.',
           confirmLabel: 'OK',
           danger: false,
         });
@@ -246,16 +248,19 @@ export function Dashboard() {
         navigate(`/forms/${created.id}/edit`);
         return;
       }
-      throw new Error(
-        'The cloud did not save the generated draft. Check your connection and try again.',
-      );
+      throw new Error(DRAFT_NOT_SAVED);
     } catch (err) {
       if (isFormQuotaError(err)) {
         setAiOpen(false);
         await showQuotaDialog();
         throw err;
       }
-      throw err instanceof Error ? err : new Error('Could not save the draft.');
+      // The Build with AI modal shows this message as is: keep it plain, and
+      // keep the technical detail in the console.
+      if (!(err instanceof Error && err.message === DRAFT_NOT_SAVED)) {
+        console.error('[slate] saving the AI draft failed:', err);
+      }
+      throw new Error(DRAFT_NOT_SAVED);
     }
   };
 
@@ -322,25 +327,30 @@ export function Dashboard() {
           }}
         >
           <p style={{ margin: '0 0 8px', fontWeight: 600, color: 'var(--slate-error)' }}>
-            localStorage data could not be read
+            Some saved data in this browser can’t be read
           </p>
           <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--slate-muted)' }}>
             {storageIssue === 'both'
-              ? 'Saved forms and responses appear corrupted. You can reset storage to start fresh.'
+              ? 'Your saved forms and responses look damaged. You can reset them to start fresh.'
               : storageIssue === 'forms'
-                ? 'Saved forms appear corrupted. Responses may still be intact.'
-                : 'Saved responses appear corrupted. Your forms may still be intact.'}
+                ? 'Your saved forms look damaged. Your responses may be fine.'
+                : 'Your saved responses look damaged. Your forms may be fine.'}
           </p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               type="button"
               className="slate-btn slate-btn--danger"
               onClick={async () => {
+                const what =
+                  storageIssue === 'both'
+                    ? 'every form and response'
+                    : storageIssue === 'forms'
+                      ? 'every form'
+                      : 'every response';
                 const ok = await confirm({
-                  title: 'Reset local storage?',
-                  message:
-                    'Deletes all forms and responses saved in this browser. There is no undo.',
-                  confirmLabel: 'Reset storage',
+                  title: 'Reset this browser’s saved data?',
+                  message: `Deletes ${what} saved in this browser. This can’t be undone.`,
+                  confirmLabel: 'Reset',
                   danger: true,
                 });
                 if (!ok) return;
@@ -352,7 +362,7 @@ export function Dashboard() {
                 setStorageIssue(null);
               }}
             >
-              Reset storage
+              Reset saved data
             </button>
           </div>
         </div>
@@ -440,7 +450,9 @@ export function Dashboard() {
                   const ok = await confirm({
                     title: `Delete ${trashed.length} ${trashed.length === 1 ? 'form' : 'forms'} forever?`,
                     message:
-                      'Permanently removes trashed forms and their responses from localStorage. This cannot be undone.',
+                      trashed.length === 1
+                        ? 'The form and its responses are deleted for good. This can’t be undone.'
+                        : 'These forms and their responses are deleted for good. This can’t be undone.',
                     confirmLabel: 'Empty trash',
                     danger: true,
                   });
@@ -470,7 +482,7 @@ export function Dashboard() {
                     const ok = await confirm({
                       title: `Delete "${f.name}" forever?`,
                       message:
-                        'Permanently removes this form and all its responses from localStorage.',
+                        'The form and all its responses are deleted for good. This can’t be undone.',
                       confirmLabel: 'Delete forever',
                       danger: true,
                     });

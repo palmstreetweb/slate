@@ -1221,6 +1221,14 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   color: var(--chrome-muted, var(--slate-muted, #6b7280));
 }
 
+[data-slate-forms][data-theme-name='slate'] .slate-dialog-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--chrome-ink);
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-title-prompt-field {
   display: block;
   margin-bottom: 16px;
@@ -1320,6 +1328,104 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   gap: 4px 16px;
   font-size: var(--slate-fs-sm);
   color: var(--slate-error, #dc2626);
+}
+
+/* The "things to fix" list (S9): one heading line that folds, then one plain
+   sentence per issue. Red dots hold Publish back; amber ones are worth a look. */
+[data-slate-forms][data-theme-name='slate'] .slate-issues {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 4px;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues--check {
+  background: color-mix(in srgb, var(--slate-warn) 9%, var(--chrome-panel));
+  border-bottom-color: color-mix(in srgb, var(--slate-warn) 40%, var(--chrome-line));
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues-title {
+  font-weight: 600;
+  color: var(--slate-error);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues--check .slate-issues-title {
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues-toggle {
+  margin-left: auto;
+  flex: none;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: var(--slate-fs-sm);
+  color: var(--slate-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: min(40vh, 240px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 3px 0 3px 16px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  font: inherit;
+  font-size: var(--slate-fs-sm);
+  line-height: 1.4;
+  text-align: left;
+  color: var(--chrome-ink);
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues-item::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: calc(3px + 0.7em - 3px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--slate-warn);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues-item--block::before {
+  background: var(--slate-error);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues-item:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-issues-toggle:focus-visible,
+[data-slate-forms][data-theme-name='slate'] .slate-issues-item:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 1px;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-editor {
@@ -3195,6 +3301,24 @@ body.slate-editor-resizing * {
   color: var(--slate-text);
 }
 
+/* An unfinished rule (muted) or one that can't work as set up (warn). The
+   text stays ink-coloured so it reads at full contrast; the edge carries the tone. */
+[data-slate-forms][data-theme-name='slate'] .slate-logic-note {
+  margin: 0;
+  font-size: var(--slate-fs-sm);
+  line-height: 1.45;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-logic-note--warn {
+  padding: 8px 10px;
+  color: var(--chrome-ink);
+  border-radius: var(--slate-radius-sm);
+  border: 1px solid color-mix(in srgb, var(--slate-warn) 45%, var(--chrome-line));
+  border-left: 3px solid var(--slate-warn);
+  background: color-mix(in srgb, var(--slate-warn) 9%, var(--chrome-panel));
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-logic-field-label {
   display: block;
   margin-bottom: 4px;
@@ -4390,6 +4514,12 @@ body.slate-editor-resizing * {
   font-family: var(--slate-font-mono);
   color: var(--slate-dim);
   white-space: nowrap;
+  /* One short line, whatever it says: a long error never pushes Share and
+     Publish off the header (COPY-X1). The full sentence is the tooltip. */
+  max-width: 28ch;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-save-status--err {
@@ -4811,6 +4941,59 @@ body.slate-editor-resizing * {
   color: var(--slate-error);
 }
 
+/* The password rule, shown while typing one (S26). */
+[data-slate-forms][data-theme-name='slate'] .slate-share-lock-hint {
+  margin: 0;
+  font-size: var(--slate-fs-xs);
+  color: var(--slate-muted);
+}
+
+/* Publish has to wait (S10): what to fix, and a way to get there. */
+[data-slate-forms][data-theme-name='slate'] .slate-share-block {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--slate-error) 40%, var(--chrome-line));
+  border-left: 3px solid var(--slate-error);
+  border-radius: var(--slate-radius-sm);
+  background: color-mix(in srgb, var(--slate-error) 7%, var(--chrome-panel));
+  font-size: var(--slate-fs-sm);
+  line-height: 1.45;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-block-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-block-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slate-forms][data-theme-name='slate']:not([data-reduced-motion]) .slate-share-block--again {
+    animation: slate-share-block-nudge 360ms ease-out;
+  }
+}
+
+@keyframes slate-share-block-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  60% {
+    transform: translateX(3px);
+  }
+}
+
 /* ---------- share: closing + tracked links (ADR-063) — one line each until opened ---------- */
 
 [data-slate-forms][data-theme-name='slate'] .slate-share-close {
@@ -4876,6 +5059,24 @@ body.slate-editor-resizing * {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+/* Saving would close the form right now (S11): say so before it happens. */
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-now {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--slate-error) 40%, var(--chrome-line));
+  border-left: 3px solid var(--slate-error);
+  border-radius: var(--slate-radius-sm);
+  background: color-mix(in srgb, var(--slate-error) 7%, var(--chrome-panel));
+  font-size: var(--slate-fs-sm);
+  line-height: 1.45;
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-close-now p {
+  margin: 0;
 }
 
 /* Grid/flex children keep their content width unless told otherwise: without this a

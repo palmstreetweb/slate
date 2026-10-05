@@ -49,6 +49,9 @@ export function CloseRow({
   const [cap, setCap] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /** Settings that would close the form the moment they're saved, waiting for a yes (S11). */
+  const [closesNow, setClosesNow] = useState<ClosePatch | null>(null);
+  const capRef = useRef<HTMLInputElement>(null);
   const reason = closedReason(form, liveResponses);
 
   const startEditing = () => {
@@ -56,29 +59,63 @@ export function CloseRow({
     setCap(form.maxResponses !== undefined ? String(form.maxResponses) : '');
     setMessage(form.closedMessage ?? '');
     setError(null);
+    setClosesNow(null);
     setEditing(true);
+  };
+
+  const capRule = `Use a whole number from 1 to ${MAX_RESPONSES_LIMIT.toLocaleString()}.`;
+
+  const commit = (patch: ClosePatch, note: { title: string; detail: string }) => {
+    const ok = onSave(patch, note);
+    if (ok) {
+      setEditing(false);
+      setClosesNow(null);
+    } else setError('Couldn’t save. Check your connection and try again.');
   };
 
   const save = () => {
     const closesAt = when ? localInputToIso(when) : undefined;
     if (when && !closesAt) return setError('Pick a date and time.');
+    // Text in a number box reads as blank; it must not quietly mean "no limit" (msg 14).
+    if (capRef.current?.validity.badInput) return setError(capRule);
     let maxResponses: number | undefined;
     if (cap.trim()) {
       const n = Number(cap);
-      if (!Number.isInteger(n) || n < 1 || n > MAX_RESPONSES_LIMIT) {
-        return setError(`Use a whole number from 1 to ${MAX_RESPONSES_LIMIT.toLocaleString()}.`);
-      }
+      if (!Number.isInteger(n) || n < 1 || n > MAX_RESPONSES_LIMIT) return setError(capRule);
       maxResponses = n;
     }
     const closedMessage = message.trim().slice(0, CLOSED_MESSAGE_MAX) || undefined;
-    const ok = onSave(
-      { closesAt, maxResponses, closedMessage },
+    const patch = { closesAt, maxResponses, closedMessage };
+    // A time that has passed, or a cap already reached, closes the form at once: ask first (S11).
+    if (closedReason(patch, liveResponses) !== null) {
+      setError(null);
+      setClosesNow(patch);
+      return;
+    }
+    commit(
+      patch,
       closesAt || maxResponses
         ? { title: 'Closing set', detail: 'Live now — no need to republish.' }
         : { title: 'Always open', detail: 'The form takes responses until you close it.' },
     );
-    if (ok) setEditing(false);
-    else setError('Couldn’t save. Check your connection and try again.');
+  };
+
+  const confirmCloseNow = () => {
+    if (!closesNow) return;
+    const pastTime = closedReason({ closesAt: closesNow.closesAt }, liveResponses) === 'date';
+    commit(
+      // It closes now, not at a time that has already gone by.
+      pastTime ? { ...closesNow, closesAt: new Date().toISOString() } : closesNow,
+      { title: 'Form closed', detail: 'People who open the link now see your closed message.' },
+    );
+  };
+
+  const closesNowText = (patch: ClosePatch): string => {
+    if (closedReason({ closesAt: patch.closesAt }, liveResponses) === 'date') {
+      return 'That time has already passed, so saving closes the form now.';
+    }
+    const n = liveResponses;
+    return `This form already has ${n.toLocaleString()} ${n === 1 ? 'response' : 'responses'}, so a limit of ${patch.maxResponses!.toLocaleString()} closes it now.`;
   };
 
   const closeNow = () => {
@@ -116,6 +153,7 @@ export function CloseRow({
               onChange={(e) => {
                 setWhen(e.target.value);
                 setError(null);
+                setClosesNow(null);
               }}
             />
           </label>
@@ -123,6 +161,7 @@ export function CloseRow({
             <span>Or after</span>
             <span className="slate-share-close-cap">
               <input
+                ref={capRef}
                 className="slate-input"
                 type="number"
                 inputMode="numeric"
@@ -133,6 +172,7 @@ export function CloseRow({
                 onChange={(e) => {
                   setCap(e.target.value);
                   setError(null);
+                  setClosesNow(null);
                 }}
               />
               <span>responses</span>
@@ -155,18 +195,44 @@ export function CloseRow({
             {error}
           </p>
         ) : null}
-        <div className="slate-share-close-actions">
-          <button
-            type="button"
-            className="slate-btn slate-btn--primary slate-btn--compact"
-            onClick={save}
-          >
-            Save
-          </button>
-          <button type="button" className="slate-share-lock-link" onClick={() => setEditing(false)}>
-            Cancel
-          </button>
-        </div>
+        {closesNow ? (
+          <div className="slate-share-close-now" role="alert">
+            <p>{closesNowText(closesNow)} People who open the link will see your closed message.</p>
+            <div className="slate-share-close-actions">
+              <button
+                type="button"
+                className="slate-btn slate-btn--danger slate-btn--compact"
+                onClick={confirmCloseNow}
+              >
+                Close it now
+              </button>
+              <button
+                type="button"
+                className="slate-share-lock-link"
+                onClick={() => setClosesNow(null)}
+              >
+                Change it
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="slate-share-close-actions">
+            <button
+              type="button"
+              className="slate-btn slate-btn--primary slate-btn--compact"
+              onClick={save}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              className="slate-share-lock-link"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </section>
     );
   }

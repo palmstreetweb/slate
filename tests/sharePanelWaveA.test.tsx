@@ -178,6 +178,57 @@ describe('closing row', () => {
     expect(state.updates).toHaveLength(0);
   });
 
+  it('a time that has passed asks first, then closes now (S11)', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('button', { name: 'Schedule' }));
+    const row = screen.getByRole('region', { name: 'Closing' });
+    const when = row.querySelector('input[type="datetime-local"]') as HTMLInputElement;
+    await user.type(when, '2020-01-01T09:00');
+    await user.click(within(row).getByRole('button', { name: 'Save' }));
+    // Nothing saved yet, and no "Closing set": it says what will happen.
+    expect(state.updates).toHaveLength(0);
+    expect(within(row).getByRole('alert')).toHaveTextContent(
+      'That time has already passed, so saving closes the form now. People who open the link will see your closed message.',
+    );
+    await user.click(within(row).getByRole('button', { name: 'Close it now' }));
+    const patch = state.updates.at(-1)!;
+    // Closed as of now, not "Closed Jan 1, 2020".
+    expect(Date.now() - Date.parse(patch.closesAt as string)).toBeLessThan(60_000);
+    expect(within(row).queryByRole('button', { name: 'Save' })).toBeNull();
+  });
+
+  it('a cap the form already reached asks first; Change it goes back (S11)', async () => {
+    state.count = 12;
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('button', { name: 'Schedule' }));
+    const row = screen.getByRole('region', { name: 'Closing' });
+    await user.type(within(row).getByRole('spinbutton'), '10');
+    await user.click(within(row).getByRole('button', { name: 'Save' }));
+    expect(within(row).getByRole('alert')).toHaveTextContent(
+      'This form already has 12 responses, so a limit of 10 closes it now.',
+    );
+    await user.click(within(row).getByRole('button', { name: 'Change it' }));
+    expect(state.updates).toHaveLength(0);
+    expect(within(row).getByRole('button', { name: 'Save' })).toBeInTheDocument();
+  });
+
+  it('text in the cap box is refused, not read as "always open" (msg 14)', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('button', { name: 'Schedule' }));
+    const row = screen.getByRole('region', { name: 'Closing' });
+    const cap = within(row).getByRole('spinbutton');
+    // What a browser reports after typing "e" into a number box: blank, but bad input.
+    Object.defineProperty(cap, 'validity', { value: { badInput: true }, configurable: true });
+    await user.click(within(row).getByRole('button', { name: 'Save' }));
+    expect(within(row).getByRole('alert')).toHaveTextContent(
+      'Use a whole number from 1 to 10,000.',
+    );
+    expect(state.updates).toHaveLength(0);
+  });
+
   it('at the cap it reads Closed and offers Reopen', async () => {
     state.form = { ...state.form, maxResponses: 20 };
     state.count = 20;

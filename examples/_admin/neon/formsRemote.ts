@@ -778,6 +778,8 @@ export function createFormRemoteSync(opts: { name: string; schema: Schema }): Fo
 export function updateFormRemoteSync(
   formId: string,
   patch: Partial<Omit<FormRecord, 'id' | 'createdAt'>>,
+  /** Runs if this exact write fails, with the record before and after the patch. */
+  onFail?: (before: FormRecord, after: FormRecord) => void,
 ): [FormRecord | null, boolean] {
   const idx = read().findIndex((f) => f.id === formId && isActive(f));
   if (idx === -1) return [null, false];
@@ -795,7 +797,7 @@ export function updateFormRemoteSync(
   copy[idx] = next;
   cache = copy;
   notify();
-  enqueueFormUpsert(next);
+  enqueueFormUpsert(next, onFail && (() => onFail(prev, next)));
   return [next, true];
 }
 
@@ -880,15 +882,28 @@ export function duplicateFormRemoteSync(formId: string): FormRecord | null {
   return createFormRemoteSync({ name: `${src.name} (Copy)`, schema: src.schema });
 }
 
-export function publishFormRemoteSync(formId: string): FormRecord | null {
+export function publishFormRemoteSync(formId: string, onFail?: () => void): FormRecord | null {
   const form = getFormRemote(formId);
   if (!form) return null;
-  const [updated] = updateFormRemoteSync(formId, {
-    publishedSchema: form.schema,
-    // The trigger honours this only because it equals `name`: Republish of a rename (017).
-    publishedName: form.name,
-    status: 'published',
-  });
+  const [updated] = updateFormRemoteSync(
+    formId,
+    {
+      publishedSchema: form.schema,
+      // The trigger honours this only because it equals `name`: Republish of a rename (017).
+      publishedName: form.name,
+      status: 'published',
+    },
+    (before, after) => {
+      // The publish never reached the server, so it isn't live: put the draft
+      // state back and say so (the shell's toast), instead of a "Live" that
+      // isn't (COPY-10). Runs before the save error, which the toast folds in.
+      rollbackForm(before, after);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('slate-publish-error', { detail: { formId } }));
+      }
+      onFail?.();
+    },
+  );
   return updated;
 }
 

@@ -22,13 +22,20 @@ export const STORAGE_NEAR = 0.8;
 const KB = 1024;
 const MB = KB * 1024;
 
+/**
+ * "Under 1 KB", "439 KB", "2.5 MB", "1 GB" (S29): never "0 KB" beside a bar
+ * that shows something, and the unit moves up once the rounded number would
+ * read 1000 or more ("1000 MB", "1024 KB").
+ */
 export function formatStorage(bytes: number): string {
   const b = Number.isFinite(bytes) && bytes > 0 ? bytes : 0;
-  if (b < MB) return `${Math.max(0, Math.round(b / KB))} KB`;
-  if (b < 1000 * MB) {
-    const mb = b / MB;
-    return `${mb < 10 ? +mb.toFixed(1) : Math.round(mb)} MB`;
-  }
+  if (b === 0) return '0 KB';
+  if (b < KB) return 'Under 1 KB';
+  const kb = Math.round(b / KB);
+  if (kb < 1000) return `${kb} KB`;
+  const exact = b / MB;
+  const mb = exact < 10 ? +exact.toFixed(1) : Math.round(exact);
+  if (mb < 1000) return `${mb} MB`;
   return `${+(b / (1024 * MB)).toFixed(1)} GB`;
 }
 

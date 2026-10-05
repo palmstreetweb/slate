@@ -13,6 +13,7 @@ import {
   trashForm,
   updateForm,
   duplicateForm,
+  setFormFillPassword,
 } from '../examples/_admin/_formsStore.js';
 
 const schema = defineSchema({
@@ -132,5 +133,13 @@ describe('fixed numeric slug (ADR-043)', () => {
     expect(copy.slug).toMatch(/^[1-9]\d{7}$/);
     expect(copy.slug).not.toBe(form.slug);
     expect(copy).not.toHaveProperty('fillLocked');
+  });
+
+  it('a password without an account says so plainly (COPY-16)', async () => {
+    const form = createForm({ name: 'Locked?', schema })!;
+    await expect(setFormFillPassword(form.id, 'harvest')).resolves.toEqual({
+      ok: false,
+      message: 'Passwords work once you’re signed in to Slate.',
+    });
   });
 });

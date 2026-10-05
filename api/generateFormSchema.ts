@@ -335,6 +335,7 @@ Options (leave false / "" unless they clearly help):
 - allowOther: true on single_choice, multi_choice, dropdown or picture_choice when people may not fit the list ("How did you hear about us?", "Which service?"). Adds "Other" with a text box. Never on yes_no or legal.
 - display on scale: "stars" to rate a visit or service, "emoji" (faces) for how someone feels, "slider" for a wide range like 0–10. Otherwise "".
 - display "stepper" on number for small counts (rooms, windows, people, pets): set min and max; unit ("windows", "sq ft") and prefix ("$") are display only.
+- min / max: on number the lowest / highest answer, on multi_choice and picture_choice how many picks (whole numbers). 0 = no limit. A required multi_choice needs at least one pick.
 - date: includeTime for appointments or pickups at a time of day; range for spans (a stay, event dates, "available from / to").
 
 Service-business types (use when they fit):

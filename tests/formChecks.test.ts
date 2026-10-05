@@ -25,6 +25,7 @@ import {
   isPhoneCountry,
   phoneCountryOptions,
 } from '../examples/_admin/phoneCountries.js';
+import { ownerIssues } from '../examples/_admin/editorIssues.js';
 
 const opts = (n: number) =>
   Array.from({ length: n }, (_, i) => ({ label: `Choice ${i + 1}`, value: `opt_${i + 1}` }));
@@ -368,5 +369,25 @@ describe('formIssues', () => {
     const issues = studioIssues(qs, '2026-10-04');
     expect(issues.length).toBeGreaterThanOrEqual(8);
     for (const issue of issues) expectPlain(issue);
+  });
+
+  it('blocks on engine checks exactly as the editor’s banner does (one policy, decision 4)', () => {
+    const qs = [
+      {
+        id: 'loop',
+        type: 'short_text',
+        title: 'Loop?',
+        logic: [{ if: { field: 'loop', op: 'is_not_empty' }, goTo: 'loop' }],
+      },
+      { id: 'shots', type: 'photo_checklist', title: 'Photos', items: [] },
+      { id: 'pin', type: 'image_pin', title: 'Mark it' },
+      { id: 'pin2', type: 'image_pin', title: 'Mark it too', required: true },
+      { id: 'slots', type: 'signup_slots', title: 'Pick a time', slots: [] },
+    ] as Question[];
+    const blocking = Object.fromEntries(formIssues(qs).map((i) => [i.questionId, i.blocking]));
+    expect(blocking).toEqual({ loop: false, shots: false, pin: false, pin2: true, slots: true });
+    expect(ownerIssues(qs).map((i) => [i.questionId, i.blocking]).sort()).toEqual(
+      Object.entries(blocking).sort(),
+    );
   });
 });

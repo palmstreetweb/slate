@@ -81,9 +81,10 @@ describe('Share panel password lock (ADR-043)', () => {
 
     await user.click(screen.getByRole('switch'));
     const set = screen.getByRole('button', { name: 'Set' }) as HTMLButtonElement;
-    await user.type(screen.getByLabelText('Form password'), 'abcde');
-    expect(set.disabled).toBe(true); // under 6 chars (ADR-058)
-    await user.type(screen.getByLabelText('Form password'), 'f');
+    // Nothing typed yet: nothing to set. The rule is on show from the start (S26).
+    expect(set.disabled).toBe(true);
+    expect(screen.getByText(/At least 6 characters/)).toBeTruthy();
+    await user.type(screen.getByLabelText('Form password'), 'abcdef');
     await user.click(set);
 
     expect(state.setFormFillPassword).toHaveBeenCalledWith('f_1', 'abcdef');
@@ -93,15 +94,22 @@ describe('Share panel password lock (ADR-043)', () => {
     expect(urlBefore).toBe('slate.test/forms/48210377');
   });
 
-  it('5 characters: Set stays disabled, and a forced submit shows the rule without calling the store', async () => {
+  it('5 characters: Set says why instead of saving, and Enter does too (ADR-058, S26)', async () => {
     const user = userEvent.setup();
     open();
     await user.click(screen.getByRole('switch'));
     const input = screen.getByLabelText('Form password') as HTMLInputElement;
     await user.type(input, '12345');
-    expect((screen.getByRole('button', { name: 'Set' }) as HTMLButtonElement).disabled).toBe(true);
+    const set = screen.getByRole('button', { name: 'Set' }) as HTMLButtonElement;
+    expect(set.disabled).toBe(false);
+    // The browser's own "Please lengthen this text…" bubble would get there first.
+    expect(input.closest('form')).toHaveAttribute('novalidate');
+    await user.click(set);
+    expect((await screen.findByRole('alert')).textContent).toBe('Use at least 6 characters.');
+    expect(state.setFormFillPassword).not.toHaveBeenCalled();
+    await user.type(input, '{Enter}');
     fireEvent.submit(input.closest('form')!);
-    expect((await screen.findByRole('alert')).textContent).toBe('Use 6 to 72 characters.');
+    expect(screen.getByRole('alert').textContent).toBe('Use at least 6 characters.');
     expect(state.setFormFillPassword).not.toHaveBeenCalled();
   });
 

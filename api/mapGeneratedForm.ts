@@ -89,10 +89,25 @@ function pictureOptionsOf(q: GeneratedQuestion): PictureOption[] {
 }
 
 /**
- * Pick limits a respondent can meet (QA 2026-10, CH-04 / CH-08): whole numbers,
- * Min at least 1 when the draft says required and never above the choices
- * (counting "Other"), Max (0 = none) kept only when it is at least Min and below
- * the number of choices.
+ * A number question's bounds (F15). The model's blank is 0, so 0 means "no
+ * limit", and a max at or below the min is no max: a draft can't ask for a
+ * budget with "Maximum is 0".
+ */
+function numberBounds(q: GeneratedQuestion): { min?: number; max?: number; step: number } {
+  const min = Number.isFinite(q.min) && q.min !== 0 ? q.min : undefined;
+  const max = Number.isFinite(q.max) && q.max !== 0 && q.max > (min ?? 0) ? q.max : undefined;
+  return {
+    ...(min !== undefined ? { min } : {}),
+    ...(max !== undefined ? { max } : {}),
+    step: Number.isFinite(q.step) && q.step > 0 ? q.step : 1,
+  };
+}
+
+/**
+ * Pick limits a respondent can meet (QA 2026-10, CH-04 / CH-08, decision 1):
+ * whole numbers, Min at least 1 when the draft says required and never above
+ * the choices (counting "Other"), Max (0 = none) kept only when it is at least
+ * Min and below the number of choices.
  */
 function pickLimits(
   q: GeneratedQuestion,
@@ -160,9 +175,7 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         title,
         placeholder: q.placeholder,
         required,
-        min: q.min,
-        max: q.max,
-        step: q.step || 1,
+        ...numberBounds(q),
         ...(q.display === 'stepper' ? { display: 'stepper' as const } : {}),
         ...(text(q.unit) ? { unit: text(q.unit)!.slice(0, 24) } : {}),
         ...(text(q.prefix) ? { prefix: text(q.prefix)!.slice(0, 12) } : {}),
@@ -187,9 +200,10 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         title,
         required,
         accept: text(q.accept),
-        maxSizeMb: q.maxSizeMb || undefined,
+        // 0 (the blank) or less means the default, never "nothing fits".
+        maxSizeMb: q.maxSizeMb > 0 ? q.maxSizeMb : undefined,
         multiple: q.multiple,
-        maxFiles: q.maxFiles || undefined,
+        maxFiles: q.maxFiles >= 1 ? Math.round(q.maxFiles) : undefined,
         ...vis,
       };
     case 'single_choice':

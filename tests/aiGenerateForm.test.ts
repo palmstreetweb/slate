@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { GENERATED_QUESTION_MAX, generatedFormSchema } from '../api/generateFormSchema.js';
+import {
+  GENERATED_QUESTION_MAX,
+  GENERATE_SYSTEM_PROMPT,
+  generatedFormSchema,
+} from '../api/generateFormSchema.js';
 import { blankGeneratedQuestion, mapGeneratedForm } from '../api/mapGeneratedForm.js';
 import { resetRateLimit, takeRateLimit } from '../api/rateLimit.js';
 import { buildGenerateUserPrompt } from '../api/runGenerate.js';
 import { checkSchema } from '../src/logic/schemaCheck.js';
+import { validate } from '../src/logic/validation.js';
 import { AI_GOLDEN_PROMPTS } from '../examples/_admin/ai/goldenPrompts.js';
 
 // The model fills every option field; no price / card details = 0, [] and '' (ADR-064).
@@ -320,5 +325,140 @@ describe('Build with AI — Wave A options (ADR-063)', () => {
         expect(q).not.toHaveProperty(key);
       }
     }
+  });
+});
+
+describe('Build with AI — bounds a draft can’t trap people with (F15, decision 1)', () => {
+  const draftWith = (questions: ReturnType<typeof blankGeneratedQuestion>[]) =>
+    mapGeneratedForm(generatedFormSchema.parse({ ...validDraft, questions })).schema;
+  const byId = (schema: ReturnType<typeof draftWith>) =>
+    Object.fromEntries(schema.questions.map((q) => [q.id, q])) as Record<
+      string,
+      Record<string, unknown>
+    >;
+  const filler = [
+    blankGeneratedQuestion({ id: 'f1', type: 'short_text', title: 'F1' }),
+    blankGeneratedQuestion({ id: 'f2', type: 'short_text', title: 'F2' }),
+  ];
+
+  it('a number left at the blank 0 / 0 has no bounds, so any budget is fine', () => {
+    const schema = draftWith([
+      blankGeneratedQuestion({ id: 'budget', type: 'number', title: 'What is your budget?' }),
+      ...filler,
+    ]);
+    const budget = schema.questions.find((q) => q.id === 'budget')!;
+    expect(budget).not.toHaveProperty('min');
+    expect(budget).not.toHaveProperty('max');
+    expect(budget).toMatchObject({ step: 1 });
+    expect(validate(budget, 500)).toBeNull();
+    expect(checkSchema(schema.questions)).toEqual([]);
+  });
+
+  it('a max at or below the min is dropped; a broken step becomes 1', () => {
+    const by = byId(
+      draftWith([
+        blankGeneratedQuestion({ id: 'a', type: 'number', title: 'A', min: 10, max: 5, step: 0 }),
+        blankGeneratedQuestion({ id: 'b', type: 'number', title: 'B', min: 2, max: 0, step: -3 }),
+        blankGeneratedQuestion({ id: 'c', type: 'number', title: 'C', min: 1, max: 40, step: 2 }),
+      ]),
+    );
+    expect(by.a).toMatchObject({ min: 10, step: 1 });
+    expect(by.a).not.toHaveProperty('max');
+    expect(by.b).toMatchObject({ min: 2, step: 1 });
+    expect(by.b).not.toHaveProperty('max');
+    expect(by.c).toMatchObject({ min: 1, max: 40, step: 2 });
+  });
+
+  it('multi-choice picks: whole, reachable, and "required" means at least one', () => {
+    const three = [opt('One', 'one'), opt('Two', 'two'), opt('Three', 'three')];
+    const by = byId(
+      draftWith([
+        blankGeneratedQuestion({
+          id: 'blank',
+          type: 'multi_choice',
+          title: 'Blank',
+          options: three,
+        }),
+        blankGeneratedQuestion({
+          id: 'needed',
+          type: 'multi_choice',
+          title: 'Needed',
+          options: three,
+          required: true,
+        }),
+        blankGeneratedQuestion({
+          id: 'toomany',
+          type: 'multi_choice',
+          title: 'Too many',
+          options: three,
+          min: 5,
+          max: 2,
+        }),
+        blankGeneratedQuestion({
+          id: 'other',
+          type: 'multi_choice',
+          title: 'With Other',
+          options: three,
+          allowOther: true,
+          min: 4,
+          max: 3.4,
+        }),
+      ]),
+    );
+    expect(by.blank).not.toHaveProperty('min');
+    expect(by.blank).not.toHaveProperty('max');
+    expect(by.needed).toMatchObject({ min: 1 });
+    // 5 of 3 can't happen: at most every choice; a max under the min goes.
+    expect(by.toomany).toMatchObject({ min: 3 });
+    expect(by.toomany).not.toHaveProperty('max');
+    // Other counts as a choice; 3.4 rounds to 3, under the minimum of 4.
+    expect(by.other).toMatchObject({ min: 4 });
+    expect(by.other).not.toHaveProperty('max');
+    expect(validate(by.needed as never, [])).toMatchObject({ code: 'min_selections' });
+  });
+
+  it('picture picks only apply with multi-select; files never get a size or count of 0', () => {
+    const pics = [
+      { ...opt('A', 'a'), src: 'https://example.com/a.jpg' },
+      { ...opt('B', 'b'), src: 'https://example.com/b.jpg' },
+    ];
+    const by = byId(
+      draftWith([
+        blankGeneratedQuestion({
+          id: 'one',
+          type: 'picture_choice',
+          title: 'One',
+          options: pics,
+          min: 2,
+          max: 0,
+        }),
+        blankGeneratedQuestion({
+          id: 'many',
+          type: 'picture_choice',
+          title: 'Many',
+          options: pics,
+          multiple: true,
+          required: true,
+          max: 0,
+        }),
+        blankGeneratedQuestion({
+          id: 'files',
+          type: 'file_upload',
+          title: 'Files',
+          maxSizeMb: -5,
+          maxFiles: 0,
+        }),
+      ]),
+    );
+    expect(by.one).not.toHaveProperty('min');
+    expect(by.one).not.toHaveProperty('max');
+    expect(by.many).toMatchObject({ multiple: true, min: 1 });
+    expect(by.many).not.toHaveProperty('max');
+    expect(by.files!.maxSizeMb).toBeUndefined();
+    expect(by.files!.maxFiles).toBeUndefined();
+  });
+
+  it('the prompt tells the model 0 means no limit', () => {
+    expect(GENERATE_SYSTEM_PROMPT).toMatch(/0 = no limit/);
   });
 });
