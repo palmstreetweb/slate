@@ -233,7 +233,7 @@ describe('checkSchema messages are for owners', () => {
     ]);
     expect(say('pick_one', 'bad_price')).toEqual(['“Pick a package”: fix the price on “Basic”.']);
     expect(say('job', 'bad_service_area')).toEqual([
-      '“Where’s the job?” needs both your business location and a radius.',
+      '“Where’s the job?”: set both your business location and a radius, or clear both.',
     ]);
     expect(say('first_b', 'bad_prefill_key')).toEqual([
       '“Email?” and “First name (again)?” use the same link name, “FIRST”. Rename one.',

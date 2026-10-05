@@ -145,12 +145,10 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
         add(q, 'bad_grid', `${named(q)} has days or hours the grid can’t use. Check From, Until and Each slot.`);
       }
     }
-    // A radius alone is a service area not set up yet (new questions start that
-    // way); a center needs a usable radius.
-    if (q.type === 'location' && q.center !== undefined) {
+    if (q.type === 'location' && (q.center !== undefined || q.radius !== undefined)) {
       const rec = q as unknown as Record<string, unknown>;
       if (geoCenter(rec) === null || geoRadiusKm(rec) === null) {
-        add(q, 'bad_service_area', `${named(q)} needs both your business location and a radius.`);
+        add(q, 'bad_service_area', `${named(q)}: set both your business location and a radius, or clear both.`);
       }
     }
     if (q.type === 'picture_choice' && q.display === 'swipe' && !q.multiple) {

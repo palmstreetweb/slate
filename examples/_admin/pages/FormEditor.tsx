@@ -1137,7 +1137,8 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
         maxSeconds: 60,
       };
     case 'location':
-      return { id, type, title: 'Where’s the job?', required: true, radius: 25, radiusUnit: 'mi' };
+      // No radius until there's a center: a half-set service area is flagged (QA MEDIA-13).
+      return { id, type, title: 'Where’s the job?', required: true, radiusUnit: 'mi' };
     case 'photo_checklist':
       return {
         id,
