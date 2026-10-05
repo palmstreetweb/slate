@@ -172,7 +172,8 @@ function SettingsContent() {
             <section className="slate-settings-section">
               <h2 className="slate-settings-heading">Account</h2>
               <p className="slate-settings-copy">
-                Signed in as {user?.email ?? 'unknown'}. Data syncs to Slate cloud.
+                {user?.email ? `Signed in as ${user.email}.` : 'Signed in.'} Data syncs to Slate
+                cloud.
               </p>
               <button
                 type="button"

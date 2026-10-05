@@ -309,7 +309,7 @@ function FormEditorBody({ formId }: { formId: string }) {
       const detail = (event as CustomEvent<{ kind?: string; message?: string }>).detail;
       if (detail?.kind !== 'form') return;
       // The toast comes from the shell (PersistErrorToasts); this is the inline status.
-      setSaveError(detail.message || 'Could not save to the cloud.');
+      setSaveError(detail.message || 'Couldn’t save your last change. Check your connection.');
     };
     const onPersistOk = (event: Event) => {
       const detail = (event as CustomEvent<{ kind?: string }>).detail;
