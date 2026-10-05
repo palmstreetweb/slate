@@ -1364,7 +1364,7 @@ function OptionNotes<T extends Option>({
           Two {noun.many} count as one: picking one picks both.
         </GuardNote>
       ) : null}
-      {blank ? <GuardNote>Give every {noun.one} a name, or people see an empty one.</GuardNote> : null}
+      {blank ? <GuardNote>Give every {noun.one} a name.</GuardNote> : null}
     </>
   );
 }
