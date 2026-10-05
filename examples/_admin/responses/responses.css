@@ -1076,25 +1076,6 @@ body[data-slate-scale='3'] [data-slate-forms][data-theme-name='slate'] .slate-rs
   color: var(--chrome-ink);
 }
 
-/* The studio wrapper and .slate-app both carry min-height: 100vh, and the
-   wrapper is the zoomed element, so at 1.1× / 1.2× they add (zoom − 1) ×
-   100vh of blank scroll under a page that already fits. */
-body[data-slate-scale='2']
-  #root
-  > .slate-page
-  > [data-slate-forms][data-theme-name='slate']:has(.slate-rsp),
-body[data-slate-scale='2'] [data-slate-forms][data-theme-name='slate']:has(.slate-rsp) .slate-app {
-  min-height: calc(100vh / 1.1);
-}
-
-body[data-slate-scale='3']
-  #root
-  > .slate-page
-  > [data-slate-forms][data-theme-name='slate']:has(.slate-rsp),
-body[data-slate-scale='3'] [data-slate-forms][data-theme-name='slate']:has(.slate-rsp) .slate-app {
-  min-height: calc(100vh / 1.2);
-}
-
 /* Phones: tighter gutters, and the page toolbar carries the title. */
 [data-slate-forms][data-theme-name='slate']:has(.slate-rsp--phone) {
   --slate-content-pad: 16px;

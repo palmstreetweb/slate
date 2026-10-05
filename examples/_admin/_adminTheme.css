@@ -1074,6 +1074,25 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   position: relative;
 }
 
+/* The test-run frame scrolls, and the toggle scrolls with it. Where the
+   question column reaches the frame's left edge (phones, tablets, the larger
+   studio sizes) a bottom-left toggle sat on the answers, so there it goes back
+   to its own slot in the form's top bar, where respondents see it. A container
+   query, because the frame's width (not the window's) decides, zoom included. */
+[data-slate-forms][data-theme-name='slate'] .slate-preview--page {
+  container: slate-test-run / inline-size;
+}
+
+@container slate-test-run (max-width: 899px) {
+  [data-slate-forms][data-theme-name='slate']
+    .slate-preview--page
+    [data-slate-forms]
+    .slate-toggle-scale {
+    position: static;
+    transform-origin: right center;
+  }
+}
+
 /* ===========================================================
    CONFIRM DIALOG — backdrop blur + centered card
    ============================================================ */
@@ -1302,11 +1321,12 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
   padding: 0;
 }
 
+/* The window's height, at any studio size (see "Studio size" below). */
 [data-slate-forms][data-theme-name='slate'] .slate-editor-shell {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - var(--slate-header-h));
-  height: calc(100dvh - var(--slate-header-h));
+  height: calc(100vh / var(--slate-zoom, 1) - var(--slate-header-h));
+  height: calc(100dvh / var(--slate-zoom, 1) - var(--slate-header-h));
   min-height: 0;
 }
 
@@ -1966,11 +1986,17 @@ body.slate-editor-resizing * {
   overflow: hidden;
 }
 
+/* clip, not hidden: the form inside is the scroller. A hidden box can still be
+   scrolled by focus or scrollIntoView, and then the wheel can't undo it.
+   A clipped flex item is not a scroll container, so min-height: 0 keeps it
+   the column's height instead of its content's. */
 [data-slate-forms][data-theme-name='slate'] .slate-canvas-frame {
   flex: 1;
+  min-height: 0;
   margin: 24px;
   border-radius: 16px;
   overflow: hidden;
+  overflow: clip;
   border: 1px solid var(--chrome-line);
   box-shadow: var(--slate-shadow-card);
   position: relative;
@@ -3880,7 +3906,7 @@ body.slate-editor-resizing * {
   display: flex;
   flex-direction: column;
   max-width: 640px;
-  max-height: calc(100dvh - 48px);
+  max-height: calc(100dvh / var(--slate-zoom, 1) - 48px);
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-dialog--ai .slate-dialog-actions {
@@ -5001,11 +5027,29 @@ body.slate-editor-resizing * {
 body[data-slate-scale='2'] #root > .slate-page > [data-slate-forms][data-theme-name='slate'],
 body[data-slate-scale='2'] > [data-slate-forms][data-theme-name='slate'] {
   zoom: 1.1;
+  --slate-zoom: 1.1;
 }
 
 body[data-slate-scale='3'] #root > .slate-page > [data-slate-forms][data-theme-name='slate'],
 body[data-slate-scale='3'] > [data-slate-forms][data-theme-name='slate'] {
   zoom: 1.2;
+  --slate-zoom: 1.2;
+}
+
+/* Lengths inside a zoomed wrapper zoom too, viewport units included, so
+   anything sized to the window divides the zoom back out:
+   calc(100dvh / var(--slate-zoom, 1)). Otherwise the editor and the test-run
+   frame ended (zoom − 1) × the window below the fold.
+   The wrapper and .slate-app carry min-height: 100vh (base.css,
+   publicChrome.css), which at 1.1× / 1.2× added the same blank scroll under
+   every page that already fits. */
+body[data-slate-scale] #root > .slate-page > [data-slate-forms][data-theme-name='slate'],
+body[data-slate-scale]
+  #root
+  > .slate-page
+  > [data-slate-forms][data-theme-name='slate']
+  > .slate-app:not(.slate-app--phone) {
+  min-height: calc(100vh / var(--slate-zoom, 1));
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-scale-tab {

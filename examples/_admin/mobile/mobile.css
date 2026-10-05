@@ -51,10 +51,17 @@
 
 /* The test-run frame scrolls: a question taller than the frame (a long list,
    a matrix, sign-up slots) must reach its OK button. The form inside grows
-   to its content exactly as on the public page; rounded corners still clip. */
+   to its content exactly as on the public page; rounded corners still clip.
+   Its height is the window's minus what sits above and below it (the header,
+   the content padding and the note line), divided by the studio size's zoom
+   (ADR-045), so the page itself never scrolls. */
 [data-slate-forms][data-theme-name='slate'] .slate-preview.slate-preview--page {
-  height: calc(100vh - 160px);
-  height: calc(100dvh - 160px);
+  height: calc(
+    100vh / var(--slate-zoom, 1) - var(--slate-header-h) - 2 * var(--slate-content-pad) - 28px
+  );
+  height: calc(
+    100dvh / var(--slate-zoom, 1) - var(--slate-header-h) - 2 * var(--slate-content-pad) - 28px
+  );
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -84,8 +91,8 @@
   --slate-content-pad: var(--m-gutter);
   --slate-card-pad: 20px;
   --slate-card-icon-btn: var(--m-tap);
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: calc(100vh / var(--slate-zoom, 1));
+  min-height: calc(100dvh / var(--slate-zoom, 1));
 }
 
 [data-slate-forms][data-theme-name='slate']
@@ -268,7 +275,9 @@
 }
 
 [data-slate-forms][data-theme-name='slate'] .slate-app--phone .slate-preview--page {
-  height: calc(100dvh - var(--slate-header-h) - var(--m-safe-t) - 40px - var(--m-safe-b));
+  height: calc(
+    100dvh / var(--slate-zoom, 1) - var(--slate-header-h) - var(--m-safe-t) - 40px - var(--m-safe-b)
+  );
   min-height: 420px;
   border-radius: 16px;
 }
@@ -527,8 +536,8 @@
 
 [data-slate-forms][data-theme-name='slate'] .slate-m-editor-pane > .slate-canvas {
   height: calc(
-    100dvh - var(--slate-header-h) - var(--m-safe-t) - var(--m-tabs-h) - var(--m-actionbar-h) -
-      var(--m-safe-b)
+    100dvh / var(--slate-zoom, 1) - var(--slate-header-h) - var(--m-safe-t) - var(--m-tabs-h) -
+      var(--m-actionbar-h) - var(--m-safe-b)
   );
   min-height: 360px;
   background: transparent;
@@ -714,7 +723,7 @@
     left: max(8px, var(--m-safe-l)) !important;
     right: max(8px, var(--m-safe-r)) !important;
     width: auto;
-    max-height: calc(100dvh - 80px - var(--m-safe-t) - var(--m-safe-b));
+    max-height: calc(100dvh / var(--slate-zoom, 1) - 80px - var(--m-safe-t) - var(--m-safe-b));
   }
 
   [data-slate-forms][data-theme-name='slate'] .slate-inbox-header {
