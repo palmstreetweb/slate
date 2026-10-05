@@ -166,8 +166,8 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {forced ? (
-            <span className="slate-badge" title="Schema forces this mode">
-              {schema.themeMode === 'dark' ? 'Forced dark' : 'Forced light'}
+            <span className="slate-badge" title="This form always shows in this mode">
+              {schema.themeMode === 'dark' ? 'Always dark' : 'Always light'}
             </span>
           ) : (
             <div className="slate-tabs" role="tablist" aria-label="Preview mode">
@@ -257,9 +257,7 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
   );
 }
 
-function labelForQuestion(q: Question): string {
-  if (q.type === 'welcome' || q.type === 'thanks' || q.type === 'statement') {
-    return TYPE_LABEL[q.type];
-  }
-  return q.id;
+/** The question's type ("Number", "Pin the Spot"), never its internal id (QA S9, CH-17, F25). */
+export function labelForQuestion(q: Question): string {
+  return TYPE_LABEL[q.type] ?? 'Question';
 }
