@@ -457,6 +457,115 @@ describe('model draft → full draft → engine schema', () => {
   });
 });
 
+describe('option extras are read by question type (SRV-3)', () => {
+  const venue = (more: string[], price = 2000) =>
+    q({
+      id: 'venue',
+      type: 'single_choice',
+      title: 'Which room?',
+      settings: ['cards'],
+      options: [opt('Garden', 'garden', more, price), opt('Hall', 'hall', [], 1500)],
+    });
+
+  it('keeps a package card’s seat counts and hours as features, not slot settings', () => {
+    const full = fromModelForm(
+      form([
+        SAMPLES.short_text,
+        SAMPLES.email,
+        venue(['Capacity 150', 'Seats 80', '20 seats', '18:00-23:00', 'Up to 5000', 'Open bar']),
+      ]),
+    );
+    const garden = full.questions[2]!.options[0]!;
+    expect(garden).toMatchObject({
+      price: 2000,
+      priceMax: 5000,
+      features: ['Capacity 150', 'Seats 80', '20 seats', '18:00-23:00', 'Open bar'],
+      capacity: 0,
+      date: '',
+      start: '',
+      end: '',
+    });
+    const { schema } = mapGeneratedForm(full);
+    const card = (schema.questions.find((x) => x.id === 'venue') as unknown as Json).options;
+    expect((card as Json[])[0]).toEqual({
+      label: 'Garden',
+      value: 'garden',
+      price: 2000,
+      priceMax: 5000,
+      features: ['Capacity 150', 'Seats 80', '20 seats', '18:00-23:00', 'Open bar'],
+    });
+  });
+
+  it('reads “up to N” as a range only above the option’s price, and “max N” never', () => {
+    const lines = (more: string[], price?: number) =>
+      fromModelForm(form([SAMPLES.short_text, SAMPLES.email, venue(more, price)])).questions[2]!
+        .options[0]!;
+    // Not above the price: a feature line, never a range that ends below the price.
+    expect(lines(['Up to 500'])).toMatchObject({ priceMax: 0, features: ['Up to 500'] });
+    // No price at all: nothing to range from.
+    expect(lines(['up to 150'], 0)).toMatchObject({ priceMax: 0, features: ['up to 150'] });
+    // The undocumented "max N" is the owner's words, not a price.
+    expect(lines(['Max 10', 'max: 8000'])).toMatchObject({
+      priceMax: 0,
+      features: ['Max 10', 'max: 8000'],
+    });
+    // The first range counts; a second "up to" stays as written.
+    expect(lines(['up to $3,000', 'Up to 9000'])).toMatchObject({
+      priceMax: 3000,
+      features: ['Up to 9000'],
+    });
+  });
+
+  it('a revision sends a card’s lines back as written, with no spots or times', () => {
+    const full = fromModelForm(
+      form([
+        SAMPLES.short_text,
+        SAMPLES.email,
+        venue(['20 seats', '18:00-23:00', 'Up to 5000', 'Open bar']),
+      ]),
+    );
+    expect(toModelForm(full).questions[2]!.options[0]!.more).toEqual([
+      'up to 5000',
+      '20 seats',
+      '18:00-23:00',
+      'Open bar',
+    ]);
+    expect(fromModelForm(toModelForm(full))).toEqual(full);
+  });
+
+  it('other choice types keep such lines as written too', () => {
+    const full = fromModelForm(
+      form([
+        SAMPLES.short_text,
+        SAMPLES.email,
+        q({
+          id: 'extras',
+          type: 'multi_choice',
+          title: 'Extras?',
+          options: [opt('Bar', 'bar', ['8 spots', '2026-10-18 09:00-11:00']), opt('DJ', 'dj')],
+        }),
+      ]),
+    );
+    expect(full.questions[2]!.options[0]).toMatchObject({
+      capacity: 0,
+      date: '',
+      start: '',
+      features: ['8 spots', '2026-10-18 09:00-11:00'],
+    });
+  });
+
+  it('sign-up slots still read spots, the day and the time, and send them back', () => {
+    const full = fromModelForm(form([SAMPLES.short_text, SAMPLES.email, SAMPLES.signup_slots]));
+    const slot = full.questions[2]!.options[0]!;
+    expect(slot).toMatchObject({ capacity: 10, date: '2026-10-18', start: '09:00', end: '11:00' });
+    expect(slot.features).toEqual([]);
+    expect(toModelForm(full).questions[2]!.options[0]!.more).toEqual([
+      'spots: 10',
+      '2026-10-18 09:00-11:00',
+    ]);
+  });
+});
+
 describe('model draft checks (what the one retry is told)', () => {
   const issues = (f: ModelForm) => {
     const r = modelFormSchema.safeParse(f);
