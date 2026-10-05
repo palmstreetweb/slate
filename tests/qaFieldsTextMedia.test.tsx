@@ -743,21 +743,29 @@ describe('availability (GAP-18, GAP-26)', () => {
   });
 });
 
-describe('thank-you redirect (F3)', () => {
-  it('a link without https:// goes to that site, not to a page here', async () => {
+describe('thank-you redirect (F3, CON-06, ENG-10)', () => {
+  // The engine follows a redirect the way a link on the host's page does, as
+  // before the QA pass; Slate's own pages hand it the full https:// address of
+  // one typed without it (`withWebRedirects`, tested with the public fill).
+  it('resolves like a link on the page, and only ever opens a web page', async () => {
     const { Form } = await import('@/index.js');
     const assign = vi.fn();
     const getter = vi.spyOn(window, 'location', 'get').mockReturnValue({
       ...window.location,
-      href: 'https://slateforms.vercel.app/forms/12345678',
+      href: 'https://wildwash.com/quote/',
       assign,
     } as unknown as Location);
     try {
       for (const [redirectUrl, expected] of [
-        ['example.com/thank-you', 'https://example.com/thank-you'],
-        ['www.example.com', 'https://www.example.com/'],
-        ['/done', 'https://slateforms.vercel.app/done'],
+        ['thank-you', 'https://wildwash.com/quote/thank-you'],
+        ['thanks.html', 'https://wildwash.com/quote/thanks.html'],
+        ['success?ref=quote', 'https://wildwash.com/quote/success?ref=quote'],
+        ['?thanks=1', 'https://wildwash.com/quote/?thanks=1'],
+        ['#done', 'https://wildwash.com/quote/#done'],
+        ['/done', 'https://wildwash.com/done'],
+        ['https://example.com/thank-you', 'https://example.com/thank-you'],
         ['javascript:alert(1)', null],
+        ['mailto:a@b.co', null],
       ] as const) {
         assign.mockClear();
         const { unmount } = render(

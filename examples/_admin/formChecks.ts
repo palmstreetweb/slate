@@ -25,6 +25,7 @@ import { checkSchema, type SchemaIssue } from '@/logic/schemaCheck.js';
 import { contactMode } from '@/logic/contact.js';
 import { acceptTokens } from '@/components/questions/FileUploadField.js';
 import { isPhoneCountry } from './phoneCountries.js';
+import { normalizeRedirectUrl } from './redirectUrl.js';
 
 export type StudioIssueKind =
   /** Min / Max selections (or likes) that aren't whole numbers. */
@@ -278,24 +279,8 @@ function optionLists(
 
 /* ---------- redirect ---------- */
 
-/**
- * The web address a redirect will use: what the owner typed, with https://
- * added when there's no scheme. Null when it can't be a web page link (no
- * domain, "javascript:", "mailto:", a path on its own).
- */
-export function normalizeRedirectUrl(raw: string): string | null {
-  const t = raw.trim();
-  if (!t) return null;
-  const full = /^[a-z][a-z\d+-]*:/i.test(t) ? t : `https://${t.replace(/^\/+/, '')}`;
-  try {
-    const u = new URL(full);
-    const host = u.hostname;
-    const webHost = /\./.test(host) && !host.startsWith('.') && !host.endsWith('.');
-    return (u.protocol === 'https:' || u.protocol === 'http:') && webHost ? full : null;
-  } catch {
-    return null;
-  }
-}
+// The address a redirect opens on Slate's pages (redirectUrl.ts, shared with the public fill).
+export { normalizeRedirectUrl };
 
 /* ---------- scale ---------- */
 

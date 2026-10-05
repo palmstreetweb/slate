@@ -24,6 +24,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { FormProps, PartialMeta, Schema, SubmitMeta } from '@/types/Schema.js';
+import type { Question } from '@/types/Question.js';
 import { useFormState } from '@/hooks/useFormState.js';
 import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 import { useAutosave } from '@/hooks/useAutosave.js';
@@ -64,19 +65,23 @@ import '@/styles/questions.css';
 import '@/styles/motion.css';
 
 /**
- * Absolute http(s) URL or null. A link with no scheme ("example.com/thanks",
- * "www.example.com") is https (F3), not a path on this page; "/path" and
- * "./path" still resolve against the page.
+ * Absolute http(s) URL or null. A redirect resolves the way a link on the
+ * page does: "thanks", "/thanks", "?done" and "#done" stay on the host page,
+ * and another site needs its full https:// address (CON-06, ENG-10). Slate's
+ * own pages hand the form the full address of one an owner typed without
+ * https:// (`withWebRedirects` in the studio, F3, SEC-5).
  */
 function httpUrlOrNull(raw: string): string | null {
   try {
-    const t = raw.trim();
-    const u = new URL(/^[./]|:/.test(t) ? t : 'https://' + t, location.href);
+    const u = new URL(raw.trim(), location.href);
     return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null;
   } catch {
     return null;
   }
 }
+
+/** A new fill's id (`SubmitMeta.fillId`), where the browser can make one (https). */
+const newFillId = () => globalThis.crypto?.randomUUID?.();
 
 export function Form<S extends Schema>({
   schema,
@@ -135,6 +140,11 @@ export function Form<S extends Schema>({
 
   /* ---------- save-and-resume (ADR-017) ---------- */
 
+  // This fill's id (`SubmitMeta.fillId`, ADR-069): saved with the answers, so
+  // a reload and Resume send the same fill again, and a server keying on it
+  // stores it once (ENG-03). "Submit another" starts a new one.
+  const fillRef = useRef(newFillId());
+
   const resumeEnabled = Boolean(resume && schema.id);
   // Nothing is saved once an ending is reached: a reload after the submit
   // must not offer to resume onto it and send the answers twice (R12).
@@ -145,6 +155,7 @@ export function Form<S extends Schema>({
     answers: state.answers,
     step: state.step,
     visitedIds: state.questionsVisited,
+    fill: fillRef.current,
   });
   const clearAutosave = autosave.clear;
 
@@ -155,10 +166,11 @@ export function Form<S extends Schema>({
   /** A submit sent the respondent back to a question, with this message (ADR-066). */
   const [notice, setNotice] = useState<{ id: string; text: string } | null>(null);
 
-  // Running score (ADR-016) — feeds {{score}} piping and SubmitMeta.
+  // Running score (ADR-016) — feeds {{score}} piping and SubmitMeta. Like the
+  // estimate, it counts only the answers that will be sent (CON-07).
   const score = useMemo(
-    () => computeScore(schema.questions, state.answers),
-    [schema.questions, state.answers],
+    () => computeScore(schema.questions, getSubmitAnswers()),
+    [schema.questions, getSubmitAnswers],
   );
 
   // Instant estimate (ADR-064) — from the answers that will be submitted
@@ -316,6 +328,7 @@ export function Form<S extends Schema>({
       hiddenFields: hiddenFields ?? {},
       score,
       ...(estimate ? { estimate } : {}),
+      fillId: fillRef.current,
     };
 
     const redirectUrl = currentQuestion.redirectUrl;
@@ -403,21 +416,18 @@ export function Form<S extends Schema>({
     submitGenRef.current += 1;
     setSubmitStatus('idle');
     setSubmitErrorMsg(null);
+    fillRef.current = newFillId();
     restart();
   }, [clearAutoAdvance, restart]);
 
   /* ---------- derived UI counts ---------- */
 
-  const counted = state.visible.filter(
-    (q) => q.type !== 'welcome' && q.type !== 'thanks' && q.type !== 'statement',
-  ).length;
-  const passedCounted = state.visible
-    .slice(0, state.step)
-    .filter((q) => q.type !== 'welcome' && q.type !== 'thanks' && q.type !== 'statement').length;
-  const isAnswerBearing =
-    currentQuestion?.type !== 'welcome' &&
-    currentQuestion?.type !== 'thanks' &&
-    currentQuestion?.type !== 'statement';
+  // Steps the counter counts: every one but the welcome, statements and endings.
+  const counts = (q: Question | null) =>
+    q?.type !== 'welcome' && q?.type !== 'thanks' && q?.type !== 'statement';
+  const counted = state.visible.filter(counts).length;
+  const passedCounted = state.visible.slice(0, state.step).filter(counts).length;
+  const isAnswerBearing = counts(currentQuestion);
   const stepNumber = isAnswerBearing ? passedCounted + 1 : 0;
 
   const showBack = state.step > 0 && currentQuestion?.type !== 'thanks';
@@ -517,7 +527,11 @@ export function Form<S extends Schema>({
               className="slate-resume-btn slate-resume-btn--primary"
               onClick={() => {
                 const snapshot = autosave.acceptSaved();
-                if (snapshot) hydrate(snapshot);
+                if (snapshot) {
+                  // The same fill as before the reload (ENG-03).
+                  fillRef.current = snapshot.fill ?? fillRef.current;
+                  hydrate(snapshot);
+                }
               }}
             >
               Resume
@@ -561,7 +575,7 @@ export function Form<S extends Schema>({
                   onFileUpload={onFileUpload}
                   resolveFileUploadMeta={resolveFileUploadMeta}
                   score={score}
-                  visibleList={state.visible}
+                  path={state.path}
                   onEditQuestion={(id) => {
                     const idx = state.visible.findIndex((q) => q.id === id);
                     if (idx >= 0) goTo(idx, 'backward');
@@ -572,6 +586,7 @@ export function Form<S extends Schema>({
                   estimate={estimate}
                   estimateSettings={schema.estimate}
                   slotsLeft={slotsLeft?.[currentQuestion.id]}
+                  resume={resumeEnabled}
                 />
               ) : null}
             </div>

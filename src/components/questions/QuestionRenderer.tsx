@@ -15,7 +15,7 @@ import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
 import type { Estimate, EstimateSettings } from '@/types/Estimate.js';
 import { formatAnswerFor, pipeQuestionCopy } from '@/logic/piping.js';
-import { isChrome, pathOf } from '@/logic/progress.js';
+import { isChrome } from '@/logic/progress.js';
 import { estimateCurrency, formatEstimate } from '@/logic/estimate.js';
 import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 
@@ -54,8 +54,11 @@ export type QuestionRendererProps = {
   resolveFileUploadMeta?: (ref: string) => Promise<FileUploadMeta | null>;
   /** Running score total, available in piping as `{{score}}` (ADR-016). */
   score?: number;
-  /** Currently visible questions — the Review step lists those on the respondent's path. */
-  visibleList?: ReadonlyArray<Question>;
+  /**
+   * The visible questions on the respondent's path (ADR-069), as navigation
+   * and the submit read it — the Review step lists the answer-bearing ones.
+   */
+  path?: ReadonlyArray<Question>;
   /** Jump back to a question for editing (review screen). */
   onEditQuestion?: (questionId: string) => void;
   /** Play the schema step-sound on discrete interactions (choices, OK, etc.). */
@@ -76,6 +79,11 @@ export type QuestionRendererProps = {
   estimateSettings?: EstimateSettings;
   /** Spots left on this question's sign-up slots, by slot value (ADR-066). */
   slotsLeft?: Readonly<Record<string, number>>;
+  /**
+   * The form keeps its answers across a reload (`resume`, ADR-017), so a
+   * question whose part didn't download may reload the page to try again.
+   */
+  resume?: boolean;
 };
 
 function StepBadge({ step, total }: { step: number; total: number }) {
@@ -102,7 +110,7 @@ export function QuestionRenderer({
   onFileUpload,
   resolveFileUploadMeta,
   score = 0,
-  visibleList,
+  path,
   onEditQuestion,
   playInteractionSound,
   playTypingSound,
@@ -110,6 +118,7 @@ export function QuestionRenderer({
   estimate = null,
   estimateSettings,
   slotsLeft,
+  resume,
 }: QuestionRendererProps) {
   // Resolve {{field:id}} / {{score}} / {{estimate}} piping (and function-style
   // DynamicTitle) once here, so every field component receives ready-to-render copy.
@@ -137,14 +146,16 @@ export function QuestionRenderer({
 
   const extKey = extFieldKey(question);
   // The Review step's rows carry piped titles, as the questions showed them.
+  // Review shows no step badge, as before it loaded on demand (ENG-09).
   if (extKey) {
     const id = question.id;
     return (
       <>
-        <StepBadge step={stepNumber} total={totalSteps} />
+        <StepBadge step={question.type === 'review' ? 0 : stepNumber} total={totalSteps} />
         <ExtField
           key={id}
           extKey={extKey}
+          reload={resume}
           question={question}
           answers={answers}
           value={answers[id]}
@@ -166,8 +177,7 @@ export function QuestionRenderer({
           review={
             question.type === 'review'
               ? {
-                  rows: pathOf(visibleList ?? [], answers)
-                    .map((i) => visibleList![i]!)
+                  rows: (path ?? [])
                     .filter((q) => !isChrome(q))
                     .map((q) => pipeQuestionCopy(q, answers, score, allQuestions, estimateText)),
                   format: formatAnswerFor,

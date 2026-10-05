@@ -83,6 +83,15 @@ export type SubmitMeta = {
    * copy of the schema rather than trust this value.
    */
   estimate?: Estimate;
+  /**
+   * One id per fill (a UUID; ADR-069): the same on every try to send it —
+   * Retry, a question the submit sent the respondent back to, and with
+   * `resume`, a reload and Resume — and new for "Submit another" or Start
+   * over. A server can store it as a retry key, so a submit that landed but
+   * whose reply was lost is never stored twice. Missing where the browser
+   * can't make one (a page not served over https).
+   */
+  fillId?: string;
 };
 
 /**
@@ -150,8 +159,14 @@ export type FormProps<S extends Schema = Schema> = {
    * successful submit. Requires `schema.id`.
    *
    * `'tab'` keeps the save in `sessionStorage` instead: it survives a reload,
-   * back / forward and a phone discarding the tab, but never reaches another
-   * tab or a later visit — for shared devices (ADR-017 addendum).
+   * back / forward and a phone discarding the tab, and goes with the tab
+   * when the browser copies it — a duplicated tab, a closed tab reopened, a
+   * restored session. It is never offered after 30 minutes without an
+   * answer, and Start over deletes it (ADR-017 addendum).
+   *
+   * With either, a question whose part didn't download may reload the page
+   * when the respondent taps Try again, since the answers come back; without
+   * `resume` the form never reloads the page.
    */
   resume?: boolean | 'tab';
   /**

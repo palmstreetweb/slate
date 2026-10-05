@@ -310,7 +310,8 @@ describe('a reload after the submit never offers to resume onto it (R12)', () =>
         answers: { name: 'Ada' },
         step: 2,
         visitedIds: ['hi', 'name', 'done'],
-        savedAt: '',
+        // A save with a time the page can read (one without is no longer offered, SEC-2).
+        savedAt: new Date().toISOString(),
       }),
     );
     const onSubmit = vi.fn();

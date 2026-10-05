@@ -13,6 +13,8 @@
  * on the map never re-animate — only freshly mounted ones do. On a confirmed
  * submit (`complete`) the rest of the map lights up in sequence and every
  * star twinkles once. Calm motion shows the finished state with no motion.
+ * Until then a soft halo sits on the newest star, remounted per step so it
+ * pulses once.
  */
 
 'use client';
@@ -153,7 +155,6 @@ export function ConstellationDecoration({ step, complete = false }: Props) {
         );
       })}
       {!complete && (
-        // Soft halo on the newest star, remounted per step so it pulses once.
         <circle
           key={`h${lit}`}
           className="slate-deco-halo"

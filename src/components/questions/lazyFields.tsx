@@ -31,7 +31,7 @@
 
 'use client';
 
-import { Component, Suspense, lazy, type ComponentType, type ReactNode } from 'react';
+import { Component, Suspense, lazy, useReducer, type ComponentType, type ReactNode } from 'react';
 import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
@@ -239,14 +239,24 @@ export function preloadExtFields(questions: ReadonlyArray<Question>): void {
   });
 }
 
-type BoundaryProps = { title: string; children: ReactNode };
+type BoundaryProps = {
+  title: string;
+  onRetry: () => void;
+  /** Try again reloads the page: the form keeps its answers across one. */
+  reload?: boolean;
+  children: ReactNode;
+};
 
 /**
  * A chunk that fails to download shows "Try again" instead of unmounting the
- * form. Browsers remember a module that failed to download and refuse it again
- * without asking the network, so an in-page retry can't work: "Try again"
- * reloads the page (the respondent's own tap, never automatic). A host that
- * passes `resume` keeps the answers across it (GAP-06).
+ * form (the respondent's own tap, never automatic). Browsers that load modules
+ * natively remember a module that failed and refuse it again without asking
+ * the network, so with `resume` on, Try again reloads the page and the answers
+ * come back (GAP-06). Without it the page is the host's, and the engine never
+ * reloads it (CON-05, SEC-4): Try again asks for the part again in place,
+ * which works with bundlers that forget a failed download, and the message
+ * also says the page can be reloaded — the respondent's call, since that
+ * host keeps no answers across a reload.
  */
 class ExtFieldBoundary extends Component<BoundaryProps, { failed: boolean }> {
   override state = { failed: false };
@@ -261,10 +271,10 @@ class ExtFieldBoundary extends Component<BoundaryProps, { failed: boolean }> {
       <div>
         <h1 className="slate-title">{this.props.title}</h1>
         <p className="slate-err" role="alert">
-          This question didn’t load. Check your connection and try again.
+          {`This question didn’t load. Check your connection and try again${this.props.reload ? '' : ', or reload the page'}.`}
         </p>
         <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={() => location.reload()}>
+          <button type="button" className="slate-ok-btn" onClick={this.props.onRetry}>
             Try again
           </button>
         </div>
@@ -283,12 +293,32 @@ function Loading({ title }: { title: string }) {
   );
 }
 
-/** Render the on-demand UI for `extKey`, with a loading state and a way to try again. */
-export function ExtField({ extKey, ...props }: ExtFieldProps & { extKey: ExtFieldKey }) {
+/**
+ * Render the on-demand UI for `extKey`, with a loading state and a way to try
+ * again: a reload when the form keeps its answers across one (`reload`, the
+ * form's `resume`), else in place.
+ */
+export function ExtField({
+  extKey,
+  reload,
+  ...props
+}: ExtFieldProps & { extKey: ExtFieldKey; reload?: boolean }) {
+  const [attempt, retried] = useReducer((n: number) => n + 1, 0);
   const title = typeof props.question.title === 'string' ? props.question.title : '';
   const Field = componentFor(extKey);
   return (
-    <ExtFieldBoundary title={title}>
+    <ExtFieldBoundary
+      key={attempt}
+      title={title}
+      reload={reload}
+      onRetry={() => {
+        if (reload) location.reload();
+        else {
+          components.delete(extKey);
+          retried();
+        }
+      }}
+    >
       <Suspense fallback={<Loading title={title} />}>
         <Field {...props} />
       </Suspense>
