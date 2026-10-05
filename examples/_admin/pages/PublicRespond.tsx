@@ -25,6 +25,17 @@ function readPrefill(): Record<string, string> {
   return prefillFromSearch(params);
 }
 
+/**
+ * An id for a link minted without one: a hash of the whole token. (Its first
+ * characters are the same for every link — the encoded `{"v":1,"schema"` —
+ * so they can't tell two links apart, and the tab's saved answers would mix.)
+ */
+export function tokenId(token: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < token.length; i++) h = Math.imul(h ^ token.charCodeAt(i), 0x01000193);
+  return `portable_${(h >>> 0).toString(36)}`;
+}
+
 /** A respondent screen with one line and no studio chrome (COPY-13, F27). */
 function Notice({ text }: { text: string }) {
   return (
@@ -49,7 +60,7 @@ export function PublicRespond({ token }: Props) {
     if (!decoded) return null;
     // Anyone can mint this link — treat the schema as hostile (ADR-046).
     const schema = sanitizeUntrustedSchema(decoded.schema);
-    const formId = decoded.formId ?? `portable_${token.slice(0, 12)}`;
+    const formId = decoded.formId ?? tokenId(token);
     // With an id, answers survive a reload or back / forward in this tab only (GAP-05).
     return { ...decoded, formId, schema: { ...schema, id: formId } };
   }, [token]);

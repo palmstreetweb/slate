@@ -31,7 +31,7 @@ vi.mock('../examples/_admin/localFileStore.js', async (importOriginal) => ({
 }));
 
 import type { Schema } from '@/index.js';
-import { PublicRespond } from '../examples/_admin/pages/PublicRespond.js';
+import { PublicRespond, tokenId } from '../examples/_admin/pages/PublicRespond.js';
 import { encodePortableSchema } from '../examples/_admin/portableShare.js';
 import { matchRoute } from '../examples/_admin/_router.js';
 import { listSubmissions } from '../examples/_admin/_submissionStore.js';
@@ -83,6 +83,15 @@ describe('a link that can’t be used', () => {
 });
 
 describe('filling a portable link', () => {
+  it('a link without a form id gets one from the whole token, so two links never share a save', () => {
+    const a = encodePortableSchema(schema);
+    const b = encodePortableSchema({ ...schema, brand: { name: 'Other' } });
+    expect(a.slice(0, 12)).toBe(b.slice(0, 12));
+    expect(tokenId(a)).not.toBe(tokenId(b));
+    expect(tokenId(a)).toMatch(/^portable_[0-9a-z]+$/);
+    expect(tokenId(a)).toBe(tokenId(a));
+  });
+
   it('prefill from the link works like the public link (GAP-23), and d isn’t a prefill', async () => {
     const token = encodePortableSchema(schema, { formId: 'portable_pre001' });
     window.history.replaceState({}, '', `/r?d=${encodeURIComponent(token)}&name=Ada`);
