@@ -171,14 +171,58 @@ describe('SlateNumberInput', () => {
     expect(input).toHaveValue(20);
   });
 
-  it('leaving settles at once, before the next tap is handled (STU-4)', async () => {
+  it('leaving saves at once; the box tidies a frame later, so a tap lands where it was aimed (STU-4)', async () => {
     const { user, input, last } = setup(10, { min: 1, max: 20, integer: true });
     await user.tripleClick(input);
     await user.keyboard('25');
-    // No frame: a tap right after the blur already sees the settled field.
-    await user.click(screen.getByRole('button', { name: 'elsewhere' }));
-    expect(input).toHaveValue(20);
+    act(() => input.blur());
+    // Saved already, with this render's props; the typed text and the line under it stay
+    // until the next frame, so nothing moves under a phone's tap before its click lands.
     expect(last()).toBe(20);
+    expect(input).toHaveValue(25);
+    expect(screen.getByRole('status')).toHaveTextContent('A whole number from 1 to 20');
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    expect(input).toHaveValue(20);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('a question switched right after leaving keeps its own number (STU-4)', async () => {
+    const values = { a: 10, b: 50 } as Record<string, number | undefined>;
+    function Two() {
+      const [at, setAt] = useState<'a' | 'b'>('a');
+      const [, bump] = useState(0);
+      return (
+        <div data-slate-forms="" data-theme-name="slate">
+          {/* One field serving both, as the inspector's unkeyed fields do. */}
+          <SlateNumberInput
+            aria-label="Field"
+            min={1}
+            max={100}
+            integer
+            value={values[at]}
+            onChange={(n) => {
+              values[at] = n;
+              bump((x) => x + 1);
+            }}
+          />
+          <button type="button" onClick={() => setAt('b')}>
+            question b
+          </button>
+        </div>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Two />);
+    const input = screen.getByRole('spinbutton', { name: 'Field' });
+    await user.tripleClick(input);
+    await user.keyboard('150');
+    expect(values.a).toBe(100);
+    // Blur, then the other question opens before the next frame.
+    act(() => input.blur());
+    act(() => screen.getByRole('button', { name: 'question b' }).click());
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    expect(values).toEqual({ a: 100, b: 50 });
+    expect(input).toHaveValue(50);
   });
 
   it('closing the editor mid-number keeps the whole number, not the part typed first (STU-4)', async () => {
