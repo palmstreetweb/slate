@@ -175,9 +175,14 @@ describe('answer formatter is total', () => {
 
   it('still formats normal answers', () => {
     expect(formatAnswerForQuestion(question('single_choice'), 'a')).toBe('A');
-    // A value the question no longer lists (and no Other) is an option deleted since:
-    // it reads "Removed option", never its stored code (copy QA).
-    expect(formatAnswerForQuestion(question('multi_choice'), ['a', 'z'])).toBe('A, Removed option');
+    // A value the question no longer lists (and no Other) shows as stored, marked
+    // as no longer an option; only the studio's own option code reads "Removed option".
+    expect(formatAnswerForQuestion(question('multi_choice'), ['a', 'z'])).toBe(
+      'A, z (no longer an option)',
+    );
+    expect(formatAnswerForQuestion(question('multi_choice'), ['a', 'opt_x1y2z3'])).toBe(
+      'A, Removed option',
+    );
     expect(formatAnswerForQuestion(question('matrix'), { row1: 'col1' })).toBe('Row 1: Col 1');
     expect(formatAnswerForQuestion(question('number'), 5)).toBe('5');
     expect(formatAnswerForQuestion(question('short_text'), '')).toBe('—');

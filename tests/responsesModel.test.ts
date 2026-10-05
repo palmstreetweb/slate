@@ -425,8 +425,8 @@ describe('charts', () => {
     expect(d.rows).toEqual([
       { value: 'repair', label: 'Repair', count: 2, pct: 50 },
       { value: 'quote', label: 'Quote', count: 1, pct: 25 },
-      // An option deleted since reads as such, never its stored code (copy QA).
-      { value: '\u0000removed', label: 'Removed option', count: 1, pct: 25 },
+      // A readable value the list no longer has keeps its own row, as the reader shows it.
+      { value: 'retired_option', label: 'retired_option (no longer an option)', count: 1, pct: 25 },
       { value: 'new_install', label: 'New install', count: 0, pct: 0 },
     ]);
   });
