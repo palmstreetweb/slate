@@ -176,7 +176,7 @@ describe('plain sentences', () => {
 });
 
 describe('what holds Publish back', () => {
-  it('a number, scale or date nobody can answer, a duplicate id, and required setups with nothing to use', () => {
+  it('a duplicate id, and required setups with nothing to use', () => {
     const blocking = ownerIssues([
       welcome,
       { id: 'qty', type: 'number', title: 'How many?', min: 10, max: 5 },
@@ -189,13 +189,36 @@ describe('what holds Publish back', () => {
     ] as Question[])
       .filter((i) => i.blocking)
       .map((i) => i.kind);
-    expect(blocking.sort()).toEqual([
-      'bad_bounds',
-      'bad_grid',
-      'duplicate_id',
-      'no_image',
-      'no_slots',
+    expect(blocking.sort()).toEqual(['bad_grid', 'duplicate_id', 'no_image', 'no_slots']);
+  });
+
+  it('bounds set the wrong way round and a step that can’t count are heads-ups, said for what happens (STU-3, COPY-R5)', () => {
+    const issues = ownerIssues([
+      welcome,
+      { id: 'qty', type: 'number', title: 'How many?', min: 10, max: 5, step: 0 },
+      { id: 'rate', type: 'scale', title: 'Rate us', min: 10, max: 1 },
+      { id: 'stars', type: 'scale', title: 'Stars', min: 1, max: 5, step: 0 },
+      {
+        id: 'when',
+        type: 'date',
+        title: 'When?',
+        min: '2026-12-01',
+        max: '2026-01-01',
+        format: 'DD/MM/YYYY',
+      },
+      done,
+    ] as Question[]);
+    expect(issues.some((i) => i.blocking)).toBe(false);
+    expect(issues.map((i) => i.text)).toEqual([
+      '“How many?” has Min (10) above Max (5), so neither limit is used. Swap them.',
+      '“How many?”: a step of 0 can’t be used, so it counts by 1. Clear it, or use more than 0.',
+      '“Rate us” has Min Value (10) above Max Value (1), so the scale runs from 1 to 10. Swap them.',
+      '“Stars” can’t count in steps of 0, so it counts by 1. Open it and press “Count by 1”.',
+      '“When?” has its earliest date (01/12/2026) after its latest (01/01/2026), so neither limit is used. Swap them.',
     ]);
+    for (const text of issues.map((i) => i.text)) {
+      expect(text).not.toMatch(/nobody|no answer fits|nothing to pick|no date fits/);
+    }
   });
 
   it('the same setups on optional questions are warnings', () => {
@@ -214,10 +237,13 @@ describe('what holds Publish back', () => {
     const issues = ownerIssues([
       welcome,
       { id: 'a', type: 'short_text', title: 'A', prefillKey: 'src' },
-      { id: 'qty', type: 'number', title: 'How many?', min: 10, max: 5 },
+      { id: 'pick', type: 'single_choice', title: 'Pick one', options: [] },
       done,
     ] as Question[]);
-    expect(issues.map((i) => i.blocking)).toEqual([true, false]);
+    expect(issues.map((i) => [i.questionId, i.blocking])).toEqual([
+      ['pick', true],
+      ['a', false],
+    ]);
   });
 });
 

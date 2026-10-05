@@ -15,6 +15,7 @@ import type {
 } from '@/index.js';
 import { OUT_OF_AREA_VALUE, IN_AREA_VALUE } from '@/logic/address.js';
 import { estimateCurrency } from '@/logic/estimate.js';
+import { formatDateAnswer } from '@/logic/dateValue.js';
 import { TYPE_LABEL } from '../questionTypeMeta.js';
 import { TypeIcon } from './TypeIcon.js';
 import { ConditionBuilder, JumpRulesEditor } from './LogicEditor.js';
@@ -274,6 +275,8 @@ export function Inspector({
           </Field>
         )}
 
+        {question.type === 'date' && <DateLimitsGuard question={question} onChange={onChange} />}
+
         {question.type === 'yes_no' && (
           <YesNoStyleSetting question={question} onChange={onChange} />
         )}
@@ -450,7 +453,7 @@ export function Inspector({
                     onChange({ min: question.max, max: question.min } as Partial<Question>),
                 }}
               >
-                Min ({question.min}) is more than Max ({question.max}), so nobody could answer.
+                Min ({question.min}) is more than Max ({question.max}), so neither limit is used.
               </GuardNote>
             ) : null}
             <Row>
@@ -1061,6 +1064,32 @@ function AcceptGuard({
   );
 }
 
+/**
+ * A date question's limits set the wrong way round (from code or a backup; the
+ * inspector has no fields for them): the form ignores both, said with a one-tap
+ * fix so they can always be put right here (review fixes, STU-3).
+ */
+function DateLimitsGuard({
+  question,
+  onChange,
+}: {
+  question: Extract<Question, { type: 'date' }>;
+  onChange: Patch;
+}) {
+  const { min, max, format } = question;
+  if (!min || !max || !(min > max)) return null;
+  return (
+    <GuardNote
+      action={{
+        label: 'Swap them',
+        onClick: () => onChange({ min: max, max: min } as Partial<Question>),
+      }}
+    >
+      {`The earliest date (${formatDateAnswer(min, format)}) is after the latest (${formatDateAnswer(max, format)}), so neither limit is used.`}
+    </GuardNote>
+  );
+}
+
 /** What can't work on a scale, said under Min / Max Value with a fix (QA F7, S16, F20). */
 function ScaleGuards({ question, onChange }: { question: ScaleQuestion; onChange: Patch }) {
   const { min, max } = question;
@@ -1073,7 +1102,7 @@ function ScaleGuards({ question, onChange }: { question: ScaleQuestion; onChange
           onClick: () => onChange({ min: max, max: min } as Partial<Question>),
         }}
       >
-        Min Value ({min}) is more than Max Value ({max}), so there’s nothing to pick.
+        Min Value ({min}) is more than Max Value ({max}), so the scale runs from {max} to {min}.
       </GuardNote>
     );
   }

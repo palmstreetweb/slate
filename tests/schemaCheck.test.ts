@@ -228,8 +228,9 @@ describe('checkSchema messages are for owners', () => {
   it('reads plainly, case by case', () => {
     const say = (id: string, kind: string) =>
       issues.filter((i) => i.questionId === id && i.kind === kind).map((i) => i.message);
+    // What the engine does with them (ENG-11): a number or date ignores both limits.
     expect(say('windows', 'bad_bounds')).toEqual([
-      '“How many windows?” has a minimum above its maximum, so nobody can answer it.',
+      '“How many windows?” has a minimum above its maximum, so neither is used. Swap them.',
     ]);
     expect(say('pick_one', 'bad_price')).toEqual(['“Pick a package”: fix the price on “Basic”.']);
     expect(say('job', 'bad_service_area')).toEqual([
@@ -254,7 +255,25 @@ describe('checkSchema messages are for owners', () => {
     );
     const [blank] = checkSchema([{ id: 'n', type: 'number', title: '  ', min: 3, max: 1 }]);
     expect(blank!.message).toBe(
-      'A question with no title has a minimum above its maximum, so nobody can answer it.',
+      'A question with no title has a minimum above its maximum, so neither is used. Swap them.',
     );
+  });
+
+  it('says what the engine does with bounds set the wrong way round (ENG-11)', () => {
+    const msg = (q: Record<string, unknown>) =>
+      checkSchema([{ id: 'x', title: 'Rate us', ...q } as never]).map((i) => i.message);
+    // A scale is drawn from the lower number to the higher, so it can still be answered.
+    expect(msg({ type: 'scale', min: 10, max: 1 })).toEqual([
+      '“Rate us” has a minimum above its maximum, so it runs low to high. Swap them.',
+    ]);
+    expect(msg({ type: 'date', min: '2026-12-01', max: '2026-01-01' })).toEqual([
+      '“Rate us” has a minimum above its maximum, so neither is used. Swap them.',
+    ]);
+    // Only one bound, or none: nothing to say.
+    expect(msg({ type: 'number', min: 10 })).toEqual([]);
+    expect(msg({ type: 'number', max: 1 })).toEqual([]);
+    expect(msg({ type: 'scale', min: 1, max: 1 })).toEqual([]);
+    // Pick limits are the studio's check, not this one.
+    expect(msg({ type: 'multi_choice', options: [], min: 3, max: 2 })).toEqual([]);
   });
 });

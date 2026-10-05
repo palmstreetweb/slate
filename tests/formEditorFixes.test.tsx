@@ -147,6 +147,13 @@ const named: Question = {
 };
 const done: Question = { id: 'done', type: 'thanks', title: 'Thanks' };
 const badNumber: Question = { id: 'qty', type: 'number', title: 'How many?', min: 10, max: 5 };
+/** Nothing to pick: this one would stop people finishing. */
+const noOptions: Question = {
+  id: 'kind',
+  type: 'single_choice',
+  title: 'Which kind?',
+  options: [],
+};
 
 function seed(questions: Question[], extra: Partial<FormRecord> = {}): FormRecord {
   const schema: Schema = {
@@ -249,9 +256,10 @@ describe('the issues banner (S9)', () => {
     renderEditor();
     const region = banner()!;
     expect(region).toBeTruthy();
-    expect(region.textContent).toContain('1 thing to fix before you publish');
+    // Bounds set the wrong way round are ignored by the form: a heads-up (STU-3).
+    expect(region.textContent).toContain('1 thing to check');
     expect(region.textContent).toContain(
-      '“How many?” has a lowest number above its highest, so no answer fits. Swap them.',
+      '“How many?” has Min (10) above Max (5), so neither limit is used. Swap them.',
     );
     expect(region.textContent).not.toMatch(/schema|qty|visibleIf/);
 
@@ -285,9 +293,10 @@ describe('the issues banner (S9)', () => {
     await user.type(min, '30');
     // Min 30 is above max 20, but the owner is mid-edit (maybe about to raise the max).
     expect(banner()).toBeNull();
-    await waitFor(() => expect(banner()?.textContent).toContain('“How many?” has a lowest'), {
-      timeout: 3000,
-    });
+    await waitFor(
+      () => expect(banner()?.textContent).toContain('“How many?” has Min (30) above Max (20)'),
+      { timeout: 3000 },
+    );
   });
 
   it('a new Location question raises nothing (no half-set service area)', async () => {
@@ -304,7 +313,7 @@ describe('the issues banner (S9)', () => {
 describe('Publish (S10, COPY-10)', () => {
   it('waits while something would stop people finishing, and Show me opens it', async () => {
     const user = userEvent.setup();
-    seed([welcome, size, badNumber, done]);
+    seed([welcome, size, noOptions, done]);
     renderEditor();
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     const dialog = await screen.findByRole('alertdialog');
@@ -312,7 +321,16 @@ describe('Publish (S10, COPY-10)', () => {
     expect(dialog.textContent).toContain('People couldn’t finish your form as it is.');
     expect(state.publishForm).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole('button', { name: 'Show me' }));
-    expect(screen.getByDisplayValue('How many?')).toBeTruthy();
+    expect(screen.getByDisplayValue('Which kind?')).toBeTruthy();
+  });
+
+  it('bounds set the wrong way round never hold Publish back: the form ignores them (STU-3)', async () => {
+    const user = userEvent.setup();
+    seed([welcome, size, badNumber, done]);
+    renderEditor();
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(state.publishForm).toHaveBeenCalledTimes(1);
   });
 
   it('warnings never hold Publish back', async () => {

@@ -202,7 +202,7 @@ describe('options (CH-05, S5, S6)', () => {
 });
 
 describe('numbers (F7, F11)', () => {
-  it('Min above Max is explained, and Swap fixes it', async () => {
+  it('Min above Max is explained as what happens, and Swap fixes it', async () => {
     const { user, spy } = setup({
       id: 'n',
       type: 'number',
@@ -210,8 +210,9 @@ describe('numbers (F7, F11)', () => {
       min: 10,
       max: 2,
     });
+    // The form ignores bounds set the wrong way round (ENG-11): nobody is stuck.
     expect(
-      screen.getByText('Min (10) is more than Max (2), so nobody could answer.'),
+      screen.getByText('Min (10) is more than Max (2), so neither limit is used.'),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Swap them' }));
     expect(spy).toHaveBeenLastCalledWith({ min: 2, max: 10 });
@@ -224,6 +225,31 @@ describe('numbers (F7, F11)', () => {
     await leave();
     expect(spy).toHaveBeenLastCalledWith({ step: 0.01 });
     expect(numberIn('Step')).toHaveValue(0.01);
+  });
+});
+
+describe('date limits (STU-3)', () => {
+  it('limits set the wrong way round can be fixed here, though the inspector has no fields for them', async () => {
+    const { user, spy } = setup({
+      id: 'd',
+      type: 'date',
+      title: 'When?',
+      min: '2026-12-01',
+      max: '2026-01-01',
+    } as Question);
+    expect(
+      screen.getByText(
+        'The earliest date (12/01/2026) is after the latest (01/01/2026), so neither limit is used.',
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Swap them' }));
+    expect(spy).toHaveBeenLastCalledWith({ min: '2026-01-01', max: '2026-12-01' });
+    expect(screen.queryByText(/so neither limit is used/)).toBeNull();
+  });
+
+  it('says nothing for limits in order, or only one of them', () => {
+    setup({ id: 'd', type: 'date', title: 'When?', min: '2026-01-01' } as Question);
+    expect(screen.queryByRole('button', { name: 'Swap them' })).toBeNull();
   });
 });
 
@@ -246,10 +272,13 @@ describe('scale (F6, F7, F20, S16, S22)', () => {
     expect(spy).toHaveBeenLastCalledWith({ required: true });
   });
 
-  it('Min above Max is explained, with Swap', () => {
+  it('Min above Max is explained as what happens, with Swap', () => {
     setup({ ...scale, min: 10, max: 1 } as Question);
+    // The scale is drawn from the lower number to the higher (ENG-11).
     expect(
-      screen.getByText('Min Value (10) is more than Max Value (1), so there’s nothing to pick.'),
+      screen.getByText(
+        'Min Value (10) is more than Max Value (1), so the scale runs from 1 to 10.',
+      ),
     ).toBeInTheDocument();
   });
 

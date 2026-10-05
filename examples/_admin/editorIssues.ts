@@ -16,6 +16,7 @@ import { OTHER_VALUE, checkSchema } from '@/index.js';
 import { isValidPrefillKey } from '@/logic/prefill.js';
 import { geoCenter, geoRadiusKm } from '@/logic/geo.js';
 import { PRICE_MAX } from '@/logic/estimate.js';
+import { formatDateAnswer } from '@/logic/dateValue.js';
 import { TYPE_LABEL } from './questionTypeMeta.js';
 import { answerRemoved, conditionLeaves, indexOf, toLeaf, unfinishedReason } from './logicRules.js';
 import { schemaIssueBlocks, slotName, studioIssues, type StudioIssueKind } from './formChecks.js';
@@ -140,6 +141,24 @@ function slotSentence(n: string, q: Question | undefined): string {
     : `${n} has a slot it can’t offer. Check each one’s name, day and spots.`;
 }
 
+/**
+ * Bounds set the wrong way round, said for what the form does with them (review
+ * fixes, ENG-11 / COPY-R5): a number or a date ignores both limits, a scale is
+ * drawn from the lower number to the higher. Nobody is stuck, so it's a heads-up.
+ */
+export function boundsSentence(n: string, q: Question | undefined): string {
+  if (q?.type === 'number') {
+    return `${n} has Min (${q.min}) above Max (${q.max}), so neither limit is used. Swap them.`;
+  }
+  if (q?.type === 'scale') {
+    return `${n} has Min Value (${q.min}) above Max Value (${q.max}), so the scale runs from ${q.max} to ${q.min}. Swap them.`;
+  }
+  if (q?.type === 'date' && q.min && q.max) {
+    return `${n} has its earliest date (${formatDateAnswer(q.min, q.format)}) after its latest (${formatDateAnswer(q.max, q.format)}), so neither limit is used. Swap them.`;
+  }
+  return `${n} has a minimum above its maximum, so neither limit is used. Swap them.`;
+}
+
 function sentence(
   issue: SchemaIssue,
   q: Question | undefined,
@@ -172,15 +191,7 @@ function sentence(
         : `${n} has a link name that can’t be used. Use letters, numbers, - or _.`;
     }
     case 'bad_bounds':
-      if (q?.type === 'number') {
-        return `${n} has a lowest number above its highest, so no answer fits. Swap them.`;
-      }
-      if (q?.type === 'scale')
-        return `${n} starts above where it ends, so there’s nothing to pick.`;
-      if (q?.type === 'date') {
-        return `${n} has an earliest date after its latest date, so no date fits.`;
-      }
-      return `${n} has a minimum above its maximum, so no answer fits.`;
+      return boundsSentence(n, q);
     case 'bad_price':
       return priceSentence(n, q);
     case 'area_off':

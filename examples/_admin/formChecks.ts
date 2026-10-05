@@ -84,7 +84,9 @@ export const FILE_COUNT_MAX = 100;
  * Publish back (decision 4). A skip to itself falls through to the next
  * question, and an empty checklist or contact block asks for nothing, so those
  * are heads-ups; a photo to mark, a grid or sign-up slots with nothing to use
- * trap people only when the question insists on an answer.
+ * trap people only when the question insists on an answer. Bounds set the wrong
+ * way round are a heads-up too (review fixes): the engine ignores a number's or a
+ * date's and draws a scale from the lower end, so every answer still goes through.
  */
 export function schemaIssueBlocks(kind: SchemaIssue['kind'], q: Question | undefined): boolean {
   if (!q) return false;
@@ -93,9 +95,6 @@ export function schemaIssueBlocks(kind: SchemaIssue['kind'], q: Question | undef
     // Two questions share one answer slot: answers mix, and Back goes to the wrong one.
     case 'duplicate_id':
       return true;
-    // No answer fits (a number, scale or date can never be valid).
-    case 'bad_bounds':
-      return q.type === 'number' || q.type === 'scale' || q.type === 'date';
     // Nothing to tap, paint or pick, and the question insists.
     case 'no_image':
     case 'bad_grid':
@@ -509,23 +508,33 @@ export function studioIssues(
       }
     }
 
+    // A step that can't count is read as 1 by the engine (the stepper, scaleRange), so
+    // nobody is trapped: a heads-up, said for what happens (review fixes, STU-3).
     if (q.type === 'number' && q.step !== undefined) {
       const step = q.step as unknown;
       if (!(typeof step === 'number' && Number.isFinite(step) && step > 0)) {
-        add(q, 'bad_step', `${name}: Step has to be more than 0.`, true);
+        add(
+          q,
+          'bad_step',
+          `${name}: a step of ${String(step)} can’t be used, so it counts by 1. Clear it, or use more than 0.`,
+          false,
+        );
       }
     }
 
     if (q.type === 'scale') {
-      const points = scalePointCount(q);
-      if (Number.isNaN(points)) {
+      const counted = scalePointCount(q);
+      if (Number.isNaN(counted)) {
         add(
           q,
           'bad_step',
-          `${name} can’t count its points in steps of ${String(q.step)}. Open it and press “Count by 1”.`,
-          true,
+          `${name} can’t count in steps of ${String(q.step)}, so it counts by 1. Open it and press “Count by 1”.`,
+          false,
         );
-      } else if (q.display === 'slider') {
+      }
+      // Counted by 1 when the step can't count, as the form draws it.
+      const points = Number.isNaN(counted) ? scalePointCount({ ...q, step: 1 }) : counted;
+      if (q.display === 'slider') {
         // A slider draws no cells (R4): a 0–100 slider is fine; only a step too fine to land on is said.
         if (points > SLIDER_STOPS_MAX) {
           add(

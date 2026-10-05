@@ -57,7 +57,8 @@ function schemaWith(questions: unknown[]): Schema {
   } as unknown as Schema;
 }
 
-const broken = schemaWith([{ id: 'qty', type: 'number', title: 'How many?', min: 10, max: 5 }]);
+// Nothing to pick would stop people finishing (bounds set the wrong way round no longer do, STU-3).
+const broken = schemaWith([{ id: 'qty', type: 'single_choice', title: 'How many?', options: [] }]);
 const clean = schemaWith([{ id: 'name', type: 'short_text', title: 'Name?' }]);
 
 function draft(schema: Schema) {
@@ -88,7 +89,7 @@ describe('Publish waits for problems that stop people finishing (S10)', () => {
     );
     const notice = screen.getByRole('status', { name: 'Before you publish' });
     expect(notice.textContent).toContain('Fix this before you publish');
-    expect(notice.textContent).toContain('“How many?” has a lowest number above its highest');
+    expect(notice.textContent).toContain('“How many?” has no options. Add at least one.');
     expect(notice.textContent).not.toMatch(/schema|qty/);
 
     await user.click(screen.getAllByRole('button', { name: 'Publish' })[0]!);

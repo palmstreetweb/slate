@@ -32,7 +32,7 @@ export type SchemaIssue = {
     | 'other_off'
     /** A prefill key is malformed, reserved, or used twice (ADR-063). */
     | 'bad_prefill_key'
-    /** `min` is above `max` (number, scale, date). */
+    /** `min` is above `max` (number, scale, date): a number or date ignores both, a scale runs low to high. */
     | 'bad_bounds'
     /** A price is not a number, too large, or its high end is below its low end (ADR-064). */
     | 'bad_price'
@@ -60,6 +60,9 @@ export type SchemaIssue = {
 
 type Leaf = Extract<Condition, { field: string }>;
 
+/** A number's, a scale's or a date's limits (a date's are ISO strings, which compare in order). */
+type Bounds = { min: number | string; max: number | string };
+
 /** Every leaf of a condition, through `all` / `any`. */
 function leaves(c: Condition): Leaf[] {
   return 'all' in c ? c.all.flatMap(leaves) : 'any' in c ? c.any.flatMap(leaves) : [c];
@@ -67,7 +70,7 @@ function leaves(c: Condition): Leaf[] {
 
 /** How the owner knows a question: its title in quotes, cut short. */
 function named(q: Question, start = true): string {
-  const t = 'title' in q && typeof q.title == 'string' ? q.title.replace(/\s+/g, ' ').trim() : '';
+  const t = typeof q.title == 'string' ? q.title.replace(/\s+/g, ' ').trim() : '';
   return t
     ? `“${t.length > 40 ? t.slice(0, 41).replace(/\s\S*$/, '') + '…' : t}”`
     : `${start ? 'A' : 'a'} question with no title`;
@@ -76,8 +79,8 @@ function named(q: Question, start = true): string {
 /** A price pair is usable: finite, within the cap, and high ≥ low. */
 function badPrice(low: unknown, high: unknown): boolean {
   if (low === undefined && high === undefined) return false;
-  const ok = (v: unknown) =>
-    typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= PRICE_MAX;
+  // Number.isFinite is false for anything that isn't a number.
+  const ok = (v: unknown) => Number.isFinite(v) && Math.abs(v as number) <= PRICE_MAX;
   if (!ok(low)) return true;
   if (high === undefined) return false;
   return !ok(high) || (high as number) < (low as number);
@@ -115,9 +118,11 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
       add(q, 'bad_price', `${named(q)}: fix the price per unit.`);
     }
     if (q.type === 'address' && Array.isArray(q.serviceArea)) {
-      const kept = serviceAreaPrefixes(q.serviceArea).length;
-      const given = q.serviceArea.filter((z) => typeof z === 'string' && z.trim()).length;
-      if (kept < given) {
+      // Fewer usable prefixes than entries given: one of them isn't a ZIP.
+      if (
+        serviceAreaPrefixes(q.serviceArea).length <
+        q.serviceArea.filter((z) => typeof z === 'string' && z.trim()).length
+      ) {
         add(q, 'bad_service_area', `${named(q)} has a service area entry that isn’t a ZIP or postal code.`);
       }
     }
@@ -181,7 +186,7 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
         add(q, 'bad_slots', `${named(q)} has a slot to fix: each needs a name, 1 to 1,000 spots and a real day and time.`);
       }
     }
-    if (q.type === 'contact_info' && contactShown(q).length === 0) {
+    if (q.type === 'contact_info' && !contactShown(q).length) {
       add(q, 'no_fields', `${named(q)} asks for nothing. Turn on name, email or phone.`);
     }
     const key = (q as { prefillKey?: string }).prefillKey?.trim();
@@ -196,11 +201,14 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
         prefillKeys.set(lower, q);
       }
     }
-    if (q.type === 'number' || q.type === 'scale' || q.type === 'date') {
-      const { min, max } = q as { min?: number | string; max?: number | string };
-      if (min !== undefined && max !== undefined && min > max) {
-        add(q, 'bad_bounds', `${named(q)} has a minimum above its maximum, so nobody can answer it.`);
-      }
+    // What the engine does with bounds set the wrong way round (ADR-069): a number or
+    // date ignores both, a scale runs from the lower to the higher. A missing bound
+    // compares false either way, so there's no check for undefined.
+    if (
+      (q.type === 'number' || q.type === 'scale' || q.type === 'date') &&
+      (q as Bounds).min > (q as Bounds).max
+    ) {
+      add(q, 'bad_bounds', `${named(q)} has a minimum above its maximum, so ${q.type == 'scale' ? 'it runs low to high' : 'neither is used'}. Swap them.`);
     }
   }
 
