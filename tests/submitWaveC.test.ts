@@ -213,7 +213,10 @@ describe('clampForQuestion: Wave C shapes', () => {
     expect(
       (clampForQuestion(byId.story!, { typed: 'y'.repeat(5000) }, ctx) as { typed: string }).typed,
     ).toHaveLength(VOICE_TYPED_MAX);
-    expect(clampForQuestion(byId.quiet!, { typed: 'hi' }, ctx)).toBeUndefined();
+    // Typing off still keeps typed text: the page offers it only when the
+    // microphone is blocked or missing, so a required voice note never traps
+    // anyone (MEDIA-17).
+    expect(clampForQuestion(byId.quiet!, { typed: ' hi ' }, ctx)).toEqual({ typed: 'hi' });
     expect(VOICE_TYPED_MAX).toBe(media.VOICE_TYPED_MAX);
   });
 

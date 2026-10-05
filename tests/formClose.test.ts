@@ -234,9 +234,10 @@ describe('per-type answer clamps (ADR-063)', () => {
       'typed one',
       'b',
     ]);
-    // Without allowOther nothing changes from the generic clamp.
-    expect(clampForQuestion({ type: 'single_choice', options: [] }, 'z'.repeat(900))).toHaveLength(
-      900,
-    );
+    // Without allowOther only option values are kept (CH-16): text the page
+    // can't send is dropped instead of stored as an answer.
+    expect(
+      clampForQuestion({ type: 'single_choice', options: [] }, 'z'.repeat(900)),
+    ).toBeUndefined();
   });
 });
