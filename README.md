@@ -130,7 +130,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `date` | `title`, `required?`, `format?` (`'MM/DD/YYYY'` default), `min?`, `max?` (ISO), `includeTime?`, `range?` | real calendar date + bounds; range in order | `string`: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM` with a time, `start/end` for a range |
 | `file_upload` | `title`, `required?`, `accept?`, `maxSizeMb?`, `multiple?`, `maxFiles?` | presence + size; max files when multiple | `File` / `string`, or `(File \| string)[]` when `multiple` |
 | `single_choice` | `title`, `options: Option[]`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` (option value, or the typed Other text) |
-| `multi_choice` | `title`, `options: Option[]`, `min?`, `max?`, `allowOther?`, `otherLabel?` | min/max selections | `string[]` (plus at most one typed Other text) |
+| `multi_choice` | `title`, `options: Option[]`, `min?`, `max?`, `allowOther?`, `otherLabel?` | min/max selections, eased when nobody could meet them (ADR-069) | `string[]` (plus at most one typed Other text) |
 | `dropdown` | `title`, `options: Option[]`, `placeholder?`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` |
 | `picture_choice` | `title`, `options: PictureOption[]`, `multiple?`, `required?`, `min?`, `max?`, `allowOther?`, `otherLabel?`, `display?` (`'grid'` \| `'swipe'`) | required / min-max | `string` or `string[]` |
 | `ranking` | `title`, `options: Option[]` | full permutation | `string[]` (ordered) |
@@ -148,7 +148,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `photo_checklist` | `title`, `items: Option[]`, `required?` (default `true`: every shot) | every shot when required | `{ [itemValue]: fileRef }` |
 | `availability` | `title`, `required?`, `days?` (`'mon'`…`'sun'`, default Mon–Fri), `startTime?` / `endTime?` (`'HH:MM'`, default 08:00–18:00), `slotMinutes?` (15, 30, 60, 120) | at least one slot when required | `{ [day]: 'HH:MM-HH:MM,…' }` |
 | `signup_slots` | `title`, `body?`, `slots: SignupSlot[]`, `required?` (default `true`), `maxPicks?` (1–50, default 1), `waitlist?`, `showRemaining?` (default `true`) | picks among the slots, at most `maxPicks`; waitlists only with `waitlist` | `{ slots: [value, …], wait?: [value, …] }` |
-| `review` | `title`, `subtitle?`, `cta?`, `visibleIf?` | — | _not stored; lists answers with jump-to-edit_ |
+| `review` | `title`, `subtitle?`, `cta?`, `visibleIf?` | — | _not stored; lists the answers on the respondent's path with jump-to-edit; an edit comes back here_ |
 | `thanks` | `title`, `subtitle?`, `cta?`, `visibleIf?`, `redirectUrl?`, `showEstimate?` | — | _not stored; fires `onSubmit`_ |
 
 `Option` is `{ label: string; value: string; description?: string; score?: number; price?: number; priceMax?: number; features?: string[]; badge?: string }` (prices and card details from ADR-064). `PictureOption` adds `{ src: string; alt?: string }`. `SignupSlot` is `{ label: string; value: string; capacity: number; date?: string; start?: string; end?: string; description?: string }` (capacity 1–1,000; `date` ISO `YYYY-MM-DD`, times `HH:MM`).
@@ -178,11 +178,13 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 
 - **Sign-up slots** — `signup_slots` lists slots with limited spots ("Sat 10–11am, 8 spots", "Bring drinks, 3 spots"); slots with a `date` are grouped by day. Pass live counts with `<Form slotsLeft={{ [questionId]: { [slotValue]: spotsLeft } }}>`: slots show "3 of 8 left" or "Full", and with `waitlist` a full slot can be joined as a waitlist instead. Taking the last spot gets its own moment. Capacity has to be enforced by whatever stores responses — the Slate submit Function takes each spot in the same transaction as the response (migration 020), so a slot never holds more people than its capacity. When a slot fills while someone is answering, reject `onSubmit` with an `Error` that carries `goTo: questionId`: the form returns to that question, shows the message there and keeps every answer. In conditions a slot's value means "took that slot"; `WAITLIST_VALUE` (exported) means "joined a waitlist".
 
-Stars, faces, the slider, the stepper, date ranges / times, the file field, picture choice, ranking, the matrix, package cards, the contact block, the address, the signature pad, the estimate reveal, every Wave C UI, sign-up slots, and the dropdown, plain date, number, phone, website, consent and NPS fields load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
+Stars, faces, the slider, the stepper, date ranges / times, the file field, picture choice, ranking, the matrix, package cards, the contact block, the address, the signature pad, the estimate reveal, every Wave C UI, sign-up slots, the dropdown, plain date, number, phone, website, consent and NPS fields, multi choice and the Review step load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
+
+**Pick limits (ADR-069).** A multiple-pick question (multi choice, picture choice with `multiple`, swipe cards) says its rule above the choices ("Pick up to 3", "Pick at least 2"), and once the most picks are made the other choices step back. A respondent is never held to a limit they can't meet: `min` counts at most the choices on offer (Other included) and rounds to whole picks, and a `max` below 1 or below `min` is ignored. Optional single choice, yes / no and single picture choice offer **Skip** (and Enter).
 
 ### Answer piping
 
-`{{field:questionId}}` in any `title`, `subtitle`, or `body` is replaced with the formatted answer; `{{score}}` resolves to the running score total and `{{estimate}}` to the instant estimate ("$2,400 – $3,100"). A contact block pipes as the name. Unanswered fields resolve to `''`.
+`{{field:questionId}}` in any `title`, `subtitle`, or `body` is replaced with the formatted answer; `{{score}}` resolves to the running score total and `{{estimate}}` to the instant estimate ("$2,400 – $3,100"). A contact block pipes as the name, files as their names (never a stored ref), and sign-up slots and availability on a 12-hour clock. Unanswered fields resolve to `''`.
 
 ```ts
 title: "Nice to meet you, {{field:name}}. What's your email?"
@@ -223,7 +225,11 @@ Any answer-bearing question (and `statement`) can carry jump rules, evaluated wh
 }
 ```
 
-Jumps change navigation only; skipped questions keep their `visibleIf`-based inclusion in the submit payload (ADR-015). Back returns to the jump origin.
+Back returns to the jump origin. The respondent's path is replayed from the current answers (ADR-069), so:
+
+- answers to questions a jump now passes over (the respondent went Back and took the other branch) are left out of the submit payload, as hidden ones are; they stay in state, so taking that branch again brings them back;
+- a question that becomes visible because of a later answer is asked before the form moves on, then the respondent continues where they were going;
+- an edit from the Review step comes back to Review.
 
 ### Schema sanity checking
 
