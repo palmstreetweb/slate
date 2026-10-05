@@ -202,7 +202,7 @@ async function handleGenerate(request: Request): Promise<Response> {
     const claims = token ? await verifyUserJwt(token).catch(() => null) : null;
     if (!claims) {
       return json(
-        { error: 'Your sign-in expired. Sign in again to use Build with AI.', retry: false },
+        { error: 'Your sign-in expired. Sign out and back in, then try again.', retry: false },
         401,
       );
     }
