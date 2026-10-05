@@ -180,7 +180,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 
 Stars, faces, the slider, the stepper, date ranges / times, the file field, picture choice, ranking, the matrix, package cards, the contact block, the address, the signature pad, the estimate reveal, every Wave C UI, sign-up slots, the dropdown, plain date, number, phone, website, consent and NPS fields, multi choice and the Review step load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
 
-**Pick limits (ADR-069).** A multiple-pick question (multi choice, picture choice with `multiple`, swipe cards) says its rule above the choices ("Pick up to 3", "Pick at least 2"), and once the most picks are made the other choices step back. A respondent is never held to a limit they can't meet: `min` counts at most the choices on offer (Other included) and rounds to whole picks, and a `max` below 1 or below `min` is ignored. Optional single choice, yes / no and single picture choice offer **Skip** (and Enter).
+**Pick limits (ADR-069).** A multiple-pick question (multi choice, picture choice with `multiple`, swipe cards) says its rule above the choices ("Pick up to 3", "Pick at least 2"), and once the most picks are made the other choices step back. A respondent is never held to a limit they can't meet: `min` counts at most the choices on offer (Other included) and rounds to whole picks, and a `max` below 1 or below `min` is ignored. Optional single choice, yes / no and single picture choice offer **Skip** (and Enter) while nothing is picked.
 
 ### Answer piping
 
