@@ -9,7 +9,7 @@
 
 import type { DateQuestion, Question } from '@/types/Question.js';
 import { isScaleStepValue } from '@/utils/scaleStep.js';
-import { isValidIsoDate, parseDateAnswer, partKey } from './dateValue.js';
+import { formatDateAnswer, isValidIsoDate, parseDateAnswer, partKey } from './dateValue.js';
 import { addressErrors, contactErrors } from './contact.js';
 import {
   SIG_TYPED_MAX,
@@ -44,9 +44,44 @@ const RANGES_RE = /^\d{2}:\d{2}-\d{2}:\d{2}(,\d{2}:\d{2}-\d{2}:\d{2})*$/;
 const URL_RE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i;
 
 /**
+ * The longest text a short or long text answer takes: the question's own
+ * limit when it is 1 or more (a 0 or negative one would trap everyone, so it
+ * counts as unset), else what the server keeps (10,000 characters).
+ */
+export function textMax(q: { maxLength?: number }): number {
+  return (q.maxLength ?? 0) >= 1 ? q.maxLength! : 1e4;
+}
+
+/**
+ * "Enter a number from $10 to $500", in the question's own prefix and unit.
+ * Bounds set the wrong way round are ignored, so a live form never asks for
+ * a number nobody can give.
+ */
+function rangeError(
+  n: number,
+  min = -Infinity,
+  max = Infinity,
+  prefix = '',
+  unit = '',
+): ValidationError | null {
+  if (min > max || (n >= min && n <= max)) return null;
+  const u = unit && ' ' + unit;
+  return {
+    code: n < min ? 'min' : 'max',
+    message:
+      max === Infinity
+        ? `Enter ${prefix + min + u} or more`
+        : min === -Infinity
+          ? `Enter ${prefix + max + u} or less`
+          : `Enter a number from ${prefix + min} to ${prefix + max + u}`,
+  };
+}
+
+/**
  * Date answers (ADR-010, ADR-063): the shape must match the question — a time
  * when `includeTime`, a `start/end` pair when `range` — every date sits inside
- * `min`/`max`, and a range never ends before it starts.
+ * `min`/`max`, and a range never ends before it starts. Limits read in the
+ * question's own format; limits set the wrong way round are ignored.
  */
 function validateDate(question: DateQuestion, answer: unknown): ValidationError | null {
   if (typeof answer !== 'string' || answer.length === 0) return null;
@@ -59,12 +94,14 @@ function validateDate(question: DateQuestion, answer: unknown): ValidationError 
   if (!shapeOk) {
     return { code: 'date', message: "That doesn't look like a valid date" };
   }
+  const { min, max, format } = question;
   for (const p of parts) {
-    if (question.min !== undefined && p.date < question.min) {
-      return { code: 'min', message: `Earliest allowed date is ${question.min}` };
+    if (min && max && min > max) break;
+    if (min && p.date < min) {
+      return { code: 'min', message: `Pick a date on or after ${formatDateAnswer(min, format)}` };
     }
-    if (question.max !== undefined && p.date > question.max) {
-      return { code: 'max', message: `Latest allowed date is ${question.max}` };
+    if (max && p.date > max) {
+      return { code: 'max', message: `Pick a date on or before ${formatDateAnswer(max, format)}` };
     }
   }
   if (parsed!.end && partKey(parsed!.end) < partKey(parsed!.start)) {
@@ -134,31 +171,26 @@ export function validate(question: Question, answer: unknown): ValidationResult 
     case 'thanks':
       return null;
 
-    case 'short_text': {
-      if (question.required && isBlankString(answer)) {
-        return { code: 'required', message: 'Please fill this in' };
-      }
-      if (typeof answer === 'string') {
-        if (question.maxLength !== undefined && answer.length > question.maxLength) {
-          return { code: 'too_long', message: `Max ${question.maxLength} characters` };
-        }
-        if (question.pattern && answer.length > 0 && !question.pattern.test(answer)) {
-          return {
-            code: 'pattern',
-            message: question.patternError ?? 'Invalid format',
-          };
-        }
-      }
-      return null;
-    }
-
+    case 'short_text':
     case 'long_text': {
       if (question.required && isBlankString(answer)) {
         return { code: 'required', message: 'Please fill this in' };
       }
-      if (typeof answer === 'string' && question.maxLength !== undefined) {
-        if (answer.length > question.maxLength) {
-          return { code: 'too_long', message: `Max ${question.maxLength} characters` };
+      if (typeof answer === 'string') {
+        const max = textMax(question);
+        if (answer.length > max) {
+          return { code: 'too_long', message: `Keep it to ${max} characters or fewer` };
+        }
+        if (
+          question.type === 'short_text' &&
+          question.pattern &&
+          answer &&
+          !question.pattern.test(answer)
+        ) {
+          return {
+            code: 'pattern',
+            message: question.patternError ?? 'Please check the format',
+          };
         }
       }
       return null;
@@ -214,12 +246,7 @@ export function validate(question: Question, answer: unknown): ValidationResult 
       }
       if (typeof answer === 'number') {
         if (!Number.isFinite(answer)) return { code: 'number', message: 'Please enter a number' };
-        if (question.min !== undefined && answer < question.min) {
-          return { code: 'min', message: `Minimum is ${question.min}` };
-        }
-        if (question.max !== undefined && answer > question.max) {
-          return { code: 'max', message: `Maximum is ${question.max}` };
-        }
+        return rangeError(answer, question.min, question.max, question.prefix, question.unit);
       }
       return null;
     }
@@ -227,19 +254,19 @@ export function validate(question: Question, answer: unknown): ValidationResult 
     case 'scale': {
       const required = question.required ?? false;
       if (required && (answer === undefined || answer === null)) {
-        return { code: 'required', message: 'Please pick a value' };
+        return { code: 'required', message: 'Please pick a number' };
       }
       if (typeof answer === 'number') {
-        if (answer < question.min) {
-          return { code: 'min', message: `Minimum is ${question.min}` };
-        }
-        if (answer > question.max) {
-          return { code: 'max', message: `Maximum is ${question.max}` };
-        }
+        // The field draws a scale set the wrong way round in order, so check it that way too.
+        const lo = Math.min(question.min, question.max);
+        const hi = Math.max(question.min, question.max);
         const step = question.step ?? 1;
-        if (!isScaleStepValue(answer, question.min, question.max, step)) {
-          return { code: 'step', message: `Pick a value in steps of ${step}` };
-        }
+        return (
+          rangeError(answer, lo, hi) ??
+          (isScaleStepValue(answer, lo, hi, step)
+            ? null
+            : { code: 'step', message: `Pick a number in steps of ${step}` })
+        );
       }
       return null;
     }
@@ -355,10 +382,10 @@ export function validate(question: Question, answer: unknown): ValidationResult 
     case 'nps': {
       const required = question.required ?? false;
       if (required && (answer === undefined || answer === null)) {
-        return { code: 'required', message: 'Please pick a value' };
+        return { code: 'required', message: 'Please pick a number' };
       }
       if (typeof answer === 'number' && (answer < 0 || answer > 10)) {
-        return { code: 'range', message: 'Pick a value between 0 and 10' };
+        return { code: 'range', message: 'Pick a number from 0 to 10' };
       }
       return null;
     }
@@ -483,7 +510,7 @@ export function validate(question: Question, answer: unknown): ValidationResult 
         (isRecord(answer) && Object.values(answer).every((v) => isBlankString(v)));
       if (blank) {
         return question.required
-          ? { code: 'required', message: 'Please share your location, or enter it below' }
+          ? { code: 'required', message: 'Please share your location, or type it instead' }
           : null;
       }
       if (!locationAnswerCore(question as unknown as Record<string, unknown>, answer, [])) {

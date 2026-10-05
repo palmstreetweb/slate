@@ -52,13 +52,8 @@ export function parseDateAnswer(v: unknown): ParsedDateAnswer | null {
   return start && end ? { start, end } : null;
 }
 
-export function partToString(p: DatePart): string {
-  return p.time ? `${p.date}T${p.time}` : p.date;
-}
-
-export function dateAnswerToString(a: ParsedDateAnswer): string {
-  return a.end ? `${partToString(a.start)}/${partToString(a.end)}` : partToString(a.start);
-}
+// Writing an answer back (`dateAnswerToString`) lives with the date fields, in
+// `dateEntry.ts`: only they need it, and this module ships in the core.
 
 /** Sortable key for ordering two parts (date, then time; a missing time sorts first). */
 export function partKey(p: DatePart): string {

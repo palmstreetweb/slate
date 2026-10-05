@@ -1472,6 +1472,34 @@
     0 0 0 4px var(--slate-accent);
 }
 
+/* A finger holding a cell (GAP-18): it fills in over the hold, so painting is
+   something you see coming, not something a resting thumb does by accident. */
+@keyframes slate-avail-press {
+  from {
+    box-shadow: inset 0 0 0 0 rgb(var(--slate-accent-rgb) / 0.55);
+  }
+  to {
+    box-shadow: inset 0 0 0 18px rgb(var(--slate-accent-rgb) / 0.55);
+  }
+}
+
+[data-slate-forms] .slate-avail-grid .slate-avail-cell.is-pressing {
+  border-color: var(--slate-accent);
+  animation: slate-avail-press 550ms linear both;
+}
+
+[data-slate-forms][data-reduced-motion] .slate-avail-grid .slate-avail-cell.is-pressing {
+  animation: none;
+  background: rgb(var(--slate-accent-rgb) / 0.35);
+}
+
+/* "On a phone, hold a moment before you drag": only where there is a finger. */
+@media (hover: hover) {
+  [data-slate-forms] .slate-touch-note {
+    display: none;
+  }
+}
+
 [data-slate-forms] .slate-avail-meta {
   display: flex;
   align-items: center;

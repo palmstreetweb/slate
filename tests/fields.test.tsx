@@ -170,7 +170,8 @@ describe('question types render', () => {
     expect(container).toMatchSnapshot();
   });
 
-  it('scale', () => {
+  // The numbers scale loads on demand since the QA pass: wait for the field.
+  it('scale', async () => {
     const { container } = renderQuestion({
       id: 'urgency',
       type: 'scale',
@@ -180,7 +181,7 @@ describe('question types render', () => {
       minLabel: 'chill',
       maxLabel: 'asap',
     });
-    expect(screen.getAllByRole('radio')).toHaveLength(5);
+    expect(await screen.findAllByRole('radio')).toHaveLength(5);
     expect(screen.getByText('chill')).toBeInTheDocument();
     expect(container).toMatchSnapshot();
   });
@@ -315,7 +316,7 @@ describe('field interactions', () => {
     });
     await user.type(screen.getByRole('textbox'), '50');
     await user.click(screen.getByRole('button', { name: /ok/i }));
-    expect(await screen.findByText(/Minimum is 100/)).toBeInTheDocument();
+    expect(await screen.findByText('! Enter 100 or more')).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
   });
 
@@ -337,7 +338,7 @@ describe('field interactions', () => {
       min: 1,
       max: 3,
     });
-    await user.click(screen.getByRole('radio', { name: '2' }));
+    await user.click(await screen.findByRole('radio', { name: '2' }));
     expect(setAnswer).toHaveBeenCalledWith('urgency', 2);
   });
 
@@ -358,7 +359,9 @@ describe('field interactions', () => {
     await user.type(day, '30');
     await user.type(year, '2026');
     await user.click(screen.getByRole('button', { name: /ok/i }));
-    expect(await screen.findByText(/valid date/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText('! February 2026 has only 28 days. Please check the day.'),
+    ).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
 
     await user.clear(day);

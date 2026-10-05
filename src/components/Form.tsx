@@ -63,10 +63,15 @@ import '@/styles/base.css';
 import '@/styles/questions.css';
 import '@/styles/motion.css';
 
-/** Absolute http(s) URL or null. Relative paths resolve against the page. */
+/**
+ * Absolute http(s) URL or null. A link with no scheme ("example.com/thanks",
+ * "www.example.com") is https (F3), not a path on this page; "/path" and
+ * "./path" still resolve against the page.
+ */
 function httpUrlOrNull(raw: string): string | null {
   try {
-    const u = new URL(raw, window.location.href);
+    const t = raw.trim();
+    const u = new URL(/^[./]|:/.test(t) ? t : 'https://' + t, location.href);
     return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null;
   } catch {
     return null;

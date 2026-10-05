@@ -1,97 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { EmailQuestion } from '@/types/Question.js';
-import type { LooseAnswers } from '@/types/Answers.js';
-import { validate } from '@/logic/validation.js';
-import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
-import { shakeInvalid } from '@/utils/motion.js';
-import { focusAfter } from '@/utils/focus.js';
-import { isTypewriterKey } from '@/utils/typewriterKey.js';
-import { resolveTitle } from './_resolveTitle.js';
+import { TextAnswer, type TextFieldProps } from './TextAnswer.js';
 
-type Props = {
-  question: EmailQuestion;
-  answers: LooseAnswers;
-  initialValue: string;
-  onAnswer: (value: string) => void;
-  onAdvance: () => void;
-  onType?: () => void;
-};
-
-export function EmailField({
-  question,
-  answers,
-  initialValue,
-  onAnswer,
-  onAdvance,
-  onType,
-}: Props) {
-  const [value, setValue] = useState(initialValue);
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const labelId = useId();
-
-  useEffect(() => {
-    return focusAfter(inputRef.current);
-  }, [question.id]);
-
-  const submit = useCallback(() => {
-    const err = validate(question, value);
-    if (err) {
-      setError(err.message);
-      shakeInvalid(inputRef.current);
-      return;
-    }
-    setError(null);
-    onAnswer(value.trim());
-    onAdvance();
-  }, [question, value, onAnswer, onAdvance]);
-
-  useRegisterFormConfirm(submit);
-
-  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (isTypewriterKey(e)) onType?.();
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      submit();
-    }
-  };
-
+export function EmailField(props: TextFieldProps<EmailQuestion>) {
   return (
-    <div>
-      <h1 id={labelId} className="slate-title">
-        {resolveTitle(question.title, answers)}
-      </h1>
-      <div style={{ marginTop: 24 }}>
-        <input
-          ref={inputRef}
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            if (error) setError(null);
-          }}
-          onKeyDown={handleKey}
-          placeholder={question.placeholder ?? 'name@example.com'}
-          aria-labelledby={labelId}
-          aria-invalid={Boolean(error)}
-          className={`slate-input${error ? ' slate-input--error' : ''}`}
-        />
-        {error && (
-          <p className="slate-err" aria-live="polite">
-            ! {error}
-          </p>
-        )}
-        <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={submit}>
-            OK <span aria-hidden>✓</span>
-          </button>
-          <span className="slate-hint">press Enter ↵</span>
-        </div>
-      </div>
-    </div>
+    <TextAnswer
+      {...props}
+      box={{
+        type: 'email',
+        inputMode: 'email',
+        autoComplete: 'email',
+        placeholder: props.question.placeholder ?? 'name@example.com',
+      }}
+      hint="press Enter ↵"
+    />
   );
 }

@@ -29,6 +29,7 @@ import { resolveUploadMeta } from '../resolveUploadMeta.js';
 import { clearUploadContext, setUploadContext } from '../uploadContext.js';
 import { TYPE_LABEL } from '../questionTypeMeta.js';
 import { sampleEstimate } from '../estimatePreview.js';
+import { usePreviewFocusGuard } from './usePreviewFocusGuard.js';
 
 import '@/styles/tokens.css';
 import '@/styles/toggle.css';
@@ -154,6 +155,8 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
     selectedQuestion.type !== 'statement';
 
   const noop = () => {};
+  // The preview's fields never pull the keyboard out of the inspector (S15).
+  const focusGuard = usePreviewFocusGuard();
 
   return (
     <section className="slate-canvas">
@@ -191,7 +194,7 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
         </div>
       </div>
 
-      <div className="slate-canvas-frame">
+      <div className="slate-canvas-frame" {...focusGuard}>
         <div
           data-slate-forms=""
           data-theme-name={schema.theme}

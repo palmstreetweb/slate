@@ -41,6 +41,7 @@ import { shakeInvalid } from '@/utils/motion.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import { FieldError } from './fieldMessage.js';
 import '@/styles/extensions.css';
 import '@/styles/extensions-c.css';
 
@@ -204,14 +205,26 @@ export default function LocationField({
     }
     const err = validate(question, answer);
     if (err) {
-      setError(err.message);
-      shakeInvalid(phase === 'manual' || phase === 'off' ? inputRef.current : rootRef.current);
+      const typingNow = phase === 'manual' || phase === 'off';
+      // Point at what is on screen: the box when typing, else the two ways in.
+      setError(
+        err.code !== 'required'
+          ? err.message
+          : typingNow
+            ? hasZipCheck
+              ? 'Please type your ZIP code'
+              : 'Please type your town or ZIP code'
+            : hasZipCheck
+              ? 'Please share your location, or enter a ZIP code instead'
+              : err.message,
+      );
+      shakeInvalid(typingNow ? inputRef.current : rootRef.current);
       return;
     }
     setError(null);
     onAnswer(answer);
     onAdvance();
-  }, [phase, question, answer, onAnswer, onAdvance]);
+  }, [phase, question, answer, hasZipCheck, onAnswer, onAdvance]);
 
   useRegisterFormConfirm(submit);
 
@@ -236,7 +249,7 @@ export default function LocationField({
         className={`slate-loc slate-loc--${phase}${area ? ` slate-loc--${area}` : ''}`}
         role="group"
         aria-labelledby={titleId}
-        aria-describedby={noteId}
+        aria-describedby={error ? `${noteId} ${titleId}-err` : noteId}
       >
         <div className="slate-loc-radar" aria-hidden="true">
           <span className="slate-loc-ring slate-loc-ring--outer" />
@@ -309,6 +322,7 @@ export default function LocationField({
               <input
                 ref={inputRef}
                 className="slate-input"
+                aria-describedby={`${titleId}-err`}
                 value={text}
                 maxLength={PLACE_TYPED_MAX}
                 inputMode={hasZipCheck ? 'numeric' : 'text'}
@@ -352,7 +366,7 @@ export default function LocationField({
 
           <p id={noteId} className="slate-loc-privacy">
             <LockIcon />
-            <span>{locationPrivacyLine(question, typing)}</span>
+            <span>{locationPrivacyLine(question, typing, Boolean(center && radius) || hasZipCheck)}</span>
           </p>
         </div>
       </div>
@@ -360,16 +374,12 @@ export default function LocationField({
       <p className="slate-sr" aria-live="polite">
         {said}
       </p>
-      {error ? (
-        <p className="slate-err" aria-live="polite">
-          ! {error}
-        </p>
-      ) : null}
+      <FieldError id={`${titleId}-err`} error={error} />
       <div className="slate-actions">
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>
         </button>
-        <span className="slate-hint">press Enter ↵</span>
+        <span className="slate-hint slate-keys">press Enter ↵</span>
       </div>
     </div>
   );

@@ -171,6 +171,39 @@
   letter-spacing: 0.01em;
 }
 
+/* A field's message slot stays in the page so screen readers announce it
+   (GAP-21); empty, it takes no room and doesn't animate. Its slide-in
+   (motion.css) starts when a message arrives, as the selector starts to match. */
+[data-slate-forms] p.slate-err:empty {
+  margin: 0;
+  animation: none;
+}
+
+/* Phones have no keys to press (GAP-26): the "press Enter" beside a typed
+   box's OK, and hints marked keyboard-only (.slate-keys), step aside. Hints
+   that say something else (a file's size limit, "drag rows") stay. */
+@media (hover: none) {
+  [data-slate-forms] .slate-input ~ .slate-actions > .slate-hint,
+  [data-slate-forms] .slate-keys {
+    display: none;
+  }
+}
+
+/* "9410 / 10000" near a text answer's limit; past it, in the error colour. */
+[data-slate-forms] .slate-count {
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--slate-text);
+  opacity: 0.7;
+}
+
+[data-slate-forms] .slate-count--over {
+  color: var(--slate-error);
+  opacity: 1;
+  font-weight: 700;
+}
+
 /* ---------- a submit sent the respondent back here (ADR-066) ---------- */
 
 [data-slate-forms] .slate-notice {
@@ -1125,10 +1158,13 @@
   gap: 6px;
 }
 
+/* The header and each row are separate grids: minmax(0, 1fr) keeps their
+   columns the same width whatever the labels, so each header stays over its
+   own cells (GAP-13); a long header wraps instead of widening its column. */
 [data-slate-forms] .slate-matrix-head,
 [data-slate-forms] .slate-matrix-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.4fr) repeat(var(--slate-matrix-cols), 1fr);
+  grid-template-columns: minmax(120px, 1.4fr) repeat(var(--slate-matrix-cols), minmax(0, 1fr));
   gap: 6px;
   align-items: stretch;
 }
@@ -1142,6 +1178,9 @@
   align-self: end;
   padding-bottom: 4px;
   text-transform: var(--slate-transform);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 [data-slate-forms] .slate-matrix-rowlabel {
@@ -1223,6 +1262,41 @@
   }
 
   [data-slate-forms] .slate-matrix-cell--selected .slate-matrix-cell-label {
+    color: var(--slate-on-accent);
+  }
+}
+
+/* Eight or more columns don't fit side by side in under ~700 px (a landscape
+   phone, a desktop at 200% zoom): such a matrix stacks as it does on phones,
+   each answer labelled, instead of squeezing its headers (GAP-13). */
+[data-slate-forms] .slate-matrix {
+  container-type: inline-size;
+}
+
+@container (max-width: 700px) {
+  [data-slate-forms] .slate-matrix:has(.slate-matrix-head > :nth-child(9)) .slate-matrix-head {
+    display: none;
+  }
+
+  [data-slate-forms] .slate-matrix:has(.slate-matrix-head > :nth-child(9)) .slate-matrix-row {
+    grid-template-columns: 1fr;
+    margin-bottom: 10px;
+  }
+
+  [data-slate-forms] .slate-matrix:has(.slate-matrix-head > :nth-child(9)) .slate-matrix-cell {
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  [data-slate-forms] .slate-matrix:has(.slate-matrix-head > :nth-child(9)) .slate-matrix-cell-label {
+    display: inline;
+  }
+
+  [data-slate-forms]
+    .slate-matrix:has(.slate-matrix-head > :nth-child(9))
+    .slate-matrix-cell--selected
+    .slate-matrix-cell-label {
     color: var(--slate-on-accent);
   }
 }
@@ -1314,7 +1388,8 @@
 
 @media (max-width: 560px) {
   [data-slate-forms] .slate-review-row {
-    grid-template-columns: 1fr;
+    /* minmax(0, …): a long title can't widen the column and push Edit off-screen (GAP-12). */
+    grid-template-columns: minmax(0, 1fr);
     gap: 4px;
   }
 }

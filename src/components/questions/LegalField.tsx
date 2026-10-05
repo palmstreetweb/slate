@@ -1,10 +1,12 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import type { LegalQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
+import { validate } from '@/logic/validation.js';
 import { useChoiceCommit } from '@/hooks/useChoiceCommit.js';
 import { ChoiceBadge } from './ChoiceBadge.js';
+import { TapActions } from './ext/TapActions.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -12,10 +14,14 @@ type Props = {
   answers: LooseAnswers;
   selected: string | undefined;
   onSelect: (value: 'accept' | 'decline') => void;
+  /** Move on without a pick (Skip, when optional) or with the one already made (OK). */
+  onAdvance: () => void;
 };
 
-export function LegalField({ question, answers, selected, onSelect }: Props) {
+export function LegalField({ question, answers, selected, onSelect, onAdvance }: Props) {
   const labelId = useId();
+  const errId = `${labelId}-err`;
+  const groupRef = useRef<HTMLDivElement>(null);
   const { committed, markCommitted } = useChoiceCommit(selected);
   const choices: ReadonlyArray<{ value: 'accept' | 'decline'; label: string; badge: string }> = [
     { value: 'accept', label: question.acceptLabel ?? 'I accept', badge: 'A' },
@@ -30,9 +36,11 @@ export function LegalField({ question, answers, selected, onSelect }: Props) {
       {question.body && <p className="slate-subtitle">{question.body}</p>}
 
       <div
+        ref={groupRef}
         className={`slate-choices${committed ? ' slate-choices--committed' : ''}`}
         role="radiogroup"
         aria-labelledby={labelId}
+        aria-describedby={errId}
       >
         {choices.map((c) => {
           const isSelected = selected === c.value;
@@ -55,9 +63,15 @@ export function LegalField({ question, answers, selected, onSelect }: Props) {
           );
         })}
       </div>
-      <p className="slate-hint" style={{ marginTop: 20 }}>
-        tap a key (A, B) or click to select
-      </p>
+      <TapActions
+        answered={selected !== undefined}
+        required={question.required ?? true}
+        check={() => validate(question, selected)?.message ?? null}
+        onAdvance={onAdvance}
+        target={groupRef}
+        errorId={errId}
+        hint={<span className="slate-hint slate-keys">tap a key (A, B) or click to select</span>}
+      />
     </div>
   );
 }

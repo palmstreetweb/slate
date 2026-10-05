@@ -139,7 +139,11 @@ describe('contact block', () => {
     await user.type(screen.getByRole('textbox', { name: /^email/i }), 'a@b.co');
     await user.type(screen.getByRole('textbox', { name: /^phone/i }), '1234567');
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(await screen.findByText(/doesn't look like a phone number/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        '! Please check the number, including the area code. For a number outside the United States, start with + and the country code.',
+      ),
+    ).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
   });
 });
@@ -251,7 +255,9 @@ describe('signature', () => {
 
     draw(canvas, [[100, 100]]);
     fireEvent.click(screen.getByRole('button', { name: /ok/i }));
-    expect(await screen.findByText(/full stroke, not a dot/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText('! That’s only a dot. Please sign your full name.'),
+    ).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }));

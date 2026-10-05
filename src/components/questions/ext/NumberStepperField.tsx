@@ -2,21 +2,32 @@
  * Quantity stepper for `number` questions with `display: 'stepper'`
  * (ADR-063). Big − / + buttons (56 px) either side of the value; holding one
  * repeats, faster the longer it's held. The value itself stays typeable for
- * big jumps, and it is a spinbutton: Up/Down (and + / −) step it. The answer
- * is the number shown — optional prefix and unit are display only.
+ * big jumps, and it is a spinbutton: Up/Down (and + / −, where it can't go
+ * below 0) step it. The answer is the number shown — optional prefix and
+ * unit are display only.
  */
 
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import type { NumberQuestion } from '@/types/Question.js';
 import { validate } from '@/logic/validation.js';
+import { NOT_A_NUMBER, parseTypedNumber } from '@/logic/numberEntry.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { motionReduced, shakeInvalid } from '@/utils/motion.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import { FieldError } from './fieldMessage.js';
 import '@/styles/extensions.css';
 
 const HOLD_DELAY_MS = 420;
@@ -29,13 +40,6 @@ function decimalsOf(step: number): number {
   return dot === -1 ? 0 : Math.min(6, s.length - dot - 1);
 }
 
-/** Parse what's in the box: '' → undefined, junk → NaN. */
-function parse(text: string): number | undefined {
-  const t = text.trim().replace(/,/g, '');
-  if (t === '') return undefined;
-  return /^-?\d*\.?\d+$/.test(t) || /^-?\d+\.?$/.test(t) ? Number(t) : Number.NaN;
-}
-
 export default function NumberStepperField({
   question,
   answers,
@@ -46,9 +50,17 @@ export default function NumberStepperField({
   ping,
 }: ExtFieldProps<NumberQuestion>) {
   const labelId = useId();
+  const errId = `${labelId}-err`;
   const step = question.step && question.step > 0 ? question.step : 1;
   const decimals = decimalsOf(step);
-  const { min, max } = question;
+  // Bounds set the wrong way round are ignored (as validate() does), so the
+  // buttons never lock and nobody is asked for a number they can't give.
+  const inverted =
+    question.min !== undefined && question.max !== undefined && question.min > question.max;
+  const min = inverted ? undefined : question.min;
+  const max = inverted ? undefined : question.max;
+  const { prefix, unit } = question;
+  const parse = useCallback((t: string) => parseTypedNumber(t, prefix, unit), [prefix, unit]);
 
   const clamp = useCallback(
     (n: number) => {
@@ -67,6 +79,15 @@ export default function NumberStepperField({
   const inputRef = useRef<HTMLInputElement>(null);
   const holdRef = useRef<number | null>(null);
   const holdDir = useRef<1 | -1 | 0>(0);
+  /** A finger is down on − / + and hasn't stepped yet: it steps on release (a tap). */
+  const tapDir = useRef<1 | -1 | 0>(0);
+  /** After a + / − key, the new number is selected, so a digit typed next replaces it. */
+  const selectAfterRender = useRef(false);
+  useLayoutEffect(() => {
+    if (!selectAfterRender.current) return;
+    selectAfterRender.current = false;
+    inputRef.current?.select();
+  });
   const current = parse(text);
   const base = current !== undefined && Number.isFinite(current) ? current : clamp(0);
   const atMin = min !== undefined && base <= min;
@@ -101,25 +122,39 @@ export default function NumberStepperField({
       setError(null);
       nudge(dir);
     },
-    [clamp, step],
+    [clamp, step, parse],
   );
 
   function stopHold() {
     holdDir.current = 0;
+    tapDir.current = 0;
     if (holdRef.current !== null) {
       window.clearTimeout(holdRef.current);
       holdRef.current = null;
     }
   }
 
-  const startHold = (dir: 1 | -1) => {
+  /**
+   * A mouse or pen steps at once. A finger waits: it may be starting a scroll
+   * (the browser then cancels the pointer), so it steps on release, or once
+   * it has been held still long enough to start repeating.
+   */
+  const startHold = (dir: 1 | -1, touch: boolean) => {
     stopHold();
     if ((dir === -1 && atMin) || (dir === 1 && atMax)) return;
     holdDir.current = dir;
-    ping?.();
-    bump(dir);
+    if (touch) {
+      tapDir.current = dir;
+    } else {
+      ping?.();
+      bump(dir);
+    }
     let repeats = 0;
     const tick = () => {
+      if (tapDir.current) {
+        tapDir.current = 0;
+        ping?.();
+      }
       bump(dir);
       repeats += 1;
       holdRef.current = window.setTimeout(tick, repeats > 8 ? HOLD_FAST_MS : HOLD_EVERY_MS);
@@ -130,7 +165,7 @@ export default function NumberStepperField({
   const submit = useCallback(() => {
     const n = parse(text);
     if (n !== undefined && Number.isNaN(n)) {
-      setError('Please enter a number');
+      setError(NOT_A_NUMBER);
       shakeInvalid(inputRef.current);
       return;
     }
@@ -143,19 +178,32 @@ export default function NumberStepperField({
     setError(null);
     onAnswer(n);
     onAdvance();
-  }, [text, question, onAnswer, onAdvance]);
+  }, [text, question, parse, onAnswer, onAdvance]);
 
   useRegisterFormConfirm(submit);
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    const signs = min === undefined || min >= 0;
+    // + and − step only where a number can't be negative; elsewhere they are
+    // signs, so "-5" types minus five (not five after a step down to -1).
+    const signs = min !== undefined && min >= 0;
     if (e.key === 'ArrowUp' || (e.key === '+' && signs)) {
       e.preventDefault();
       bump(1);
+      if (e.key === '+') selectAfterRender.current = true;
       return;
     }
     if (e.key === 'ArrowDown' || (e.key === '-' && signs)) {
       e.preventDefault();
+      if (e.key === '-') {
+        // "-2" where only 0 or more is allowed (F19): at the bottom, say so
+        // instead of stepping; either way the number shown is selected, so
+        // the next digit replaces it ("2", never "02" read as 2).
+        if (atMin) setError(validate(question, base - step)?.message ?? null);
+        else bump(-1);
+        e.currentTarget.select();
+        selectAfterRender.current = true;
+        return;
+      }
       bump(-1);
       return;
     }
@@ -170,10 +218,18 @@ export default function NumberStepperField({
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      startHold(dir);
+      startHold(dir, e.pointerType === 'touch');
     },
-    onPointerUp: stopHold,
+    // A finger lifted without scrolling or holding was a tap: step once now.
+    onPointerUp: () => {
+      if (tapDir.current === dir) {
+        ping?.();
+        bump(dir);
+      }
+      stopHold();
+    },
     onPointerLeave: stopHold,
+    // The browser took the gesture for a scroll: nothing changes.
     onPointerCancel: stopHold,
     // Keyboard (Enter/Space) and assistive tech click without a pointer.
     onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -226,6 +282,7 @@ export default function NumberStepperField({
                 : undefined
             }
             aria-invalid={Boolean(error)}
+            aria-describedby={errId}
             onChange={(e) => {
               setText(e.target.value);
               if (error) setError(null);
@@ -251,11 +308,7 @@ export default function NumberStepperField({
           </svg>
         </button>
       </div>
-      {error && (
-        <p className="slate-err" aria-live="polite">
-          ! {error}
-        </p>
-      )}
+      <FieldError id={errId} error={error} />
       <div className="slate-actions">
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>

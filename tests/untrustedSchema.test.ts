@@ -112,16 +112,24 @@ describe('numbers a crafted link can’t abuse (F14, decision 1)', () => {
     const { createElement } = await import('react');
     const { render } = await import('@testing-library/react');
     const { ScaleField } = await import('../src/components/questions/ScaleField.js');
+    const { MAX_CELLS } = await import('../src/components/questions/ext/scaleCells.js');
     const q = scale({ min: 0, max: 2_000_000, step: 0 });
+    // The link is capped at 0–100 here, and the numbers scale itself draws at
+    // most MAX_CELLS (21) cells whatever a schema says (QA w2b), so the first 21.
+    expect(q).toMatchObject({ min: 0, max: 100 });
     const { container } = render(
       createElement(ScaleField, {
         question: q as never,
         answers: {},
         initialValue: undefined,
         onAnswer: () => {},
+        onAdvance: () => {},
       }),
     );
-    expect(container.querySelectorAll('[role="radio"]')).toHaveLength(101);
+    const cells = container.querySelectorAll('[role="radio"]');
+    expect(cells).toHaveLength(MAX_CELLS);
+    expect(cells[0]!.textContent).toBe('0');
+    expect(cells[MAX_CELLS - 1]!.textContent).toBe('20');
   });
 
   it('bounds that leave no answer, and boxes that can’t hold a letter, go', () => {

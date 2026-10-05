@@ -547,8 +547,10 @@ exports[`question types render > date 1`] = `
         role="group"
       >
         <input
+          aria-describedby="_r_9_-err"
           aria-invalid="false"
           aria-label="Month"
+          autocomplete="off"
           class="slate-input slate-date-seg"
           inputmode="numeric"
           placeholder="MM"
@@ -562,8 +564,10 @@ exports[`question types render > date 1`] = `
           /
         </span>
         <input
+          aria-describedby="_r_9_-err"
           aria-invalid="false"
           aria-label="Day"
+          autocomplete="off"
           class="slate-input slate-date-seg"
           inputmode="numeric"
           placeholder="DD"
@@ -577,8 +581,10 @@ exports[`question types render > date 1`] = `
           /
         </span>
         <input
+          aria-describedby="_r_9_-err"
           aria-invalid="false"
           aria-label="Year"
+          autocomplete="off"
           class="slate-input slate-date-seg slate-date-seg--year"
           inputmode="numeric"
           placeholder="YYYY"
@@ -586,6 +592,11 @@ exports[`question types render > date 1`] = `
           value=""
         />
       </div>
+      <p
+        aria-live="polite"
+        class="slate-err"
+        id="_r_9_-err"
+      />
       <div
         class="slate-actions"
       >
@@ -601,7 +612,7 @@ exports[`question types render > date 1`] = `
           </span>
         </button>
         <span
-          class="slate-hint"
+          class="slate-hint slate-keys"
         >
           press Enter ↵
         </span>
@@ -698,6 +709,7 @@ exports[`question types render > email 1`] = `
       style="margin-top: 24px;"
     >
       <input
+        aria-describedby="_r_2_-err"
         aria-invalid="false"
         aria-labelledby="_r_2_"
         autocomplete="email"
@@ -706,6 +718,11 @@ exports[`question types render > email 1`] = `
         placeholder="name@example.com"
         type="email"
         value=""
+      />
+      <p
+        aria-live="polite"
+        class="slate-err"
+        id="_r_2_-err"
       />
       <div
         class="slate-actions"
@@ -759,6 +776,7 @@ exports[`question types render > legal 1`] = `
       The fine print.
     </p>
     <div
+      aria-describedby="_r_d_-err"
       aria-labelledby="_r_d_"
       class="slate-choices"
       role="radiogroup"
@@ -795,11 +813,19 @@ exports[`question types render > legal 1`] = `
       </button>
     </div>
     <p
-      class="slate-hint"
-      style="margin-top: 20px;"
+      aria-live="polite"
+      class="slate-err"
+      id="_r_d_-err"
+    />
+    <div
+      class="slate-actions"
     >
-      tap a key (A, B) or click to select
-    </p>
+      <span
+        class="slate-hint slate-keys"
+      >
+        tap a key (A, B) or click to select
+      </span>
+    </div>
   </div>
 </div>
 `;
@@ -829,11 +855,17 @@ exports[`question types render > long_text 1`] = `
       style="margin-top: 24px;"
     >
       <textarea
+        aria-describedby="_r_1_-err"
         aria-invalid="false"
         aria-labelledby="_r_1_"
         class="slate-input"
         placeholder="Type your answer..."
         rows="3"
+      />
+      <p
+        aria-live="polite"
+        class="slate-err"
+        id="_r_1_-err"
       />
       <div
         class="slate-actions"
@@ -972,6 +1004,7 @@ exports[`question types render > nps 1`] = `
       Recommend us?
     </h1>
     <div
+      aria-describedby="_r_e_-err"
       aria-labelledby="_r_e_"
       class="slate-scale"
       role="radiogroup"
@@ -1079,11 +1112,22 @@ exports[`question types render > nps 1`] = `
         </span>
       </div>
     </div>
+    <p
+      aria-live="polite"
+      class="slate-err"
+      id="_r_e_-err"
+    />
     <div
       class="slate-actions"
     >
+      <button
+        class="slate-ok-btn"
+        type="button"
+      >
+        Skip
+      </button>
       <span
-        class="slate-hint"
+        class="slate-hint slate-keys"
       >
         press a number ↑
       </span>
@@ -1126,6 +1170,11 @@ exports[`question types render > number 1`] = `
         type="text"
         value=""
       />
+      <p
+        aria-live="polite"
+        class="slate-err"
+        id="_r_4_-err"
+      />
       <div
         class="slate-actions"
       >
@@ -1141,7 +1190,7 @@ exports[`question types render > number 1`] = `
           </span>
         </button>
         <span
-          class="slate-hint"
+          class="slate-hint slate-keys"
         >
           press Enter ↵
         </span>
@@ -1176,6 +1225,7 @@ exports[`question types render > phone 1`] = `
       style="margin-top: 24px;"
     >
       <input
+        aria-describedby="_r_3_-err"
         aria-invalid="false"
         aria-labelledby="_r_3_"
         autocomplete="tel"
@@ -1184,6 +1234,11 @@ exports[`question types render > phone 1`] = `
         placeholder="(555) 123-4567"
         type="tel"
         value=""
+      />
+      <p
+        aria-live="polite"
+        class="slate-err"
+        id="_r_3_-err"
       />
       <div
         class="slate-actions"
@@ -1200,7 +1255,7 @@ exports[`question types render > phone 1`] = `
           </span>
         </button>
         <span
-          class="slate-hint"
+          class="slate-hint slate-keys"
         >
           press Enter ↵
         </span>
@@ -1232,6 +1287,7 @@ exports[`question types render > scale 1`] = `
       Urgency?
     </h1>
     <div
+      aria-describedby="_r_7_-err"
       aria-labelledby="_r_7_"
       class="slate-scale"
       role="radiogroup"
@@ -1291,11 +1347,22 @@ exports[`question types render > scale 1`] = `
         </span>
       </div>
     </div>
+    <p
+      aria-live="polite"
+      class="slate-err"
+      id="_r_7_-err"
+    />
     <div
       class="slate-actions"
     >
+      <button
+        class="slate-ok-btn"
+        type="button"
+      >
+        Skip
+      </button>
       <span
-        class="slate-hint"
+        class="slate-hint slate-keys"
       >
         press a number ↑
       </span>
@@ -1329,6 +1396,7 @@ exports[`question types render > short_text 1`] = `
       style="margin-top: 24px;"
     >
       <input
+        aria-describedby="_r_0_-err"
         aria-invalid="false"
         aria-labelledby="_r_0_"
         autocomplete="off"
@@ -1336,6 +1404,11 @@ exports[`question types render > short_text 1`] = `
         placeholder="Jane"
         type="text"
         value=""
+      />
+      <p
+        aria-live="polite"
+        class="slate-err"
+        id="_r_0_-err"
       />
       <div
         class="slate-actions"
@@ -1512,6 +1585,7 @@ exports[`question types render > url 1`] = `
       style="margin-top: 24px;"
     >
       <input
+        aria-describedby="_r_8_-err"
         aria-invalid="false"
         aria-labelledby="_r_8_"
         autocapitalize="off"
@@ -1522,6 +1596,11 @@ exports[`question types render > url 1`] = `
         spellcheck="false"
         type="text"
         value=""
+      />
+      <p
+        aria-live="polite"
+        class="slate-err"
+        id="_r_8_-err"
       />
       <div
         class="slate-actions"
@@ -1538,7 +1617,7 @@ exports[`question types render > url 1`] = `
           </span>
         </button>
         <span
-          class="slate-hint"
+          class="slate-hint slate-keys"
         >
           press Enter ↵
         </span>

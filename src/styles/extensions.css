@@ -56,6 +56,21 @@
   outline-offset: 2px;
 }
 
+/* Focus starts on the row itself, so a stray Enter picks nothing (F4); a
+   keyboard user sees a quiet ring around the row until an arrow key moves in
+   (not on touch screens, where there are no keys to move it with). */
+[data-slate-forms] .slate-scale-icons:focus {
+  outline: none;
+}
+
+@media (hover: hover) {
+  [data-slate-forms] .slate-scale-icons:focus-visible {
+    outline: 2px dashed rgb(var(--slate-accent-rgb) / 0.55);
+    outline-offset: 6px;
+    border-radius: var(--slate-radius);
+  }
+}
+
 /* Stars: bare, big, and close together — the row reads as one control. */
 [data-slate-forms] .slate-scale-icons--stars {
   gap: 2px;
@@ -484,6 +499,10 @@
 
 [data-slate-forms] .slate-time-row {
   align-items: center;
+  /* At very narrow widths (an SE at 150% zoom) AM / PM wraps under the time
+     instead of running past the edge (GAP-29). */
+  flex-wrap: wrap;
+  row-gap: 10px;
 }
 
 [data-slate-forms] .slate-meridiem {

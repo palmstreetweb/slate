@@ -25,7 +25,6 @@ import { ThanksScreen } from './ThanksScreen.js';
 import { ShortTextField } from './ShortTextField.js';
 import { LongTextField } from './LongTextField.js';
 import { EmailField } from './EmailField.js';
-import { ScaleField } from './ScaleField.js';
 import { SingleChoiceField } from './SingleChoiceField.js';
 import { YesNoField } from './YesNoField.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
@@ -131,12 +130,6 @@ export function QuestionRenderer({
   // Auto-advance helper for single_choice — fire after a brief pause so
   // the selected highlight is visible before the transition starts.
   const selectAndAdvance = (id: string, value: string) => {
-    ping();
-    setAnswer(id, value);
-    scheduleAutoAdvance(() => advance());
-  };
-
-  const selectScaleAndAdvance = (id: string, value: number) => {
     ping();
     setAnswer(id, value);
     scheduleAutoAdvance(() => advance());
@@ -257,19 +250,6 @@ export function QuestionRenderer({
         </>
       );
 
-    case 'scale':
-      return (
-        <>
-          <StepBadge step={stepNumber} total={totalSteps} />
-          <ScaleField
-            question={question}
-            answers={answers}
-            initialValue={answers[question.id] as number | undefined}
-            onAnswer={(v) => selectScaleAndAdvance(question.id, v)}
-          />
-        </>
-      );
-
     case 'single_choice':
       return (
         <>
@@ -302,6 +282,7 @@ export function QuestionRenderer({
     case 'review':
     case 'multi_choice':
     case 'dropdown':
+    case 'scale':
     case 'url':
     case 'number':
     case 'date':
