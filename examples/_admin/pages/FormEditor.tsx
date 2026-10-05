@@ -16,7 +16,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormSound, Question, QuestionType, Schema, ThemeMode, ThemeName } from '@/index.js';
-import { checkSchema, defineSchema } from '@/index.js';
+import { defineSchema } from '@/index.js';
+import { formIssues } from '../formChecks.js';
 import { playFormSound } from '@/utils/formSounds.js';
 import {
   createFormAsync,
@@ -602,7 +603,7 @@ function FormEditorBody({ formId }: { formId: string }) {
 
   // Schema sanity (roadmap Phase 6) — recomputed on every change since
   // saving is synchronous; surfaces dangling visibleIf / jump references.
-  const issues = checkSchema(schema.questions);
+  const issues = formIssues(schema.questions);
   const isPublished = liveForm?.status === 'published';
   const stale =
     Boolean(liveForm) &&
@@ -1136,7 +1137,8 @@ function makeDefaultQuestion(type: QuestionType, id: string): Question {
         maxSeconds: 60,
       };
     case 'location':
-      return { id, type, title: 'Where’s the job?', required: true, radius: 25, radiusUnit: 'mi' };
+      // No radius until there's a center: a half-set service area is flagged (QA MEDIA-13).
+      return { id, type, title: 'Where’s the job?', required: true, radiusUnit: 'mi' };
     case 'photo_checklist':
       return {
         id,

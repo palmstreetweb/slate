@@ -554,6 +554,9 @@ describe('Wave C schema checks', () => {
       'bad_service_area',
     );
     expect(
+      kinds([{ id: 'l', type: 'location', title: 'T', center: { lat: 34.4, lng: -119.7 } }]),
+    ).toContain('bad_service_area');
+    expect(
       kinds([{ id: 's', type: 'picture_choice', title: 'T', options: [], display: 'swipe' }]),
     ).toContain('swipe_single');
   });

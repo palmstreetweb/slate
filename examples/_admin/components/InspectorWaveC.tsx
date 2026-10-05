@@ -216,6 +216,7 @@ export function ImagePinSettings({
         <SlateNumberInput
           min={1}
           max={PINS_MAX}
+          integer
           value={question.maxPins ?? 3}
           allowEmpty={false}
           onChange={(n) => onChange({ maxPins: n } as Partial<Question>)}
@@ -261,6 +262,7 @@ export function VoiceNoteSettings({
           min={VOICE_SECONDS_MIN}
           max={VOICE_SECONDS_MAX}
           step={15}
+          integer
           value={question.maxSeconds ?? 60}
           allowEmpty={false}
           onChange={(n) => onChange({ maxSeconds: n } as Partial<Question>)}

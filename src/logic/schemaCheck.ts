@@ -5,7 +5,9 @@
  * the carrying question itself.
  *
  * The engine stays forgiving at runtime (dangling refs fall through to
- * normal flow); this is for builders/CI to surface problems early.
+ * normal flow); this is for builders/CI to surface problems early. Messages
+ * are written for the form's owner: they name a question by its title (never
+ * its internal id) and say what to do (QA 2026-10).
  */
 
 import type { Condition, Question } from '@/types/Question.js';
@@ -36,7 +38,7 @@ export type SchemaIssue = {
     | 'bad_price'
     /** A condition asks for in / out of area on an address without a service area (ADR-064). */
     | 'area_off'
-    /** A service-area entry isn't a ZIP code or prefix (ADR-064). */
+    /** A service-area entry isn't a ZIP code or prefix; a location center without a usable radius (ADR-064). */
     | 'bad_service_area'
     /** A contact block with every part turned off (ADR-064). */
     | 'no_fields'
@@ -52,31 +54,23 @@ export type SchemaIssue = {
     | 'no_slots'
     /** A slot without a name, 1–1,000 spots, its own key or a real date and time; or over 50 slots (ADR-066). */
     | 'bad_slots';
+  /** For the form's owner: names the question by its title and says what to do. */
   message: string;
 };
 
-function conditionFields(c: Condition): string[] {
-  if ('all' in c) return c.all.flatMap(conditionFields);
-  if ('any' in c) return c.any.flatMap(conditionFields);
-  return [c.field];
+type Leaf = Extract<Condition, { field: string }>;
+
+/** Every leaf of a condition, through `all` / `any`. */
+function leaves(c: Condition): Leaf[] {
+  return 'all' in c ? c.all.flatMap(leaves) : 'any' in c ? c.any.flatMap(leaves) : [c];
 }
 
-/** Fields whose leaf condition targets OTHER_VALUE. */
-function otherFields(c: Condition): string[] {
-  if ('all' in c) return c.all.flatMap(otherFields);
-  if ('any' in c) return c.any.flatMap(otherFields);
-  if (!('value' in c)) return [];
-  const values = Array.isArray(c.value) ? c.value : [c.value];
-  return values.includes(OTHER_VALUE) ? [c.field] : [];
-}
-
-/** Fields whose leaf condition targets IN_AREA_VALUE / OUT_OF_AREA_VALUE. */
-function areaFields(c: Condition): string[] {
-  if ('all' in c) return c.all.flatMap(areaFields);
-  if ('any' in c) return c.any.flatMap(areaFields);
-  if (!('value' in c)) return [];
-  const values = Array.isArray(c.value) ? c.value : [c.value];
-  return values.includes(IN_AREA_VALUE) || values.includes(OUT_OF_AREA_VALUE) ? [c.field] : [];
+/** How the owner knows a question: its title in quotes, cut short. */
+function named(q: Question, start = true): string {
+  const t = 'title' in q && typeof q.title == 'string' ? q.title.replace(/\s+/g, ' ').trim() : '';
+  return t
+    ? `“${t.length > 40 ? t.slice(0, 41).replace(/\s\S*$/, '') + '…' : t}”`
+    : `${start ? 'A' : 'a'} question with no title`;
 }
 
 /** A price pair is usable: finite, within the cap, and high ≥ low. */
@@ -92,97 +86,46 @@ function badPrice(low: unknown, high: unknown): boolean {
 /** Validate a questions list. Returns an empty array when the schema is clean. */
 export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
   const issues: SchemaIssue[] = [];
-  const ids = new Set<string>();
-  const seenDuplicates = new Set<string>();
+  const add = (q: Question, kind: SchemaIssue['kind'], message: string) =>
+    issues.push({ questionId: q.id, kind, message });
+  const byId = new Map<string, Question>();
+  const dup = new Set<string>();
 
   for (const q of questions) {
-    if (ids.has(q.id) && !seenDuplicates.has(q.id)) {
-      seenDuplicates.add(q.id);
-      issues.push({
-        questionId: q.id,
-        kind: 'duplicate_id',
-        message: `Duplicate question id "${q.id}"`,
-      });
+    // One issue per id, however many share it.
+    if (byId.has(q.id) && !dup.has(q.id)) {
+      dup.add(q.id);
+      add(q, 'duplicate_id', `${named(q)} and another question save to the same answer. Delete one and add it back.`);
     }
-    ids.add(q.id);
+    byId.set(q.id, q);
   }
 
-  const byId = new Map(questions.map((q) => [q.id, q] as const));
-  const checkOther = (q: Question, c: Condition) => {
-    for (const field of otherFields(c)) {
-      const target = byId.get(field);
-      if (target && !allowsOther(target)) {
-        issues.push({
-          questionId: q.id,
-          kind: 'other_off',
-          message: `"${q.id}" checks for Other on "${field}", which has no Other choice`,
-        });
-      }
-    }
-  };
-
-  const checkArea = (q: Question, c: Condition) => {
-    for (const field of areaFields(c)) {
-      const target = byId.get(field);
-      if (target && !checksArea(target, questions)) {
-        issues.push({
-          questionId: q.id,
-          kind: 'area_off',
-          message:
-            target.type === 'location'
-              ? `"${q.id}" checks the service area of "${field}", which has no center and radius`
-              : `"${q.id}" checks the service area of "${field}", which doesn't list any ZIP codes`,
-        });
-      }
-    }
-  };
-
-  const prefillKeys = new Map<string, string>();
+  const prefillKeys = new Map<string, Question>();
   for (const q of questions) {
     if (
-      (q.type === 'single_choice' ||
-        q.type === 'multi_choice' ||
-        q.type === 'dropdown' ||
-        q.type === 'picture_choice') &&
-      q.options.some((o) => badPrice(o.price, o.priceMax))
+      q.type === 'single_choice' ||
+      q.type === 'multi_choice' ||
+      q.type === 'dropdown' ||
+      q.type === 'picture_choice'
     ) {
-      issues.push({
-        questionId: q.id,
-        kind: 'bad_price',
-        message: `"${q.id}" has a price that isn't a number, is too large, or ends below where it starts`,
-      });
+      const o = q.options.find((o) => badPrice(o.price, o.priceMax));
+      if (o) add(q, 'bad_price', `${named(q)}: fix the price${o.label?.trim() ? ` on “${o.label.trim()}”` : ''}.`);
     }
     if (q.type === 'number' && badPrice(q.unitPrice, q.unitPriceMax)) {
-      issues.push({
-        questionId: q.id,
-        kind: 'bad_price',
-        message: `"${q.id}" has a price per unit that isn't a number, is too large, or ends below where it starts`,
-      });
+      add(q, 'bad_price', `${named(q)}: fix the price per unit.`);
     }
     if (q.type === 'address' && Array.isArray(q.serviceArea)) {
       const kept = serviceAreaPrefixes(q.serviceArea).length;
       const given = q.serviceArea.filter((z) => typeof z === 'string' && z.trim()).length;
       if (kept < given) {
-        issues.push({
-          questionId: q.id,
-          kind: 'bad_service_area',
-          message: `"${q.id}" lists a service area entry that isn't a ZIP code or prefix`,
-        });
+        add(q, 'bad_service_area', `${named(q)} has a service area entry that isn’t a ZIP or postal code.`);
       }
     }
     if (q.type === 'image_pin' && safeImageSrc(q.image, PIN_IMAGE_DATA_MAX) === null) {
-      issues.push({
-        questionId: q.id,
-        kind: 'no_image',
-        message: `"${q.id}" has no photo to mark — add one (an upload or an https image link)`,
-      });
+      add(q, 'no_image', `${named(q)} needs a photo to mark. Upload one or paste an https link.`);
     }
     if (q.type === 'photo_checklist' && !(q.items ?? []).some((i) => i.label?.trim())) {
-      issues.push({
-        questionId: q.id,
-        kind: 'no_items',
-        message: `"${q.id}" lists no photos to take`,
-      });
+      add(q, 'no_items', `${named(q)} has no photos to take. Add at least one.`);
     }
     if (q.type === 'availability') {
       // Mirrors logic/availability.ts (kept out of the engine's core, ADR-065).
@@ -198,29 +141,18 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
         ![15, 30, 60, 120].includes(slot) ||
         !(mins(q.endTime, 1080) - mins(q.startTime, 480) >= slot)
       ) {
-        issues.push({
-          questionId: q.id,
-          kind: 'bad_grid',
-          message: `"${q.id}" has days, times or a slot length the grid can't use`,
-        });
+        // The studio's own controls can only get the hours wrong; imports can get any of them.
+        add(q, 'bad_grid', `${named(q)} has days or hours the grid can’t use. Check From, Until and Each slot.`);
       }
     }
     if (q.type === 'location' && (q.center !== undefined || q.radius !== undefined)) {
       const rec = q as unknown as Record<string, unknown>;
       if (geoCenter(rec) === null || geoRadiusKm(rec) === null) {
-        issues.push({
-          questionId: q.id,
-          kind: 'bad_service_area',
-          message: `"${q.id}" needs both a center (latitude, longitude) and a radius to check the service area`,
-        });
+        add(q, 'bad_service_area', `${named(q)}: set both your business location and a radius, or clear both.`);
       }
     }
     if (q.type === 'picture_choice' && q.display === 'swipe' && !q.multiple) {
-      issues.push({
-        questionId: q.id,
-        kind: 'swipe_single',
-        message: `"${q.id}" uses swipe cards, which need "Allow multiple selections" on`,
-      });
+      add(q, 'swipe_single', `${named(q)}: swipe cards need more than one pick. Choose Swipe cards again.`);
     }
     if (q.type === 'signup_slots') {
       // The rule of signupSlotsOf (logic/signup.ts, kept out of the core; a test checks they agree).
@@ -244,95 +176,59 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
             (x.date !== undefined && !isValidIsoDate(x.date)) ||
             [x.start, x.end].some((t) => t !== undefined && !isValidTime(t)),
         );
-      if (!usable || bad) {
-        issues.push({
-          questionId: q.id,
-          kind: usable ? 'bad_slots' : 'no_slots',
-          message: usable
-            ? `"${q.id}" has a slot it can't offer: each needs a name, 1–1,000 spots and a real date and time (50 slots at most)`
-            : `"${q.id}" offers no slots — add one with a name and its spots`,
-        });
+      if (!usable) add(q, 'no_slots', `${named(q)} has no slots. Add one with a name and its spots.`);
+      else if (bad) {
+        add(q, 'bad_slots', `${named(q)} has a slot to fix: each needs a name, 1 to 1,000 spots and a real day and time.`);
       }
     }
     if (q.type === 'contact_info' && contactShown(q).length === 0) {
-      issues.push({
-        questionId: q.id,
-        kind: 'no_fields',
-        message: `"${q.id}" asks for no contact details — turn on name, email or phone`,
-      });
+      add(q, 'no_fields', `${named(q)} asks for nothing. Turn on name, email or phone.`);
     }
     const key = (q as { prefillKey?: string }).prefillKey?.trim();
     if (key && canPrefill(q)) {
       const lower = key.toLowerCase();
+      const other = prefillKeys.get(lower);
       if (!isValidPrefillKey(key)) {
-        issues.push({
-          questionId: q.id,
-          kind: 'bad_prefill_key',
-          message: `"${q.id}" has a link name "${key}" that can't be used (letters, numbers, - and _; not src, embed or utm_…)`,
-        });
-      } else if (prefillKeys.has(lower)) {
-        issues.push({
-          questionId: q.id,
-          kind: 'bad_prefill_key',
-          message: `"${q.id}" and "${prefillKeys.get(lower)}" share the link name "${key}"`,
-        });
+        add(q, 'bad_prefill_key', `${named(q)} has a link name that can’t be used. Fix it under Fill from link.`);
+      } else if (other) {
+        add(q, 'bad_prefill_key', `${named(q)} and ${named(other, false)} use the same link name, “${key}”. Rename one.`);
       } else {
-        prefillKeys.set(lower, q.id);
+        prefillKeys.set(lower, q);
       }
     }
     if (q.type === 'number' || q.type === 'scale' || q.type === 'date') {
       const { min, max } = q as { min?: number | string; max?: number | string };
       if (min !== undefined && max !== undefined && min > max) {
-        issues.push({
-          questionId: q.id,
-          kind: 'bad_bounds',
-          message: `"${q.id}" has a minimum above its maximum`,
-        });
+        add(q, 'bad_bounds', `${named(q)} has a minimum above its maximum, so nobody can answer it.`);
       }
     }
   }
 
   for (const q of questions) {
-    if ('visibleIf' in q && q.visibleIf) checkOther(q, q.visibleIf);
-    if ('logic' in q && q.logic) for (const rule of q.logic) checkOther(q, rule.if);
-    if ('visibleIf' in q && q.visibleIf) checkArea(q, q.visibleIf);
-    if ('logic' in q && q.logic) for (const rule of q.logic) checkArea(q, rule.if);
-    if ('visibleIf' in q && q.visibleIf) {
-      for (const field of conditionFields(q.visibleIf)) {
-        if (!ids.has(field)) {
-          issues.push({
-            questionId: q.id,
-            kind: 'dangling_condition',
-            message: `"${q.id}" has a visibleIf referencing unknown question "${field}"`,
-          });
+    const rules: Array<[Condition, string]> = [];
+    if ('visibleIf' in q && q.visibleIf) rules.push([q.visibleIf, 'When to show']);
+    for (const rule of ('logic' in q && q.logic) || []) rules.push([rule.if, 'Skip ahead']);
+    for (const [c, where] of rules) {
+      for (const leaf of leaves(c)) {
+        const target = byId.get(leaf.field);
+        const values = 'value' in leaf ? [leaf.value].flat() : [];
+        if (!target) {
+          add(q, 'dangling_condition', `${named(q)} has a “${where}” rule that uses a deleted question. Change or remove it.`);
+        } else if (values.includes(OTHER_VALUE) && !allowsOther(target)) {
+          add(q, 'other_off', `${named(q)} has a rule about “Other” on ${named(target, false)}, but that choice is off.`);
+        } else if (
+          (values.includes(IN_AREA_VALUE) || values.includes(OUT_OF_AREA_VALUE)) &&
+          !checksArea(target, questions)
+        ) {
+          add(q, 'area_off', `${named(q)} has a rule about the service area on ${named(target, false)}, which has none set up.`);
         }
       }
     }
-
-    if ('logic' in q && q.logic) {
-      for (const rule of q.logic) {
-        for (const field of conditionFields(rule.if)) {
-          if (!ids.has(field)) {
-            issues.push({
-              questionId: q.id,
-              kind: 'dangling_condition',
-              message: `"${q.id}" has a jump condition referencing unknown question "${field}"`,
-            });
-          }
-        }
-        if (!ids.has(rule.goTo)) {
-          issues.push({
-            questionId: q.id,
-            kind: 'dangling_jump',
-            message: `"${q.id}" jumps to unknown question "${rule.goTo}"`,
-          });
-        } else if (rule.goTo === q.id) {
-          issues.push({
-            questionId: q.id,
-            kind: 'self_jump',
-            message: `"${q.id}" jumps to itself`,
-          });
-        }
+    for (const rule of ('logic' in q && q.logic) || []) {
+      if (!byId.has(rule.goTo)) {
+        add(q, 'dangling_jump', `${named(q)} skips to a deleted question. Pick a new place to skip to.`);
+      } else if (rule.goTo === q.id) {
+        add(q, 'self_jump', `${named(q)} skips to itself. Pick a new place to skip to.`);
       }
     }
   }

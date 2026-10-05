@@ -1,0 +1,60 @@
+/*
+ * Inspector guards: the note under a number field while what's typed doesn't
+ * fit, and the plain-words warnings under settings that would trap or confuse
+ * respondents (min above max, a redirect that isn't a web address, …).
+ * Colours are tokens only; everything is scoped to the studio wrapper.
+ */
+
+[data-slate-forms][data-theme-name='slate'] .slate-number-note {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--slate-fs-xs);
+  line-height: 1.4;
+  color: var(--slate-warn);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-guard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: var(--slate-fs-xs);
+  line-height: 1.4;
+  color: var(--slate-warn);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-guard--quiet {
+  color: var(--slate-dim);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-guard-action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--slate-accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-guard-action:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* As specific as the studio's own input rule (_adminTheme.css), plus the flag, so it wins. */
+[data-slate-forms][data-theme-name='slate']
+  .slate-input.slate-input--error:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-input),
+[data-slate-forms][data-theme-name='slate']
+  .slate-input[aria-invalid='true']:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-input) {
+  border-color: var(--slate-warn);
+}
+
+[data-slate-forms][data-theme-name='slate']
+  .slate-number:has(.slate-number-input[aria-invalid='true']) {
+  border-color: var(--slate-warn);
+}
