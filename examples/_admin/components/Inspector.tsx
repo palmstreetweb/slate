@@ -627,7 +627,9 @@ export function Inspector({
             <Field
               label="Style"
               hint={
-                (question.display === 'stars' || question.display === 'emoji') &&
+                // Stars from 1 say this under Min / Max instead, with a fix (ScaleGuards).
+                (question.display === 'emoji' ||
+                  (question.display === 'stars' && question.min < 1)) &&
                 scalePoints(question) > 7
                   ? `${scalePoints(question)} points is a lot of ${question.display === 'stars' ? 'stars' : 'faces'} on a phone — 5 reads best.`
                   : question.display === 'slider'
@@ -645,13 +647,11 @@ export function Inspector({
                 ]}
                 aria-label="Scale style"
                 onChange={(display) =>
+                  // A style never changes the range: trying Stars on a live 0–10 scale
+                  // must not leave it 1–5. The guard under Min / Max offers that (STU-9).
                   onChange({
                     display: display === 'numbers' ? undefined : display,
                     sliderIcon: display === 'slider' ? question.sliderIcon : undefined,
-                    // Stars count from one: "1 star" saves 1 (QA F20), and 5 reads best.
-                    ...(display === 'stars' && question.display !== 'stars'
-                      ? starsRange(question)
-                      : {}),
                   } as Partial<Question>)
                 }
               />
@@ -1160,15 +1160,21 @@ function ScaleGuards({ question, onChange }: { question: ScaleQuestion; onChange
       </GuardNote>
     );
   }
-  if (question.display === 'stars' && min < 1) {
-    return (
-      <GuardNote
-        action={{
-          label: 'Start at 1',
-          onClick: () => onChange(starsRange(question) as Partial<Question>),
-        }}
-      >
+  // Stars count from 1 ("1 star" saves 1) and 5 reads best: offered, never applied by
+  // the style alone (STU-9). The button says the range it sets.
+  if (question.display === 'stars' && (min < 1 || points > 7)) {
+    const fix = starsRange(question);
+    const action = {
+      label: fix.max === max ? `Start at ${fix.min}` : `Use ${fix.min} to ${fix.max}`,
+      onClick: () => onChange(fix as Partial<Question>),
+    };
+    return min < 1 ? (
+      <GuardNote action={action}>
         Stars start at 1. Starting at {min}, the first star saves {min}.
+      </GuardNote>
+    ) : (
+      <GuardNote quiet action={action}>
+        {points} stars is a lot to tap on a phone. 5 reads best.
       </GuardNote>
     );
   }

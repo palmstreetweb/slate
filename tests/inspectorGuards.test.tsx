@@ -304,13 +304,37 @@ describe('scale (F6, F7, F20, S16, S22)', () => {
     expect(note).toHaveClass('slate-guard--quiet');
   });
 
-  it('switching to Stars counts from 1, five stars by default', async () => {
+  it('trying Stars never rewrites the range: it offers 1 to 5 instead (STU-9)', async () => {
     const { user, spy } = setup(scale);
     await user.click(screen.getByRole('button', { name: 'Scale style' }));
     await user.click(screen.getByRole('option', { name: 'Stars' }));
-    expect(spy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ display: 'stars', min: 1, max: 5 }),
-    );
+    expect(spy).toHaveBeenLastCalledWith({ display: 'stars', sliderIcon: undefined });
+    // A 0–10 scale stays 0–10; the guard says why 1–5 reads better, with one tap to set it.
+    expect(numberIn('Min Value')).toHaveValue(0);
+    expect(numberIn('Max Value')).toHaveValue(10);
+    expect(
+      screen.getByText('Stars start at 1. Starting at 0, the first star saves 0.'),
+    ).toBeInTheDocument();
+    // Switching back leaves the range as it was.
+    await user.click(screen.getByRole('button', { name: 'Scale style' }));
+    await user.click(screen.getByRole('option', { name: 'Numbers' }));
+    expect(spy).toHaveBeenLastCalledWith({ display: undefined, sliderIcon: undefined });
+    expect(spy).not.toHaveBeenCalledWith(expect.objectContaining({ min: 1 }));
+    expect(numberIn('Max Value')).toHaveValue(10);
+  });
+
+  it('Stars from 0 to 10: one tap sets 1 to 5, and the button says so', async () => {
+    const { user, spy } = setup({ ...scale, display: 'stars' } as Question);
+    await user.click(screen.getByRole('button', { name: 'Use 1 to 5' }));
+    expect(spy).toHaveBeenLastCalledWith({ min: 1, max: 5 });
+  });
+
+  it('Stars from 1 to 10: a quiet note that 5 reads best, with a fix', async () => {
+    const { user, spy } = setup({ ...scale, min: 1, display: 'stars' } as Question);
+    const note = screen.getByText('10 stars is a lot to tap on a phone. 5 reads best.');
+    expect(note.closest('.slate-guard')).toHaveClass('slate-guard--quiet');
+    await user.click(screen.getByRole('button', { name: 'Use 1 to 5' }));
+    expect(spy).toHaveBeenLastCalledWith({ min: 1, max: 5 });
   });
 
   it('stars from 0 are pointed out', async () => {
