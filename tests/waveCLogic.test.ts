@@ -461,9 +461,11 @@ describe('Wave C piping', () => {
     expect(formatAnswerFor(loc, { area: 'out', via: 'zip' })).toBe('outside the service area');
     expect(formatAnswerFor(loc, { via: 'typed' })).toBe('');
     const week: Question = { id: 'w', type: 'availability', title: 'T', days: ['tue'] };
+    // On a 12-hour clock (ADR-069); a day that runs to midnight ends at 12:00 AM.
     expect(formatAnswerFor(week, { tue: '09:00-11:00,14:00-15:00' })).toBe(
-      'Tue 09:00–11:00, 14:00–15:00',
+      'Tue 9:00 AM–11:00 AM, 2:00 PM–3:00 PM',
     );
+    expect(formatAnswerFor(week, { tue: '22:00-24:00' })).toBe('Tue 10:00 PM–12:00 AM');
     const pin: Question = { id: 'p', type: 'image_pin', title: 'T' };
     expect(formatAnswerFor(pin, { pins: ['0.1,0.1'], notes: ['here'] })).toBe('1 spot: here');
   });

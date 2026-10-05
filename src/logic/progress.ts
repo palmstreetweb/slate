@@ -15,7 +15,7 @@ import { areaIndex, type AreaIndex } from './address.js';
 /** Question types that are not answer-bearing. */
 const CHROME_TYPES = new Set(['welcome', 'statement', 'review', 'thanks']);
 
-function isChrome(q: Question): boolean {
+export function isChrome(q: Question): boolean {
   return CHROME_TYPES.has(q.type);
 }
 
@@ -60,6 +60,30 @@ export function resolveJumpTarget(
 }
 
 /**
+ * The respondent's path through `visible` with these answers (ADR-069): the
+ * steps from the first one, each advance taken the way the form takes it (a
+ * matching logic jump, else the next step), up to the first ending or a step
+ * already on it. Questions a jump passes over are not on the path. It is a
+ * pure function of the answers, so going Back and changing an answer
+ * changes the path the same way it changes where the form goes.
+ */
+export function pathOf(
+  visible: ReadonlyArray<Question>,
+  answers: LooseAnswers,
+  others?: OtherIndex,
+  areas?: AreaIndex,
+): number[] {
+  const path: number[] = [];
+  for (let i = 0; i < visible.length && !path.includes(i); ) {
+    path.push(i);
+    if (visible[i]!.type === 'thanks') break;
+    const jump = resolveJumpTarget(visible[i]!, visible, answers, others, areas);
+    i = jump !== null && jump !== i ? jump : i + 1;
+  }
+  return path;
+}
+
+/**
  * Progress percentage 0–100. Counts only answer-bearing questions in the
  * visible list. `currentStep` is the index in `visible` of the question
  * currently being shown.
@@ -73,15 +97,20 @@ export function progress(visible: ReadonlyArray<Question>, currentStep: number):
 
 /**
  * The "answers payload" that gets passed to `onSubmit` — strictly the answers
- * to currently-visible answer-bearing questions. Hidden answers are retained
- * in the engine's internal state but excluded here per ADR-005.
+ * to currently-visible answer-bearing questions on the respondent's path.
+ * Hidden answers are retained in the engine's internal state but excluded
+ * here per ADR-005, and so are answers a logic jump now passes over (ADR-069:
+ * the respondent went Back and took the other branch).
  */
 export function visibleAnswersForSubmit(
   visible: ReadonlyArray<Question>,
   allAnswers: LooseAnswers,
+  others?: OtherIndex,
+  areas?: AreaIndex,
 ): LooseAnswers {
   const out: LooseAnswers = {};
-  for (const q of visible) {
+  for (const i of pathOf(visible, allAnswers, others, areas)) {
+    const q = visible[i]!;
     if (isChrome(q)) continue;
     if (q.id in allAnswers && allAnswers[q.id] !== undefined) {
       out[q.id] = allAnswers[q.id];

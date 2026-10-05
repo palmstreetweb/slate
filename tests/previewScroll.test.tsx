@@ -7,7 +7,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form, defineSchema } from '@/index.js';
 import type { Question } from '@/types/Question.js';
@@ -51,9 +51,12 @@ describe('editor live preview (Canvas)', () => {
     const user = userEvent.setup();
     const schema = canvasSchema();
     const q = schema.questions[0] as Question;
-    render(<Canvas formId="f_canvas_test" schema={schema} selectedQuestion={q} />);
+    const { container } = render(
+      <Canvas formId="f_canvas_test" schema={schema} selectedQuestion={q} />,
+    );
 
-    await user.click(screen.getByRole('checkbox', { name: /crack fill/i }));
+    // Multi choice loads on demand (ADR-069).
+    await user.click(await screen.findByRole('checkbox', { name: /crack fill/i }));
     await user.click(screen.getByRole('checkbox', { name: /striping/i }));
     expect(screen.getByRole('checkbox', { name: /crack fill/i })).toHaveAttribute(
       'aria-checked',
@@ -65,18 +68,20 @@ describe('editor live preview (Canvas)', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /^ok/i }));
-    expect(screen.queryByText(/pick at least/i)).not.toBeInTheDocument();
+    expect(container.querySelector('.slate-err')).toBeNull();
   });
 
   it('still says what is missing when the minimum is not met', async () => {
     const user = userEvent.setup();
     const schema = canvasSchema();
-    render(
+    const { container } = render(
       <Canvas formId="f_canvas_test" schema={schema} selectedQuestion={schema.questions[0] as Question} />,
     );
-    await user.click(screen.getByRole('checkbox', { name: /crack fill/i }));
+    await user.click(await screen.findByRole('checkbox', { name: /crack fill/i }));
     await user.click(screen.getByRole('button', { name: /^ok/i }));
-    expect(await screen.findByText(/pick at least 2/i)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(container.querySelector('.slate-err')).toHaveTextContent('Pick at least 2'),
+    );
   });
 
   it('opens each selected question fresh and at its top', async () => {
@@ -85,7 +90,7 @@ describe('editor live preview (Canvas)', () => {
     const { container, rerender } = render(
       <Canvas formId="f_canvas_test" schema={schema} selectedQuestion={schema.questions[0] as Question} />,
     );
-    await user.click(screen.getByRole('checkbox', { name: /crack fill/i }));
+    await user.click(await screen.findByRole('checkbox', { name: /crack fill/i }));
     const scroller = container.querySelector('.slate-canvas-frame > [data-slate-forms]') as HTMLElement;
     scroller.scrollTop = 400;
 

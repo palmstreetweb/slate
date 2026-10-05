@@ -207,8 +207,9 @@ describe('the core: validation, conditions, piping', () => {
         { label: '', value: 's_bare', capacity: 2, date: '2026-10-04', start: '09:00' },
       ],
     });
+    // An unnamed slot reads as its day and a 12-hour time, never ISO (ADR-069).
     expect(formatAnswerFor(question, { slots: ['s_am', 's_bare'], wait: ['s_noon'] })).toBe(
-      'Morning, 2026-10-04 09:00, Noon (waitlist)',
+      'Morning, 10/04/2026 9:00 AM, Noon (waitlist)',
     );
     expect(
       pipe('See you at {{field:swim}}!', { swim: { slots: ['s_am'] } }, 0, [question as Question]),

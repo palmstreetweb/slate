@@ -136,11 +136,19 @@
   opacity: 0.6;
 }
 
-[data-slate-forms] .slate-scale-icons--emoji .slate-scale-icon:hover,
 [data-slate-forms] .slate-scale-icons--emoji .slate-scale-icon--lit {
   border-color: var(--slate-accent);
   background: var(--slate-accent-lo);
   color: var(--slate-accent);
+}
+
+/* Hover only where a pointer hovers (a phone keeps it on the last tap, QA GAP-08). */
+@media (hover: hover) {
+  [data-slate-forms] .slate-scale-icons--emoji .slate-scale-icon:hover {
+    border-color: var(--slate-accent);
+    background: var(--slate-accent-lo);
+    color: var(--slate-accent);
+  }
 }
 
 [data-slate-forms] .slate-scale-icons--emoji .slate-scale-icon--selected {
@@ -153,12 +161,19 @@
   border-color: var(--slate-text);
 }
 
-[data-slate-forms][data-theme-name='swiss'] .slate-scale-icons--emoji .slate-scale-icon:hover,
 [data-slate-forms][data-theme-name='swiss'] .slate-scale-icons--emoji .slate-scale-icon--lit,
 [data-slate-forms][data-theme-name='swiss'] .slate-scale-icons--emoji .slate-scale-icon--selected {
   background: var(--slate-text);
   border-color: var(--slate-text);
   color: var(--slate-bg);
+}
+
+@media (hover: hover) {
+  [data-slate-forms][data-theme-name='swiss'] .slate-scale-icons--emoji .slate-scale-icon:hover {
+    background: var(--slate-text);
+    border-color: var(--slate-text);
+    color: var(--slate-bg);
+  }
 }
 
 [data-slate-forms][data-has-decoration]:not([data-theme-name='swiss'])
@@ -849,9 +864,14 @@
 }
 
 /* Swiss inverts a picked card; the check follows the text colour there. */
-[data-slate-forms][data-theme-name='swiss'] .slate-choice--selected .slate-pkg-feature svg,
-[data-slate-forms][data-theme-name='swiss'] .slate-pkg:hover .slate-pkg-feature svg {
+[data-slate-forms][data-theme-name='swiss'] .slate-choice--selected .slate-pkg-feature svg {
   stroke: currentColor;
+}
+
+@media (hover: hover) {
+  [data-slate-forms][data-theme-name='swiss'] .slate-pkg:hover .slate-pkg-feature svg {
+    stroke: currentColor;
+  }
 }
 
 [data-slate-forms] .slate-pkg-badge {

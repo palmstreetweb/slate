@@ -850,7 +850,14 @@ exports[`question types render > multi_choice 1`] = `
     >
       Add-ons?
     </h1>
+    <p
+      class="slate-pick-hint"
+      id="_r_6_-rule"
+    >
+      Pick as many as you like
+    </p>
     <div
+      aria-describedby="_r_6_-rule"
       aria-labelledby="_r_6_"
       class="slate-choices"
       role="group"
@@ -901,9 +908,11 @@ exports[`question types render > multi_choice 1`] = `
         </span>
       </button>
       <span
-        class="slate-hint"
+        class="slate-hint slate-key-hint"
       >
-        tap keys to toggle, press Enter ↵
+        press 
+        A–B
+         to pick, then Enter ↵
       </span>
     </div>
   </div>
@@ -1385,10 +1394,12 @@ exports[`question types render > single_choice 1`] = `
       </button>
     </div>
     <p
-      class="slate-hint"
+      class="slate-hint slate-key-hint"
       style="margin-top: 20px;"
     >
-      tap a key (A, B, C, D) or click to select
+      press 
+      A–B
+      , or click to choose
     </p>
   </div>
 </div>
@@ -1592,10 +1603,10 @@ exports[`question types render > yes_no 1`] = `
       </button>
     </div>
     <p
-      class="slate-hint"
+      class="slate-hint slate-key-hint"
       style="margin-top: 20px;"
     >
-      press Y or N, or click to select
+      press Y or N, or click to choose
     </p>
   </div>
 </div>

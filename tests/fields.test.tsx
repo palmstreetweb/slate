@@ -153,7 +153,8 @@ describe('question types render', () => {
     expect(container).toMatchSnapshot();
   });
 
-  it('multi_choice', () => {
+  // Multi choice loads on demand (ADR-069): wait for the field.
+  it('multi_choice', async () => {
     const { container } = renderQuestion({
       id: 'addons',
       type: 'multi_choice',
@@ -163,7 +164,9 @@ describe('question types render', () => {
         { label: 'B', value: 'b' },
       ],
     });
-    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    expect(await screen.findAllByRole('checkbox')).toHaveLength(2);
+    // The rule is said up front, before the first tap.
+    expect(screen.getByText('Pick as many as you like')).toBeInTheDocument();
     expect(container).toMatchSnapshot();
   });
 

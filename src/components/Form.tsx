@@ -36,6 +36,7 @@ import { computeScore } from '@/logic/scoring.js';
 import { computeEstimate } from '@/logic/estimate.js';
 import { prefillAnswers } from '@/logic/prefill.js';
 import { allowsOther } from '@/logic/other.js';
+import { togglePick } from '@/logic/validation.js';
 import { TopBar } from './chrome/TopBar.js';
 import { ProgressBar } from './chrome/ProgressBar.js';
 import { FooterCounter } from './chrome/FooterCounter.js';
@@ -209,12 +210,7 @@ export function Form<S extends Schema>({
         if (!opt) return;
         playInteractionSound();
         if (currentQuestion.multiple) {
-          setAnswer(currentQuestion.id, (prev) => {
-            const cur = Array.isArray(prev) ? (prev as string[]) : [];
-            return cur.includes(opt.value)
-              ? cur.filter((v) => v !== opt.value)
-              : [...cur, opt.value];
-          });
+          setAnswer(currentQuestion.id, (prev) => togglePick(currentQuestion, prev, opt.value));
         } else {
           setAnswer(currentQuestion.id, opt.value);
           scheduleAutoAdvance(() => next());
@@ -232,10 +228,8 @@ export function Form<S extends Schema>({
         if (!opt) return;
         playInteractionSound();
         // Functional updater so back-to-back keypresses don't see stale state.
-        setAnswer(currentQuestion.id, (prev) => {
-          const cur = Array.isArray(prev) ? (prev as string[]) : [];
-          return cur.includes(opt.value) ? cur.filter((v) => v !== opt.value) : [...cur, opt.value];
-        });
+        // Past the most picks a key does nothing; the rule is shown up front.
+        setAnswer(currentQuestion.id, (prev) => togglePick(currentQuestion, prev, opt.value));
       }
     },
     [currentQuestion, setAnswer, next, playInteractionSound, scheduleAutoAdvance],

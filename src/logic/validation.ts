@@ -96,6 +96,36 @@ function isMissingValue(v: unknown): boolean {
   return false;
 }
 
+export type PickRule = {
+  options: ReadonlyArray<unknown>;
+  allowOther?: boolean;
+  min?: number;
+  max?: number;
+};
+
+/**
+ * The picks a multi choice (or a picture choice with `multiple`) asks for, as
+ * `[min, max]`, never more than a respondent can give: the minimum is a whole
+ * number and at most the choices on offer (Other counts as one), and a maximum
+ * below 1 or below that minimum is dropped (Infinity: no maximum). The studio
+ * keeps owners from saving such limits; this keeps forms saved before that
+ * answerable.
+ */
+export function pickLimits(q: PickRule): [number, number] {
+  const min = Math.min(Math.ceil(q.min ?? 0), q.options.length + (q.allowOther ? 1 : 0));
+  return [min, q.max! >= Math.max(min, 1) ? Math.floor(q.max!) : Infinity];
+}
+
+/** `prev` with `value` ticked or unticked; a pick past the maximum is refused (same list back). */
+export function togglePick(q: PickRule, prev: unknown, value: string): string[] {
+  const cur = Array.isArray(prev) ? (prev as string[]) : [];
+  return cur.includes(value)
+    ? cur.filter((v) => v !== value)
+    : cur.length < pickLimits(q)[1]
+      ? [...cur, value]
+      : cur;
+}
+
 export function validate(question: Question, answer: unknown): ValidationResult {
   switch (question.type) {
     case 'welcome':
@@ -246,26 +276,23 @@ export function validate(question: Question, answer: unknown): ValidationResult 
       return null;
     }
 
-    case 'picture_choice': {
-      if (question.multiple) {
-        const arr = Array.isArray(answer) ? answer : [];
-        const min = question.min ?? 0;
-        if (arr.length < min) {
-          return {
-            code: 'min_selections',
-            message: min === 1 ? 'Please pick at least one' : `Pick at least ${min}`,
-          };
-        }
-        if (question.max !== undefined && arr.length > question.max) {
-          return { code: 'max_selections', message: `Pick at most ${question.max}` };
-        }
-        return null;
+    case 'picture_choice':
+    case 'multi_choice': {
+      // A picture choice without `multiple` is one pick, like a single choice.
+      if (question.type === 'picture_choice' && !question.multiple) {
+        return (question.required ?? true) && isBlankString(answer)
+          ? { code: 'required', message: 'Please pick one' }
+          : null;
       }
-      const required = question.required ?? true;
-      if (required && isBlankString(answer)) {
-        return { code: 'required', message: 'Please pick one' };
+      const picks = Array.isArray(answer) ? answer.length : 0;
+      const [min, max] = pickLimits(question);
+      if (picks < min) {
+        return {
+          code: 'min_selections',
+          message: min === 1 ? 'Please pick at least one' : `Pick at least ${min}`,
+        };
       }
-      return null;
+      return picks > max ? { code: 'max_selections', message: `Pick up to ${max}` } : null;
     }
 
     case 'ranking': {
@@ -509,27 +536,12 @@ export function validate(question: Question, answer: unknown): ValidationResult 
           : { code: 'required', message: 'Please pick one' };
       }
       const max = question.maxPicks ?? 1;
-      if (picks.length > max) return { code: 'max_selections', message: `Pick at most ${max}` };
+      if (picks.length > max) return { code: 'max_selections', message: `Pick up to ${max}` };
       if (
         (wait.length && !question.waitlist) ||
         picks.some((v, i) => picks.indexOf(v) !== i || !question.slots?.some((s) => s.value === v))
       ) {
         return { code: 'shape', message: 'That one isn’t available. Please pick again.' };
-      }
-      return null;
-    }
-
-    case 'multi_choice': {
-      const arr = Array.isArray(answer) ? answer : [];
-      const min = question.min ?? 0;
-      if (arr.length < min) {
-        return {
-          code: 'min_selections',
-          message: min === 1 ? 'Please pick at least one' : `Pick at least ${min}`,
-        };
-      }
-      if (question.max !== undefined && arr.length > question.max) {
-        return { code: 'max_selections', message: `Pick at most ${question.max}` };
       }
       return null;
     }

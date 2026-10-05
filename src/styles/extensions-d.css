@@ -130,9 +130,14 @@
   .slate-slot-meter-fill,
 [data-slate-forms][data-theme-name='mono']
   .slate-slot.slate-choice--selected
-  .slate-slot-meter-fill,
-[data-slate-forms][data-theme-name='swiss'] .slate-slot:hover .slate-slot-meter-fill {
+  .slate-slot-meter-fill {
   background: currentColor;
+}
+
+@media (hover: hover) {
+  [data-slate-forms][data-theme-name='swiss'] .slate-slot:hover .slate-slot-meter-fill {
+    background: currentColor;
+  }
 }
 
 [data-slate-forms] .slate-slot-tick {

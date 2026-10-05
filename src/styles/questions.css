@@ -289,17 +289,22 @@
   color: var(--slate-text);
 }
 
-[data-slate-forms] .slate-choice:hover {
-  border-color: var(--slate-accent);
-  background: var(--slate-accent-lo);
-}
+/* Hover looks only where a pointer can hover: a phone keeps :hover on the
+   last thing tapped, and a hover that looks like "picked" made an option
+   the respondent had just unticked still look ticked (QA GAP-08). */
+@media (hover: hover) {
+  [data-slate-forms] .slate-choice:hover {
+    border-color: var(--slate-accent);
+    background: var(--slate-accent-lo);
+  }
 
-/* Swiss hover/selected = full inversion: text-color becomes the bg, bg
-   becomes the text-color. Works in both light + dark because both tokens
-   are mode-aware. */
-[data-slate-forms][data-theme-name='swiss'] .slate-choice:hover {
-  background: var(--slate-text);
-  color: var(--slate-bg);
+  /* Swiss hover/selected = full inversion: text-color becomes the bg, bg
+     becomes the text-color. Works in both light + dark because both tokens
+     are mode-aware. */
+  [data-slate-forms][data-theme-name='swiss'] .slate-choice:hover {
+    background: var(--slate-text);
+    color: var(--slate-bg);
+  }
 }
 
 [data-slate-forms] .slate-choice--selected {
@@ -317,9 +322,11 @@
   color: var(--slate-bg);
 }
 
-[data-slate-forms][data-theme-name='swiss'][data-theme] .slate-choice:hover {
-  background: var(--slate-text);
-  color: var(--slate-bg);
+@media (hover: hover) {
+  [data-slate-forms][data-theme-name='swiss'][data-theme] .slate-choice:hover {
+    background: var(--slate-text);
+    color: var(--slate-bg);
+  }
 }
 
 [data-slate-forms] .slate-choice-badge {
@@ -362,11 +369,49 @@
    Same rule, mode-aware via tokens. The :hover variant is essential —
    without it the badge stays cream-on-cream on the inverted hover bg and
    the letter disappears. */
-[data-slate-forms][data-theme-name='swiss'] .slate-choice--selected .slate-choice-badge,
-[data-slate-forms][data-theme-name='swiss'] .slate-choice:hover .slate-choice-badge {
+[data-slate-forms][data-theme-name='swiss'] .slate-choice--selected .slate-choice-badge {
   background: var(--slate-bg);
   color: var(--slate-text);
   border-color: var(--slate-bg);
+}
+
+@media (hover: hover) {
+  [data-slate-forms][data-theme-name='swiss'] .slate-choice:hover .slate-choice-badge {
+    background: var(--slate-bg);
+    color: var(--slate-text);
+    border-color: var(--slate-bg);
+  }
+}
+
+/* ---------- pick rule and key hints (ADR-069) ---------- */
+
+/* "Pick up to 3": a multiple-pick question says its rule before the first tap. */
+[data-slate-forms] .slate-pick-hint {
+  margin: 14px 0 0;
+  font-family: var(--slate-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--slate-muted);
+  text-transform: var(--slate-transform);
+}
+
+[data-slate-forms] .slate-pick-hint + .slate-choices,
+[data-slate-forms] .slate-pick-hint + .slate-picture-grid {
+  margin-top: 20px;
+}
+
+/* At the most picks, the options left step back; a tap only shakes one. */
+[data-slate-forms] .slate-choices > .slate-choice[aria-disabled='true'],
+[data-slate-forms] .slate-picture-grid > .slate-picture[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Letter-key hints mean nothing without a keyboard: phones and tablets hide them. */
+@media (hover: none) {
+  [data-slate-forms] .slate-key-hint {
+    display: none;
+  }
 }
 
 [data-slate-forms] .slate-choice-desc {
@@ -506,9 +551,11 @@
     color 120ms;
 }
 
-[data-slate-forms] .slate-scale-cell:hover {
-  border-color: var(--slate-accent);
-  background: var(--slate-accent-lo);
+@media (hover: hover) {
+  [data-slate-forms] .slate-scale-cell:hover {
+    border-color: var(--slate-accent);
+    background: var(--slate-accent-lo);
+  }
 }
 
 [data-slate-forms] .slate-scale-cell--selected {
@@ -891,9 +938,11 @@
     background 150ms;
 }
 
-[data-slate-forms] .slate-picture:hover {
-  border-color: var(--slate-accent);
-  background: var(--slate-accent-lo);
+@media (hover: hover) {
+  [data-slate-forms] .slate-picture:hover {
+    border-color: var(--slate-accent);
+    background: var(--slate-accent-lo);
+  }
 }
 
 [data-slate-forms] .slate-picture--selected {
@@ -988,9 +1037,11 @@
     background 150ms;
 }
 
-[data-slate-forms] .slate-ranking-btn:hover:not(:disabled) {
-  border-color: var(--slate-accent);
-  background: var(--slate-accent-lo);
+@media (hover: hover) {
+  [data-slate-forms] .slate-ranking-btn:hover:not(:disabled) {
+    border-color: var(--slate-accent);
+    background: var(--slate-accent-lo);
+  }
 }
 
 [data-slate-forms] .slate-ranking-btn:disabled {
@@ -1048,9 +1099,11 @@
     background 120ms;
 }
 
-[data-slate-forms] .slate-matrix-cell:hover {
-  border-color: var(--slate-accent);
-  background: var(--slate-accent-lo);
+@media (hover: hover) {
+  [data-slate-forms] .slate-matrix-cell:hover {
+    border-color: var(--slate-accent);
+    background: var(--slate-accent-lo);
+  }
 }
 
 [data-slate-forms] .slate-matrix-cell--selected {
@@ -1167,6 +1220,11 @@
   font-style: italic;
 }
 
+/* A required question on the path still unanswered (ADR-069). */
+[data-slate-forms] .slate-review-missing {
+  color: var(--slate-error);
+}
+
 [data-slate-forms] .slate-review-edit {
   border: none;
   background: none;
@@ -1204,10 +1262,16 @@
   border-color: var(--slate-border-md);
 }
 
-[data-slate-forms][data-theme-name='classic'] .slate-choice:hover,
 [data-slate-forms][data-theme-name='classic'] .slate-choice--selected {
   border-color: var(--slate-accent);
   background: var(--slate-accent-lo);
+}
+
+@media (hover: hover) {
+  [data-slate-forms][data-theme-name='classic'] .slate-choice:hover {
+    border-color: var(--slate-accent);
+    background: var(--slate-accent-lo);
+  }
 }
 
 [data-slate-forms][data-theme-name='classic'] .slate-choice-badge {

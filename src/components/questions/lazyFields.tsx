@@ -23,6 +23,10 @@
  * and NPS moved here too, unchanged, for the same reason.
  *
  * Wave D (ADR-066) adds sign-up slots.
+ *
+ * Multi choice and the Review step moved here too (ADR-069), to make room
+ * for the pick-limit and path rules. Neither is ever the first screen of a
+ * form the studio makes (it opens with a welcome screen).
  */
 
 'use client';
@@ -60,6 +64,16 @@ export type ExtFieldProps<Q extends Question = Question> = {
   allQuestions?: ReadonlyArray<Question>;
   /** Sign-up slots (ADR-066): spots left per slot value, from the host; unknown slots show their capacity. */
   slotsLeft?: Readonly<Record<string, number>>;
+  /**
+   * The Review step (ADR-069): the answer-bearing questions on the
+   * respondent's path, the core's answer formatter and the edit links,
+   * passed in so its chunk imports none of the core's own modules.
+   */
+  review?: {
+    rows: ReadonlyArray<Question>;
+    format: (q: Question, v: unknown) => string;
+    onEdit: (questionId: string) => void;
+  };
 };
 
 export type ExtFieldKey =
@@ -82,7 +96,9 @@ export type ExtFieldKey =
   | 'location'
   | 'photo-checklist'
   | 'availability'
-  | 'signup-slots';
+  | 'signup-slots'
+  | 'multi-choice'
+  | 'review';
 
 /** Chunks on the same cache that aren't question fields. */
 type ExtChunkKey = ExtFieldKey | 'estimate-reveal';
@@ -113,6 +129,8 @@ const LOADERS: Record<ExtChunkKey, () => Promise<{ default: AnyChunk }>> = {
   'photo-checklist': () => import('./ext/PhotoChecklistField.js'),
   availability: () => import('./ext/AvailabilityField.js'),
   'signup-slots': () => import('./ext/SignupSlotsField.js'),
+  'multi-choice': () => import('./ext/MultiChoiceExt.js'),
+  review: () => import('./ext/ReviewExt.js'),
   'estimate-reveal': () => import('./ext/EstimateReveal.js'),
 };
 
@@ -142,6 +160,8 @@ export function extFieldKey(q: Question): ExtFieldKey | null {
       return 'signature';
     case 'single_choice':
       return q.display === 'cards' ? 'choice-cards' : null;
+    case 'multi_choice':
+      return 'multi-choice';
     case 'ranking':
       return 'ranking';
     case 'matrix':
@@ -165,6 +185,8 @@ export function extFieldKey(q: Question): ExtFieldKey | null {
       return 'availability';
     case 'signup_slots':
       return 'signup-slots';
+    case 'review':
+      return 'review';
     default:
       return null;
   }

@@ -4,6 +4,7 @@ import { useId } from 'react';
 import type { YesNoQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { useChoiceCommit } from '@/hooks/useChoiceCommit.js';
+import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { ChoiceBadge } from './ChoiceBadge.js';
 import { resolveTitle } from './_resolveTitle.js';
 
@@ -12,11 +13,15 @@ type Props = {
   answers: LooseAnswers;
   selected: string | undefined;
   onSelect: (value: 'yes' | 'no') => void;
+  /** Move on without answering: an optional question offers Skip (and Enter). */
+  onSkip?: () => void;
 };
 
-export function YesNoField({ question, answers, selected, onSelect }: Props) {
+export function YesNoField({ question, answers, selected, onSelect, onSkip }: Props) {
   const labelId = useId();
   const { committed, markCommitted } = useChoiceCommit(selected);
+  const skip = question.required === false ? onSkip : undefined;
+  useRegisterFormConfirm(skip!, Boolean(skip));
   const choices: ReadonlyArray<{ value: 'yes' | 'no'; label: string; badge: string }> = [
     { value: 'yes', label: question.yesLabel ?? 'Yes', badge: 'Y' },
     { value: 'no', label: question.noLabel ?? 'No', badge: 'N' },
@@ -54,9 +59,24 @@ export function YesNoField({ question, answers, selected, onSelect }: Props) {
           );
         })}
       </div>
-      <p className="slate-hint" style={{ marginTop: 20 }}>
-        press Y or N, or click to select
-      </p>
+      {skip ? (
+        <div className="slate-actions">
+          <button type="button" className="slate-ok-btn" onClick={skip}>
+            {selected ? (
+              <>
+                OK <span aria-hidden>✓</span>
+              </>
+            ) : (
+              'Skip'
+            )}
+          </button>
+          <span className="slate-hint slate-key-hint">press Y or N, or Enter ↵</span>
+        </div>
+      ) : (
+        <p className="slate-hint slate-key-hint" style={{ marginTop: 20 }}>
+          press Y or N, or click to choose
+        </p>
+      )}
     </div>
   );
 }
