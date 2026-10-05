@@ -89,3 +89,80 @@ describe('sanitizeUntrustedSchema (portable links, ADR-046)', () => {
     expect(date).not.toHaveProperty('includeTime');
   });
 });
+
+describe('numbers a crafted link can’t abuse (F14, decision 1)', () => {
+  const one = (q: Record<string, unknown>) =>
+    sanitizeUntrustedSchema({ ...base, questions: [q] } as unknown as Schema)
+      .questions[0] as unknown as Record<string, unknown>;
+  const scale = (extra: Record<string, unknown>) =>
+    one({ id: 's', type: 'scale', title: 'S', ...extra });
+
+  it('a scale step of 0 or less is dropped, and a huge span is capped', () => {
+    expect(scale({ min: 1, max: 5, step: 0 })).not.toHaveProperty('step');
+    expect(scale({ min: 1, max: 5, step: -1 })).not.toHaveProperty('step');
+    expect(scale({ min: 0, max: 2_000_000 })).toMatchObject({ min: 0, max: 100 });
+    expect(scale({ min: 0, max: 1000, step: 0.5 })).toMatchObject({ min: 0, max: 50, step: 0.5 });
+    expect(scale({ min: 9, max: 1 })).toMatchObject({ min: 1, max: 9 });
+    expect(scale({ min: 'x', max: null })).toMatchObject({ min: 0, max: 10 });
+    // What a fair link asked for stays exactly as it was.
+    expect(scale({ min: 1, max: 5 })).toMatchObject({ min: 1, max: 5 });
+  });
+
+  it('the scale a crafted link draws is small enough to render', async () => {
+    const { createElement } = await import('react');
+    const { render } = await import('@testing-library/react');
+    const { ScaleField } = await import('../src/components/questions/ScaleField.js');
+    const q = scale({ min: 0, max: 2_000_000, step: 0 });
+    const { container } = render(
+      createElement(ScaleField, {
+        question: q as never,
+        answers: {},
+        initialValue: undefined,
+        onAnswer: () => {},
+      }),
+    );
+    expect(container.querySelectorAll('[role="radio"]')).toHaveLength(101);
+  });
+
+  it('bounds that leave no answer, and boxes that can’t hold a letter, go', () => {
+    const inverted = one({ id: 'n', type: 'number', title: 'N', min: 10, max: 5 });
+    expect(inverted).not.toHaveProperty('min');
+    expect(inverted).not.toHaveProperty('max');
+    expect(one({ id: 'n', type: 'number', title: 'N', step: 0 })).not.toHaveProperty('step');
+    expect(
+      one({ id: 'd', type: 'date', title: 'D', min: '2026-12-01', max: '2026-01-01' }),
+    ).not.toHaveProperty('min');
+    expect(one({ id: 't', type: 'short_text', title: 'T', maxLength: 0 })).not.toHaveProperty(
+      'maxLength',
+    );
+    expect(one({ id: 't', type: 'long_text', title: 'T', maxLength: 5.5 })).toMatchObject({
+      maxLength: 5,
+    });
+  });
+
+  it('pick counts nobody can meet are brought into reach', () => {
+    const options = ['a', 'b', 'c'].map((v) => ({ label: v, value: v }));
+    const multi = (extra: Record<string, unknown>) =>
+      one({ id: 'm', type: 'multi_choice', title: 'M', options, ...extra });
+    expect(multi({ min: 10, max: 0 })).toMatchObject({ min: 3 });
+    expect(multi({ min: 10, max: 0 })).not.toHaveProperty('max');
+    expect(multi({ min: 2, max: 1 })).not.toHaveProperty('max');
+    expect(multi({ min: 1, max: 2 })).toMatchObject({ min: 1, max: 2 });
+    expect(
+      one({ id: 'p', type: 'picture_choice', title: 'P', options: [], min: 2, max: 3 }),
+    ).not.toHaveProperty('min');
+  });
+});
+
+describe('the theme a crafted link may use (F31)', () => {
+  it('keeps a built-in theme; the studio’s own or an unknown name becomes swiss', async () => {
+    const { safeThemeName } = await import('../examples/_admin/sanitizeUntrustedSchema.js');
+    const theme = (t: unknown) =>
+      sanitizeUntrustedSchema({ ...base, theme: t, questions: [] } as unknown as Schema).theme;
+    expect(theme('midnight')).toBe('midnight');
+    expect(theme('slate')).toBe('swiss');
+    expect(theme('constructor')).toBe('swiss');
+    expect(theme(undefined)).toBe('swiss');
+    expect(safeThemeName('__proto__')).toBe('swiss');
+  });
+});

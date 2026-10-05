@@ -4,7 +4,8 @@
  * rest of what a hostile schema could smuggle before it renders on our origin.
  */
 
-import type { Schema } from '@/index.js';
+import type { Schema, ThemeName } from '@/index.js';
+import { themes } from '@/index.js';
 
 const MAX_TEXT = 2000;
 
@@ -215,6 +216,80 @@ function sanitizeWaveD(next: Record<string, unknown>): void {
     });
 }
 
+/** Most cells a scale from a link may draw: a 0–2,000,000 scale left the tab unresponsive (F14). */
+const SCALE_CELLS_MAX = 101;
+
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * Numbers that drive loops and limits (F14, decision 1): a scale's ends and
+ * step (a step of 0 never finished drawing), bounds that leave no answer, a
+ * text box that can't hold a letter, and pick counts nobody can meet.
+ */
+function sanitizeBounds(next: Record<string, unknown>): void {
+  if (next.type === 'scale') {
+    let min = finite(next.min) ? next.min : 0;
+    let max = finite(next.max) ? next.max : 10;
+    if (min > max) [min, max] = [max, min];
+    if (finite(next.step) && next.step > 0) {
+      if ((max - min) / next.step > SCALE_CELLS_MAX - 1)
+        max = min + next.step * (SCALE_CELLS_MAX - 1);
+    } else {
+      delete next.step;
+      if (max - min > SCALE_CELLS_MAX - 1) max = min + SCALE_CELLS_MAX - 1;
+    }
+    next.min = min;
+    next.max = max;
+  }
+  if (next.type === 'number') {
+    for (const key of ['min', 'max', 'step'])
+      if (key in next && !finite(next[key])) delete next[key];
+    if (finite(next.step) && next.step <= 0) delete next.step;
+    if (finite(next.min) && finite(next.max) && next.min > next.max) {
+      delete next.min;
+      delete next.max;
+    }
+  }
+  if (next.type === 'date') {
+    const iso = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    for (const key of ['min', 'max']) if (key in next && !iso(next[key])) delete next[key];
+    if (iso(next.min) && iso(next.max) && (next.min as string) > (next.max as string)) {
+      delete next.min;
+      delete next.max;
+    }
+  }
+  if ('maxLength' in next) {
+    if (finite(next.maxLength) && next.maxLength >= 1) {
+      next.maxLength = Math.min(Math.floor(next.maxLength), 10_000);
+    } else delete next.maxLength;
+  }
+  const picks =
+    next.type === 'multi_choice' || (next.type === 'picture_choice' && next.multiple === true);
+  if (picks) {
+    const choices =
+      (Array.isArray(next.options) ? next.options.length : 0) + (next.allowOther === true ? 1 : 0);
+    const min = finite(next.min) ? Math.min(Math.max(0, Math.floor(next.min)), choices) : 0;
+    const max = finite(next.max) ? Math.floor(next.max) : 0;
+    if (min > 0) next.min = min;
+    else delete next.min;
+    if (max >= 1 && max >= min) next.max = max;
+    else delete next.max;
+  } else if (next.type === 'picture_choice') {
+    delete next.min;
+    delete next.max;
+  }
+}
+
+/**
+ * A built-in theme, or the default (F31). 'slate' is the studio's own chrome:
+ * on a form it pulled in studio input styles (the AM/PM toggle lost PM).
+ */
+export function safeThemeName(theme: unknown): ThemeName {
+  return typeof theme === 'string' && Object.prototype.hasOwnProperty.call(themes, theme)
+    ? (theme as ThemeName)
+    : 'swiss';
+}
+
 function sanitizeOption(o: Record<string, unknown>): void {
   keepPrice(o, 'price');
   keepPrice(o, 'priceMax');
@@ -277,6 +352,7 @@ export function sanitizeUntrustedSchema(schema: Schema): Schema {
       if (key in next) next[key] = clampText(next[key]);
     }
     sanitizeOptions(next);
+    sanitizeBounds(next);
     sanitizeWaveB(next);
     sanitizeWaveC(next);
     sanitizeWaveD(next);
@@ -303,7 +379,7 @@ export function sanitizeUntrustedSchema(schema: Schema): Schema {
   const brand = { ...schema.brand, name: clampText(schema.brand?.name ?? '') };
   if ('logo' in brand) delete (brand as Record<string, unknown>).logo;
   const estimate = sanitizeEstimate((schema as { estimate?: unknown }).estimate);
-  const out: Schema = { ...schema, brand, questions };
+  const out: Schema = { ...schema, brand, questions, theme: safeThemeName(schema.theme) };
   if (estimate) out.estimate = estimate;
   else delete out.estimate;
   return out;
