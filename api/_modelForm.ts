@@ -460,19 +460,21 @@ function toModelQuestion(q: GeneratedQuestion): ModelQuestion {
   if (q.maxFiles > 0) settings.push(`max files: ${q.maxFiles}`);
   if (q.maxSizeMb > 0) settings.push(`max size: ${q.maxSizeMb}`);
 
+  // Pairs keep their places ([yes, no], [low end, high end]); lists drop blanks.
+  const pair = (a: string, b: string) => (a.trim() || b.trim() ? [a.trim(), b.trim()] : []);
   const labels =
     q.type === 'yes_no'
-      ? [q.yesLabel, q.noLabel]
+      ? pair(q.yesLabel, q.noLabel)
       : q.type === 'legal'
-        ? [q.acceptLabel, q.declineLabel]
+        ? pair(q.acceptLabel, q.declineLabel)
         : q.type === 'scale' || q.type === 'nps'
-          ? [q.minLabel, q.maxLabel]
+          ? pair(q.minLabel, q.maxLabel)
           : q.type === 'statement' || q.type === 'review'
-            ? [q.cta]
+            ? [q.cta].filter((l) => l.trim())
             : q.type === 'matrix'
-              ? q.columns.map((c) => c.label)
+              ? q.columns.map((c) => c.label).filter((l) => l.trim())
               : q.type === 'address'
-                ? (q.serviceArea ?? [])
+                ? (q.serviceArea ?? []).filter((l) => l.trim())
                 : [];
 
   const text =
@@ -500,7 +502,7 @@ function toModelQuestion(q: GeneratedQuestion): ModelQuestion {
       q.type === 'matrix'
         ? q.rows.map((r) => ({ label: r.label, value: r.value, price: 0, more: [] }))
         : q.options.map(toModelOption),
-    labels: labels.filter((l) => l.trim()),
+    labels,
     settings,
     showIfField: q.showIfField,
     showIfEquals: q.showIfEquals,

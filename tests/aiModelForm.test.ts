@@ -438,6 +438,19 @@ describe('model draft → full draft → engine schema', () => {
     expect(fromModelForm(toModelForm(full))).toEqual(full);
   });
 
+  it('a half-set button pair keeps each word in its place', () => {
+    const full = fromModelForm(
+      form([
+        q({ id: 'a', type: 'yes_no', title: 'A?', labels: ['', 'Not this time'] }),
+        q({ id: 'b', type: 'scale', title: 'B?', min: 1, max: 5, labels: ['', 'Loved it'] }),
+        q({ id: 'c', type: 'short_text', title: 'C?' }),
+      ]),
+    );
+    expect(full.questions[0]).toMatchObject({ yesLabel: '', noLabel: 'Not this time' });
+    expect(toModelForm(full).questions[0]!.labels).toEqual(['', 'Not this time']);
+    expect(fromModelForm(toModelForm(full))).toEqual(full);
+  });
+
   it('a later-wave draft round-trips too', () => {
     const later = fromModelForm(form(Object.values(SAMPLES).slice(20)));
     expect(fromModelForm(toModelForm(later))).toEqual(later);
