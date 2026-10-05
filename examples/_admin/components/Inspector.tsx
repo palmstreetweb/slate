@@ -142,7 +142,7 @@ export function Inspector({
           </Field>
         )}
         {'title' in question && typeof question.title === 'function' && (
-          <Field label="Title (Dynamic Function)">
+          <Field label="Title (set in code)">
             <p style={{ margin: 0, fontSize: 13, color: 'var(--slate-muted)' }}>
               This title changes with the answers, so it’s set in the form’s code and can’t be
               edited here.
@@ -1378,7 +1378,13 @@ function PrefillSetting({
         label="Can Be Prefilled From the Link"
       />
       {on && (
-        <Field label="Link Name" hint={problem ?? `Add ?${trimmed}=… to the form link.`}>
+        <Field
+          label="Link Name"
+          hint={
+            problem ??
+            `To fill it in, add ?${trimmed}= and the answer to the end of the form’s link.`
+          }
+        >
           <input
             className={`slate-input${problem ? ' slate-input--error' : ''}`}
             value={key ?? ''}

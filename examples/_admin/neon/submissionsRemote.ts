@@ -404,16 +404,25 @@ async function withAuthRetry(write: () => PromiseLike<{ error: unknown }>): Prom
 
 /**
  * Optimistic local change, then the server write; roll back on failure.
- * `failTitle` heads the toast ("Couldn’t empty Trash").
+ * `failTitle` heads the toast ("Couldn’t empty Trash"). Resolves true once the
+ * write landed, false once it was rolled back (and said).
  */
-function optimistic(apply: () => void, write: () => Promise<void>, failTitle: string): void {
+function optimistic(
+  apply: () => void,
+  write: () => Promise<void>,
+  failTitle: string,
+): Promise<boolean> {
   const prev = snapshot();
   apply();
   notify();
-  void write().catch((err: unknown) => {
-    emitPersistError(err, failTitle);
-    restoreSnapshot(prev);
-  });
+  return write().then(
+    () => true,
+    (err: unknown) => {
+      emitPersistError(err, failTitle);
+      restoreSnapshot(prev);
+      return false;
+    },
+  );
 }
 
 function chunks<T>(list: T[], size = BATCH): T[][] {
@@ -496,8 +505,9 @@ export function restoreSubmissionRemoteSync(submissionId: string): void {
   );
 }
 
-export function restoreSubmissionsRemoteSync(formId: string): void {
-  optimistic(
+/** Restore all of a form's trash; resolves true once the server has it (QA leftover). */
+export function restoreSubmissionsRemoteSync(formId: string): Promise<boolean> {
+  return optimistic(
     () => {
       for (const e of [...index.values()]) {
         if (e.deletedAt && e.formId === formId) stampDeleted(e.id, undefined);

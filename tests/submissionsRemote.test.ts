@@ -180,6 +180,17 @@ describe('responses store: slim index + per-form answers (ADR-049)', () => {
     expect(db.table.some((x) => x.id === 'b0')).toBe(false);
   });
 
+  it('restore all resolves true once it lands, false once it was rolled back (QA leftover)', async () => {
+    const r = await load();
+    await r.hydrateSubmissionsRemote();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    db.failNext = 'update';
+    await expect(r.restoreSubmissionsRemoteSync('B')).resolves.toBe(false);
+    expect(r.countTrashedSubmissionsRemote('B')).toBeGreaterThan(0);
+    await expect(r.restoreSubmissionsRemoteSync('B')).resolves.toBe(true);
+    expect(r.countTrashedSubmissionsRemote('B')).toBe(0);
+  });
+
   it('a failed write rolls the local change back and reports it', async () => {
     const r = await load();
     await r.hydrateSubmissionsRemote();

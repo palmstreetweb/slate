@@ -578,6 +578,29 @@ describe('redirect per ending (STU-7)', () => {
   });
 });
 
+describe('plain labels (QA leftovers)', () => {
+  it('a title set in the form’s code says so, without developer words', () => {
+    setup({ id: 'q', type: 'short_text', title: (() => 'Hi') as never } as Question);
+    expect(screen.getByText('Title (set in code)')).toBeInTheDocument();
+    expect(screen.queryByText(/Dynamic Function/)).toBeNull();
+  });
+
+  it('Fill from link says how, in a sentence', () => {
+    // A question with a link name opens the section.
+    setup({
+      id: 'first_name',
+      type: 'short_text',
+      title: 'First name?',
+      prefillKey: 'first_name',
+    } as Question);
+    expect(
+      screen.getByText(
+        'To fill it in, add ?first_name= and the answer to the end of the form’s link.',
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('welcome and thanks keep a Subtitle field (S18)', () => {
   it('shows it even when the subtitle was cleared', () => {
     setup({ id: 'w', type: 'welcome', title: 'Hi' } as Question);

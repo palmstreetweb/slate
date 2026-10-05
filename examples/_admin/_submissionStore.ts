@@ -294,12 +294,13 @@ export function restoreSubmission(submissionId: string): void {
   );
 }
 
-export function restoreSubmissions(formId: string): void {
-  if (useRemote()) {
-    remote.restoreSubmissionsRemoteSync(formId);
-    return;
-  }
-  if (neonNotReady()) return;
+/**
+ * Move a form's trashed responses back. Resolves true once they are saved (at once on this
+ * device; once the server has them in the cloud), so "Restored" is only said then.
+ */
+export function restoreSubmissions(formId: string): Promise<boolean> {
+  if (useRemote()) return remote.restoreSubmissionsRemoteSync(formId);
+  if (neonNotReady()) return Promise.resolve(false);
   write(
     read().map((s) => {
       if (s.formId !== formId || !isTrashed(s)) return s;
@@ -307,6 +308,7 @@ export function restoreSubmissions(formId: string): void {
       return rest;
     }),
   );
+  return Promise.resolve(true);
 }
 
 export function permanentlyDeleteSubmission(submissionId: string): void {

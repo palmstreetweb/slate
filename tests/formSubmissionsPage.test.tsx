@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   /** null = use the real (offline, always-ready) store. */
   ready: null as boolean | null,
   ensure: null as null | (() => Promise<void>),
+  /** Stands in for the store's restore-all, to make its save fail. */
+  restoreAll: null as null | ((formId: string) => Promise<boolean>),
   navigate: vi.fn(),
 }));
 
@@ -35,6 +37,8 @@ vi.mock('../examples/_admin/_submissionStore.js', async (importOriginal) => {
       state.ready === null ? real.isFormSubmissionsReady(id) : state.ready,
     ensureFormSubmissions: (id: string, opts?: { force?: boolean }) =>
       state.ensure ? state.ensure() : real.ensureFormSubmissions(id, opts),
+    restoreSubmissions: (id: string) =>
+      state.restoreAll ? state.restoreAll(id) : real.restoreSubmissions(id),
   };
 });
 // The shell's header chrome (bell, sign-out, theme) has its own tests.
@@ -79,6 +83,9 @@ vi.mock('../examples/_admin/responses/ResponsesInbox.js', () => ({
       ))}
       <button type="button" onClick={p.onEmptyTrash}>
         empty trash
+      </button>
+      <button type="button" onClick={p.onRestoreAll}>
+        restore all
       </button>
     </div>
   ),
@@ -143,6 +150,7 @@ beforeEach(() => {
   state.form = { id: 'f1', name: 'Pool sign-up', status: 'draft', schema };
   state.ready = null;
   state.ensure = null;
+  state.restoreAll = null;
   state.navigate.mockReset();
 });
 
@@ -274,6 +282,36 @@ describe('Responses page shell', () => {
     await user.click(within(again).getByRole('button', { name: 'Empty trash' }));
     expect(listTrashedSubmissions('f1')).toHaveLength(0);
     expect(screen.getByText('Trash is empty')).toBeInTheDocument();
+  });
+
+  it('Restore all says “Restored” once the save landed, and not when it failed (QA leftover)', async () => {
+    const user = userEvent.setup();
+    seed([makeSub('s1', 5, 'Nora'), makeSub('s2', 50, 'Kai', true), makeSub('s3', 60, 'Bo', true)]);
+    let land: (ok: boolean) => void = () => {};
+    state.restoreAll = () =>
+      new Promise<boolean>((resolve) => {
+        land = resolve;
+      });
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Trash, 2 responses' }));
+    await user.click(screen.getByRole('button', { name: 'restore all' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Restore all' }),
+    );
+    // The write is still out: nothing said yet.
+    expect(screen.queryByText('Restored 2 responses')).toBeNull();
+    // It failed (its own toast says so): never "Restored".
+    await act(async () => land(false));
+    expect(screen.queryByText('Restored 2 responses')).toBeNull();
+
+    // Again, and this time it lands.
+    state.restoreAll = null;
+    await user.click(screen.getByRole('button', { name: 'restore all' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Restore all' }),
+    );
+    expect(await screen.findByText('Restored 2 responses')).toBeInTheDocument();
+    expect(listTrashedSubmissions('f1')).toHaveLength(0);
   });
 
   it('empty states: draft, published, and only-trash', () => {

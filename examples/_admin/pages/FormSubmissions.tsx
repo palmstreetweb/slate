@@ -369,8 +369,10 @@ export function FormSubmissions({ formId }: Props) {
         confirmLabel: 'Restore all',
       });
       if (!ok) return;
-      restoreSubmissions(formId);
-      toast.push({ title: `Restored ${plural(n, 'response', 'responses')}`, tone: 'info' });
+      // Said once the save has landed; a failure has its own toast and puts them back.
+      if (await restoreSubmissions(formId)) {
+        toast.push({ title: `Restored ${plural(n, 'response', 'responses')}`, tone: 'info' });
+      }
     })();
   }, [confirm, formId, toast]);
 
