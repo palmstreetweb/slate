@@ -2,13 +2,22 @@
  * Quantity stepper for `number` questions with `display: 'stepper'`
  * (ADR-063). Big − / + buttons (56 px) either side of the value; holding one
  * repeats, faster the longer it's held. The value itself stays typeable for
- * big jumps, and it is a spinbutton: Up/Down (and + / −) step it. The answer
- * is the number shown — optional prefix and unit are display only.
+ * big jumps, and it is a spinbutton: Up/Down (and + / −, where it can't go
+ * below 0) step it. The answer is the number shown — optional prefix and
+ * unit are display only.
  */
 
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import type { NumberQuestion } from '@/types/Question.js';
 import { validate } from '@/logic/validation.js';
 import { NOT_A_NUMBER, parseTypedNumber } from '@/logic/numberEntry.js';
@@ -71,6 +80,13 @@ export default function NumberStepperField({
   const holdDir = useRef<1 | -1 | 0>(0);
   /** A finger is down on − / + and hasn't stepped yet: it steps on release (a tap). */
   const tapDir = useRef<1 | -1 | 0>(0);
+  /** After a + / − key, the new number is selected, so a digit typed next replaces it. */
+  const selectAfterRender = useRef(false);
+  useLayoutEffect(() => {
+    if (!selectAfterRender.current) return;
+    selectAfterRender.current = false;
+    inputRef.current?.select();
+  });
   const current = parse(text);
   const base = current !== undefined && Number.isFinite(current) ? current : clamp(0);
   const atMin = min !== undefined && base <= min;
@@ -166,24 +182,25 @@ export default function NumberStepperField({
   useRegisterFormConfirm(submit);
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    const signs = min === undefined || min >= 0;
+    // + and − step only where a number can't be negative; elsewhere they are
+    // signs, so "-5" types minus five (not five after a step down to -1).
+    const signs = min !== undefined && min >= 0;
     if (e.key === 'ArrowUp' || (e.key === '+' && signs)) {
       e.preventDefault();
       bump(1);
+      if (e.key === '+') selectAfterRender.current = true;
       return;
     }
     if (e.key === 'ArrowDown' || (e.key === '-' && signs)) {
       e.preventDefault();
       if (e.key === '-') {
-        // Typing "-2" where only 0 or more is allowed: say so (instead of
-        // stepping, then reading the 2 as "02"), and let the next digit
-        // replace the number rather than add to it.
-        if (atMin) {
-          setError(validate(question, base - step)?.message ?? null);
-        } else {
-          bump(-1);
-        }
-        requestAnimationFrame(() => inputRef.current?.select());
+        // "-2" where only 0 or more is allowed (F19): at the bottom, say so
+        // instead of stepping; either way the number shown is selected, so
+        // the next digit replaces it ("2", never "02" read as 2).
+        if (atMin) setError(validate(question, base - step)?.message ?? null);
+        else bump(-1);
+        e.currentTarget.select();
+        selectAfterRender.current = true;
         return;
       }
       bump(-1);

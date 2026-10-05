@@ -72,6 +72,14 @@ describe('layout (GAP-12, GAP-13, GAP-29, GAP-21)', () => {
     );
   });
 
+  it('a matrix with eight or more columns stacks when it is under ~700 px wide', () => {
+    const sheet = css('questions.css');
+    expect(sheet).toMatch(/\[data-slate-forms\] \.slate-matrix \{\s*container-type: inline-size;/);
+    expect(sheet).toMatch(
+      /@container \(max-width: 700px\) \{\s*\[data-slate-forms\] \.slate-matrix:has\(\.slate-matrix-head > :nth-child\(9\)\) \.slate-matrix-head \{\s*display: none;/,
+    );
+  });
+
   it('AM / PM wraps under the time on a very narrow screen', () => {
     expect(css('extensions.css')).toMatch(/\.slate-time-row \{[^}]*flex-wrap: wrap;/);
   });

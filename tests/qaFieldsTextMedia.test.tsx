@@ -367,10 +367,20 @@ describe('number stepper (X-3, F19)', () => {
 
   it('"-" at 0 says what is allowed instead of turning -2 into 02', async () => {
     renderField(q);
-    const box = await screen.findByRole('spinbutton');
+    const box = (await screen.findByRole('spinbutton')) as HTMLInputElement;
     fireEvent.keyDown(box, { key: '-' });
     expect(box).toHaveValue('0');
     expect(screen.getByText('! Enter a number from 0 to 5')).toBeInTheDocument();
+    // The number is selected, so the 2 typed next replaces it.
+    expect([box.selectionStart, box.selectionEnd]).toEqual([0, 1]);
+  });
+
+  it('with no lower limit, "-" is a minus sign, not a step', async () => {
+    renderField({ id: 'w', type: 'number', title: 'Change?', display: 'stepper' });
+    const box = await screen.findByRole('spinbutton');
+    const ev = fireEvent.keyDown(box, { key: '-' });
+    expect(ev).toBe(true); // not prevented: the browser types the minus
+    expect(box).toHaveValue('0');
   });
 });
 

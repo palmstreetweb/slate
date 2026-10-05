@@ -62,13 +62,13 @@ function drawStroke(ctx: CanvasRenderingContext2D, s: ReadonlyArray<Point>) {
 
 /**
  * The vertical distance (box units) of a stroke that was really a scroll: a
- * quick (under 350 ms), mostly up-or-down swipe that runs off the top or the
- * bottom of the pad. 0 for anything that could be ink.
+ * quick (under half a second), mostly up-or-down swipe that runs off the top
+ * or the bottom of the pad. 0 for anything that could be ink.
  */
 function scrollFlick(stroke: ReadonlyArray<Point>, ms: number): number {
   const first = stroke[0];
   const last = stroke[stroke.length - 1];
-  if (!first || !last || ms > 350) return 0;
+  if (!first || !last || ms > 500) return 0;
   const dx = last[0] - first[0];
   const dy = last[1] - first[1];
   const offPad = stroke.some(([, y]) => y < 0 || y > SIG_H);
