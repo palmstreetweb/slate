@@ -113,6 +113,26 @@ describe('Share panel password lock (ADR-043)', () => {
     expect(state.setFormFillPassword).not.toHaveBeenCalled();
   });
 
+  it('the placeholder says the same 6-character rule for words too (COPY-R14)', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('switch'));
+    const input = screen.getByLabelText('Form password');
+    expect(input).toHaveAttribute('placeholder', 'At least 6 letters or digits');
+    expect(input.getAttribute('placeholder')).not.toMatch(/a word/i);
+  });
+
+  it('changing a password: the placeholder asks for a new one of 6+ characters', async () => {
+    const user = userEvent.setup();
+    state.form = { ...published, fillLocked: true };
+    open();
+    await user.click(screen.getByRole('button', { name: 'Change' }));
+    expect(screen.getByLabelText('Form password')).toHaveAttribute(
+      'placeholder',
+      'New password, 6+ characters',
+    );
+  });
+
   it('locked: Change / Remove; Remove clears with an empty string', async () => {
     const user = userEvent.setup();
     state.form = { ...published, fillLocked: true };

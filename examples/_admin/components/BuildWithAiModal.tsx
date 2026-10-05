@@ -344,9 +344,9 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                   }}
                 />
                 {prompt.length >= AI_PROMPT_COUNT_FROM ? (
+                  // Read with the box (aria-describedby), never announced per keystroke (COPY-R9).
                   <p
                     id="slate-ai-count"
-                    aria-live="polite"
                     style={{
                       margin: 0,
                       fontSize: 12,
@@ -359,6 +359,12 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                       : `${prompt.length.toLocaleString()} / ${AI_PROMPT_MAX.toLocaleString()} characters`}
                   </p>
                 ) : null}
+                {/* Always there, so a screen reader hears the limit once, when it's reached. */}
+                <p className="slate-sr" role="status">
+                  {prompt.length >= AI_PROMPT_MAX
+                    ? `That’s the limit: ${AI_PROMPT_MAX.toLocaleString()} characters.`
+                    : ''}
+                </p>
                 <input
                   ref={fileRef}
                   type="file"

@@ -117,6 +117,18 @@ describe('preview frames', () => {
   });
 });
 
+describe('the banner’s Hide / Show and quiet guard notes are ink (COPY-R10)', () => {
+  it('neither uses a muted colour that falls below 4.5:1 on a tint or the phone’s page', () => {
+    const toggle = rule(read('examples/_admin/_adminTheme.css'), '.slate-issues-toggle');
+    expect(toggle).toMatch(/color:\s*var\(--chrome-ink\)/);
+    const quiet = rule(
+      read('examples/_admin/components/inspectorGuards.css'),
+      '.slate-guard--quiet',
+    );
+    expect(quiet).toMatch(/color:\s*var\(--chrome-ink\)/);
+  });
+});
+
 describe('light-mode warning contrast (S27)', () => {
   const tokens = readFileSync(
     resolve(__dirname, '../examples/_admin/slateChromeTokens.css'),
@@ -147,6 +159,11 @@ describe('light-mode warning contrast (S27)', () => {
       const warn = token('--slate-warn')!;
       for (const bg of ['--chrome-panel', '--chrome-panel-2', '--chrome-bg']) {
         expect(ratio(warn, token(bg)!), `${ui} ${bg}`).toBeGreaterThanOrEqual(4.5);
+      }
+      // Ink (the issues toggle, quiet guard notes) on the page and panels (COPY-R10).
+      const ink = token('--chrome-ink')!;
+      for (const bg of ['--chrome-panel', '--chrome-panel-2', '--chrome-bg']) {
+        expect(ratio(ink, token(bg)!), `${ui} ink on ${bg}`).toBeGreaterThanOrEqual(4.5);
       }
     });
   }

@@ -397,7 +397,10 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
               setLockDraft(e.target.value);
               setLockError(null);
             }}
-            placeholder={fillLocked ? 'New word or 6+ digits' : 'A word or 6+ digits'}
+            // Six characters for any password, word or digits (COPY-R14), as the hint says.
+            placeholder={
+              fillLocked ? 'New password, 6+ characters' : 'At least 6 letters or digits'
+            }
             aria-label="Form password"
             aria-describedby={`${titleId}-lock-hint`}
             aria-invalid={lockError ? true : undefined}
