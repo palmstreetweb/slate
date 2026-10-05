@@ -23,6 +23,9 @@ import { shakeInvalid } from '@/utils/motion.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
 import { OTHER_EMPTY, OtherTextBox, keyRange, useOtherChoice } from './OtherChoice.js';
 import { resolveTitle } from './_resolveTitle.js';
+import { sayAgain } from './ext/fieldMessage.js';
+// `.slate-sr`, the visually hidden region (on demand only, like this field).
+import '@/styles/extensions.css';
 
 type Props = {
   question: MultiChoiceQuestion;
@@ -63,12 +66,15 @@ export function MultiChoiceField({
   const [error, setError] = useState<string | null>(null);
   /** The option tapped while the most picks were made: its note says why. */
   const [refused, setRefused] = useState<string | null>(null);
+  /** The note's words for a screen reader, in a region that's always there (COPY-R8). */
+  const [said, setSaid] = useState('');
   const choicesRef = useRef<HTMLDivElement>(null);
   const other = useOtherChoice(question, selected, labelId);
   const picked = other.enabled ? splitOther(question.options, selected).picked : selected;
   const [, max] = pickLimits(question);
   // The open Other box is a pick too.
   const full = picked.length + (other.open ? 1 : 0) >= max;
+  const fullText = `You can pick up to ${max}. Tap one of your picks to let it go.`;
 
   // New picks clear the error, whether they came from a tap or a letter key.
   const [seen, setSeen] = useState(selected);
@@ -95,6 +101,7 @@ export function MultiChoiceField({
     } else if (full) {
       // At the most picks: untick one first, says the note under this option.
       setRefused(value);
+      setSaid(sayAgain(fullText));
       shakeInvalid(el);
       return;
     } else {
@@ -109,13 +116,14 @@ export function MultiChoiceField({
       onSelect(picked);
     } else if (full) {
       setRefused(OTHER_KEY);
+      setSaid(sayAgain(fullText));
       shakeInvalid(choicesRef.current?.querySelector('.slate-choice--other'));
       return;
     } else {
       other.openBox();
     }
     if (error) setError(null);
-  }, [other, onSelect, picked, error, full]);
+  }, [other, onSelect, picked, error, full, fullText]);
 
   const submit = useCallback(() => {
     if (other.open && !other.text.trim()) {
@@ -146,11 +154,8 @@ export function MultiChoiceField({
   useRegisterFormConfirm(submit);
   useRegisterOtherKey(toggleOther, other.enabled);
 
-  const note = (
-    <p className="slate-err slate-choice-note" aria-live="polite">
-      You can pick up to {max}. Tap one of your picks to let it go.
-    </p>
-  );
+  // Shown under the option tapped; said by the region below the choices.
+  const note = <p className="slate-err slate-choice-note">{fullText}</p>;
 
   return (
     <div>
@@ -207,6 +212,9 @@ export function MultiChoiceField({
         {refused === OTHER_KEY ? note : null}
       </div>
       <OtherTextBox other={other} onEnter={submit} onType={onType} />
+      <p className="slate-sr" aria-live="polite">
+        {said}
+      </p>
 
       {other.error || error ? (
         <p className="slate-err" aria-live="polite">

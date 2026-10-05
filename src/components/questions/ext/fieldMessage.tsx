@@ -16,3 +16,14 @@ export function FieldError({ id, error }: { id?: string; error: string | null })
     </p>
   );
 }
+
+/**
+ * The next text for a message slot or live region (COPY-R8): the same
+ * sentence again ends in a no-break space, so a screen reader says it again
+ * (a region speaks only when its text changes) — a second tap on a full slot
+ * is answered too. Use as a state updater: `setSaid(sayAgain(text))`.
+ */
+export const sayAgain =
+  (text: string) =>
+  (cur: string | null): string =>
+    cur === text ? `${text} ` : text;

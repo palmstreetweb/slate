@@ -16,8 +16,8 @@
  *
  * Min / Max Likes (ADR-069): the rule is shown over the deck ("Like up to
  * 3"); at the most likes a like springs back and says so; the end screen
- * says what's still needed, and a liked picture there can be let go with a
- * tap. An optional yes / no card can be skipped.
+ * says what's still needed, and a tap on a liked picture there removes it
+ * from the likes. An optional yes / no card can be skipped.
  */
 
 'use client';
@@ -31,6 +31,7 @@ import { focusAfter } from '@/utils/focus.js';
 import { motionReduced, shakeInvalid } from '@/utils/motion.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import { FieldError, sayAgain } from './fieldMessage.js';
 import '@/styles/extensions.css';
 import '@/styles/extensions-c.css';
 
@@ -335,7 +336,13 @@ function PictureSwipe({
   const refuse = useCallback(
     (dir: Dir) => {
       if (dir !== 'like' || liked.length < max) return false;
-      setError(`You can like up to ${max}. Pass on this one, or undo a like.`);
+      // Undo steps back one card, whatever was decided there (COPY-R11); the
+      // message slot is always in the page, so it is announced (COPY-R8).
+      setError(
+        sayAgain(
+          `You can like up to ${max}. Pass on this one, or press Undo to go back and change a like.`,
+        ),
+      );
       shakeInvalid(likeRef.current);
       return true;
     },
@@ -352,7 +359,7 @@ function PictureSwipe({
     setDecisions(next);
     setError(null);
     onAnswer(options.filter((_, i) => next[i] === 'like').map((o) => o.value));
-    setSaid(`${options[at]?.label ?? 'That one'} let go.`);
+    setSaid(`${options[at]?.label ?? 'That one'} removed from your likes.`);
   };
 
   const undo = () => {
@@ -386,7 +393,7 @@ function PictureSwipe({
         err.code === 'min_selections'
           ? 'Tap Swipe again, or Undo last, to like more.'
           : err.code === 'max_selections'
-            ? `You can like up to ${max}. Tap a picture to let it go.`
+            ? `You can like up to ${max}. Tap a picture to remove it.`
             : err.message,
       );
       shakeInvalid(okRef.current);
@@ -512,7 +519,7 @@ function PictureSwipe({
                     type="button"
                     className="slate-swipe-unlike"
                     onClick={() => unlike(o.value)}
-                    aria-label={`Let ${o.label} go`}
+                    aria-label={`Remove ${o.label} from your likes`}
                   >
                     <img
                       src={o.src || undefined}
@@ -527,7 +534,7 @@ function PictureSwipe({
             </ul>
           ) : null}
           {liked.length > 0 ? (
-            <p className="slate-hint slate-swipe-unlike-hint">tap a picture to let it go</p>
+            <p className="slate-hint slate-swipe-unlike-hint">tap a picture to remove it</p>
           ) : null}
           <button type="button" className="slate-swipe-again" onClick={again}>
             Swipe again
@@ -541,11 +548,7 @@ function PictureSwipe({
       <p className="slate-sr" aria-live="polite">
         {said}
       </p>
-      {error ? (
-        <p className="slate-err" aria-live="polite">
-          {error}
-        </p>
-      ) : null}
+      <FieldError error={error} />
       {done ? (
         <div className="slate-actions">
           <button ref={okRef} type="button" className="slate-ok-btn" onClick={submit}>

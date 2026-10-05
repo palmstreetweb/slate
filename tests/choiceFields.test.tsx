@@ -294,19 +294,22 @@ describe('swipe cards with Max Likes (CH-11, GAP-17)', () => {
     const likeFarm = await screen.findByRole('button', { name: 'Like Farmhouse' });
     expect(likeFarm).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(likeFarm);
-    expect(
-      screen.getByText('You can like up to 1. Pass on this one, or undo a like.'),
-    ).toBeInTheDocument();
+    // Undo steps back a card, whatever was decided there (COPY-R11).
+    const why =
+      'You can like up to 1. Pass on this one, or press Undo to go back and change a like.';
+    expect(screen.getByText(why)).toHaveAttribute('aria-live', 'polite');
     // Still on Farmhouse: nothing was decided.
     expect(screen.getByRole('button', { name: 'Like Farmhouse' })).toBeInTheDocument();
   });
 
-  it('on the end screen a liked picture can be let go, and Undo goes back a card', async () => {
+  it('on the end screen a liked picture can be removed, and Undo goes back a card', async () => {
     const { onSet } = renderLive({ ...deck, max: undefined } as Question, {
       style: ['craft', 'farm'],
     });
     expect(await screen.findByText('You liked 2 of 3')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Let Farmhouse go' }));
+    expect(screen.getByText('tap a picture to remove it')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Farmhouse from your likes' }));
+    expect(screen.getByText('Farmhouse removed from your likes.')).toBeInTheDocument();
     expect(screen.getByText('You liked 1 of 3')).toBeInTheDocument();
     expect(onSet).toHaveBeenLastCalledWith('style', ['craft']);
     fireEvent.click(screen.getByRole('button', { name: 'Undo last' }));
@@ -364,7 +367,13 @@ describe('sign-up slots (MEDIA-07, GAP-16)', () => {
       await screen.findByText('Sorry, every spot is taken. You can still send the rest.'),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: /^Morning/ }));
-    expect(screen.getByText('Sorry, every spot is taken.')).toBeInTheDocument();
+    // Shown under the slot, and said by the region that's always there (COPY-R8).
+    expect(
+      screen.getByText('Sorry, every spot is taken.', { selector: '.slate-slot-note' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Sorry, every spot is taken.', { selector: '.slate-sr' }),
+    ).toHaveAttribute('aria-live', 'polite');
     await user.click(screen.getByRole('button', { name: /^ok/i }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0]![0]).toEqual({});
@@ -377,8 +386,14 @@ describe('sign-up slots (MEDIA-07, GAP-16)', () => {
     await user.click(screen.getByRole('checkbox', { name: /^Noon/ }));
     const evening = screen.getByRole('checkbox', { name: /^Evening/ });
     await user.click(evening);
-    const note = screen.getByText('You can pick up to 2. Tap one of your picks to let it go.');
+    const why = 'You can pick up to 2. Tap one of your picks to let it go.';
+    const note = screen.getByText(why, { selector: '.slate-slot-note' });
     expect(evening.nextElementSibling).toBe(note);
+    const region = screen.getByText(why, { selector: '.slate-sr' });
+    expect(region.textContent).toBe(why);
+    // A second tap is said again: the region's text changes (COPY-R8).
+    await user.click(evening);
+    expect(region.textContent).toBe(`${why} `);
     // A tap that works clears it.
     await user.click(screen.getByRole('checkbox', { name: /^Noon/ }));
     expect(note).not.toBeInTheDocument();

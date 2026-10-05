@@ -162,6 +162,11 @@
   color: var(--slate-error);
   font-family: var(--slate-font-body);
   text-transform: var(--slate-transform);
+  /* Brought into view (shakeInvalid) while it slides in from 6 px above where
+     it rests (motion.css): room below for the rest, so its last line isn't cut
+     off at the foot of the screen (QA, final check: the swipe deck's
+     "You can like up to …"). */
+  scroll-margin-bottom: 16px;
 }
 
 [data-slate-forms][data-theme-name='swiss'] .slate-err {
@@ -1031,20 +1036,25 @@
   display: block;
 }
 
+/* The badge sits in the line of text, so a label that can't fit beside it
+   goes under it as a whole word: on a two-column phone grid, "Mediterranean"
+   wraps under the badge instead of breaking ("Mediterranea/n"). Only a word
+   wider than the whole tile still breaks (QA, final check). */
 [data-slate-forms] .slate-picture-caption {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: block;
   padding: 10px 12px;
   font-size: 0.95rem;
   text-align: left;
   text-transform: var(--slate-transform);
+  overflow-wrap: break-word;
 }
 
 [data-slate-forms] .slate-picture-caption .slate-choice-badge {
   width: 22px;
   height: 22px;
   font-size: 11px;
+  margin-right: 10px;
+  vertical-align: middle;
 }
 
 /* ---------- ranking ---------- */

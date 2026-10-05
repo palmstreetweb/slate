@@ -448,11 +448,16 @@ describe('a tap past the most picks says why (R5)', () => {
     const c = screen.getByRole('checkbox', { name: /Option C/ });
     expect(c).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(c);
-    const note = screen.getByText('You can pick up to 2. Tap one of your picks to let it go.');
+    const why = 'You can pick up to 2. Tap one of your picks to let it go.';
+    const note = screen.getByText(why, { selector: '.slate-choice-note' });
     expect(c.nextElementSibling).toBe(note);
+    // Said by a region that's always there, not the note created with it (COPY-R8).
+    expect(screen.getByText(why, { selector: '.slate-sr' })).toHaveAttribute('aria-live', 'polite');
     expect(onSet).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByRole('checkbox', { name: /Option A/ }));
-    expect(screen.queryByText(/You can pick up to 2/)).toBeNull();
+    expect(
+      screen.queryByText(/You can pick up to 2/, { selector: '.slate-choice-note' }),
+    ).toBeNull();
   });
 
   it('picture choice: the reason shows under the grid', async () => {

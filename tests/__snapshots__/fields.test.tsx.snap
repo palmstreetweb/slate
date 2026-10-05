@@ -331,6 +331,10 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
       </button>
     </div>
     <p
+      aria-live="polite"
+      class="slate-err"
+    />
+    <p
       class="slate-hint slate-key-hint"
       style="margin-top: 20px;"
     >
@@ -960,6 +964,10 @@ exports[`question types render > multi_choice 1`] = `
         </span>
       </button>
     </div>
+    <p
+      aria-live="polite"
+      class="slate-sr"
+    />
     <div
       class="slate-actions"
     >
