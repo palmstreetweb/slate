@@ -532,6 +532,52 @@ describe('redirect (F3, S12)', () => {
   });
 });
 
+describe('redirect per ending (STU-7)', () => {
+  it('a half-typed address stays with its ending: another ending starts empty', async () => {
+    const endings: Question[] = [
+      { id: 'done', type: 'thanks', title: 'Thanks!' },
+      { id: 'out_of_area', type: 'thanks', title: 'Out of area' },
+    ];
+    const spy = vi.fn();
+    function TwoEndings() {
+      const [qs, setQs] = useState(endings);
+      const [at, setAt] = useState(0);
+      const q = qs[at]!;
+      return (
+        <div data-slate-forms="" data-theme-name="slate">
+          <button type="button" onClick={() => setAt(1)}>
+            second ending
+          </button>
+          {/* Not keyed by question, like the editor's own inspector. */}
+          <Inspector
+            question={q}
+            allQuestions={qs}
+            onChange={(patch) => {
+              spy(q.id, patch);
+              setQs((cur) =>
+                cur.map((x) => (x.id === q.id ? ({ ...x, ...patch } as Question) : x)),
+              );
+            }}
+            onDelete={vi.fn()}
+            canDelete
+          />
+        </div>
+      );
+    }
+    const user = userEvent.setup();
+    render(<TwoEndings />);
+    const box = () => screen.getByPlaceholderText('https://yoursite.com/thanks');
+    await user.type(box(), 'mysite');
+    expect(spy).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'second ending' }));
+    expect(box()).toHaveValue('');
+    expect(screen.queryByText(/That isn’t a web address/)).toBeNull();
+    await user.type(box(), 'other.com');
+    expect(spy).toHaveBeenLastCalledWith('out_of_area', { redirectUrl: 'https://other.com' });
+    expect(spy).not.toHaveBeenCalledWith('out_of_area', { redirectUrl: 'https://mysite.com' });
+  });
+});
+
 describe('welcome and thanks keep a Subtitle field (S18)', () => {
   it('shows it even when the subtitle was cleared', () => {
     setup({ id: 'w', type: 'welcome', title: 'Hi' } as Question);

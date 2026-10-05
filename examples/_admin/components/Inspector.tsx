@@ -862,7 +862,10 @@ export function Inspector({
 
         {question.type === 'multi_choice' && <PickLimits question={question} onChange={onChange} />}
 
-        {question.type === 'thanks' && <RedirectSetting question={question} onChange={onChange} />}
+        {question.type === 'thanks' && (
+          // One field per ending: a half-typed address never follows the owner to another (STU-7).
+          <RedirectSetting key={question.id} question={question} onChange={onChange} />
+        )}
 
         {question.type === 'thanks' && onEstimateChange && (
           <EstimateSection
