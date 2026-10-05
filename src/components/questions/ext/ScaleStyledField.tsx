@@ -198,7 +198,7 @@ function ScaleIcons({ question, answers, value, onCommit, onAdvance }: ExtFieldP
           return true;
         }}
         hint={
-          <span className="slate-hint slate-hint--touch">
+          <span className="slate-hint">
             {stars ? 'tap a star' : 'tap a face'}
             <span className="slate-keys">, or press a number</span>
           </span>
@@ -340,9 +340,9 @@ function ScaleSlider({
           OK <span aria-hidden>✓</span>
         </button>
         {touched ? (
-          <span className="slate-hint">press Enter ↵</span>
+          <span className="slate-hint slate-keys">press Enter ↵</span>
         ) : (
-          <span className="slate-hint slate-hint--touch">drag to answer</span>
+          <span className="slate-hint">drag to answer</span>
         )}
       </div>
     </div>

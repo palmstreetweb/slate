@@ -68,7 +68,11 @@ function renderField(question: Question, answers: LooseAnswers = {}) {
   return { ...utils, setAnswer, advance };
 }
 
-const enter = () => fireEvent.keyDown(window, { key: 'Enter' });
+// On-demand fields register their OK / Enter handler in an effect: let it run first.
+const enter = async () => {
+  await act(async () => {});
+  fireEvent.keyDown(window, { key: 'Enter' });
+};
 
 afterEach(() => {
   vi.useRealTimers();
@@ -88,7 +92,7 @@ describe('stars and faces (F4, F20, GAP-11)', () => {
   it('an Enter right away picks nothing; a required rating says what to do', async () => {
     const { setAnswer, advance } = renderField(stars);
     await screen.findAllByRole('radio');
-    enter();
+    await enter();
     expect(setAnswer).not.toHaveBeenCalled();
     expect(advance).not.toHaveBeenCalled();
     expect(screen.getByText('! Please pick a rating')).toBeInTheDocument();
@@ -109,7 +113,7 @@ describe('stars and faces (F4, F20, GAP-11)', () => {
   it('an optional rating can be skipped with Enter or the Skip button', async () => {
     const { setAnswer, advance } = renderField({ ...stars, required: false });
     await screen.findAllByRole('radio');
-    enter();
+    await enter();
     expect(advance).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
     expect(advance).toHaveBeenCalledTimes(2);
@@ -123,7 +127,7 @@ describe('stars and faces (F4, F20, GAP-11)', () => {
     fireEvent.keyDown(group, { key: 'ArrowRight' });
     fireEvent.keyDown(screen.getByRole('radio', { name: '1 star' }), { key: 'ArrowRight' });
     expect(screen.getByRole('radio', { name: '2 stars' })).toHaveFocus();
-    enter();
+    await enter();
     expect(setAnswer).toHaveBeenCalledWith('rate', 2);
   });
 
@@ -147,7 +151,7 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
     const { advance } = renderField({ id: 's', type: 'scale', title: 'S', min: 0, max: 10 });
     fireEvent.click(await screen.findByRole('button', { name: 'Skip' }));
     expect(advance).toHaveBeenCalledTimes(1);
-    enter();
+    await enter();
     expect(advance).toHaveBeenCalledTimes(2);
   });
 
@@ -162,7 +166,7 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
     });
     await screen.findAllByRole('radio');
     expect(screen.queryByRole('button', { name: 'Skip' })).toBeNull();
-    enter();
+    await enter();
     expect(screen.getByText('! Please pick a number')).toBeInTheDocument();
     expect(advance).not.toHaveBeenCalled();
   });
@@ -184,7 +188,7 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
     first.unmount();
     const second = renderField({ id: 'n', type: 'nps', title: 'N', required: true });
     await screen.findAllByRole('radio');
-    enter();
+    await enter();
     expect(screen.getByText('! Please pick a number')).toBeInTheDocument();
     expect(second.advance).not.toHaveBeenCalled();
   });
@@ -192,7 +196,7 @@ describe('numbers scale, NPS and legal: Skip / OK (F8, X2)', () => {
   it('legal: a required one says what to do on Enter; an optional one skips', async () => {
     const first = renderField({ id: 'l', type: 'legal', title: 'Terms?' });
     await screen.findAllByRole('radio');
-    enter();
+    await enter();
     expect(screen.getByText('! Please choose an option')).toBeInTheDocument();
     expect(first.advance).not.toHaveBeenCalled();
     first.unmount();
@@ -250,7 +254,7 @@ describe('slider (SCROLL-10, GAP-10, F24)', () => {
     fireEvent.pointerCancel(slider, { pointerType: 'touch' });
     expect(container.querySelector('.slate-slider-value')).toHaveTextContent('–');
     expect(slider).toHaveAttribute('aria-valuetext', expect.stringMatching(/not answered yet/i));
-    enter();
+    await enter();
     expect(screen.getByText('! Move the slider to choose a number')).toBeInTheDocument();
   });
 

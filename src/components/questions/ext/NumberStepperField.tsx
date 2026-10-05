@@ -312,7 +312,7 @@ export default function NumberStepperField({
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>
         </button>
-        <span className="slate-hint slate-hint--touch">hold − / + to go faster</span>
+        <span className="slate-hint">hold − / + to go faster</span>
       </div>
     </div>
   );

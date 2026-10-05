@@ -189,7 +189,7 @@ export default function ContactInfoField({
         <button type="button" className="slate-ok-btn" onClick={confirm}>
           OK <span aria-hidden>✓</span>
         </button>
-        <span className="slate-hint">press Enter ↵</span>
+        <span className="slate-hint slate-keys">press Enter ↵</span>
       </div>
     </div>
   );

@@ -581,7 +581,7 @@ exports[`question types render > date 1`] = `
           </span>
         </button>
         <span
-          class="slate-hint"
+          class="slate-hint slate-keys"
         >
           press Enter ↵
         </span>
@@ -1150,7 +1150,7 @@ exports[`question types render > number 1`] = `
           </span>
         </button>
         <span
-          class="slate-hint"
+          class="slate-hint slate-keys"
         >
           press Enter ↵
         </span>
@@ -1215,7 +1215,7 @@ exports[`question types render > phone 1`] = `
           </span>
         </button>
         <span
-          class="slate-hint"
+          class="slate-hint slate-keys"
         >
           press Enter ↵
         </span>
@@ -1575,7 +1575,7 @@ exports[`question types render > url 1`] = `
           </span>
         </button>
         <span
-          class="slate-hint"
+          class="slate-hint slate-keys"
         >
           press Enter ↵
         </span>

@@ -163,10 +163,11 @@
   animation: none;
 }
 
-/* Phones have no keys to press (GAP-26): "press Enter" beside OK, and other
-   keyboard-only hints (.slate-keys), step aside. */
+/* Phones have no keys to press (GAP-26): the "press Enter" beside a typed
+   box's OK, and hints marked keyboard-only (.slate-keys), step aside. Hints
+   that say something else (a file's size limit, "drag rows") stay. */
 @media (hover: none) {
-  [data-slate-forms] .slate-ok-btn ~ .slate-hint:not(.slate-hint--touch),
+  [data-slate-forms] .slate-input ~ .slate-actions > .slate-hint,
   [data-slate-forms] .slate-keys {
     display: none;
   }

@@ -92,7 +92,7 @@ describe('layout (GAP-12, GAP-13, GAP-29, GAP-21)', () => {
 
   it('keyboard-only hints step aside on touch screens', () => {
     expect(css('questions.css')).toMatch(
-      /@media \(hover: none\) \{\s*\[data-slate-forms\] \.slate-ok-btn ~ \.slate-hint:not\(\.slate-hint--touch\),\s*\[data-slate-forms\] \.slate-keys \{\s*display: none;/,
+      /@media \(hover: none\) \{\s*\[data-slate-forms\] \.slate-input ~ \.slate-actions > \.slate-hint,\s*\[data-slate-forms\] \.slate-keys \{\s*display: none;/,
     );
   });
 });
