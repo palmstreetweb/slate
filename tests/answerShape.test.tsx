@@ -127,6 +127,16 @@ describe('studio normalizes every stored row on load', () => {
     expect(() => String(out.q2)).not.toThrow();
   });
 
+  it('keeps every row of a big grid the server stored (SRV-2: it cut at 100)', () => {
+    const wide = Object.fromEntries(Array.from({ length: 120 }, (_, i) => [`item_${i}`, 'need']));
+    expect(normalizeAnswers({ stock: wide })).toEqual({ stock: wide });
+    const huge = Object.fromEntries(Array.from({ length: 5000 }, (_, i) => [`r${i}`, 'y']));
+    expect(Object.keys(normalizeAnswers({ g: huge }).g as object)).toHaveLength(5000);
+    // A hostile row is still bounded.
+    const junk = Object.fromEntries(Array.from({ length: 12_000 }, (_, i) => [`k${i}`, 'y']));
+    expect(Object.keys(normalizeAnswers({ g: junk }).g as object)).toHaveLength(10_000);
+  });
+
   it('survives junk at the top level', () => {
     for (const junk of [null, 'str', 42, [1, 2], hostile()]) {
       expect(() => normalizeAnswers(junk)).not.toThrow();
@@ -179,6 +189,11 @@ describe('answer formatter is total', () => {
     // it reads "Removed option", never its stored code (copy QA).
     expect(formatAnswerForQuestion(question('multi_choice'), ['a', 'z'])).toBe('A, Removed option');
     expect(formatAnswerForQuestion(question('matrix'), { row1: 'col1' })).toBe('Row 1: Col 1');
+    // The server keeps a grid row or column deleted after it was answered (SRV-1):
+    // it reads as removed, never its stored code.
+    expect(
+      formatAnswerForQuestion(question('matrix'), { row1: 'opt_gone01', opt_gone02: 'col1' }),
+    ).toBe('Row 1: Removed column\nRemoved row: Col 1');
     expect(formatAnswerForQuestion(question('number'), 5)).toBe('5');
     expect(formatAnswerForQuestion(question('short_text'), '')).toBe('—');
   });

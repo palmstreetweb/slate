@@ -18,8 +18,15 @@ import { signupAnswerCore } from './signup.js';
  */
 const MAX_STRING_CHARS = 64 * 1024;
 const MAX_ARRAY_ITEMS = 100;
-/** Rows kept on a matrix: the published rows only, at most this many (GAP-14). */
-const MATRIX_ROWS_MAX = 100;
+/**
+ * Rows kept on a matrix that the published question no longer lists (SRV-1):
+ * a row the owner removed while someone was answering. Every published row is
+ * kept whatever the count (SRV-2); the published list and the 64 KiB body
+ * bound those.
+ */
+const MATRIX_OTHER_ROWS_MAX = 100;
+/** Longest key kept for such a row: the studio's own keys are far shorter. */
+const MATRIX_ROW_KEY_MAX = 64;
 
 /**
  * Clamp one answer to a shape the studio renders (audit H1):
@@ -224,59 +231,77 @@ function wholeOrNull(v: unknown, round: (n: number) => number): number | null {
 }
 
 /**
- * A choice answer (CH-16), the way the engine can send it: published option
- * values only, each once, plus at most one typed "Other" (capped) when the
- * question allows it; one value on a single pick. A multi pick is capped at
- * `max` with the engine's own clamp, so nobody is ever trapped: the smallest
- * number of picks is never more than there are choices (counting Other), and
- * a `max` below that is ignored. Lenient on `min` — a short list is kept,
- * never refused (an older page's answer is never lost for it).
+ * The picks in one choice answer or grid cell, each once, in the order sent:
+ * a published value as it is, and anything else kept as text, like a typed
+ * "Other" (cut at 500 characters; blank is nothing). A page loaded before the
+ * owner removed an option, row or column still sends that value, and the
+ * respondent's answer must not vanish (SRV-1); Responses reads it as removed.
+ */
+function picksOf(listed: ReadonlySet<string>, v: unknown): string[] {
+  const out: string[] = [];
+  for (const item of Array.isArray(v) ? v.slice(0, MAX_ARRAY_ITEMS) : [v]) {
+    const t = clampText(item);
+    if (t === undefined) continue;
+    const kept = listed.has(t) ? t : t.trim() ? t.slice(0, OTHER_MAX) : undefined;
+    if (kept !== undefined && !out.includes(kept)) out.push(kept);
+  }
+  return out;
+}
+
+/**
+ * A choice answer (CH-16, SRV-1): its picks (`picksOf`), so a typed "Other"
+ * and an option removed since are both kept; one value on a single pick. A
+ * multi pick is capped at `max` with the engine's own clamp, so nobody is
+ * ever trapped: the smallest number of picks is never more than there are
+ * choices (counting Other), and a `max` below that is ignored. Lenient on
+ * `min` — a short list is kept, never refused (an older page's answer is
+ * never lost for it).
  */
 function clampChoice(q: Record<string, unknown>, v: unknown): string | string[] | undefined {
   if (v == null) return undefined;
   const values = optionValues(q);
-  const other = q.allowOther === true;
   const many = q.type === 'multi_choice' || (q.type === 'picture_choice' && q.multiple === true);
-  const out: string[] = [];
-  let typed = false;
-  for (const item of Array.isArray(v) ? v.slice(0, MAX_ARRAY_ITEMS) : [v]) {
-    const t = clampText(item);
-    if (t === undefined) continue;
-    if (values.has(t)) {
-      if (!out.includes(t)) out.push(t);
-    } else if (other && !typed && t.trim()) {
-      typed = true;
-      out.push(t.slice(0, OTHER_MAX));
-    }
-  }
+  const out = picksOf(values, v);
   if (!many) return out[0];
-  const choices = values.size + (other ? 1 : 0);
+  const choices = values.size + (q.allowOther === true ? 1 : 0);
   const min = Math.min(Math.max(0, wholeOrNull(q.min, Math.ceil) ?? 0), choices);
   const max = wholeOrNull(q.max, Math.floor);
   return max !== null && max >= 1 && max >= min ? out.slice(0, max) : out;
 }
 
 /**
- * A matrix (GAP-14): the published rows only (at most 100), each holding the
- * published column values — one, or a list when the question takes several.
- * The generic clamp kept the first 20 entries of any object, so rows 21 and
- * on were dropped without a word.
+ * A matrix (GAP-14, SRV-1, SRV-2): every published row, however many (the
+ * generic clamp kept the first 20 entries of any object, and then the first
+ * 100 rows, so later rows were dropped without a word), then up to 100 rows
+ * the question no longer lists (a row removed while someone was answering;
+ * a key of at most 64 characters). Each cell holds its picks (`picksOf`,
+ * so a column removed meanwhile is kept too): one, or a list when the
+ * question takes several.
  */
 function clampMatrix(
   q: Record<string, unknown>,
   v: unknown,
 ): Record<string, string | string[]> | undefined {
   if (v === null || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const given = v as Record<string, unknown>;
   const rows = [...optionValues({ options: q.rows })].filter(isSafeKey);
   const columns = optionValues({ options: q.columns });
   const out: Record<string, string | string[]> = {};
-  for (const row of rows.slice(0, MATRIX_ROWS_MAX)) {
-    const cell = (v as Record<string, unknown>)[row];
-    const picked = [
-      ...new Set((Array.isArray(cell) ? cell : [cell]).filter((c) => columns.has(c as string))),
-    ] as string[];
-    if (!picked.length) continue;
+  const keep = (row: string, cell: unknown): boolean => {
+    const picked = picksOf(columns, cell);
+    if (!picked.length) return false;
     out[row] = q.multiple === true ? picked : picked[0]!;
+    return true;
+  };
+  for (const row of rows) {
+    if (Object.prototype.hasOwnProperty.call(given, row)) keep(row, given[row]);
+  }
+  const listed = new Set(rows);
+  let others = 0;
+  for (const [row, cell] of Object.entries(given)) {
+    if (others >= MATRIX_OTHER_ROWS_MAX) break;
+    if (listed.has(row) || !isSafeKey(row) || row.length > MATRIX_ROW_KEY_MAX) continue;
+    if (keep(row, cell)) others += 1;
   }
   return Object.keys(out).length ? out : undefined;
 }
@@ -296,10 +321,13 @@ export type ClampContext = {
  * engine never sends:
  *   - number / scale / nps: a finite number (numeric text becomes a number);
  *   - date: a string of at most 40 characters;
- *   - choices (CH-16): option values only, each once; with `allowOther`, one
- *     typed entry capped at 500 characters; one value on a single pick; a
- *     multi pick capped at its `max` with the engine's clamp (never on `min`);
- *   - matrix (GAP-14): the published rows and column values only;
+ *   - choices (CH-16, SRV-1): option values, each once, and anything else as
+ *     text like a typed Other (cut at 500 characters, each once) — an option
+ *     removed since the page loaded, or what the respondent typed; one value
+ *     on a single pick; a multi pick capped at its `max` with the engine's
+ *     clamp (never on `min`);
+ *   - matrix (GAP-14, SRV-1, SRV-2): every published row, then up to 100
+ *     rows removed since; cells keep column values, anything else as text;
  *   - contact_info / address (ADR-064): known parts only, trimmed and capped;
  *   - signature (ADR-064): a path the engine could have written, or a typed name;
  *   - image_pin / location / availability (ADR-065): re-derived from the
