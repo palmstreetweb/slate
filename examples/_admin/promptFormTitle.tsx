@@ -18,6 +18,7 @@ import { isDefaultFormName, normalizeFormNameInput } from './formName.js';
 import { detectAdminUiTheme } from './adminUiTheme.js';
 import { readSlateMode } from './slateMode.js';
 import { lockBodyScroll } from './lockBodyScroll.js';
+import { useCloseOnLeave } from './useCloseOnLeave.js';
 
 type PromptFn = () => Promise<string | null>;
 
@@ -28,6 +29,7 @@ export function PromptFormTitleProvider({ children }: { children: ReactNode }) {
   const resolverRef = useRef<((value: string | null) => void) | null>(null);
 
   const prompt = useCallback<PromptFn>(() => {
+    resolverRef.current?.(null);
     setOpen(true);
     return new Promise<string | null>((resolve) => {
       resolverRef.current = resolve;
@@ -40,6 +42,10 @@ export function PromptFormTitleProvider({ children }: { children: ReactNode }) {
     setOpen(false);
     resolve?.(value);
   }, []);
+
+  // Leaving the page cancels it, like Cancel (no share for a page that's gone).
+  const cancel = useCallback(() => close(null), [close]);
+  useCloseOnLeave(open, cancel);
 
   return (
     <PromptContext.Provider value={prompt}>

@@ -11,6 +11,8 @@ import {
   pickBackupFile,
 } from '../dataBackup.js';
 
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 export function BackupPanel() {
   const confirm = useConfirm();
   const [formCount, setFormCount] = useState(() => listAllForms().length);
@@ -33,16 +35,18 @@ export function BackupPanel() {
     const backup = parseBackup(raw);
     if (!backup) {
       await confirm({
-        title: 'Import failed',
-        message: 'That file is not a valid Slate backup.',
+        title: 'That isn’t a Slate backup',
+        message: 'Choose a file you saved with Export backup.',
         confirmLabel: 'OK',
         danger: false,
       });
       return;
     }
+    const saved = new Date(backup.exportedAt);
+    const when = Number.isNaN(saved.getTime()) ? '' : ` from ${saved.toLocaleString()}`;
     const ok = await confirm({
       title: 'Import backup?',
-      message: `Replace all forms and responses in this browser with ${backup.forms.length} form(s) and ${backup.submissions.length} response(s) from ${new Date(backup.exportedAt).toLocaleString()}?`,
+      message: `This replaces every form and response in this browser with the ${count(backup.forms.length, 'form', 'forms')} and ${count(backup.submissions.length, 'response', 'responses')} in the backup${when}.`,
       confirmLabel: 'Import',
       danger: true,
     });
@@ -52,8 +56,9 @@ export function BackupPanel() {
     refreshCounts();
     if (!persisted) {
       await confirm({
-        title: 'Import incomplete',
-        message: 'Responses imported, but forms could not be saved — localStorage may be full.',
+        title: 'Forms weren’t imported',
+        message:
+          'The responses were imported, but this browser is out of space for the forms. Delete forms you don’t need, then import again.',
         confirmLabel: 'OK',
         danger: false,
       });
@@ -64,8 +69,8 @@ export function BackupPanel() {
     <section className="slate-settings-section">
       <h2 className="slate-settings-heading">Backup</h2>
       <p className="slate-settings-copy">
-        Forms and responses save in this browser only. Export a JSON backup occasionally, or
-        restore from a file if you switch browsers or clear site data.
+        Forms and responses are saved in this browser only. Export a backup now and then, and import
+        it if you switch browsers or clear this site’s data.
       </p>
       <dl className="slate-settings-stats">
         <div>

@@ -172,7 +172,8 @@ function SettingsContent() {
             <section className="slate-settings-section">
               <h2 className="slate-settings-heading">Account</h2>
               <p className="slate-settings-copy">
-                Signed in as {user?.email ?? 'unknown'}. Data syncs to Slate cloud.
+                {user?.email ? `Signed in as ${user.email}.` : 'Signed in.'} Data syncs to Slate
+                cloud.
               </p>
               <button
                 type="button"
@@ -192,10 +193,25 @@ function SettingsContent() {
   );
 }
 
+/**
+ * A dialog, sheet, menu or the bell panel is open on top of Settings. Esc and
+ * presses are its own (Backup's "Import backup?", Feedback, the ⋯ sheet), and
+ * must not also close Settings: confirming used to throw the owner out to the
+ * dashboard, and with dialogs closing on a page change, cancel every import.
+ */
+function overlayOnTop(): boolean {
+  return (
+    document.querySelector(
+      '[aria-modal="true"], [role="alertdialog"], [role="menu"], [role="dialog"]:not(.slate-settings)',
+    ) !== null
+  );
+}
+
 export function Settings() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeSettings();
+      if (e.key !== 'Escape' || e.defaultPrevented || overlayOnTop()) return;
+      closeSettings();
     };
     const onPointerDown = (e: PointerEvent) => {
       const el = e.target as Element | null;
@@ -203,12 +219,19 @@ export function Settings() {
       if (el.closest('.slate-settings')) return;
       if (el.closest('.slate-settings-fab')) return;
       if (el.closest('.slate-header')) return;
+      if (overlayOnTop()) return;
+      // Only a press on the studio page around Settings closes it. Dialogs,
+      // toasts and menus are portaled to <body>, outside that page.
+      const shell = document.querySelector('.slate-settings')?.closest('[data-slate-forms]');
+      if (!shell?.contains(el)) return;
       closeSettings();
     };
-    window.addEventListener('keydown', onKey);
+    // Capture, so this runs before a dialog's own Esc handler closes it and
+    // the check above still sees the dialog.
+    window.addEventListener('keydown', onKey, true);
     document.addEventListener('pointerdown', onPointerDown);
     return () => {
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, true);
       document.removeEventListener('pointerdown', onPointerDown);
     };
   }, []);

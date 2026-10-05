@@ -27,6 +27,7 @@ import { createPortal } from 'react-dom';
 import { detectAdminUiTheme } from './adminUiTheme.js';
 import { readSlateMode } from './slateMode.js';
 import { lockBodyScroll } from './lockBodyScroll.js';
+import { useCloseOnLeave } from './useCloseOnLeave.js';
 
 export type ConfirmOptions = {
   title: string;
@@ -47,6 +48,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const resolverRef = useRef<Resolver | null>(null);
 
   const confirm = useCallback<ConfirmFn>((options) => {
+    // One question at a time: a newer ask cancels an unanswered one.
+    resolverRef.current?.(false);
     setOpts(options);
     return new Promise<boolean>((resolve) => {
       resolverRef.current = resolve;
@@ -59,6 +62,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     setOpts(null);
     r?.(value);
   }, []);
+
+  // Back or a link while it's open cancels it, so it can't act on another page.
+  const cancel = useCallback(() => close(false), [close]);
+  useCloseOnLeave(opts !== null, cancel);
 
   return (
     <ConfirmContext.Provider value={confirm}>

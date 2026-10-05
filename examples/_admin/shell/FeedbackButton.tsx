@@ -4,8 +4,9 @@
 
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useFocusTrap } from '../useFocusTrap.js';
 import { getNeon } from '../neon/env.js';
 import { ensureAuthForDataApi } from '../neon/ensureAuth.js';
 import { useAuth } from '../neon/AuthProvider.js';
@@ -56,11 +57,22 @@ export function FeedbackButton({ trigger = true }: { trigger?: boolean } = {}) {
     return () => window.removeEventListener(OPEN_EVENT, onOpen);
   }, []);
 
-  const close = () => {
-    if (sending) return;
+  // Esc, Cancel and the backdrop close it, except while the note is sending.
+  // A stable callback, so the focus trap doesn't re-run on every keystroke.
+  const sendingRef = useRef(false);
+  useEffect(() => {
+    sendingRef.current = sending;
+  }, [sending]);
+  const close = useCallback(() => {
+    if (sendingRef.current) return;
     setOpen(false);
     setError(null);
-  };
+  }, []);
+
+  // Like every other studio dialog: focus moves in, Tab stays in, Esc closes,
+  // and focus goes back to the button that opened it.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open, close);
 
   const send = async () => {
     const text = message.trim();
@@ -121,6 +133,7 @@ export function FeedbackButton({ trigger = true }: { trigger?: boolean } = {}) {
             >
               <div className="slate-dialog-backdrop" role="presentation" onClick={close}>
                 <div
+                  ref={dialogRef}
                   className="slate-dialog slate-feedback"
                   role="dialog"
                   aria-modal="true"
