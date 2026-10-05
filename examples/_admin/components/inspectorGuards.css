@@ -46,8 +46,11 @@
   border-radius: 2px;
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-input--error,
-[data-slate-forms][data-theme-name='slate'] .slate-input[aria-invalid='true'] {
+/* As specific as the studio's own input rule (_adminTheme.css), plus the flag, so it wins. */
+[data-slate-forms][data-theme-name='slate']
+  .slate-input.slate-input--error:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-input),
+[data-slate-forms][data-theme-name='slate']
+  .slate-input[aria-invalid='true']:not(:is(.slate-canvas-frame, .slate-preview) [data-slate-forms] .slate-input) {
   border-color: var(--slate-warn);
 }
 
