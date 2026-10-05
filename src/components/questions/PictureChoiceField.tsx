@@ -112,8 +112,11 @@ export function PictureChoiceField({
     if (error) setError(null);
   };
 
-  /** An optional single picture choice can be skipped (or kept, after Back). */
-  const skip = !multiple && question.required === false ? onAdvance : undefined;
+  /** An optional single picture choice, still unanswered, can be skipped. */
+  const skip =
+    !multiple && !other.open && question.required === false && !selectedArr.length
+      ? onAdvance
+      : undefined;
 
   const submit = useCallback(() => {
     if (other.open && !other.text.trim()) {
@@ -256,15 +259,15 @@ export function PictureChoiceField({
 
       {confirms ? (
         <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={submit}>
-            {skip && !other.open && !selectedArr.length ? (
-              'Skip'
-            ) : (
-              <>
-                OK <span aria-hidden>✓</span>
-              </>
-            )}
-          </button>
+          {skip ? (
+            <button type="button" className="slate-ok-btn slate-ok-btn--skip" onClick={skip}>
+              Skip
+            </button>
+          ) : (
+            <button type="button" className="slate-ok-btn" onClick={submit}>
+              OK <span aria-hidden>✓</span>
+            </button>
+          )}
           <span className="slate-hint slate-key-hint">
             {multiple ? `press ${keys} to pick, then Enter ↵` : 'press Enter ↵'}
           </span>

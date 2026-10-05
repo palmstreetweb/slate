@@ -233,6 +233,23 @@ describe('picture choice: limits up front, and Skip when optional', () => {
 
 /* ---------- package cards ---------- */
 
+describe('Skip is quiet, and only while nothing is picked (CH-09)', () => {
+  it('single choice: a quiet Skip unanswered; once answered, a tap on a choice moves on', async () => {
+    const q: Question = {
+      id: 's',
+      type: 'single_choice',
+      title: 'Size?',
+      required: false,
+      options: pics.map(({ label, value }) => ({ label, value })),
+    };
+    const first = renderLive(q);
+    expect(screen.getByRole('button', { name: 'Skip' })).toHaveClass('slate-ok-btn--skip');
+    first.unmount();
+    renderLive(q, { s: 'g' });
+    expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
+  });
+});
+
 describe('package cards: Skip when optional (CH-09)', () => {
   it('offers Skip and moves on with nothing picked', async () => {
     const { advance, onSet } = renderLive({

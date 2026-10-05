@@ -20,7 +20,8 @@ type Props = {
 export function YesNoField({ question, answers, selected, onSelect, onSkip }: Props) {
   const labelId = useId();
   const { committed, markCommitted } = useChoiceCommit(selected);
-  const skip = question.required === false ? onSkip : undefined;
+  // Optional and unanswered: Skip (and Enter). Answered, a tap on a choice moves on.
+  const skip = question.required === false && !selected ? onSkip : undefined;
   useRegisterFormConfirm(skip!, Boolean(skip));
   const choices: ReadonlyArray<{ value: 'yes' | 'no'; label: string; badge: string }> = [
     { value: 'yes', label: question.yesLabel ?? 'Yes', badge: 'Y' },
@@ -61,14 +62,8 @@ export function YesNoField({ question, answers, selected, onSelect, onSkip }: Pr
       </div>
       {skip ? (
         <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={skip}>
-            {selected ? (
-              <>
-                OK <span aria-hidden>✓</span>
-              </>
-            ) : (
-              'Skip'
-            )}
+          <button type="button" className="slate-ok-btn slate-ok-btn--skip" onClick={skip}>
+            Skip
           </button>
           <span className="slate-hint slate-key-hint">press Y or N, or Enter ↵</span>
         </div>

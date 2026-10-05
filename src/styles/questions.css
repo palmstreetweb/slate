@@ -119,6 +119,22 @@
   transform: none;
 }
 
+/* Skip on an optional question (ADR-069): there, not a call to action. The
+   [data-theme] lifts it above every theme's OK button. */
+[data-slate-forms][data-theme] .slate-ok-btn.slate-ok-btn--skip {
+  background: transparent;
+  color: var(--slate-text);
+  border: var(--slate-border-width) solid var(--slate-border-md);
+  box-shadow: none;
+}
+
+@media (hover: hover) {
+  [data-slate-forms][data-theme] .slate-ok-btn.slate-ok-btn--skip:hover {
+    border-color: var(--slate-accent);
+    box-shadow: none;
+  }
+}
+
 [data-slate-forms] .slate-hint {
   font-size: 11px;
   letter-spacing: 0.15em;

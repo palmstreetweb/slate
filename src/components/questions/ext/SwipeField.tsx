@@ -569,8 +569,8 @@ function YesNoSwipe({
   const { cardRef, fling, handlers } = useSwipeCard(decide);
   useArrowKeys(fling, true);
   useEffect(() => focusAfter(groupRef.current), [question.id]);
-  // An optional card can be skipped: a Skip button, and Enter (ADR-069).
-  const skip = question.required === false ? onAdvance : undefined;
+  // An optional card, still unanswered, can be skipped: a Skip button, and Enter (ADR-069).
+  const skip = question.required === false && !answered ? onAdvance : undefined;
   useRegisterFormConfirm(skip!, Boolean(skip));
 
   // Y / N (through <Form>) answer without touching the card: fling it the same way.
@@ -647,14 +647,8 @@ function YesNoSwipe({
       </p>
       {skip ? (
         <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={skip}>
-            {answered ? (
-              <>
-                OK <span aria-hidden>✓</span>
-              </>
-            ) : (
-              'Skip'
-            )}
+          <button type="button" className="slate-ok-btn slate-ok-btn--skip" onClick={skip}>
+            Skip
           </button>
         </div>
       ) : null}

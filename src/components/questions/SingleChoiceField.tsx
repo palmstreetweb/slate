@@ -58,8 +58,9 @@ export function SingleChoiceField({
     onSelect(value);
   }, [other, question.options, markCommitted, onSelect]);
 
-  // OK commits the typed Other; an optional question can be skipped (or kept, after Back).
-  const confirm = other.open ? commitOther : question.required === false ? onSkip : undefined;
+  // OK commits the typed Other; an optional, unanswered question can be skipped.
+  const skip = !other.open && question.required === false && !selected ? onSkip : undefined;
+  const confirm = other.open ? commitOther : skip;
   useRegisterFormConfirm(confirm!, Boolean(confirm));
   useRegisterOtherKey(other.openBox, other.enabled);
 
@@ -121,15 +122,15 @@ export function SingleChoiceField({
       ) : null}
       {confirm ? (
         <div className="slate-actions">
-          <button type="button" className="slate-ok-btn" onClick={confirm}>
-            {other.open || selected ? (
-              <>
-                OK <span aria-hidden>✓</span>
-              </>
-            ) : (
-              'Skip'
-            )}
-          </button>
+          {skip ? (
+            <button type="button" className="slate-ok-btn slate-ok-btn--skip" onClick={skip}>
+              Skip
+            </button>
+          ) : (
+            <button type="button" className="slate-ok-btn" onClick={commitOther}>
+              OK <span aria-hidden>✓</span>
+            </button>
+          )}
           <span className="slate-hint slate-key-hint">press Enter ↵</span>
         </div>
       ) : (
