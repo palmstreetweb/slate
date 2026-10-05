@@ -1185,6 +1185,7 @@ exports[`question types render > phone 1`] = `
       style="margin-top: 24px;"
     >
       <input
+        aria-describedby="_r_3_-err"
         aria-invalid="false"
         aria-labelledby="_r_3_"
         autocomplete="tel"
@@ -1193,6 +1194,11 @@ exports[`question types render > phone 1`] = `
         placeholder="(555) 123-4567"
         type="tel"
         value=""
+      />
+      <p
+        aria-live="polite"
+        class="slate-err"
+        id="_r_3_-err"
       />
       <div
         class="slate-actions"
@@ -1537,6 +1543,7 @@ exports[`question types render > url 1`] = `
       style="margin-top: 24px;"
     >
       <input
+        aria-describedby="_r_8_-err"
         aria-invalid="false"
         aria-labelledby="_r_8_"
         autocapitalize="off"
@@ -1547,6 +1554,11 @@ exports[`question types render > url 1`] = `
         spellcheck="false"
         type="text"
         value=""
+      />
+      <p
+        aria-live="polite"
+        class="slate-err"
+        id="_r_8_-err"
       />
       <div
         class="slate-actions"

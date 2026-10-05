@@ -4,7 +4,7 @@
  *
  *   - mouse / pen: press and drag to paint (or erase, when the first cell was
  *     already painted);
- *   - touch: tap a cell, or hold ~⅓ s then drag to paint; a quick swipe still
+ *   - touch: tap a cell, or hold ~½ s then drag to paint; a swipe still
  *     scrolls the page, and a sideways drag paints straight away;
  *   - keyboard: arrow keys move, Space toggles, Shift + arrows paint as they go;
  *   - a day's header or a time label fills (or clears) that whole column or row.
@@ -39,13 +39,28 @@ import { focusAfter } from '@/utils/focus.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import { FieldError } from './fieldMessage.js';
 import '@/styles/extensions.css';
 import '@/styles/extensions-c.css';
 
-/** Hold this long on touch before a drag paints instead of scrolling. */
-const HOLD_MS = 320;
+/**
+ * Hold this long on touch before a drag paints instead of scrolling (GAP-18):
+ * long enough that a finger resting a moment before a swipe still scrolls,
+ * with the held cell filling in meanwhile (`is-pressing`) so a deliberate
+ * hold can be seen coming.
+ */
+const HOLD_MS = 550;
 
 const cellKey = (day: string, slot: number) => `${day}:${slot}`;
+
+/** "15 min", "1 hour", "1 hr 15 min", "3 hours" (GAP-26). */
+function freeTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  if (!h) return `${m} min`;
+  if (!m) return `${h} ${h === 1 ? 'hour' : 'hours'}`;
+  return `${h} hr ${m} min`;
+}
 
 export default function AvailabilityField({
   question,
@@ -85,7 +100,15 @@ export default function AvailabilityField({
     start: string | null;
     /** The last painted cell: a fast drag skips cells, so the line between is filled. */
     last: string | null;
+    /** The cell a finger is holding, filling in until the hold paints it. */
+    pressing?: HTMLElement | null;
   } | null>(null);
+
+  /** The finger lifted, scrolled or drew sideways: the held cell stops filling in. */
+  const unpress = (p: NonNullable<typeof paint.current>) => {
+    p.pressing?.classList.remove('is-pressing');
+    p.pressing = null;
+  };
 
   useEffect(
     () => focusAfter(gridRef.current?.querySelector<HTMLElement>('[tabindex="0"]') ?? null),
@@ -161,7 +184,11 @@ export default function AvailabilityField({
       setCells([k], mode);
       ping?.();
     } else {
+      const held = (e.target as HTMLElement).closest<HTMLElement>('[data-cell]');
+      held?.classList.add('is-pressing');
+      p.pressing = held;
       p.timer = window.setTimeout(() => {
+        held?.classList.remove('is-pressing');
         if (paint.current !== p) return;
         p.active = true;
         setCells([k], mode);
@@ -179,12 +206,12 @@ export default function AvailabilityField({
       const dy = Math.abs(e.clientY - p.y0);
       if (dx < 8 && dy < 8) return;
       // A sideways drag paints now; a vertical one is a scroll.
+      window.clearTimeout(p.timer);
+      unpress(p);
       if (dx > dy * 1.4) {
-        window.clearTimeout(p.timer);
         p.active = true;
         if (p.start) setCells([p.start], p.mode);
       } else {
-        window.clearTimeout(p.timer);
         paint.current = null;
         return;
       }
@@ -218,6 +245,7 @@ export default function AvailabilityField({
     const p = paint.current;
     if (!p || p.id !== e.pointerId) return;
     window.clearTimeout(p.timer);
+    unpress(p);
     paint.current = null;
     // A quick tap on touch toggles the one cell.
     if (p.touch && !p.active && p.start && e.type === 'pointerup') {
@@ -307,7 +335,6 @@ export default function AvailabilityField({
 
   useRegisterFormConfirm(submit);
 
-  const hours = (picked.size * grid.slot) / 60;
   const daysFree = grid.days.filter((d) => [...picked].some((k) => k.startsWith(`${d}:`)));
   // Label every slot when they're an hour or longer; otherwise only on the hour.
   const labelEvery = grid.slot >= 60 ? 1 : 60 / grid.slot;
@@ -319,6 +346,7 @@ export default function AvailabilityField({
       </h1>
       <p className="slate-subtitle slate-avail-lede">
         Tap or drag to paint the times you’re free. Tap a day to fill it.
+        <span className="slate-touch-note"> On a phone, hold a moment before you drag.</span>
       </p>
 
       <div className="slate-avail">
@@ -327,7 +355,7 @@ export default function AvailabilityField({
           className="slate-avail-grid"
           role="grid"
           aria-labelledby={titleId}
-          aria-describedby={howId}
+          aria-describedby={error ? `${howId} ${titleId}-err` : howId}
           aria-multiselectable="true"
           style={{ '--slate-days': grid.days.length } as CSSProperties}
           onPointerDown={begin}
@@ -401,7 +429,7 @@ export default function AvailabilityField({
           <span className="slate-avail-sum" role="status">
             {picked.size === 0
               ? 'Nothing painted yet'
-              : `${hours % 1 ? hours.toFixed(1) : hours} ${hours === 1 ? 'hour' : 'hours'} free · ${daysFree
+              : `${freeTime(picked.size * grid.slot)} free · ${daysFree
                   .map((d) => WEEKDAY_SHORT[d] ?? d)
                   .join(', ')}`}
           </span>
@@ -423,11 +451,7 @@ export default function AvailabilityField({
       <p className="slate-sr" aria-live="polite">
         {said}
       </p>
-      {error ? (
-        <p className="slate-err" aria-live="polite">
-          ! {error}
-        </p>
-      ) : null}
+      <FieldError id={`${titleId}-err`} error={error} />
       <div className="slate-actions">
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>

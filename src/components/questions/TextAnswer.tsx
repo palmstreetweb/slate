@@ -24,7 +24,7 @@ import {
 } from 'react';
 import type { EmailQuestion, LongTextQuestion, ShortTextQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
-import { validate } from '@/logic/validation.js';
+import { textMax, validate } from '@/logic/validation.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import { focusAfter } from '@/utils/focus.js';
@@ -45,11 +45,6 @@ type Props = TextFieldProps<ShortTextQuestion | LongTextQuestion | EmailQuestion
   box: InputHTMLAttributes<HTMLInputElement> & { rows?: number };
   /** A textarea; Return starts a new line on phones. */
   multiline?: boolean;
-  /**
-   * The longest answer. Nothing is cut: near the limit a counter shows
-   * "9410 / 10000", past it in the error colour, and OK says how long it may be.
-   */
-  max?: number;
   hint: string;
 };
 
@@ -62,7 +57,6 @@ export function TextAnswer({
   onType,
   box,
   multiline,
-  max = 0,
   hint,
 }: Props) {
   const [value, setValue] = useState(initialValue);
@@ -72,6 +66,9 @@ export function TextAnswer({
   const errId = `${labelId}-err`;
   // One element type for TypeScript; the attributes passed suit both.
   const Box = (multiline ? 'textarea' : 'input') as 'input';
+  // The longest answer. Nothing is cut: near the limit a counter shows
+  // "9410 / 10000", past it in the error colour, and OK says how long it may be.
+  const max = textMax(question as { maxLength?: number });
   const n = value.length;
 
   useEffect(() => {
@@ -131,7 +128,7 @@ export function TextAnswer({
           <button type="button" className="slate-ok-btn" onClick={submit}>
             OK <span aria-hidden>✓</span>
           </button>
-          {max && n > max * 0.9 ? (
+          {n > max * 0.9 ? (
             <span className={n > max ? 'slate-count slate-count--over' : 'slate-count'}>
               {n} / {max}
             </span>

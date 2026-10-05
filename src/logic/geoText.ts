@@ -10,6 +10,11 @@ type GeoRecord = Record<string, unknown>;
 
 /** What a location question saves, by default (ADR-068): the verdict only. */
 export const LOCATION_SAVES_VERDICT = 'We only save whether you’re in the service area.';
+/**
+ * The same default when there is nothing to check against (no radius, no ZIP
+ * list): only `{ via }` is kept (ADR-068 §2), so there is no "service area".
+ */
+export const LOCATION_SAVES_SHARED = 'We only save that you shared your location, not where you are.';
 /** While typing, without the opt-in: a typed place is kept as written (ADR-068). */
 export const LOCATION_SAVES_TYPED = 'We save what you type here, not your exact location.';
 /** What it saves when the owner keeps the approximate location (ADR-068). */
@@ -19,10 +24,12 @@ export const LOCATION_SAVES_APPROX =
 /**
  * The privacy line under the button: the owner's own note, if any, then what
  * is actually saved — always shown, so no note can promise less than is kept.
+ * `checks` is whether the question can say in / out (a radius, or ZIP areas).
  */
 export function locationPrivacyLine(
   q: { privacyNote?: unknown; keepLocation?: unknown },
   typing = false,
+  checks = true,
 ): string {
   const note = typeof q.privacyNote === 'string' ? q.privacyNote.trim() : '';
   const saves =
@@ -30,7 +37,9 @@ export function locationPrivacyLine(
       ? LOCATION_SAVES_APPROX
       : typing
         ? LOCATION_SAVES_TYPED
-        : LOCATION_SAVES_VERDICT;
+        : checks
+          ? LOCATION_SAVES_VERDICT
+          : LOCATION_SAVES_SHARED;
   if (!note) return saves;
   return `${note}${/[.!?…]["”’)]?$/.test(note) ? '' : '.'} ${saves}`;
 }

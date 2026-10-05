@@ -67,7 +67,8 @@ export function contactErrors(
     if (v.length > CONTACT_MAX[f]) out[f] = 'That’s too long';
     else if (f === 'email' && !EMAIL_RE.test(v)) out[f] = "That doesn't look like a valid email";
     else if (f === 'phone' && v.replace(/\D/g, '').length < 7) {
-      out[f] = "That doesn't look like a phone number";
+      // The contact block itself says more (area code, country), in phoneText.ts.
+      out[f] = 'Please check the phone number';
     }
   }
   return out;

@@ -17,7 +17,11 @@ import type {
   YesNoQuestion,
 } from '@/index.js';
 import { PINS_MAX } from '@/logic/pins.js';
-import { LOCATION_SAVES_APPROX, LOCATION_SAVES_VERDICT } from '@/logic/geoText.js';
+import {
+  LOCATION_SAVES_APPROX,
+  LOCATION_SAVES_SHARED,
+  LOCATION_SAVES_VERDICT,
+} from '@/logic/geoText.js';
 import { formZipAreas, hasGeoArea } from '@/logic/geo.js';
 import {
   VOICE_SECONDS_MAX,
@@ -473,7 +477,7 @@ export function LocationSettings({
       ) : null}
       <Field
         label="Privacy line"
-        hint={`Optional: say what you use it for. Always followed by “${keep ? LOCATION_SAVES_APPROX : LOCATION_SAVES_VERDICT}”`}
+        hint={`Optional: say what you use it for. Always followed by “${keep ? LOCATION_SAVES_APPROX : checkable ? LOCATION_SAVES_VERDICT : LOCATION_SAVES_SHARED}”`}
       >
         <textarea
           className="slate-textarea"

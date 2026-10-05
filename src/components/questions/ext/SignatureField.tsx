@@ -32,6 +32,7 @@ import { motionReduced, shakeInvalid } from '@/utils/motion.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import type { ExtFieldProps } from '../lazyFields.js';
 import { resolveTitle } from '../_resolveTitle.js';
+import { FieldError } from './fieldMessage.js';
 import '@/styles/extensions.css';
 
 /** Ink width in box units (≈2 px on a phone, ≈3.5 px on a desktop). */
@@ -59,6 +60,32 @@ function drawStroke(ctx: CanvasRenderingContext2D, s: ReadonlyArray<Point>) {
   ctx.stroke();
 }
 
+/**
+ * The vertical distance (box units) of a stroke that was really a scroll: a
+ * quick (under 350 ms), mostly up-or-down swipe that runs off the top or the
+ * bottom of the pad. 0 for anything that could be ink.
+ */
+function scrollFlick(stroke: ReadonlyArray<Point>, ms: number): number {
+  const first = stroke[0];
+  const last = stroke[stroke.length - 1];
+  if (!first || !last || ms > 350) return 0;
+  const dx = last[0] - first[0];
+  const dy = last[1] - first[1];
+  const offPad = stroke.some(([, y]) => y < 0 || y > SIG_H);
+  return offPad && Math.abs(dy) > SIG_H * 0.4 && Math.abs(dx) < Math.abs(dy) / 2 ? dy : 0;
+}
+
+/** Scroll whatever scrolls around the pad (a preview frame, else the page). */
+function scrollPageBy(from: Element | null, top: number) {
+  let el = from?.parentElement ?? null;
+  while (el) {
+    const { overflowY } = getComputedStyle(el);
+    if (el.scrollHeight > el.clientHeight && /auto|scroll/.test(overflowY)) break;
+    el = el.parentElement;
+  }
+  (el ?? document.scrollingElement)?.scrollBy?.({ top, behavior: 'smooth' });
+}
+
 export default function SignatureField({
   question,
   answers,
@@ -79,6 +106,7 @@ export default function SignatureField({
   const strokes = useRef<Point[][]>(parseSignaturePath(signaturePathOf(value)) ?? []);
   const [hasInk, setHasInk] = useState(strokes.current.length > 0);
   const drawing = useRef<Point[] | null>(null);
+  const strokeStart = useRef({ at: 0, touch: false });
   const padRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const typedRef = useRef<HTMLInputElement>(null);
@@ -155,6 +183,7 @@ export default function SignatureField({
       /* capture is a nicety */
     }
     drawing.current = [toBox(e)];
+    strokeStart.current = { at: e.timeStamp, touch: e.pointerType === 'touch' };
     if (error) setError(null);
     repaint();
   };
@@ -169,10 +198,20 @@ export default function SignatureField({
     repaint();
   };
 
-  const endStroke = () => {
+  const endStroke = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const stroke = drawing.current;
     drawing.current = null;
     if (!stroke) return;
+    // The pad keeps the finger so it can draw (touch-action: none), so a quick
+    // up-or-down flick that runs off the pad was meant to scroll the page
+    // (SCROLL-12): it leaves no mark, and the page scrolls by that much.
+    const dy = scrollFlick(stroke, e.timeStamp - strokeStart.current.at);
+    if (strokeStart.current.touch && dy !== 0) {
+      repaint();
+      const rect = canvasRef.current?.getBoundingClientRect();
+      scrollPageBy(padRef.current, (-dy * (rect?.height ?? SIG_H)) / SIG_H);
+      return;
+    }
     strokes.current = [...strokes.current, stroke];
     setHasInk(true);
     repaint();
@@ -214,11 +253,18 @@ export default function SignatureField({
       const path = encodeSignature(strokes.current);
       answer = path ? { path } : undefined;
     }
-    // A drawing that encodes to nothing but a dot fails "real ink" even when optional.
+    // A drawing that encodes to nothing but a dot fails "real ink" even when
+    // optional; an optional signature can still be cleared and skipped.
     const err =
       answer && 'path' in answer && !isRealSignature(parseSignaturePath(answer.path))
-        ? { message: 'Please sign with a full stroke, not a dot' }
-        : validate(question, answer);
+        ? {
+            message: question.required
+              ? 'That’s only a dot. Please sign your full name.'
+              : 'That’s only a dot. Sign your full name, or tap Clear to skip.',
+          }
+        : mode === 'type' && !answer && question.required
+          ? { message: 'Please type your full name' }
+          : validate(question, answer);
     if (err) {
       setError(err.message);
       shakeInvalid(mode === 'type' ? typedRef.current : padRef.current);
@@ -244,7 +290,7 @@ export default function SignatureField({
           className={`slate-sig${hasInk ? ' slate-sig--inked' : ''}${error ? ' slate-sig--error' : ''}`}
           role="group"
           aria-labelledby={titleId}
-          aria-describedby={hintId}
+          aria-describedby={error ? `${hintId} ${titleId}-err` : hintId}
           tabIndex={-1}
         >
           <div className="slate-sig-pad">
@@ -307,6 +353,7 @@ export default function SignatureField({
               placeholder="Jane Smith"
               value={typed}
               aria-invalid={Boolean(error)}
+              aria-describedby={`${titleId}-err`}
               onChange={(e) => {
                 setTyped(e.target.value);
                 if (error) setError(null);
@@ -335,11 +382,7 @@ export default function SignatureField({
         </div>
       )}
 
-      {error ? (
-        <p className="slate-err" aria-live="polite">
-          ! {error}
-        </p>
-      ) : null}
+      <FieldError id={`${titleId}-err`} error={error} />
       <div className="slate-actions">
         <button type="button" className="slate-ok-btn" onClick={submit}>
           OK <span aria-hidden>✓</span>

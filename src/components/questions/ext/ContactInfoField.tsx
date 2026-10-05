@@ -16,6 +16,7 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } f
 import type { ContactField, ContactInfoQuestion } from '@/types/Question.js';
 import type * as Libphonenumber from 'libphonenumber-js';
 import { CONTACT_MAX, contactErrors, contactMode, contactShown } from '@/logic/contact.js';
+import { phoneCountry, phoneProblem } from '@/logic/phoneText.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { shakeInvalid } from '@/utils/motion.js';
@@ -76,19 +77,23 @@ export default function ContactInfoField({
         if (t) trimmed[f] = t;
       }
       const found = contactErrors(question, trimmed);
+      // Local numbers read in the owner's country, or the US when that isn't a real one.
+      let country = phoneCountry(question.defaultCountry, () => true);
       // A phone that parses is stored as E.164; one that doesn't is an error.
       if (trimmed.phone && !found.phone) {
         try {
           const lib = await loadPhoneLib();
-          const country = (question.defaultCountry ?? 'US') as Parameters<
-            typeof lib.parsePhoneNumberFromString
-          >[1];
-          const parsed = lib.parsePhoneNumberFromString(trimmed.phone, country);
+          country = phoneCountry(question.defaultCountry, (c) => lib.isSupportedCountry(c));
+          const parsed = lib.parsePhoneNumberFromString(trimmed.phone, country as Libphonenumber.CountryCode);
           if (parsed?.isValid()) trimmed.phone = parsed.number;
-          else found.phone = "That doesn't look like a phone number";
-        } catch {
+          else found.phone = phoneProblem(country);
+        } catch (err) {
           // Offline and the parser didn't load: keep what they typed.
+          console.error('[slate] phone check unavailable', err);
         }
+      } else if (trimmed.phone && found.phone && trimmed.phone.length <= CONTACT_MAX.phone) {
+        // Too few digits: the same words as the phone question.
+        found.phone = phoneProblem(country);
       }
       const bad = shown.find((f) => found[f]);
       if (bad) {

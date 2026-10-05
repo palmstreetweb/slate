@@ -56,7 +56,7 @@ describe('contact block', () => {
     });
     expect(contactErrors(contact, { name: 'Ada', email: 'nope', phone: '12' })).toEqual({
       email: "That doesn't look like a valid email",
-      phone: "That doesn't look like a phone number",
+      phone: 'Please check the phone number',
     });
     expect(contactErrors(contact, { name: 'Ada', email: 'a@b.co' })).toEqual({});
   });

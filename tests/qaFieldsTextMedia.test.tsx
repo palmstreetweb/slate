@@ -516,3 +516,219 @@ describe('typed text (F9, F18, GAP-21)', () => {
     expect(box).toHaveAccessibleDescription("! That doesn't look like a valid email");
   });
 });
+
+describe('phone numbers (F13, F22)', () => {
+  it('a missing or made-up default country reads local numbers as US ones', async () => {
+    for (const defaultCountry of ['', 'XX', 'x']) {
+      const { setAnswer, unmount } = renderField({
+        id: 'p',
+        type: 'phone',
+        title: 'Phone?',
+        defaultCountry,
+      });
+      const box = await screen.findByRole('textbox');
+      fireEvent.change(box, { target: { value: '(805) 962-1234' } });
+      fireEvent.keyDown(box, { key: 'Enter' });
+      await vi.waitFor(() => expect(setAnswer).toHaveBeenCalledWith('p', '+18059621234'));
+      unmount();
+    }
+  });
+
+  it('a number that doesn’t check out says how to fix it, naming the form’s country', async () => {
+    renderField({ id: 'p', type: 'phone', title: 'Phone?', defaultCountry: 'GB' });
+    const box = await screen.findByRole('textbox');
+    fireEvent.change(box, { target: { value: '123' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(
+      await screen.findByText(
+        '! Please check the number, including the area code. For a number outside the United Kingdom, start with + and the country code.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('the contact block says the same about too few digits', async () => {
+    renderField({ id: 'c', type: 'contact_info', title: 'How do we reach you?', fields: { phone: 'required' } });
+    fireEvent.change(await screen.findByRole('textbox', { name: /^name/i }), {
+      target: { value: 'Ada' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: /^email/i }), {
+      target: { value: 'a@b.co' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: /^phone/i }), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: /ok/i }));
+    expect(
+      await screen.findByText(/Please check the number, including the area code/),
+    ).toBeInTheDocument();
+  });
+
+  it('country names read mid-sentence; enough digits is a plausible number', async () => {
+    const { countryName, looksLikePhone, phoneCountry } = await import('@/logic/phoneText.js');
+    expect(countryName('US')).toBe('the United States');
+    expect(countryName('CA')).toBe('Canada');
+    expect(countryName('NL')).toBe('the Netherlands');
+    expect(phoneCountry('gb', () => true)).toBe('GB');
+    expect(phoneCountry('ZZ', () => false)).toBe('US');
+    expect(looksLikePhone('555-1234')).toBe(true);
+    expect(looksLikePhone('123')).toBe(false);
+  });
+});
+
+describe('signature (F23, SCROLL-12)', () => {
+  const sig: Question = { id: 's', type: 'signature', title: 'Sign here', required: true };
+  const fakeRect = (el: HTMLElement) => {
+    el.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 500, height: 200, right: 500, bottom: 200, x: 0, y: 0 }) as DOMRect;
+  };
+
+  it('typed mode, left blank, asks for the name', async () => {
+    renderField(sig);
+    fireEvent.click(await screen.findByRole('button', { name: /type your name instead/i }));
+    fireEvent.click(screen.getByRole('button', { name: /ok/i }));
+    expect(screen.getByText('! Please type your full name')).toBeInTheDocument();
+  });
+
+  it('an optional signature with only a dot says Clear skips it', async () => {
+    const { advance } = renderField({ ...sig, required: false });
+    const canvas = await screen.findByRole('img', { name: /signature pad/i });
+    fakeRect(canvas);
+    fireEvent.pointerDown(canvas, { pointerId: 1, button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
+    fireEvent.click(screen.getByRole('button', { name: /ok/i }));
+    expect(
+      screen.getByText('! That’s only a dot. Sign your full name, or tap Clear to skip.'),
+    ).toBeInTheDocument();
+    expect(advance).not.toHaveBeenCalled();
+  });
+
+  it('a quick up-flick that runs off the pad scrolls the page and leaves no mark', async () => {
+    renderField(sig);
+    const canvas = await screen.findByRole('img', { name: /signature pad/i });
+    fakeRect(canvas);
+    const scrollBy = vi.fn();
+    // jsdom has no scrolling element; the page's stands in.
+    Object.defineProperty(document, 'scrollingElement', {
+      configurable: true,
+      get: () => ({ scrollBy }),
+    });
+    const spy = { mockRestore: () => delete (document as { scrollingElement?: unknown }).scrollingElement };
+    try {
+      const touch = { pointerId: 2, pointerType: 'touch', button: 0 };
+      fireEvent.pointerDown(canvas, { ...touch, clientX: 250, clientY: 150 });
+      fireEvent.pointerMove(canvas, { ...touch, clientX: 252, clientY: 60 });
+      fireEvent.pointerMove(canvas, { ...touch, clientX: 255, clientY: -40 });
+      fireEvent.pointerUp(canvas, touch);
+      expect(screen.getByRole('button', { name: 'Clear' })).toBeDisabled();
+      expect(scrollBy).toHaveBeenCalledWith(expect.objectContaining({ top: 190 }));
+      // A real stroke across the pad is still ink.
+      fireEvent.pointerDown(canvas, { ...touch, clientX: 40, clientY: 150 });
+      fireEvent.pointerMove(canvas, { ...touch, clientX: 200, clientY: 60 });
+      fireEvent.pointerMove(canvas, { ...touch, clientX: 400, clientY: 150 });
+      fireEvent.pointerUp(canvas, touch);
+      expect(screen.getByRole('button', { name: 'Clear' })).toBeEnabled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('location (MEDIA-15)', () => {
+  const loc: Question = { id: 'where', type: 'location', title: 'Where is the job?', required: true };
+
+  it('with no service area, the privacy line doesn’t promise a verdict', async () => {
+    renderField(loc);
+    expect(
+      await screen.findByText('We only save that you shared your location, not where you are.'),
+    ).toBeInTheDocument();
+  });
+
+  it('the required message points at what is on screen', async () => {
+    renderField(loc);
+    fireEvent.click(await screen.findByRole('button', { name: /ok/i }));
+    expect(screen.getByText('! Please share your location, or type it instead')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Type it instead' }));
+    fireEvent.click(screen.getByRole('button', { name: /ok/i }));
+    expect(screen.getByText('! Please type your town or ZIP code')).toBeInTheDocument();
+  });
+});
+
+describe('availability (GAP-18, GAP-26)', () => {
+  const q: Question = {
+    id: 'when',
+    type: 'availability',
+    title: 'When are you free?',
+    days: ['mon'],
+    startTime: '09:00',
+    endTime: '11:00',
+    slotMinutes: 15,
+  };
+
+  it('says free time in minutes and hours, not fractions', async () => {
+    renderField(q);
+    const grid = await screen.findByRole('grid');
+    const cell = (name: string) => screen.getByRole('gridcell', { name });
+    cell('Monday 9 AM to 9:15 AM').focus();
+    fireEvent.keyDown(grid, { key: ' ' });
+    expect(screen.getByText('15 min free · Mon')).toBeInTheDocument();
+    for (let i = 0; i < 4; i++) fireEvent.keyDown(grid, { key: 'ArrowDown', shiftKey: true });
+    expect(screen.getByText('1 hr 15 min free · Mon')).toBeInTheDocument();
+  });
+
+  it('a finger resting half a second before a swipe still scrolls; a held cell shows it is filling', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { setAnswer } = renderField(q);
+    await screen.findByRole('grid');
+    const cell = screen.getByRole('gridcell', { name: 'Monday 9 AM to 9:15 AM' });
+    const touch = { pointerId: 3, pointerType: 'touch', button: 0, clientX: 100, clientY: 100 };
+    fireEvent.pointerDown(cell, touch);
+    expect(cell).toHaveClass('is-pressing');
+    act(() => {
+      vi.advanceTimersByTime(450);
+    });
+    fireEvent.pointerMove(cell, { ...touch, clientY: 40 });
+    expect(cell).not.toHaveClass('is-pressing');
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.pointerCancel(cell, touch);
+    expect(setAnswer).not.toHaveBeenCalled();
+  });
+});
+
+describe('thank-you redirect (F3)', () => {
+  it('a link without https:// goes to that site, not to a page here', async () => {
+    const { Form } = await import('@/index.js');
+    const assign = vi.fn();
+    const getter = vi.spyOn(window, 'location', 'get').mockReturnValue({
+      ...window.location,
+      href: 'https://slateforms.vercel.app/forms/12345678',
+      assign,
+    } as unknown as Location);
+    try {
+      for (const [redirectUrl, expected] of [
+        ['example.com/thank-you', 'https://example.com/thank-you'],
+        ['www.example.com', 'https://www.example.com/'],
+        ['/done', 'https://slateforms.vercel.app/done'],
+        ['javascript:alert(1)', null],
+      ] as const) {
+        assign.mockClear();
+        const { unmount } = render(
+          <Form
+            schema={{
+              brand: { name: 'Co' },
+              theme: 'classic',
+              themeMode: 'light',
+              questions: [{ id: 'bye', type: 'thanks', title: 'Thanks', redirectUrl }],
+            }}
+            onSubmit={() => Promise.resolve()}
+          />,
+        );
+        await screen.findByText(/response received/i);
+        if (expected) expect(assign).toHaveBeenCalledWith(expected);
+        else expect(assign).not.toHaveBeenCalled();
+        unmount();
+      }
+    } finally {
+      getter.mockRestore();
+    }
+  });
+});

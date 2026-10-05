@@ -8,6 +8,7 @@ import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import { focusAfter } from '@/utils/focus.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
+import { FieldError } from './ext/fieldMessage.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -84,16 +85,13 @@ export function UrlField({
           onKeyDown={handleKey}
           placeholder={question.placeholder ?? 'https://example.com'}
           aria-labelledby={labelId}
+          aria-describedby={`${labelId}-err`}
           aria-invalid={Boolean(error)}
           className={`slate-input${error ? ' slate-input--error' : ''}`}
           autoCapitalize="off"
           spellCheck={false}
         />
-        {error && (
-          <p className="slate-err" aria-live="polite">
-            ! {error}
-          </p>
-        )}
+        <FieldError id={`${labelId}-err`} error={error} />
         <div className="slate-actions">
           <button type="button" className="slate-ok-btn" onClick={submit}>
             OK <span aria-hidden>✓</span>

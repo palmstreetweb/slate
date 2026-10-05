@@ -2,6 +2,12 @@
  * Phone input. Stores E.164. The libphonenumber-js dependency is dynamically
  * imported inside this file (per ADR-006) so consumers who never use phone
  * questions don't pay for the parser bundle.
+ *
+ * Local numbers are read in the owner's country, or the US when that isn't a
+ * real one (F13). A number that doesn't check out gets one plain message,
+ * shared with the contact block (logic/phoneText.ts). If the parser can't
+ * download (a Wi-Fi blip), a number with enough digits is kept as typed —
+ * as the contact block does — rather than blaming the number.
  */
 
 'use client';
@@ -10,10 +16,12 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { PhoneQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { validate } from '@/logic/validation.js';
+import { looksLikePhone, phoneCountry, phoneProblem } from '@/logic/phoneText.js';
 import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import { focusAfter } from '@/utils/focus.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
+import { FieldError } from './ext/fieldMessage.js';
 import { resolveTitle } from './_resolveTitle.js';
 
 type Props = {
@@ -50,6 +58,7 @@ export function PhoneField({
   const inputRef = useRef<HTMLInputElement>(null);
   const submittingRef = useRef(false);
   const labelId = useId();
+  const errId = `${labelId}-err`;
 
   useEffect(() => {
     return focusAfter(inputRef.current);
@@ -58,35 +67,41 @@ export function PhoneField({
   const submit = useCallback(async () => {
     if (submittingRef.current) return;
     submittingRef.current = true;
+    const fail = (message: string) => {
+      setError(message);
+      shakeInvalid(inputRef.current);
+    };
     try {
       // Engine-level required check first (cheap).
       const presence = validate(question, value);
-      if (presence) {
-        setError(presence.message);
-        shakeInvalid(inputRef.current);
-        return;
-      }
-      if (!value.trim() && !question.required) {
+      if (presence) return fail(presence.message);
+      const typed = value.trim();
+      if (!typed && !question.required) {
         onAnswer('');
         onAdvance();
         return;
       }
 
-      const lib = await loadLib();
-      const country = (question.defaultCountry ?? 'US') as Parameters<
-        typeof lib.parsePhoneNumberFromString
-      >[1];
-      const parsed = lib.parsePhoneNumberFromString(value, country);
-      if (!parsed || !parsed.isValid()) {
-        setError("That doesn't look like a valid phone number");
-        shakeInvalid(inputRef.current);
+      let lib: typeof Libphonenumber;
+      try {
+        lib = await loadLib();
+      } catch (err) {
+        // Offline and the parser didn't load: keep a plausible number as typed.
+        console.error('[slate] phone check unavailable', err);
+        if (!looksLikePhone(typed)) {
+          return fail(phoneProblem(phoneCountry(question.defaultCountry, () => true)));
+        }
+        setError(null);
+        onAnswer(typed);
+        onAdvance();
         return;
       }
+      const country = phoneCountry(question.defaultCountry, (c) => lib.isSupportedCountry(c));
+      const parsed = lib.parsePhoneNumberFromString(typed, country as Libphonenumber.CountryCode);
+      if (!parsed || !parsed.isValid()) return fail(phoneProblem(country));
       setError(null);
       onAnswer(parsed.number);
       onAdvance();
-    } catch {
-      setError('Could not parse that phone number');
     } finally {
       submittingRef.current = false;
     }
@@ -123,14 +138,11 @@ export function PhoneField({
           onKeyDown={handleKey}
           placeholder={question.placeholder ?? '(555) 123-4567'}
           aria-labelledby={labelId}
+          aria-describedby={errId}
           aria-invalid={Boolean(error)}
           className={`slate-input${error ? ' slate-input--error' : ''}`}
         />
-        {error && (
-          <p className="slate-err" aria-live="polite">
-            ! {error}
-          </p>
-        )}
+        <FieldError id={errId} error={error} />
         <div className="slate-actions">
           <button type="button" className="slate-ok-btn" onClick={() => void submit()}>
             OK <span aria-hidden>✓</span>

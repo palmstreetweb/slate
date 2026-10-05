@@ -481,6 +481,10 @@
 
 [data-slate-forms] .slate-time-row {
   align-items: center;
+  /* At very narrow widths (an SE at 150% zoom) AM / PM wraps under the time
+     instead of running past the edge (GAP-29). */
+  flex-wrap: wrap;
+  row-gap: 10px;
 }
 
 [data-slate-forms] .slate-meridiem {

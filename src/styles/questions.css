@@ -1039,10 +1039,13 @@
   gap: 6px;
 }
 
+/* The header and each row are separate grids: minmax(0, 1fr) keeps their
+   columns the same width whatever the labels, so each header stays over its
+   own cells (GAP-13); a long header wraps instead of widening its column. */
 [data-slate-forms] .slate-matrix-head,
 [data-slate-forms] .slate-matrix-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.4fr) repeat(var(--slate-matrix-cols), 1fr);
+  grid-template-columns: minmax(120px, 1.4fr) repeat(var(--slate-matrix-cols), minmax(0, 1fr));
   gap: 6px;
   align-items: stretch;
 }
@@ -1056,6 +1059,9 @@
   align-self: end;
   padding-bottom: 4px;
   text-transform: var(--slate-transform);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 [data-slate-forms] .slate-matrix-rowlabel {
@@ -1216,7 +1222,8 @@
 
 @media (max-width: 560px) {
   [data-slate-forms] .slate-review-row {
-    grid-template-columns: 1fr;
+    /* minmax(0, …): a long title can't widen the column and push Edit off-screen (GAP-12). */
+    grid-template-columns: minmax(0, 1fr);
     gap: 4px;
   }
 }
