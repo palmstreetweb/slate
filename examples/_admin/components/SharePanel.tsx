@@ -387,6 +387,8 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
       {lockEditing ? (
         <form
           className="slate-share-lock-form"
+          // Our own sentence, not the browser's "Please lengthen this text…" bubble (S26).
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
             void applyLock(lockDraft.trim());

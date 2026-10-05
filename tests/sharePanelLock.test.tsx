@@ -102,6 +102,8 @@ describe('Share panel password lock (ADR-043)', () => {
     await user.type(input, '12345');
     const set = screen.getByRole('button', { name: 'Set' }) as HTMLButtonElement;
     expect(set.disabled).toBe(false);
+    // The browser's own "Please lengthen this text…" bubble would get there first.
+    expect(input.closest('form')).toHaveAttribute('novalidate');
     await user.click(set);
     expect((await screen.findByRole('alert')).textContent).toBe('Use at least 6 characters.');
     expect(state.setFormFillPassword).not.toHaveBeenCalled();
