@@ -88,6 +88,37 @@ function pictureOptionsOf(q: GeneratedQuestion): PictureOption[] {
     }));
 }
 
+/**
+ * A number question's bounds (F15). The model's blank is 0, so 0 means "no
+ * limit", and a max at or below the min is no max: a draft can't ask for a
+ * budget with "Maximum is 0".
+ */
+function numberBounds(q: GeneratedQuestion): { min?: number; max?: number; step: number } {
+  const min = Number.isFinite(q.min) && q.min !== 0 ? q.min : undefined;
+  const max = Number.isFinite(q.max) && q.max !== 0 && q.max > (min ?? 0) ? q.max : undefined;
+  return {
+    ...(min !== undefined ? { min } : {}),
+    ...(max !== undefined ? { max } : {}),
+    step: Number.isFinite(q.step) && q.step > 0 ? q.step : 1,
+  };
+}
+
+/**
+ * How many picks a multi-select asks for (decision 1): whole numbers; a
+ * minimum the choices (with Other) can meet; "required" means at least one;
+ * no maximum of 0, below the minimum, or one the choices can't reach.
+ */
+function pickBounds(q: GeneratedQuestion, choices: number): { min?: number; max?: number } {
+  let min = Number.isFinite(q.min) ? Math.max(0, Math.round(q.min)) : 0;
+  if (q.required) min = Math.max(min, 1);
+  min = Math.min(min, choices);
+  const max = Number.isFinite(q.max) ? Math.round(q.max) : 0;
+  return {
+    ...(min > 0 ? { min } : {}),
+    ...(max >= 1 && max >= min && max < choices ? { max } : {}),
+  };
+}
+
 /** `allowOther` only when the model set it (ADR-063). */
 function otherOf(q: GeneratedQuestion): { allowOther?: true } {
   return q.allowOther ? { allowOther: true } : {};
@@ -140,9 +171,7 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         title,
         placeholder: q.placeholder,
         required,
-        min: q.min,
-        max: q.max,
-        step: q.step || 1,
+        ...numberBounds(q),
         ...(q.display === 'stepper' ? { display: 'stepper' as const } : {}),
         ...(text(q.unit) ? { unit: text(q.unit)!.slice(0, 24) } : {}),
         ...(text(q.prefix) ? { prefix: text(q.prefix)!.slice(0, 12) } : {}),
@@ -167,9 +196,10 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         title,
         required,
         accept: text(q.accept),
-        maxSizeMb: q.maxSizeMb || undefined,
+        // 0 (the blank) or less means the default, never "nothing fits".
+        maxSizeMb: q.maxSizeMb > 0 ? q.maxSizeMb : undefined,
         multiple: q.multiple,
-        maxFiles: q.maxFiles || undefined,
+        maxFiles: q.maxFiles >= 1 ? Math.round(q.maxFiles) : undefined,
         ...vis,
       };
     case 'single_choice':
@@ -183,17 +213,18 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         ...otherOf(q),
         ...vis,
       };
-    case 'multi_choice':
+    case 'multi_choice': {
+      const options = optionsOf(q);
       return {
         id,
         type: 'multi_choice',
         title,
-        options: optionsOf(q),
-        min: q.min,
-        max: q.max || undefined,
+        options,
+        ...pickBounds(q, options.length + (q.allowOther ? 1 : 0)),
         ...otherOf(q),
         ...vis,
       };
+    }
     case 'dropdown':
       return {
         id,
@@ -205,21 +236,24 @@ function mapQuestion(q: GeneratedQuestion, id: string, vis: { visibleIf?: Condit
         ...otherOf(q),
         ...vis,
       };
-    case 'picture_choice':
+    case 'picture_choice': {
+      const options = pictureOptionsOf(q);
+      // Swipe cards store the liked list, so they turn on multi-select (ADR-065).
+      const multiple = q.display === 'swipe' ? true : q.multiple;
       return {
         id,
         type: 'picture_choice',
         title,
-        options: pictureOptionsOf(q),
-        // Swipe cards store the liked list, so they turn on multi-select (ADR-065).
-        multiple: q.display === 'swipe' ? true : q.multiple,
+        options,
+        multiple,
         ...(q.display === 'swipe' ? { display: 'swipe' as const } : {}),
         required,
-        min: q.min,
-        max: q.max || undefined,
+        // Picks only count with multi-select, where "required" is at least one.
+        ...(multiple ? pickBounds(q, options.length + (q.allowOther ? 1 : 0)) : {}),
         ...otherOf(q),
         ...vis,
       };
+    }
     case 'ranking':
       return { id, type: 'ranking', title, options: optionsOf(q), ...vis };
     case 'matrix':
