@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Form } from '@/index.js';
 import { signupPicks } from '@/logic/signup.js';
 import { getForm, subscribe, type FormRecord } from '../_formsStore.js';
@@ -33,6 +33,17 @@ export function FormPreview({ formId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- recount when responses change
     [form, formId, subsTick],
   );
+
+  // The frame scrolls (a tall question reaches OK); each new question starts at
+  // its top, like the public page. The first question is already there.
+  const frameRef = useRef<HTMLDivElement>(null);
+  const shownRef = useRef<string | null>(null);
+  const toFrameTop = useCallback((id: string) => {
+    if (shownRef.current !== null && shownRef.current !== id && frameRef.current) {
+      frameRef.current.scrollTop = 0;
+    }
+    shownRef.current = id;
+  }, []);
 
   // Re-fetch when the formId changes or another tab edits the schema.
   useEffect(() => {
@@ -124,7 +135,7 @@ export function FormPreview({ formId }: Props) {
         </button>
         .
       </p>
-      <div className="slate-preview slate-preview--page">
+      <div ref={frameRef} className="slate-preview slate-preview--page">
         {/* No `resume` here: the preview is a build/test surface, not a real
             respondent session. Autosaving partial test runs and offering to
             resume them on every preview open reads as a glitch. Production
@@ -134,6 +145,7 @@ export function FormPreview({ formId }: Props) {
           onFileUpload={hostFileUpload}
           resolveFileUploadMeta={resolveUploadMeta}
           slotsLeft={slotsLeft}
+          onQuestionChange={toFrameTop}
           onSubmit={async (answers, meta) => {
             const left = localSlotsLeft(form.schema.questions, listSubmissions(formId));
             const full = Object.entries(left).flatMap(([question, per]) =>

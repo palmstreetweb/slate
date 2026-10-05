@@ -9,8 +9,9 @@
  * schema's themeMode is 'toggle' or 'auto'.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Question, Schema, ThemeMode, ResolvedThemeMode } from '@/index.js';
+import type { LooseAnswers } from '@/types/Answers.js';
 import { listSubmissions, subscribe as subscribeSubmissions } from '../_submissionStore.js';
 import { localSlotsLeft } from '../signupSlots.js';
 import { QuestionRenderer } from '@/components/questions/QuestionRenderer.js';
@@ -66,6 +67,32 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
     [selectedQuestion, formId, subsTick],
   );
   const [mode, setMode] = useState<ResolvedThemeMode>(() => defaultMode(schema.themeMode));
+
+  // The preview is clickable: picks stick while one question is shown, so an
+  // owner trying a multi choice sees their ticks instead of "Pick at least 2"
+  // over an empty list. Nothing is saved; a new selection starts fresh.
+  const [answers, setAnswers] = useState<LooseAnswers>({});
+  const [tryKey, setTryKey] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const setAnswer = useCallback(
+    (id: string, value: LooseAnswers[string] | ((prev: LooseAnswers[string]) => LooseAnswers[string])) =>
+      setAnswers((prev) => ({
+        ...prev,
+        [id]: typeof value === 'function' ? value(prev[id]) : value,
+      })),
+    [],
+  );
+  // A finished try (OK, a swiped card) resets the question so it can be tried again.
+  const restartTry = useCallback(() => {
+    setAnswers({});
+    setTryKey((n) => n + 1);
+  }, []);
+
+  // Each selected question opens at its top with nothing picked.
+  useLayoutEffect(() => {
+    setAnswers({});
+    if (scrollerRef.current) scrollerRef.current.scrollTop = 0;
+  }, [selectedQuestion.id]);
 
   useEffect(() => {
     setUploadContext(formId);
@@ -127,7 +154,6 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
     selectedQuestion.type !== 'statement';
 
   const noop = () => {};
-  const noopWith = () => {};
 
   return (
     <section className="slate-canvas">
@@ -171,7 +197,17 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
           data-theme-name={schema.theme}
           data-theme={mode}
           {...(hasStepDecorationBackdrop(decoration) ? { 'data-has-decoration': '' } : {})}
-          style={{ height: '100%', width: '100%', overflowX: 'hidden', overflowY: 'auto' }}
+          ref={scrollerRef}
+          // minHeight 0 beats the form's own `min-height: 100vh` (base.css), so the
+          // scroller is the frame's height and its last pixels (OK) can be reached.
+          style={{
+            height: '100%',
+            minHeight: 0,
+            width: '100%',
+            overflowX: 'hidden',
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
+          }}
         >
           <ThemeDecoration themeName={schema.theme} step={stepIndex} />
           <ProgressBar value={progressPct} />
@@ -184,15 +220,15 @@ export function Canvas({ formId, schema, selectedQuestion }: Props) {
 
           <div className="slate-stage" style={{ minHeight: 'auto', padding: '48px 24px 120px' }}>
             <div
-              key={selectedQuestion.id}
+              key={`${selectedQuestion.id}:${tryKey}`}
               className="slate-stage-content"
               style={{ minHeight: 'auto' }}
             >
               <QuestionRenderer
                 question={selectedQuestion}
-                answers={{}}
-                setAnswer={noopWith}
-                advance={noop}
+                answers={answers}
+                setAnswer={setAnswer}
+                advance={restartTry}
                 stepNumber={stepNumber}
                 totalSteps={totalSteps}
                 submitStatus={selectedQuestion.type === 'thanks' ? 'success' : 'idle'}

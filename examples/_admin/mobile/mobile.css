@@ -49,10 +49,15 @@
   color: var(--slate-muted);
 }
 
-[data-slate-forms][data-theme-name='slate'] .slate-preview--page {
+/* The test-run frame scrolls: a question taller than the frame (a long list,
+   a matrix, sign-up slots) must reach its OK button. The form inside grows
+   to its content exactly as on the public page; rounded corners still clip. */
+[data-slate-forms][data-theme-name='slate'] .slate-preview.slate-preview--page {
   height: calc(100vh - 160px);
   height: calc(100dvh - 160px);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Tablets and small laptops: the editor header drops what it can spare

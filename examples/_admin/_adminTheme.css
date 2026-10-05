@@ -1033,10 +1033,11 @@ body > [data-slate-forms][data-theme-name='slate']:not(.slate-loading) {
 
 /* Anchor the previewed form's content to the upper third of the frame
    instead of dead-center. The form's own [data-slate-forms] base CSS sets
-   `min-height: 100vh` which is larger than Slate preview frame
-   (calc(100vh - 160px)) — leaving the content visually below center.
-   These overrides cap the inner wrapper + stage to 100% of the frame and
-   pull content up with a top-padding clamp. */
+   `min-height: 100vh`, which is taller than the studio preview frame
+   (calc(100vh - 160px)) and left the content visually below center.
+   These overrides make the inner wrapper + stage at least as tall as the
+   frame (a floor, not a cap: a tall question grows and the frame scrolls)
+   and pull content up with a top-padding clamp. */
 .slate-preview [data-slate-forms] {
   min-height: 100%;
 }
