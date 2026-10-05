@@ -80,7 +80,9 @@ export default function ContactInfoField({
       if (trimmed.phone && !found.phone) {
         try {
           const lib = await loadPhoneLib();
-          const country = (question.defaultCountry ?? 'US') as Parameters<
+          // A blank or unknown saved country reads local numbers as US ones (QA F13).
+          const c = question.defaultCountry;
+          const country = (c && lib.isSupportedCountry(c) ? c : 'US') as Parameters<
             typeof lib.parsePhoneNumberFromString
           >[1];
           const parsed = lib.parsePhoneNumberFromString(trimmed.phone, country);

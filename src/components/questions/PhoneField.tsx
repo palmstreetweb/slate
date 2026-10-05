@@ -73,7 +73,9 @@ export function PhoneField({
       }
 
       const lib = await loadLib();
-      const country = (question.defaultCountry ?? 'US') as Parameters<
+      // A blank or unknown saved country reads local numbers as US ones (QA F13).
+      const c = question.defaultCountry;
+      const country = (c && lib.isSupportedCountry(c) ? c : 'US') as Parameters<
         typeof lib.parsePhoneNumberFromString
       >[1];
       const parsed = lib.parsePhoneNumberFromString(value, country);
