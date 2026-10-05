@@ -631,6 +631,45 @@ describe('sign-up slots (MEDIA-20, S17)', () => {
     expect(screen.getByText('Same name, day and time as slot 3.')).toBeInTheDocument();
   });
 
+  it('a too-big Spots then a tap on + Add Slot keeps the new slot (touch order, STU-4)', async () => {
+    const initial: SignupSlotsQuestion = {
+      id: 'su',
+      type: 'signup_slots',
+      title: 'Pick a time',
+      slots: [
+        { label: 'A', value: 's_a', capacity: 8 },
+        { label: 'B', value: 's_b', capacity: 8 },
+      ],
+    };
+    let latest = initial;
+    function Editor() {
+      const [q, setQ] = useState(initial);
+      latest = q;
+      return (
+        <ConfirmProvider>
+          <div data-slate-forms="" data-theme-name="slate">
+            <SignupSlotsSettings
+              question={q}
+              // Patches merge into the newest question, as the editor's updateQuestion does.
+              onChange={(patch) => setQ((cur) => ({ ...cur, ...patch }) as SignupSlotsQuestion)}
+            />
+          </div>
+        </ConfirmProvider>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Editor />);
+    const spots = screen.getByRole('spinbutton', { name: 'Spots in B' });
+    await user.tripleClick(spots);
+    await user.keyboard('1500');
+    // On a phone the blur and the click both land before the next frame.
+    act(() => spots.blur());
+    act(() => screen.getByRole('button', { name: /Add Slot/ }).click());
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+    expect(latest.slots).toHaveLength(3);
+    expect(latest.slots.map((x) => x.capacity)).toEqual([8, 1000, expect.any(Number)]);
+  });
+
   it('a slot with neither a name nor a day asks for one', () => {
     const q: SignupSlotsQuestion = {
       id: 'su',

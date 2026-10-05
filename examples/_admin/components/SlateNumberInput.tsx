@@ -3,18 +3,21 @@
  *
  * While the field has focus it keeps what the owner typed as a draft, so an
  * emptied field, a half-typed "0.0" or a first digit below the minimum is
- * never rewritten under the caret. A complete number that fits is saved as it
- * is typed; anything else waits until the field is left (or Enter), when it is
- * rounded and pulled into range — or the last saved number comes back. While
- * the typed number doesn't fit, a short line under the field says what does.
- * A focus taken and handed straight back (the live preview, S4) isn't leaving
- * the field: the draft is settled a frame after the blur, only if the field
- * didn't get its focus back.
+ * never rewritten under the caret. Every complete number is saved as it is
+ * typed, as leaving the field would save it: one that fits as it is, one that
+ * doesn't rounded and pulled into range (150 in a 1–100 field saves 100) while
+ * the typed text stays on screen with a short line saying what fits. So the
+ * form never holds a part of what was typed ("15" of "150") when the editor
+ * closes, Publish runs or another question opens (STU-4). Leaving the field
+ * (or Enter) only tidies what is shown: it settles at once, with the field's
+ * current props, and again if the field goes away with a draft. The one wait
+ * is a focus the live preview takes and may hand straight back (S4): that
+ * isn't leaving, so it settles a frame later, only if focus didn't come back.
  */
 
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
 import './inspectorGuards.css';
 
@@ -101,11 +104,23 @@ export function SlateNumberInput({
   const limits: Limits = { min, max, integer, above };
   const saved = numberOrUndefined(value);
   /** What the owner is typing, while the field has focus; null shows the saved value. */
-  const [draft, setDraft] = useState<string | null>(null);
+  const [draft, setDraftState] = useState<string | null>(null);
   /** The browser holds text it can't read as a number yet ("-", "1e"). */
-  const [partial, setPartial] = useState(false);
+  const [partial, setPartialState] = useState(false);
+  /** The same two, read by a settle that runs after this render (blur, unmount). */
+  const draftRef = useRef<string | null>(null);
+  const partialRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const noteId = useId();
+
+  const setDraft = (next: string | null) => {
+    draftRef.current = next;
+    setDraftState(next);
+  };
+  const setPartial = (next: boolean) => {
+    partialRef.current = next;
+    setPartialState(next);
+  };
 
   const display = draft ?? (saved === undefined ? '' : String(saved));
   const base = min ?? (above !== undefined ? above + step : 0);
@@ -114,12 +129,17 @@ export function SlateNumberInput({
     if (n !== saved) onChange(n);
   };
 
-  /** Leave the draft: save what fits, round or pull it into range, or put the saved value back. */
+  /**
+   * Leave the draft: save what fits, round or pull it into range, or put the saved
+   * value back. Typing has already saved any complete number this way, so this
+   * mostly tidies the box; it still saves an emptied field that needs a number.
+   */
   const finish = () => {
-    if (draft === null) return;
-    const text = draft.trim();
+    const typed = draftRef.current;
+    if (typed === null) return;
+    const text = typed.trim();
     if (text === '') {
-      if (partial) {
+      if (partialRef.current) {
         // "-" on its own: nothing to save, and the box shouldn't keep showing it.
         if (inputRef.current && saved === undefined) inputRef.current.value = '';
       } else if (allowEmpty) commit(undefined);
@@ -131,6 +151,18 @@ export function SlateNumberInput({
     setDraft(null);
     setPartial(false);
   };
+  /** The settle with this render's props: what a later frame or the unmount calls. */
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+
+  // Going away with a draft (the editor closes, a question with other fields opens):
+  // settle with the props it last had, so nothing typed is lost or half-saved.
+  useEffect(
+    () => () => {
+      if (draftRef.current !== null) finishRef.current();
+    },
+    [],
+  );
 
   const bump = (dir: 1 | -1) => {
     const typed = draft !== null && draft.trim() !== '' ? Number(draft) : NaN;
@@ -197,13 +229,21 @@ export function SlateNumberInput({
               if (allowEmpty) commit(undefined);
               return;
             }
+            // Saved as leaving would save it; what was typed stays on screen (STU-4).
             const n = Number(raw);
-            if (fitsLimits(n, limits)) commit(n);
+            const settled = fitsLimits(n, limits) ? n : settleNumber(n, limits);
+            if (settled !== null) commit(settled);
           }}
-          onBlur={() => {
-            requestAnimationFrame(() => {
-              if (document.activeElement !== inputRef.current) finish();
-            });
+          onBlur={(e) => {
+            const to = e.relatedTarget as Element | null;
+            if (to?.closest?.('[data-slate-preview]')) {
+              // The live preview took focus; it may hand it straight back (S4).
+              requestAnimationFrame(() => {
+                if (document.activeElement !== inputRef.current) finishRef.current();
+              });
+              return;
+            }
+            finish();
           }}
         />
         <div className="slate-number-step" aria-hidden={false}>
