@@ -37,6 +37,10 @@ if (route.name === 'fill' && isNeonConfigured()) {
   });
 }
 
+// After the form fetch is in flight. Sentry is its own chunk (ADR-069), so
+// this does not sit on the fill's first request.
+void import('./sentry.js').then((m) => m.initSentry());
+
 /** Cross-origin parents make `window.top` access throw — that counts as framed. */
 function isFramed(): boolean {
   try {

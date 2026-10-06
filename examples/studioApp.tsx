@@ -38,6 +38,7 @@ import { isNeonConfigured } from './_admin/neon/env.js';
 import { formatNeonError, isRlsOrAuthError } from './_admin/neon/neonError.js';
 import { installAdminUiSounds } from './_admin/uiSounds.js';
 import { enableSafeAreaViewport } from './_admin/mobile/viewport.js';
+import { initSentry, sentryRootOptions } from './sentry.js';
 
 import './_admin/slateChromeTokens.css';
 import '@/styles/toggle.css';
@@ -315,8 +316,9 @@ function RootCrashFallback() {
 
 /** Studio bundle (ADR-048). Also serves public routes after in-app navigation. */
 export function mountStudio(root: HTMLElement): void {
+  initSentry();
   enableSafeAreaViewport();
-  createRoot(root).render(
+  createRoot(root, sentryRootOptions()).render(
     <StrictMode>
       <UiSoundsRoot>
         <AuthProvider>

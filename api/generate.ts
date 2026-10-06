@@ -22,6 +22,7 @@ import {
   extractDocumentText,
   type DocumentPayload,
 } from './extractDocument.js';
+import { captureApiException } from './sentry.js';
 
 // Long PDF forms take well over a minute on Haiku. The route answers by its own
 // deadline (below), so a slow draft is a clear message, never a Vercel 504.
@@ -235,10 +236,12 @@ async function handleGenerate(request: Request): Promise<Response> {
       return json({ error: err.message }, 400);
     }
     if (err instanceof GenerateTimeoutError) {
+      await captureApiException(err);
       return json({ error: err.message }, 504);
     }
     const message = err instanceof Error ? err.message : 'Generate failed.';
     console.error('[slate] generate failed', err);
+    await captureApiException(err);
     return json({ error: message.slice(0, 280) }, 502);
   }
 }
@@ -273,6 +276,18 @@ function isWebRequest(value: unknown): value is Request {
 }
 
 export default async function handler(
+  request: Request | NodeIncoming,
+  res?: NodeOutgoing,
+): Promise<Response | void> {
+  try {
+    return await handleNodeOrWeb(request, res);
+  } catch (err) {
+    await captureApiException(err);
+    throw err;
+  }
+}
+
+async function handleNodeOrWeb(
   request: Request | NodeIncoming,
   res?: NodeOutgoing,
 ): Promise<Response | void> {
