@@ -7,8 +7,10 @@
 import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useRoute } from './_admin/_router.js';
+import { ErrorBoundary } from './_admin/components/ErrorBoundary.js';
 import { MotionGallery } from './motion/MotionGallery.js';
 import { ToastProvider } from './_admin/toast.js';
+import { initSentry, sentryRootOptions } from './sentry.js';
 
 // Studio chrome for the pass 4–5 studio moments (ADR-060).
 import './_admin/slateChromeTokens.css';
@@ -47,12 +49,35 @@ function loadDisplayFont(): void {
   document.head.appendChild(link);
 }
 
+function MotionCrashFallback() {
+  return (
+    <div
+      role="alert"
+      style={{
+        maxWidth: 420,
+        margin: '20vh auto',
+        padding: 24,
+        fontFamily: 'system-ui, sans-serif',
+        textAlign: 'center',
+      }}
+    >
+      <p style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px' }}>The gallery hit a problem.</p>
+      <button type="button" onClick={() => window.location.reload()}>
+        Refresh
+      </button>
+    </div>
+  );
+}
+
 export function mountMotion(root: HTMLElement): void {
+  initSentry();
   document.title = 'Motion gallery · Slate';
   loadDisplayFont();
-  createRoot(root).render(
+  createRoot(root, sentryRootOptions()).render(
     <StrictMode>
-      <MotionRoute />
+      <ErrorBoundary label="motion" fallback={<MotionCrashFallback />}>
+        <MotionRoute />
+      </ErrorBoundary>
     </StrictMode>,
   );
 }

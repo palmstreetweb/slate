@@ -320,6 +320,9 @@ describe('vercel.json framing (ADR-054)', () => {
     expect([...open]).toEqual([...closed]);
     expect(closed.get('script-src')).toBe("'self'");
     expect(closed.has('upgrade-insecure-requests')).toBe(true);
+    // Public fill uses the open policy, so both must be allowed to reach Sentry.
+    expect(closed.get('connect-src')).toContain('https://*.ingest.us.sentry.io');
+    expect(open.get('connect-src')).toContain('https://*.ingest.us.sentry.io');
   });
 
   it.each([...PUBLIC_FILL, ...EVERYTHING_ELSE])(

@@ -1299,6 +1299,30 @@ Revisit when: owners want a coarse location by default (a service-area zone name
 
 ---
 
+## ADR-069 — Sentry on the deployed site, not in the library
+Date: 2026-10-06
+Status: accepted
+Context: Production errors on the Vercel site (studio, public fill, `/api/generate`) were only visible in function logs. The published package `@palmstreetweb/slate` is a library other sites embed; its bundle budget is the engine, and a monitoring SDK does not belong in every consumer.
+Decision:
+1. `@sentry/react` instruments the Vite site (`examples/`). `@sentry/node` instruments `/api/generate` only, and only after the DSN check, via a dynamic import. Both packages are `devDependencies`. Nothing under `src/` imports them, so `tsup` does not ship them and they are not `dependencies` or `peerDependencies`.
+2. DSNs come from the environment: `VITE_SENTRY_DSN` (inlined into the site build) and `SENTRY_DSN` (read at function runtime). Neither is committed. Reporting is on only for a production build / `VERCEL_ENV=production` when the DSN is set. Preview and `vercel dev` stay quiet.
+3. Modest client and server options: `tracesSampleRate` 0.1, no session replay, and `dataCollection` with user info, cookies, headers, bodies, query strings, and stack-frame variables off. SDK 11 removed `sendDefaultPii`; that object is the replacement. React 19 reports through `createRoot` (`reactErrorHandler`). The existing `ErrorBoundary` still draws the fallback, including on public fill and the motion gallery, which had none.
+4. Source maps upload only when `SENTRY_AUTH_TOKEN` is set, via `@sentry/vite-plugin` with org `palm-street-web` and project `slate`. Without the token the plugin is not loaded and the build does not emit maps. With the token, maps are `hidden` and deleted after the build so they are not deployed. A failed upload logs a warning and does not fail the Vercel build. Release name, when present, is `VERCEL_GIT_COMMIT_SHA`.
+5. CSP `connect-src` on both policies (studio and embeddable public fill) allows `https://*.ingest.us.sentry.io`. Tracing headers stay on same-origin browser requests and are not attached to Anthropic or Neon from the function.
+6. `/api/auth-email` is the Edge runtime. `@sentry/node` does not run there. It is a forwarder; its failures stay in the Vercel log.
+Alternatives:
+- A dependency of the published package. Rejected: every embed would install and possibly bundle Sentry.
+- Hard-coding the DSN. Rejected: the repo is public.
+- Session replay. Rejected for this pass: form answers are personal, and the fill path should stay small.
+- Always uploading source maps. Rejected: the token is not on Vercel yet, and the build has to succeed without it.
+Consequences:
+- The public fill downloads a Sentry chunk after the form request has started. It is not on that first request, but it is extra bytes on a cold visit.
+- Stack traces stay minified until `SENTRY_AUTH_TOKEN` is set on Vercel.
+- Preview deployments do not report, even if the DSN is present there.
+Revisit when: auth-email needs its own edge SDK, or source maps are uploading and we want commit association (`setCommits`).
+
+---
+
 ## Deferred to V2
 
 Per brief §14, V1 explicitly does **not** include the items below. Each gets a stub ADR when the work is actually scheduled.
