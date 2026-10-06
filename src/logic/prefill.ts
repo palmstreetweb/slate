@@ -11,6 +11,7 @@ import type { LooseAnswers } from '@/types/Answers.js';
 import type { Question } from '@/types/Question.js';
 import { pickLimits, validate, type PickRule } from './validation.js';
 import { allowsOther, resolveOtherText } from './other.js';
+import { expandYear } from './dateValue.js';
 
 /** Longest prefilled value, in characters. */
 export const PREFILL_VALUE_MAX = 500;
@@ -74,12 +75,12 @@ function coerce(q: Question, text: string): LooseAnswers[string] {
     case 'url':
       return text;
     case 'date':
-      // As typed into the boxes (GAP-23): "10/20/2026", or "20.10.26" day first; 26 is 2026.
+      // As typed into the boxes (GAP-23): "10/20/2026", or "20.10.26" day first; a 2-digit year as the boxes read it.
       return text.replace(
         /^(\d\d?)[/.-](\d\d?)[/.-](\d\d|\d{4})$/,
         (_, a: string, b: string, y: string) => {
           const d = q.format === 'DD/MM/YYYY';
-          return `${y[2] ? y : '20' + y}-${(d ? b : a).padStart(2, '0')}-${(d ? a : b).padStart(2, '0')}`;
+          return `${y[2] ? y : expandYear(y)}-${(d ? b : a).padStart(2, '0')}-${(d ? a : b).padStart(2, '0')}`;
         },
       );
     case 'number':

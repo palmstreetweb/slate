@@ -15,6 +15,7 @@ import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
 import { validate, textMax } from '@/logic/validation.js';
 import { parseTypedNumber } from '@/logic/numberEntry.js';
 import { buildIsoDate, splitTypedDate, typedBox } from '@/logic/dateEntry.js';
+import { expandYear } from '@/logic/dateValue.js';
 import { nearestStep, scaleValues } from '@/components/questions/ext/scaleCells.js';
 import type { Question } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
@@ -435,7 +436,29 @@ describe('number stepper (X-3, F19)', () => {
 describe('dates (F5, F29, F17, COPY-09)', () => {
   const d: Question = { id: 'd', type: 'date', title: 'When?', required: true };
 
-  it('a 2-digit year means this century', async () => {
+  it('a 2-digit year uses a sliding window: up to 10 years ahead is this century', () => {
+    expect(expandYear('26', 2026)).toBe('2026');
+    expect(expandYear('36', 2026)).toBe('2036');
+    expect(expandYear('37', 2026)).toBe('1937');
+    expect(expandYear('99', 2026)).toBe('1999');
+    expect(expandYear('00', 2026)).toBe('2000');
+    // Near a century's end the window reaches into the next one.
+    expect(expandYear('05', 2096)).toBe('2105');
+    expect(expandYear('06', 2096)).toBe('2106');
+    expect(expandYear('07', 2096)).toBe('2007');
+  });
+
+  it('a birth year typed as "85" reads 1985', async () => {
+    const { setAnswer } = renderField(d);
+    fireEvent.change(await screen.findByLabelText('Month'), { target: { value: '04' } });
+    fireEvent.change(screen.getByLabelText('Day'), { target: { value: '12' } });
+    fireEvent.change(screen.getByLabelText('Year'), { target: { value: '85' } });
+    fireEvent.click(screen.getByRole('button', { name: /ok/i }));
+    expect(setAnswer).toHaveBeenCalledWith('d', '1985-04-12');
+    expect(screen.getByLabelText('Year')).toHaveValue('1985');
+  });
+
+  it('a 2-digit year near today means this century', async () => {
     const { setAnswer } = renderField(d);
     fireEvent.change(await screen.findByLabelText('Month'), { target: { value: '10' } });
     fireEvent.change(screen.getByLabelText('Day'), { target: { value: '03' } });

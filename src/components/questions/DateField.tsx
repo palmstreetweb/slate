@@ -4,7 +4,7 @@
  * See DECISIONS.md ADR-010. Stored as ISO `YYYY-MM-DD`.
  *
  * Typing follows `logic/dateEntry.ts`: "3/7/2026" or a pasted "10/03/2026"
- * fills the boxes, a 2-digit year is this century, and a partly filled or
+ * fills the boxes, a 2-digit year is read with a sliding window, and a partly filled or
  * impossible date says what to fix in the form's own order.
  */
 

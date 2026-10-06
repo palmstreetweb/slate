@@ -219,6 +219,8 @@ describe('prefill reads numbers and dates as they are typed (GAP-23)', () => {
     expect(prefillAnswers(questions, { day: '10/20/2026' })).toEqual({ day: '2026-10-20' });
     expect(prefillAnswers(questions, { day: '3-7-26' })).toEqual({ day: '2026-03-07' });
     expect(prefillAnswers(questions, { dmy: '20.10.26' })).toEqual({ dmy: '2026-10-20' });
+    // The same sliding window as the boxes: a birth year in the last century.
+    expect(prefillAnswers(questions, { day: '4/12/85' })).toEqual({ day: '1985-04-12' });
     expect(prefillAnswers(questions, { day: '2026-10-20' })).toEqual({ day: '2026-10-20' });
     // An impossible date is ignored, never stored.
     expect(prefillAnswers(questions, { day: '13/40/2026' })).toEqual({});

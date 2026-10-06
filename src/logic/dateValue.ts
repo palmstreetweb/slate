@@ -14,6 +14,19 @@ const PART_RE = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?$/;
 const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_RE = /^(\d{2}):(\d{2})$/;
 
+/**
+ * A 2-digit year, read with a sliding window: the year from 89 years ago to 10
+ * years ahead that ends in those digits. In 2026, "26" is 2026, "36" is 2036,
+ * "37" is 1937 and "99" is 1999, so birth years and near-future dates both work
+ * (Caleb, 2026-10-05). Typed boxes and prefill links share it.
+ */
+export function expandYear(yy: string, now = new Date().getFullYear()): string {
+  let y = now - (now % 100) + Number(yy);
+  if (y > now + 10) y -= 100;
+  else if (y < now - 89) y += 100;
+  return String(y);
+}
+
 /** True iff `v` is a real calendar date in ISO `YYYY-MM-DD` form. */
 export function isValidIsoDate(v: string): boolean {
   const m = ISO_DATE_RE.exec(v);

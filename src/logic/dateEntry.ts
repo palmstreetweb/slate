@@ -6,14 +6,15 @@
  * engine's core imports may import this (a core module's exports all ship up
  * front, AGENTS.md). Stored-answer parsing stays in `dateValue.ts`, unchanged.
  *
- *   - A 2-digit year means this century: "26" is 2026 (Caleb, QA pass).
+ *   - A 2-digit year uses a sliding window (`expandYear`): "26" is 2026, "99"
+ *     is 1999 (Caleb, 2026-10-05).
  *   - Years before 1900 are refused in plain words.
  *   - "/", "-" or "." after one digit finishes that box ("3/" is 03).
  *   - A whole date pasted or typed into one box fills all three.
  */
 
 import type { DatePart, ParsedDateAnswer } from './dateValue.js';
-import { isValidIsoDate } from './dateValue.js';
+import { expandYear, isValidIsoDate } from './dateValue.js';
 
 export type DateFormat = 'MM/DD/YYYY' | 'DD/MM/YYYY';
 export type DateBoxes = { month: string; day: string; year: string };
@@ -41,9 +42,9 @@ export function dateAnswerToString(a: ParsedDateAnswer): string {
   return a.end ? `${partToString(a.start)}/${partToString(a.end)}` : partToString(a.start);
 }
 
-/** "26" → "2026"; anything else as typed. */
+/** "26" → "2026", "99" → "1999" (`expandYear`); anything else as typed. */
 export function fullYear(year: string): string {
-  return year.length === 2 ? `20${year}` : year;
+  return year.length === 2 ? expandYear(year) : year;
 }
 
 /**
