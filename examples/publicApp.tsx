@@ -8,12 +8,14 @@
 import { StrictMode, Suspense, lazy, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { isRespondentRoute, routeKey, useRoute } from './_admin/_router.js';
+import { ErrorBoundary } from './_admin/components/ErrorBoundary.js';
 import { PublicFill } from './_admin/pages/PublicFill.js';
 import { PageNotFound } from './_admin/pages/PageNotFound.js';
 import { PageTransition } from './_admin/shell/PageTransition.js';
 import { LoadingScreen } from './_admin/shell/LoadingScreen.js';
 import { PAGE_DIDNT_LOAD } from './_admin/fillCopy.js';
 import { readSlateMode } from './_admin/slateMode.js';
+import { initSentry, sentryRootOptions } from './sentry.js';
 
 import './_admin/slateChromeTokens.css';
 import './_admin/publicChrome.css';
@@ -88,10 +90,34 @@ function PublicRoutes() {
   return null;
 }
 
+function FillCrashFallback() {
+  return (
+    <div
+      role="alert"
+      style={{
+        maxWidth: 420,
+        margin: '20vh auto',
+        padding: 24,
+        fontFamily: 'system-ui, sans-serif',
+        textAlign: 'center',
+      }}
+    >
+      <p style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px' }}>This form hit a problem.</p>
+      <p style={{ margin: '0 0 16px', opacity: 0.75 }}>Refresh the page to try again.</p>
+      <button type="button" onClick={() => window.location.reload()}>
+        Refresh
+      </button>
+    </div>
+  );
+}
+
 export function mountPublic(root: HTMLElement): void {
-  createRoot(root).render(
+  initSentry();
+  createRoot(root, sentryRootOptions()).render(
     <StrictMode>
-      <PublicRoutes />
+      <ErrorBoundary label="form" fallback={<FillCrashFallback />}>
+        <PublicRoutes />
+      </ErrorBoundary>
     </StrictMode>,
   );
 }

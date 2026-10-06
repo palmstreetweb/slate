@@ -45,6 +45,7 @@ import {
 import { installAdminUiSounds } from './_admin/uiSounds.js';
 import { enableSafeAreaViewport } from './_admin/mobile/viewport.js';
 import { detectAdminUiTheme } from './_admin/adminUiTheme.js';
+import { initSentry, sentryRootOptions } from './sentry.js';
 
 import './_admin/slateChromeTokens.css';
 import '@/styles/toggle.css';
@@ -331,8 +332,9 @@ function RootCrashFallback() {
 
 /** Studio bundle (ADR-048). Also serves public routes after in-app navigation. */
 export function mountStudio(root: HTMLElement): void {
+  initSentry();
   enableSafeAreaViewport();
-  createRoot(root).render(
+  createRoot(root, sentryRootOptions()).render(
     <StrictMode>
       <UiSoundsRoot>
         <AuthProvider>
