@@ -49,20 +49,20 @@ Every major version bump must include an entry in this file using the template b
 | `@palmstreetweb/forms@1.0.0-beta.1` | `@palmstreetweb/slate@1.0.0-beta.1` | Medium — see below |
 | `@palmstreetweb/slate@1.0.0-beta.1` | `@palmstreetweb/slate@1.0.0-beta.2` | Low — check the Breaking list below |
 
-## v1.0.0-beta.2 — 2026-10-05 (QA pass, ADR-069)
+## v1.0.0-beta.2 — 2026-10-05 (QA pass, ADR-070)
 
-The QA pass of 2026-10 (ADR-069) tested every question type and option. The changes a host can notice are below; ADR-069 has the rest. While on `1.0.0-beta.*` these ship in a beta increment (ADR-007), so the version is `1.0.0-beta.2`.
+The QA pass of 2026-10 (ADR-070) tested every question type and option. The changes a host can notice are below; ADR-070 has the rest. While on `1.0.0-beta.*` these ship in a beta increment (ADR-007), so the version is `1.0.0-beta.2`.
 
 ### Breaking
 - **`onSubmit`, `onPartialChange` and `onQuestionChange` get the answers on the respondent's path.** Answers to questions a logic jump now passes over (the respondent went Back and took the other branch) are left out, as hidden ones already were. They stay in the form's state, so taking that branch again brings them back.
   - **Before:** a skipped question kept its answer in the payload while its `visibleIf` passed (ADR-015).
-  - **After:** only the questions on the path the answers lead through (`pathOf`, ADR-069 part A §4).
+  - **After:** only the questions on the path the answers lead through (`pathOf`, ADR-070 part A §4).
   - **Why:** the respondent's answers are what they would see on Review; a branch they backed out of isn't part of them.
   - **Migration:** nothing for most hosts. A host that relied on answers from an abandoned branch should model them as answers on the path (or a `visibleIf` question) instead.
 - **`<Form>` no longer runs the `psw-*` → `slate-*` storage migration** (the ADR-025 shim, past its ~2026-07-15 removal date).
   - **Before:** on first mount, `<Form>` copied the legacy `psw-forms-theme` and `psw-forms-resume:<schema.id>` keys (saved before the 2026-06-14 rebrand) to `slate-forms-theme` and `slate-forms-resume:<schema.id>`.
   - **After:** it doesn't; a light / dark choice or a resume session saved only under a `psw-*` key isn't picked up.
-  - **Why:** the shim's removal date had passed, and the engine needed its bytes (ADR-069).
+  - **Why:** the shim's removal date had passed, and the engine needed its bytes (ADR-070).
   - **Migration:** none for anything saved since the rebrand. A host that must still pick up older ones can copy those `localStorage` keys to their `slate-*` names before mounting `<Form>`.
 - **Text answers stop at 10,000 characters when `maxLength` is unset**, what the Slate server keeps; text is never cut while typing (the `maxlength` attribute is gone): a counter shows near the limit, and OK asks for a shorter answer.
   - **Migration:** set `maxLength` if your own storage keeps less, or more is wanted (the Slate server keeps up to 64 KiB).
@@ -77,19 +77,19 @@ The QA pass of 2026-10 (ADR-069) tested every question type and option. The chan
 ### Added
 - `resume: 'tab'`: save-and-resume in `sessionStorage`. It survives a reload, back / forward and a phone discarding the tab, goes with the tab when the browser copies it (a duplicated tab, a closed tab reopened, a restored session), and is offered back only within 30 minutes of the last answer (ADR-017 addendum).
 - `SubmitMeta.fillId`: one UUID per fill, the same on Retry and, with `resume`, after a reload and Resume; new for "Submit another" and Start over. Store it as a retry key so a submit whose reply was lost is never stored twice. Missing on a page not served over https.
-- One-tap questions set to `required: false` (single choice, yes / no, single picture choice, package cards, ratings, NPS, consent) offer **Skip**, and Enter skips them; one with no `required` stays one-tap, as in beta.1. Multiple-pick questions say their rule up front ("Pick up to 3") and the maximum blocks further picks (ADR-069).
+- One-tap questions set to `required: false` (single choice, yes / no, single picture choice, package cards, ratings, NPS, consent) offer **Skip**, and Enter skips them; one with no `required` stays one-tap, as in beta.1. Multiple-pick questions say their rule up front ("Pick up to 3") and the maximum blocks further picks (ADR-070).
 - Question types and options added since beta.1 (ADR-063 to ADR-068) are additive; the README's question-type table lists them.
 
 ### Changed
 - A `redirectUrl` is followed only when it is an http or https address. It resolves the way a link on your page does, as in beta.1 (`thanks`, `/thanks`, `?done` and `#done` stay on your site), so another site needs its full `https://` address.
-- Logic jumps decide each step on what had been answered by then: a rule that reads a later answer never moves the path behind it, and a question shown only by a later answer is asked right after that answer (ADR-069).
+- Logic jumps decide each step on what had been answered by then: a rule that reads a later answer never moves the path behind it, and a question shown only by a later answer is asked right after that answer (ADR-070).
 - A held Enter (key repeat) never confirms a question.
 - `SLATE_IMAGE_TYPE_HINT` reads "Try a different photo."
 - `focusAfter` doesn't move focus inside an element marked `data-slate-preview` (the studio's live preview).
 - Respondent messages are plain sentences throughout: no codes, ISO dates or raw server text.
 
 ### Fixed
-- Respondents are never trapped by settings nobody could meet: pick limits above the choices, optional questions with no way past, bounds set the wrong way round (ADR-069 parts A and B).
+- Respondents are never trapped by settings nobody could meet: pick limits above the choices, optional questions with no way past, bounds set the wrong way round (ADR-070 parts A and B).
 
 ## v1.0.0-beta.1 — 2026-06-14 (Slate rebrand)
 

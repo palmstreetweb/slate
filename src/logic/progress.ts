@@ -62,7 +62,7 @@ export function resolveJumpTarget(
 export type Path = number[] & { next: number };
 
 /**
- * The respondent's path through `visible` with these answers (ADR-069), in
+ * The respondent's path through `visible` with these answers (ADR-070), in
  * the order they meet it: from the first step, each advance the way the form
  * takes it, up to the first ending or a step already on it. Navigation, the
  * Review step and the submit all read it.
@@ -131,7 +131,7 @@ export function progress(visible: ReadonlyArray<Question>, currentStep: number):
  * The "answers payload" that gets passed to `onSubmit` — strictly the answers
  * to currently-visible answer-bearing questions on the respondent's path.
  * Hidden answers are retained in the engine's internal state but excluded
- * here per ADR-005, and so are answers a logic jump now passes over (ADR-069:
+ * here per ADR-005, and so are answers a logic jump now passes over (ADR-070:
  * the respondent went Back and took the other branch).
  */
 export function visibleAnswersForSubmit(

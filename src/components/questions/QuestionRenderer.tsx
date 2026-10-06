@@ -55,7 +55,7 @@ export type QuestionRendererProps = {
   /** Running score total, available in piping as `{{score}}` (ADR-016). */
   score?: number;
   /**
-   * The visible questions on the respondent's path (ADR-069), as navigation
+   * The visible questions on the respondent's path (ADR-070), as navigation
    * and the submit read it — the Review step lists the answer-bearing ones.
    */
   path?: ReadonlyArray<Question>;

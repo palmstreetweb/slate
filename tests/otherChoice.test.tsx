@@ -308,7 +308,7 @@ describe('multi choice with Other', () => {
     allowOther: true,
   };
 
-  // Multi choice loads on demand (ADR-069): each test waits for the field.
+  // Multi choice loads on demand (ADR-070): each test waits for the field.
   it('stores picked options plus the typed text on OK', async () => {
     const { setAnswer, advance } = renderField(q, { svc: ['google'] });
     const otherBox = await screen.findByRole('checkbox', { name: /other/i });

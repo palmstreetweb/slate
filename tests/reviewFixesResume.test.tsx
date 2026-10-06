@@ -1,5 +1,5 @@
 /**
- * Review fixes of 2026-10-05, save-and-resume (ADR-017 addendum, ADR-069):
+ * Review fixes of 2026-10-05, save-and-resume (ADR-017 addendum, ADR-070):
  * one fill id across a reload and Resume, so a submit whose reply was lost is
  * never stored twice (ENG-03, SEC-1); a tab's save that has sat for 30
  * minutes isn't offered to the next person at a shared device (SEC-2).

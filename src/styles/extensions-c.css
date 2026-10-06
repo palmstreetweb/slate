@@ -356,7 +356,7 @@
   padding-left: 0;
 }
 
-/* The end screen (ADR-069): a liked picture is a button that lets it go. */
+/* The end screen (ADR-070): a liked picture is a button that lets it go. */
 [data-slate-forms] .slate-swipe-unlike {
   display: flex;
   flex-direction: column;

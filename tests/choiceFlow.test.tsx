@@ -1,5 +1,5 @@
 /**
- * QA pass 2026-10-04, choice and logic, through the whole <Form> (ADR-069):
+ * QA pass 2026-10-04, choice and logic, through the whole <Form> (ADR-070):
  * the pick rule up front, the maximum that blocks extra picks (taps and
  * keys), errors that clear when fixed by keys, Other naming a picked option,
  * optional questions that can be skipped, and Review.

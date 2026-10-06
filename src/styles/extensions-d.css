@@ -35,7 +35,7 @@
   gap: 8px;
 }
 
-/* Why a tap wasn't taken, right under the slot tapped (ADR-069). */
+/* Why a tap wasn't taken, right under the slot tapped (ADR-070). */
 [data-slate-forms] .slate-slot-note {
   margin: 0 0 4px;
 }

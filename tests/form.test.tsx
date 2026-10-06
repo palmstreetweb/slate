@@ -270,7 +270,7 @@ describe('<Form> — piping, scoring, multiple endings (Phase 4)', () => {
     await user.type(screen.getByRole('textbox'), 'Ada');
     await user.click(screen.getByRole('button', { name: /ok/i }));
 
-    // Review lists the question + answer (the step loads on demand, ADR-069).
+    // Review lists the question + answer (the step loads on demand, ADR-070).
     expect(await screen.findByText('Everything correct?')).toBeInTheDocument();
     expect(await screen.findByText('Ada')).toBeInTheDocument();
 
@@ -278,7 +278,7 @@ describe('<Form> — piping, scoring, multiple endings (Phase 4)', () => {
     await user.click(screen.getByRole('button', { name: /edit your name/i }));
     expect(await screen.findByText('Your name?')).toBeInTheDocument();
 
-    // OK on the edited question comes straight back to Review (ADR-069).
+    // OK on the edited question comes straight back to Review (ADR-070).
     await user.click(screen.getByRole('button', { name: /ok/i }));
     await user.click(await screen.findByRole('button', { name: /looks good/i }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));

@@ -55,7 +55,7 @@ describe('editor live preview (Canvas)', () => {
       <Canvas formId="f_canvas_test" schema={schema} selectedQuestion={q} />,
     );
 
-    // Multi choice loads on demand (ADR-069).
+    // Multi choice loads on demand (ADR-070).
     await user.click(await screen.findByRole('checkbox', { name: /crack fill/i }));
     await user.click(screen.getByRole('checkbox', { name: /striping/i }));
     expect(screen.getByRole('checkbox', { name: /crack fill/i })).toHaveAttribute(

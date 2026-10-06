@@ -1,6 +1,6 @@
 /**
  * Multi choice — tick any number of options, then OK. Loads on demand through
- * ext/MultiChoiceExt.tsx (ADR-069); letter keys go through <Form>.
+ * ext/MultiChoiceExt.tsx (ADR-070); letter keys go through <Form>.
  *
  * The pick rule is said up front ("Pick up to 3", "Pick at least 2"), from
  * the limits a respondent can actually meet (`pickLimits`). Once the most

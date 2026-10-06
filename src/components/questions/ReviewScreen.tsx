@@ -1,7 +1,7 @@
 /**
  * Review screen (roadmap Phase 5) — chrome step listing the answer-bearing
  * questions on the respondent's path with their answers in words and a
- * jump-to-edit button; an edit comes back here (ADR-069). A required
+ * jump-to-edit button; an edit comes back here (ADR-070). A required
  * question still unanswered is marked. Confirm CTA advances (usually into
  * `thanks`, firing onSubmit).
  *
@@ -47,7 +47,7 @@ export function ReviewScreen({ question, rows, answers, format, onEdit, onAdvanc
 
       <dl className="slate-review" aria-labelledby={labelId}>
         {rows.map((q) => {
-          // Labels and words, never stored codes (ADR-063, ADR-069).
+          // Labels and words, never stored codes (ADR-063, ADR-070).
           const value = reviewText(q, answers[q.id], format);
           // A sign-up can be left empty when every spot is gone (MEDIA-07): not flagged.
           const missing =

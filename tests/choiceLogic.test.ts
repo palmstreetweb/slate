@@ -1,5 +1,5 @@
 /**
- * QA pass 2026-10-04, choice and logic (ADR-069): pick limits nobody is held
+ * QA pass 2026-10-04, choice and logic (ADR-070): pick limits nobody is held
  * to past what they can give, the respondent's path, and answers in words on
  * Review and in piping.
  */

@@ -1,5 +1,5 @@
 /**
- * QA pass 2026-10, integration (ADR-069): checks that hold only once the seven
+ * QA pass 2026-10, integration (ADR-070): checks that hold only once the seven
  * workstreams are together.
  * - The editor's live preview names the question by its type, never its
  *   internal id (S9, CH-17, F25, MEDIA-13; neither studio workstream owned it).

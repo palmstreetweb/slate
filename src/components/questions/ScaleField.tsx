@@ -6,7 +6,7 @@
  *
  * Skip needs `required: false` set: a rating saved before the studio offered
  * Required on it has no `required`, and stays one-tap as it always was
- * (CON-04, ADR-069). Enter then says what to do instead of skipping.
+ * (CON-04, ADR-070). Enter then says what to do instead of skipping.
  */
 
 'use client';

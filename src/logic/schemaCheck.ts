@@ -201,7 +201,7 @@ export function checkSchema(questions: ReadonlyArray<Question>): SchemaIssue[] {
         prefillKeys.set(lower, q);
       }
     }
-    // What the engine does with bounds set the wrong way round (ADR-069): a number or
+    // What the engine does with bounds set the wrong way round (ADR-070): a number or
     // date ignores both, a scale runs from the lower to the higher. A missing bound
     // compares false either way, so there's no check for undefined.
     if (

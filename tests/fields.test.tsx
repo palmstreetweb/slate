@@ -153,7 +153,7 @@ describe('question types render', () => {
     expect(container).toMatchSnapshot();
   });
 
-  // Multi choice loads on demand (ADR-069): wait for the field.
+  // Multi choice loads on demand (ADR-070): wait for the field.
   it('multi_choice', async () => {
     const { container } = renderQuestion({
       id: 'addons',
@@ -650,7 +650,7 @@ describe('phase 3 question types', () => {
     expect(setAnswer).toHaveBeenCalledWith('rate', { quality: 'great' });
 
     await user.click(screen.getByRole('button', { name: /ok/i }));
-    // The message names the row still empty, and that row is marked (ADR-069).
+    // The message names the row still empty, and that row is marked (ADR-070).
     expect(await screen.findByText('Please answer “Speed” too.')).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: 'Speed' })).toHaveClass(
       'slate-matrix-row--missing',

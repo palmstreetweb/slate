@@ -63,7 +63,7 @@ export function NumberField({
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isTypewriterKey(e)) onType?.();
-    // A held Enter (key repeat) never confirms (ADR-069, ENG-07).
+    // A held Enter (key repeat) never confirms (ADR-070, ENG-07).
     if (e.key === 'Enter' && !e.shiftKey && !e.repeat) {
       e.preventDefault();
       submit();

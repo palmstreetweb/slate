@@ -1,5 +1,5 @@
 /**
- * How an answer reads on the Review step (ADR-069). Pure, no React.
+ * How an answer reads on the Review step (ADR-070). Pure, no React.
  *
  * The Review step loads on demand, so it can carry fuller wording than the
  * piping formatter in the engine's core: a grid reads as its row and column

@@ -74,7 +74,7 @@ export default function QuotePage() {
 | Prop | Type | Required | Notes |
 |---|---|---|---|
 | `schema` | `Schema` | ✓ | Wrap with `defineSchema` for full type inference. |
-| `onSubmit` | `(answers, meta) => void \| Promise<void>` | ✓ | Fires exactly once on entering `thanks`, with the answers on the respondent's path (ADR-069). Async errors flip the thanks screen to a Retry state. |
+| `onSubmit` | `(answers, meta) => void \| Promise<void>` | ✓ | Fires exactly once on entering `thanks`, with the answers on the respondent's path (ADR-070). Async errors flip the thanks screen to a Retry state. |
 | `onQuestionChange` | `(questionId, answers) => void` |  | Fires on every step transition. Good for analytics. |
 | `hiddenFields` | `Record<string, unknown>` |  | Passed through to `meta.hiddenFields`. Never rendered. |
 | `errorMessage` | `string` |  | Fallback shown when `onSubmit` rejects (default: "Something went wrong submitting your form. Please try again."). |
@@ -130,7 +130,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 | `date` | `title`, `required?`, `format?` (`'MM/DD/YYYY'` default), `min?`, `max?` (ISO), `includeTime?`, `range?` | real calendar date + bounds, said in the form's own format (set the wrong way round, ignored); range in order; a 2-digit year uses a sliding window ("26" is 2026, "99" is 1999), years before 1900 are refused | `string`: `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM` with a time, `start/end` for a range |
 | `file_upload` | `title`, `required?`, `accept?`, `maxSizeMb?`, `multiple?`, `maxFiles?` | presence + size; max files when multiple (below 1 is 10); `accept` reads endings with or without the dot (`pdf, jpg`), MIME types (`image/*`) and the words "photos", "Word", "Excel" — a word it can't read is left out | `File` / `string`, or `(File \| string)[]` when `multiple` |
 | `single_choice` | `title`, `options: Option[]`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` (option value, or the typed Other text) |
-| `multi_choice` | `title`, `options: Option[]`, `min?`, `max?`, `allowOther?`, `otherLabel?` | min/max selections, eased when nobody could meet them (ADR-069) | `string[]` (plus at most one typed Other text) |
+| `multi_choice` | `title`, `options: Option[]`, `min?`, `max?`, `allowOther?`, `otherLabel?` | min/max selections, eased when nobody could meet them (ADR-070) | `string[]` (plus at most one typed Other text) |
 | `dropdown` | `title`, `options: Option[]`, `placeholder?`, `required?` (default `true`), `allowOther?`, `otherLabel?` | required | `string` |
 | `picture_choice` | `title`, `options: PictureOption[]`, `multiple?`, `required?`, `min?`, `max?`, `allowOther?`, `otherLabel?`, `display?` (`'grid'` \| `'swipe'`) | required / min-max | `string` or `string[]` |
 | `ranking` | `title`, `options: Option[]` | full permutation | `string[]` (ordered) |
@@ -180,7 +180,7 @@ Every question has `id: string` and (where applicable) an optional `visibleIf?: 
 
 Stars, faces, the slider, the stepper, date ranges / times, the file field, picture choice, ranking, the matrix, package cards, the contact block, the address, the signature pad, the estimate reveal, every Wave C UI, sign-up slots, the dropdown, plain date, number, phone, website, consent and NPS fields, multi choice and the Review step load on demand in their own chunks (`import { Form }` stays under the <50 kB budget; `node scripts/engine-size.mjs` after a build reports it).
 
-**Pick limits (ADR-069).** A multiple-pick question (multi choice, picture choice with `multiple`, swipe cards) says its rule above the choices ("Pick up to 3", "Pick at least 2"), and once the most picks are made the other choices step back. A respondent is never held to a limit they can't meet: `min` counts at most the choices on offer (Other included) and rounds to whole picks, and a `max` below 1 or below `min` is ignored. Single choice, yes / no, single picture choice and package cards, and the numbers scale, NPS, legal consent, stars and faces offer **Skip** (and Enter, once the question has been up a moment) while nothing is picked — only with `required: false` set; a question with no `required` stays one-tap, as forms made before ADR-069 expect.
+**Pick limits (ADR-070).** A multiple-pick question (multi choice, picture choice with `multiple`, swipe cards) says its rule above the choices ("Pick up to 3", "Pick at least 2"), and once the most picks are made the other choices step back. A respondent is never held to a limit they can't meet: `min` counts at most the choices on offer (Other included) and rounds to whole picks, and a `max` below 1 or below `min` is ignored. Single choice, yes / no, single picture choice and package cards, and the numbers scale, NPS, legal consent, stars and faces offer **Skip** (and Enter, once the question has been up a moment) while nothing is picked — only with `required: false` set; a question with no `required` stays one-tap, as forms made before ADR-070 expect.
 
 ### Answer piping
 
@@ -225,7 +225,7 @@ Any answer-bearing question (and `statement`) can carry jump rules, evaluated wh
 }
 ```
 
-Back returns to the jump origin. The respondent's path is replayed from the current answers (ADR-069), so:
+Back returns to the jump origin. The respondent's path is replayed from the current answers (ADR-070), so:
 
 - answers to questions a jump now passes over (the respondent went Back and took the other branch) are left out of the submit payload, as hidden ones are; they stay in state, so taking that branch again brings them back;
 - a question that becomes visible because of a later answer is asked before the form moves on, then the respondent continues where they were going;
@@ -233,7 +233,7 @@ Back returns to the jump origin. The respondent's path is replayed from the curr
 
 ### Schema sanity checking
 
-`checkSchema(questions)` is a pure helper that returns `SchemaIssue[]` — duplicate ids, `visibleIf`/jump conditions referencing unknown questions, and dangling or self jump targets. The engine is forgiving at runtime (bad refs fall through to normal flow); use this in CI or on save to catch authoring mistakes early. Each `message` is written for the form's owner: it names the question by its title and says what to do (ADR-069), so match on `kind`, never on the text. Slate's editor lists these in plain words with its own settings and logic-rule checks, and holds Publish back only for the ones that would stop people finishing the form.
+`checkSchema(questions)` is a pure helper that returns `SchemaIssue[]` — duplicate ids, `visibleIf`/jump conditions referencing unknown questions, and dangling or self jump targets. The engine is forgiving at runtime (bad refs fall through to normal flow); use this in CI or on save to catch authoring mistakes early. Each `message` is written for the form's owner: it names the question by its title and says what to do (ADR-070), so match on `kind`, never on the text. Slate's editor lists these in plain words with its own settings and logic-rule checks, and holds Publish back only for the ones that would stop people finishing the form.
 
 ```ts
 import { checkSchema } from '@palmstreetweb/slate';
@@ -244,7 +244,7 @@ const issues = checkSchema(schema.questions); // [] when clean
 
 Give options a `score` and the engine accumulates a total — available in piping as `{{score}}` and delivered in `SubmitMeta.score` (ADR-016); it counts the answers that are sent. Several `thanks` screens can coexist, each gated by `visibleIf`; the first visible one is shown. A `redirectUrl` on a thanks screen navigates there after `onSubmit` resolves. It resolves the way a link on your page does — `thanks`, `/thanks`, `?done` and `#done` stay on your site — so another site needs its full address (`https://example.com/thanks`); only http and https are followed. (Slate's own pages turn an address an owner typed without `https://` into the full one before the form is shown.)
 
-Logic jumps decide each step on what had been answered by then: a rule that reads a later answer never moves the path behind it, and a question shown only by a later answer is asked right after that answer. `onSubmit` receives the answers on the respondent's path, the same questions the Review step lists (ADR-069).
+Logic jumps decide each step on what had been answered by then: a rule that reads a later answer never moves the path behind it, and a question shown only by a later answer is asked right after that answer. `onSubmit` receives the answers on the respondent's path, the same questions the Review step lists (ADR-070).
 
 ### `SubmitMeta`
 
@@ -276,7 +276,7 @@ type SubmitMeta = {
 
 | Key | Action |
 |---|---|
-| `Enter` | Advance from welcome / statement; submit text-type fields; on an optional (`required: false`) rating, NPS, legal or choice question with no answer, skip it (ADR-069). A held Enter (key repeat) never confirms |
+| `Enter` | Advance from welcome / statement; submit text-type fields; on an optional (`required: false`) rating, NPS, legal or choice question with no answer, skip it (ADR-070). A held Enter (key repeat) never confirms |
 | `Shift + Enter` | New line in `long_text` (on touch screens Return is a new line; OK submits) |
 | `A`–`F` | Select choice option (also `picture_choice` and `legal` accept/decline) |
 | `Y` / `N` | Answer `yes_no` questions |
@@ -356,7 +356,7 @@ Motion follows BUILD_BRIEF §10 and ADR-059, and all of it lives in `styles.css`
 The `examples/` folder isn't published. It hosts **Slate**, a supported internal dev tool (ADR-018) for building and previewing forms:
 
 - Dashboard listing locally-stored form definitions (with two seed schemas).
-- Three-pane editor (outline / canvas / inspector) with drag-and-drop reordering, duplication, bulk delete, a visual logic editor (conditions, jumps, scores), and an issues banner in plain words (`checkSchema`, settings checks and rule checks; Publish waits only for what would trap respondents, ADR-069).
+- Three-pane editor (outline / canvas / inspector) with drag-and-drop reordering, duplication, bulk delete, a visual logic editor (conditions, jumps, scores), and an issues banner in plain words (`checkSchema`, settings checks and rule checks; Publish waits only for what would trap respondents, ADR-070).
 - **Share panel** — copy link + QR for dev preview; optional public URL when `VITE_PUBLIC_FORM_BASE` is set (see `.env.example`).
 - Live `<Form>` preview (with save-and-resume on) and a responses inbox with CSV export and per-question summaries, all backed by `localStorage`.
 - **Motion gallery** at `/motion` — every animation above with a Replay button, in all twelve themes, with a Reduce-motion preview switch. Built-in demo schemas; no sign-in, nothing submitted.

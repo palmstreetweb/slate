@@ -1,5 +1,5 @@
 /**
- * Review fixes of 2026-10-05, the respondent's path (ADR-069 part A §4):
+ * Review fixes of 2026-10-05, the respondent's path (ADR-070 part A §4):
  * a jump is decided on what had been answered when the respondent first left
  * its question (CON-01), so answers given later never move the path behind
  * them; Review lists the path navigation and the submit use (ENG-05) and

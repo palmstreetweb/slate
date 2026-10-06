@@ -282,7 +282,7 @@ function ScaleSlider({
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      // A held Enter (key repeat) never confirms (ADR-069, ENG-07).
+      // A held Enter (key repeat) never confirms (ADR-070, ENG-07).
       if (!e.repeat) submit();
       return;
     }

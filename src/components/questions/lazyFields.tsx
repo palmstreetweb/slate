@@ -24,7 +24,7 @@
  *
  * Wave D (ADR-066) adds sign-up slots.
  *
- * Multi choice and the Review step moved here too (ADR-069), to make room
+ * Multi choice and the Review step moved here too (ADR-070), to make room
  * for the pick-limit and path rules. Neither is ever the first screen of a
  * form the studio makes (it opens with a welcome screen).
  */
@@ -65,7 +65,7 @@ export type ExtFieldProps<Q extends Question = Question> = {
   /** Sign-up slots (ADR-066): spots left per slot value, from the host; unknown slots show their capacity. */
   slotsLeft?: Readonly<Record<string, number>>;
   /**
-   * The Review step (ADR-069): the answer-bearing questions on the
+   * The Review step (ADR-070): the answer-bearing questions on the
    * respondent's path, the core's answer formatter and the edit links,
    * passed in so its chunk imports none of the core's own modules.
    */

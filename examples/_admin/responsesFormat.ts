@@ -66,7 +66,7 @@ export function isRemovedOptionValue(value: string): boolean {
  * for the studio's code of an option deleted since; on a question that allows
  * Other (ADR-063), "Other: what they typed"; otherwise the stored text marked
  * "(no longer an option)" — Other turned off since, or a readable option
- * deleted. Typed words are never hidden (review fixes, ADR-069): the reader,
+ * deleted. Typed words are never hidden (review fixes, ADR-070): the reader,
  * search, the CSV and the Summary all read this.
  */
 export function choiceText(q: Question, value: string): string {

@@ -1,5 +1,5 @@
 /**
- * `multi_choice` through the on-demand registry (ADR-069). It loads while the
+ * `multi_choice` through the on-demand registry (ADR-070). It loads while the
  * respondent is on the welcome screen or an earlier question, like the
  * picture grid and the dropdown before it (ADR-064, ADR-065), which keeps
  * room in the engine's budget for the rules that make sure no respondent is

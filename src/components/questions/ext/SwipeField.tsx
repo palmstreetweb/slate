@@ -14,7 +14,7 @@
  * little physics; calm motion keeps the follow but drops the tilt and the
  * fling, and the next card simply appears.
  *
- * Min / Max Likes (ADR-069): the rule is shown over the deck ("Like up to
+ * Min / Max Likes (ADR-070): the rule is shown over the deck ("Like up to
  * 3"); at the most likes a like springs back and says so; the end screen
  * says what's still needed, and a tap on a liked picture there removes it
  * from the likes. An optional yes / no card can be skipped.
@@ -330,7 +330,7 @@ function PictureSwipe({
     [options, decisions, onAnswer, ping],
   );
 
-  // At the most likes, a like comes back with a word on why (ADR-069),
+  // At the most likes, a like comes back with a word on why (ADR-070),
   // brought into view: under a tall deck it would land below the fold (R9).
   const likeRef = useRef<HTMLButtonElement>(null);
   const refuse = useCallback(
@@ -592,7 +592,7 @@ function YesNoSwipe({
   useArrowKeys(fling, true);
   useEffect(() => focusAfter(groupRef.current), [question.id]);
   // An optional card, still unanswered, can be skipped: a Skip button, and Enter
-  // (ADR-069) once the card has been up a moment, so a double Enter from the
+  // (ADR-070) once the card has been up a moment, so a double Enter from the
   // question before never skips it unseen (ENG-06).
   const skip = question.required === false && !answered ? onAdvance : undefined;
   useRegisterFormConfirm(skip!, Boolean(skip), 500);

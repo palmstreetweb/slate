@@ -123,7 +123,7 @@
   transform: none;
 }
 
-/* Skip on an optional question (ADR-069): there, not a call to action. The
+/* Skip on an optional question (ADR-070): there, not a call to action. The
    [data-theme] lifts it above every theme's OK button. */
 [data-slate-forms][data-theme] .slate-ok-btn.slate-ok-btn--skip {
   background: transparent;
@@ -452,7 +452,7 @@
   }
 }
 
-/* ---------- pick rule and key hints (ADR-069) ---------- */
+/* ---------- pick rule and key hints (ADR-070) ---------- */
 
 /* "Pick up to 3": a multiple-pick question says its rule before the first tap. */
 [data-slate-forms] .slate-pick-hint {
@@ -1133,7 +1133,7 @@
   cursor: default;
 }
 
-/* Touch (ADR-069): a long press drags instead of selecting text, and the
+/* Touch (ADR-070): a long press drags instead of selecting text, and the
    buttons are 44 px. A swipe that starts on the grip still scrolls the page
    (pan-y); a finger that rests on it ~250 ms lifts the row, and from then on
    the field holds the page still itself (RankingField). */
@@ -1249,7 +1249,7 @@
   text-transform: var(--slate-transform);
 }
 
-/* A required row still empty after OK (ADR-069). */
+/* A required row still empty after OK (ADR-070). */
 [data-slate-forms] .slate-matrix-row--missing .slate-matrix-rowlabel {
   color: var(--slate-error);
 }
@@ -1418,7 +1418,7 @@
   font-style: italic;
 }
 
-/* A required question on the path still unanswered (ADR-069). */
+/* A required question on the path still unanswered (ADR-070). */
 [data-slate-forms] .slate-review-missing {
   color: var(--slate-error);
 }

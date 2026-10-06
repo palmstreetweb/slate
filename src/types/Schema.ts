@@ -84,7 +84,7 @@ export type SubmitMeta = {
    */
   estimate?: Estimate;
   /**
-   * One id per fill (a UUID; ADR-069): the same on every try to send it —
+   * One id per fill (a UUID; ADR-070): the same on every try to send it —
    * Retry, a question the submit sent the respondent back to, and with
    * `resume`, a reload and Resume — and new for "Submit another" or Start
    * over. A server can store it as a retry key, so a submit that landed but

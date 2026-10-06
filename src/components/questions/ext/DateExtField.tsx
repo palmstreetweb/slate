@@ -151,7 +151,7 @@ function DateTimePart({
   const keyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      // A held Enter (key repeat) never confirms (ADR-069, ENG-07).
+      // A held Enter (key repeat) never confirms (ADR-070, ENG-07).
       if (!e.repeat) onEnter();
       return;
     }

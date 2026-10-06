@@ -7,7 +7,7 @@
  *
  * When a required grid is sent with gaps, the message names what's missing
  * and those rows are marked, so a respondent at the foot of a tall grid
- * knows where to look (ADR-069).
+ * knows where to look (ADR-070).
  */
 
 'use client';

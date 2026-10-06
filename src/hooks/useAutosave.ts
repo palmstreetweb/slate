@@ -12,7 +12,7 @@
  * successful submit or when the user declines (Start over).
  *
  * The save carries the fill's id (`fill`), so a reload and Resume send the
- * same fill again rather than a second one (ADR-069).
+ * same fill again rather than a second one (ADR-070).
  *
  * `File` answers can't be serialized — they're stripped from the snapshot
  * (the question will simply be unanswered after resuming).

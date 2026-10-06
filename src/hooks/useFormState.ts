@@ -27,7 +27,7 @@ export type FormState = {
   /** The visible-questions list (chrome screens included). */
   visible: Question[];
   /**
-   * The visible questions on the respondent's path (ADR-069), in order:
+   * The visible questions on the respondent's path (ADR-070), in order:
    * what `getSubmitAnswers` sends and what the Review step lists.
    */
   path: Question[];
@@ -89,7 +89,7 @@ type RawState = {
   direction: AnimDirection;
   isAnimating: boolean;
   visitedIds: string[];
-  /** Where the next advance returns to (ADR-069): Review, after an edit from it. */
+  /** Where the next advance returns to (ADR-070): Review, after an edit from it. */
   returnTo?: string;
 };
 
@@ -98,7 +98,7 @@ export type ResumeSnapshot = {
   answers: LooseAnswers;
   step: number;
   visitedIds: string[];
-  /** The fill's id (`SubmitMeta.fillId`, ADR-069); saves made before it have none. */
+  /** The fill's id (`SubmitMeta.fillId`, ADR-070); saves made before it have none. */
   fill?: string;
 };
 
@@ -132,7 +132,7 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
         const cur = Math.min(s.step, visible.length - 1);
         const current = visible[cur];
         if (!current) return s;
-        // The respondent's path (ADR-069) is where an advance goes: logic
+        // The respondent's path (ADR-070) is where an advance goes: logic
         // jumps (ADR-015), then any question a later answer revealed. Back
         // still works — the step left is pushed onto history like any other.
         const path = pathOf(
@@ -189,7 +189,7 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
         if (target === s.step) return s;
         const current = visible[Math.min(s.step, visible.length - 1)];
         const cut = a.rewind ? s.history.lastIndexOf(visible[target]!.id) : -1;
-        // An edit from Review comes back to it (ADR-069): returnTo.
+        // An edit from Review comes back to it (ADR-070): returnTo.
         return {
           ...s,
           history: a.rewind
@@ -302,7 +302,7 @@ export function useFormState(schema: Schema, opts: UseFormStateOptions = {}): Us
     dispatch({ type: 'hydrate', snapshot });
   }, []);
 
-  // The respondent's path (ADR-069), with the same indexes and prefill as
+  // The respondent's path (ADR-070), with the same indexes and prefill as
   // navigation: what is sent, and what the Review step lists.
   const path = useMemo(
     () =>

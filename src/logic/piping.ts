@@ -139,7 +139,7 @@ export function formatAnswerFor(q: Question | undefined, v: unknown): string {
       return [...slots.map(name), ...wait.map((x) => `${name(x)} (waitlist)`)].join(', ');
     }
     case 'file_upload': {
-      // File names, never the stored `slate-file://` refs (ADR-069); a file
+      // File names, never the stored `slate-file://` refs (ADR-070); a file
       // saved on this device carries no name, so those read as "2 files".
       const t = describeFileUploadAnswers(v as string[]) ?? '';
       const n = Array.isArray(v) ? v.length : 1;

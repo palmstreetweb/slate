@@ -1,5 +1,5 @@
 /**
- * Thank-you redirects on Slate's own pages (ADR-069, review fixes: CON-06,
+ * Thank-you redirects on Slate's own pages (ADR-070, review fixes: CON-06,
  * ENG-10, SEC-5). Studio only, so no engine bytes, and small enough for the
  * public bundle (no studio imports).
  *

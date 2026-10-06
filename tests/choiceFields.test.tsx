@@ -1,5 +1,5 @@
 /**
- * QA pass 2026-10-04, the on-demand choice fields (ADR-069): the dropdown's
+ * QA pass 2026-10-04, the on-demand choice fields (ADR-070): the dropdown's
  * bare Enter, picture choice limits and Skip, swipe cards with Min / Max
  * Likes, package cards' Skip, sign-up slots when a tap can't be taken or
  * every spot is gone, ranking on touch, and the grid's messages.

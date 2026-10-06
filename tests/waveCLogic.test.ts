@@ -461,7 +461,7 @@ describe('Wave C piping', () => {
     expect(formatAnswerFor(loc, { area: 'out', via: 'zip' })).toBe('outside the service area');
     expect(formatAnswerFor(loc, { via: 'typed' })).toBe('');
     const week: Question = { id: 'w', type: 'availability', title: 'T', days: ['tue'] };
-    // On a 12-hour clock (ADR-069); a day that runs to midnight ends at 12:00 AM.
+    // On a 12-hour clock (ADR-070); a day that runs to midnight ends at 12:00 AM.
     expect(formatAnswerFor(week, { tue: '09:00-11:00,14:00-15:00' })).toBe(
       'Tue 9:00 AM–11:00 AM, 2:00 PM–3:00 PM',
     );

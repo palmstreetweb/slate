@@ -4,7 +4,7 @@
  * toggles selections and confirms with OK. With `allowOther` (ADR-063) a
  * last tile opens a text box under the grid.
  *
- * Several picks work like a multi choice (ADR-069): the rule is said up
+ * Several picks work like a multi choice (ADR-070): the rule is said up
  * front, the maximum blocks extra picks (a tap on another tile says why under
  * the grid, brought into view), and an error clears as soon as the picks
  * change. An optional single picture choice can be skipped.
