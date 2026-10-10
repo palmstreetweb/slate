@@ -69,6 +69,7 @@ export function clearFormsRemoteCache(): void {
   unsavedFormIds.clear();
   formWriteChain.clear();
   deletedFormIds.clear();
+  localWriteAt.clear();
   cache = [];
   hydrated = false;
   quotaMax = FORM_QUOTA_MAX;
@@ -123,6 +124,9 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
     return (data ?? []) as DbFormRow[];
   };
 
+  // A row the server answers with can predate a save this browser made after the
+  // request went out; the merge keeps such a form's local record (audit B1).
+  const fetchStartedAt = Date.now();
   let rows = await fetchForms();
 
   // An empty first load is where a token race shows up: the read ran as the
@@ -169,7 +173,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
   // Merge server rows with in-flight local writes. An optimistic "New form"
   // must survive a soft refresh that raced ahead of the upsert response —
   // otherwise the editor mounts on a cache miss → "Form not found".
-  cache = mergeHydratedForms(next);
+  cache = mergeHydratedForms(next, fetchStartedAt);
   hydrated = true;
   // The cap only moves on create/delete; polling it every refresh was a third request per tick.
   if (!opts?.soft) await refreshFormQuota();
@@ -233,6 +237,7 @@ export async function setFormFillPasswordRemote(
       const { fillLocked: _drop, ...rest } = f;
       return locked ? { ...rest, fillLocked: true } : rest;
     });
+    touchLocal(formId);
     // A queued editor save carries its own snapshot — keep the flag in step.
     const queued = queuedFormWrite.get(formId);
     if (queued) {
@@ -410,12 +415,29 @@ const unsavedFormIds = new Set<string>();
 const formWriteChain = new Map<string, Promise<void>>();
 /** Form ids with a pending/completed permanent delete — block resurrecting upserts. */
 const deletedFormIds = new Set<string>();
+/**
+ * When this browser last changed a form's cached record, or a write of it landed
+ * (`Date.now()`). A fetch sent before that moment can answer with an older row;
+ * the merge keeps the local record instead (audit B1).
+ */
+const localWriteAt = new Map<string, number>();
+
+function touchLocal(formId: string): void {
+  localWriteAt.set(formId, Date.now());
+}
+
+/** Any form has a write queued, on the wire, or not yet accepted by the server (audit B5). */
+export function hasPendingFormWritesRemote(): boolean {
+  return queuedFormWrite.size > 0 || formWriteChain.size > 0 || unsavedFormIds.size > 0;
+}
 
 /**
  * Server snapshot wins for settled rows; keep optimistic / in-flight locals
- * that have not appeared in the fetch yet (or are newer queued edits).
+ * that have not appeared in the fetch yet (or are newer queued edits), and any
+ * local record changed since the fetch went out (`fetchStartedAt`), because the
+ * server's answer can predate that change (audit B1).
  */
-function mergeHydratedForms(serverRows: FormRecord[]): FormRecord[] {
+function mergeHydratedForms(serverRows: FormRecord[], fetchStartedAt = Infinity): FormRecord[] {
   const byId = new Map(serverRows.map((f) => [f.id, f]));
 
   for (const [id, local] of queuedFormWrite) {
@@ -435,8 +457,9 @@ function mergeHydratedForms(serverRows: FormRecord[]): FormRecord[] {
 
   for (const local of cache) {
     if (deletedFormIds.has(local.id)) continue;
-    if (byId.has(local.id)) continue;
-    if (queuedFormWrite.has(local.id) || formWriteChain.has(local.id)) {
+    if (queuedFormWrite.has(local.id)) continue;
+    const touchedSinceFetch = (localWriteAt.get(local.id) ?? -Infinity) >= fetchStartedAt;
+    if (formWriteChain.has(local.id) || touchedSinceFetch) {
       byId.set(local.id, local);
     }
   }
@@ -494,6 +517,7 @@ function emitPersistOk(kind: 'form' | 'submission', formId?: string): void {
 function enqueueFormUpsert(form: FormRecord, waiter?: WriteWaiter): void {
   if (deletedFormIds.has(form.id)) return;
   queuedFormWrite.set(form.id, form);
+  touchLocal(form.id);
   if (waiter) queuedWaiters.set(form.id, [...(queuedWaiters.get(form.id) ?? []), waiter]);
   const prev = formWriteChain.get(form.id) ?? Promise.resolve();
   const next = prev
@@ -513,6 +537,7 @@ function enqueueFormUpsert(form: FormRecord, waiter?: WriteWaiter): void {
         queuedWaiters.delete(form.id);
         try {
           await upsertForm(latest);
+          touchLocal(form.id);
           unsavedFormIds.delete(form.id);
           emitPersistOk('form', form.id);
           for (const w of waiters) w.onLanded?.();
@@ -573,6 +598,7 @@ function dropOptimisticForm(formId: string): void {
 function enqueueFormInsert(form: FormRecord): void {
   if (deletedFormIds.has(form.id)) return;
   queuedFormWrite.set(form.id, form);
+  touchLocal(form.id);
   const prev = formWriteChain.get(form.id) ?? Promise.resolve();
   const next = prev
     .catch(() => {
@@ -587,6 +613,7 @@ function enqueueFormInsert(form: FormRecord): void {
       queuedFormWrite.delete(form.id);
       try {
         const landedSlug = await insertForm(latest);
+        touchLocal(form.id);
         if (landedSlug !== latest.slug) {
           cache = read().map((f) => (f.id === form.id ? { ...f, slug: landedSlug } : f));
           notify();
@@ -712,6 +739,7 @@ export async function updateFormRemote(
     const copy = [...read()];
     copy[idx] = next;
     cache = copy;
+    touchLocal(formId);
     notify();
     return [next, true];
   } catch {
@@ -729,6 +757,7 @@ export async function trashFormRemote(formId: string): Promise<boolean> {
     const copy = [...read()];
     copy[idx] = next;
     cache = copy;
+    touchLocal(formId);
     notify();
     return true;
   } catch {
@@ -746,6 +775,7 @@ export async function restoreFormRemote(formId: string): Promise<boolean> {
     const copy = [...read()];
     copy[idx] = next;
     cache = copy;
+    touchLocal(formId);
     notify();
     return true;
   } catch {
@@ -930,6 +960,7 @@ function rollbackForm(
   const copy = [...read()];
   copy[idx] = back;
   cache = copy;
+  touchLocal(before.id);
   notify();
 }
 
