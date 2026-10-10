@@ -11,6 +11,7 @@ import {
   pickBackupFile,
 } from '../dataBackup.js';
 import { safeThemeName } from '../sanitizeUntrustedSchema.js';
+import { localDateStamp } from '../dateStamp.js';
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -26,8 +27,7 @@ export function BackupPanel() {
 
   const onExportBackup = () => {
     const backup = buildBackup(listAllForms(), listAllSubmissions());
-    const stamp = new Date().toISOString().slice(0, 10);
-    downloadBackupJson(backup, `slate-backup-${stamp}.json`);
+    downloadBackupJson(backup, `slate-backup-${localDateStamp()}.json`);
   };
 
   const onImportBackup = async () => {

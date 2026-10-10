@@ -93,12 +93,15 @@ function neonNotReady(): boolean {
 }
 
 /**
- * Closing and tracked links can be offered (ADR-063). Local mode keeps them on the record.
- * In the cloud they need migration 019's columns, so they only show once a hydrate has read
+ * Closing and tracked links can be offered (ADR-063). Only in the cloud, like the
+ * password: the server enforces them on the public link. On this device alone the
+ * link the panel shares is the portable one, which carries the schema and nothing
+ * else, so "Close now" would claim a closing the link never honoured (audit A1).
+ * They also need migration 019's columns, so they only show once a hydrate has read
  * them: a database without 019 never shows a setting it would silently drop or not enforce.
  */
 export function supportsCloseSettings(): boolean {
-  return !isNeonConfigured() || (isStoresHydrated() && remote.hasCloseColumnsRemote());
+  return isNeonConfigured() && isStoresHydrated() && remote.hasCloseColumnsRemote();
 }
 
 function read(): FormRecord[] {

@@ -4,6 +4,7 @@
 
 import type { Question } from '@/index.js';
 import type { StoredSubmission } from './_submissionStore.js';
+import { localDateStamp } from './dateStamp.js';
 import type { TrackedSource } from './_formsStore.js';
 import { sourceLabel, sourceOf } from './trackedLinks.js';
 import {
@@ -131,10 +132,14 @@ export function buildResponsesCsv(
   return [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
 }
 
-export function responsesCsvFilename(formName: string): string {
-  const base = formName.replace(/[^a-z0-9-_ ]/gi, '').trim() || 'responses';
-  const stamp = new Date().toISOString().slice(0, 10);
-  return `${base} — responses ${stamp}.csv`;
+export function responsesCsvFilename(formName: string, now: Date = new Date()): string {
+  // Characters a file name can't take are dropped; the gap they leave closes up (audit A3).
+  const base =
+    formName
+      .replace(/[^a-z0-9-_ ]/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim() || 'responses';
+  return `${base} — responses ${localDateStamp(now)}.csv`;
 }
 
 export function downloadResponsesCsv(
