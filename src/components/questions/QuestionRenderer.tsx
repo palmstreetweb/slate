@@ -39,6 +39,12 @@ type SetAnswerUpdater = (prev: SetAnswerValue) => SetAnswerValue;
 export type QuestionRendererProps = {
   question: Question;
   answers: LooseAnswers;
+  /**
+   * The answers that will be sent (the path's, ADR-070): what piped titles
+   * read, so a title never shows an answer a jump or a hidden question drops.
+   * Without it, `answers` is piped.
+   */
+  sent?: LooseAnswers;
   setAnswer: (id: string, value: SetAnswerValue | SetAnswerUpdater) => void;
   advance: () => void;
   stepNumber: number;
@@ -99,6 +105,7 @@ function StepBadge({ step, total }: { step: number; total: number }) {
 export function QuestionRenderer({
   question: rawQuestion,
   answers,
+  sent = answers,
   setAnswer,
   advance,
   stepNumber,
@@ -124,8 +131,8 @@ export function QuestionRenderer({
   // DynamicTitle) once here, so every field component receives ready-to-render copy.
   const estimateText = estimate ? formatEstimate(estimate) : '';
   const question = useMemo(
-    () => pipeQuestionCopy(rawQuestion, answers, score, allQuestions, estimateText),
-    [rawQuestion, answers, score, allQuestions, estimateText],
+    () => pipeQuestionCopy(rawQuestion, sent, score, allQuestions, estimateText),
+    [rawQuestion, sent, score, allQuestions, estimateText],
   );
 
   const { schedule: scheduleAutoAdvance } = useAutoAdvanceTimer(rawQuestion.id);
@@ -179,7 +186,7 @@ export function QuestionRenderer({
               ? {
                   rows: (path ?? [])
                     .filter((q) => !isChrome(q))
-                    .map((q) => pipeQuestionCopy(q, answers, score, allQuestions, estimateText)),
+                    .map((q) => pipeQuestionCopy(q, sent, score, allQuestions, estimateText)),
                   format: formatAnswerFor,
                   onEdit: (id) => onEditQuestion?.(id),
                 }

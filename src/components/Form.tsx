@@ -29,10 +29,14 @@ import { useFormState } from '@/hooks/useFormState.js';
 import { useAutoAdvanceTimer } from '@/hooks/useAutoAdvanceTimer.js';
 import { useAutosave } from '@/hooks/useAutosave.js';
 import { useKeyboardNav } from '@/hooks/useKeyboardNav.js';
-import { FormConfirmRefContext, FormOtherRefContext } from '@/hooks/useRegisterFormConfirm.js';
+import {
+  FormConfirmRefContext,
+  FormDraftsContext,
+  FormOtherRefContext,
+} from '@/hooks/useRegisterFormConfirm.js';
 import { useTheme } from '@/hooks/useTheme.js';
 import { useReducedMotion } from '@/hooks/useReducedMotion.js';
-import { progress as progressFn } from '@/logic/progress.js';
+import { isChrome } from '@/logic/progress.js';
 import { computeScore } from '@/logic/scoring.js';
 import { computeEstimate } from '@/logic/estimate.js';
 import { prefillAnswers } from '@/logic/prefill.js';
@@ -53,6 +57,7 @@ import {
   playFormFinale,
   playFormSound,
   playTypewriterTick,
+  preloadFormSounds,
   resolveFormSound,
 } from '@/utils/formSounds.js';
 import { LEAVE_MAX_MS, snapshotLeavingQuestion } from '@/utils/questionHandoff.js';
@@ -156,8 +161,13 @@ export function Form<S extends Schema>({
     step: state.step,
     visitedIds: state.questionsVisited,
     fill: fillRef.current,
+    initial: initialAnswers,
   });
   const clearAutosave = autosave.clear;
+
+  // What a respondent typed, drew or swiped on a question but hasn't confirmed
+  // with OK yet, kept across Back (audit 2026-10); fields seed from it.
+  const draftsRef = useRef(new Map<string, unknown>());
 
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>(
     'idle',
@@ -166,23 +176,24 @@ export function Form<S extends Schema>({
   /** A submit sent the respondent back to a question, with this message (ADR-066). */
   const [notice, setNotice] = useState<{ id: string; text: string } | null>(null);
 
-  // Running score (ADR-016) — feeds {{score}} piping and SubmitMeta. Like the
-  // estimate, it counts only the answers that will be sent (CON-07).
-  const score = useMemo(
-    () => computeScore(schema.questions, getSubmitAnswers()),
-    [schema.questions, getSubmitAnswers],
-  );
+  // The answers that will be sent (ADR-070): what the score, the estimate and
+  // piped titles read, so what the respondent sees is what is sent (CON-07).
+  const sent = useMemo(getSubmitAnswers, [getSubmitAnswers]);
 
-  // Instant estimate (ADR-064) — from the answers that will be submitted
-  // (visible questions only), so what the respondent sees is what is sent.
-  const estimate = useMemo(
-    () => computeEstimate(schema, getSubmitAnswers()),
-    [schema, getSubmitAnswers],
-  );
+  // Running score (ADR-016) — feeds {{score}} piping and SubmitMeta.
+  const score = useMemo(() => computeScore(schema.questions, sent), [schema.questions, sent]);
+
+  // Instant estimate (ADR-064).
+  const estimate = useMemo(() => computeEstimate(schema, sent), [schema, sent]);
 
   /* ---------- sound (ADR-023) — interaction-time, not step-change ---------- */
 
   const soundId = resolveFormSound(schema.sound);
+
+  // The synth loads on demand; start it now so the first step plays at once.
+  useEffect(() => {
+    if (soundId !== 'off') void preloadFormSounds();
+  }, [soundId]);
 
   const playInteractionSound = useCallback(() => {
     if (soundId !== 'off') playFormSound(soundId);
@@ -417,18 +428,24 @@ export function Form<S extends Schema>({
     setSubmitStatus('idle');
     setSubmitErrorMsg(null);
     fillRef.current = newFillId();
+    draftsRef.current.clear();
     restart();
   }, [clearAutoAdvance, restart]);
 
   /* ---------- derived UI counts ---------- */
 
-  // Steps the counter counts: every one but the welcome, statements and endings.
-  const counts = (q: Question | null) =>
-    q?.type !== 'welcome' && q?.type !== 'thanks' && q?.type !== 'statement';
-  const counted = state.visible.filter(counts).length;
-  const passedCounted = state.visible.slice(0, state.step).filter(counts).length;
-  const isAnswerBearing = counts(currentQuestion);
-  const stepNumber = isAnswerBearing ? passedCounted + 1 : 0;
+  // The counter, the badge and the bar follow the respondent's path (ADR-070):
+  // questions a jump passes over aren't counted, and one a later answer
+  // revealed counts where it comes up. Chrome screens (welcome, statements,
+  // Review, endings) never count.
+  const at = state.path.indexOf(currentQuestion as Question);
+  const counts = (q: Question) => !isChrome(q);
+  const counted = state.path.filter(counts).length;
+  const passedCounted = (
+    at < 0 ? state.visible.slice(0, state.step) : state.path.slice(0, at)
+  ).filter(counts).length;
+  const isAnswerBearing = Boolean(currentQuestion && counts(currentQuestion));
+  const stepNumber = isAnswerBearing ? Math.min(passedCounted + 1, counted) : 0;
 
   const showBack = state.step > 0 && currentQuestion?.type !== 'thanks';
   // The bar only reaches 100% on a confirmed submit (ADR-059): while the
@@ -436,7 +453,7 @@ export function Form<S extends Schema>({
   // answered question's value.
   const onThanks = currentQuestion?.type === 'thanks';
   const submitConfirmed = onThanks && submitStatus === 'success';
-  const rawProgress = progressFn(state.visible, state.step);
+  const rawProgress = counted ? Math.min(passedCounted / counted, 1) * 100 : 0;
   const progressPct =
     onThanks && !submitConfirmed && counted > 0
       ? Math.min(rawProgress, ((counted - 1) / counted) * 100)
@@ -548,48 +565,51 @@ export function Form<S extends Schema>({
         <div className="slate-q-leave-host" ref={leaveHostRef} aria-hidden="true" />
         <FormConfirmRefContext.Provider value={confirmStepRef}>
           <FormOtherRefContext.Provider value={otherKeyRef}>
-            <div
-              key={questionKey}
-              ref={stageContentRef}
-              className="slate-q-enter slate-stage-content"
-              data-direction={state.direction}
-              onAnimationEnd={animationEnd}
-            >
-              {noticeFor ? (
-                <p className="slate-notice" role="alert">
-                  {noticeFor}
-                </p>
-              ) : null}
-              {currentQuestion ? (
-                <QuestionRenderer
-                  question={currentQuestion}
-                  answers={state.answers}
-                  setAnswer={setAnswer}
-                  advance={next}
-                  stepNumber={stepNumber}
-                  totalSteps={counted}
-                  submitStatus={currentQuestion.type === 'thanks' ? submitStatus : 'idle'}
-                  submitError={submitErrorMsg}
-                  onRetrySubmit={retrySubmit}
-                  onRestart={restartForm}
-                  onFileUpload={onFileUpload}
-                  resolveFileUploadMeta={resolveFileUploadMeta}
-                  score={score}
-                  path={state.path}
-                  onEditQuestion={(id) => {
-                    const idx = state.visible.findIndex((q) => q.id === id);
-                    if (idx >= 0) goTo(idx, 'backward');
-                  }}
-                  playInteractionSound={playInteractionSound}
-                  playTypingSound={playTypingSound}
-                  allQuestions={schema.questions}
-                  estimate={estimate}
-                  estimateSettings={schema.estimate}
-                  slotsLeft={slotsLeft?.[currentQuestion.id]}
-                  resume={resumeEnabled}
-                />
-              ) : null}
-            </div>
+            <FormDraftsContext.Provider value={draftsRef.current}>
+              <div
+                key={questionKey}
+                ref={stageContentRef}
+                className="slate-q-enter slate-stage-content"
+                data-direction={state.direction}
+                onAnimationEnd={animationEnd}
+              >
+                {noticeFor ? (
+                  <p className="slate-notice" role="alert">
+                    {noticeFor}
+                  </p>
+                ) : null}
+                {currentQuestion ? (
+                  <QuestionRenderer
+                    question={currentQuestion}
+                    answers={state.answers}
+                    sent={sent}
+                    setAnswer={setAnswer}
+                    advance={next}
+                    stepNumber={stepNumber}
+                    totalSteps={counted}
+                    submitStatus={currentQuestion.type === 'thanks' ? submitStatus : 'idle'}
+                    submitError={submitErrorMsg}
+                    onRetrySubmit={retrySubmit}
+                    onRestart={restartForm}
+                    onFileUpload={onFileUpload}
+                    resolveFileUploadMeta={resolveFileUploadMeta}
+                    score={score}
+                    path={state.path}
+                    onEditQuestion={(id) => {
+                      const idx = state.visible.findIndex((q) => q.id === id);
+                      if (idx >= 0) goTo(idx, 'backward');
+                    }}
+                    playInteractionSound={playInteractionSound}
+                    playTypingSound={playTypingSound}
+                    allQuestions={schema.questions}
+                    estimate={estimate}
+                    estimateSettings={schema.estimate}
+                    slotsLeft={slotsLeft?.[currentQuestion.id]}
+                    resume={resumeEnabled}
+                  />
+                ) : null}
+              </div>
+            </FormDraftsContext.Provider>
           </FormOtherRefContext.Provider>
         </FormConfirmRefContext.Provider>
       </div>

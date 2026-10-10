@@ -78,11 +78,19 @@ export function evaluate(
   others?: OtherIndex,
   areas?: AreaIndex,
 ): boolean {
+  // A condition that can't be read (a schema from a link, or a host's typo)
+  // never holds: a rule carrying it doesn't fire — and nothing crashes.
+  if (!condition || typeof condition !== 'object') return false;
   if ('all' in condition) {
-    return condition.all.every((c) => evaluate(c, answers, others, areas));
+    return (
+      Array.isArray(condition.all) &&
+      condition.all.every((c) => evaluate(c, answers, others, areas))
+    );
   }
   if ('any' in condition) {
-    return condition.any.some((c) => evaluate(c, answers, others, areas));
+    return (
+      Array.isArray(condition.any) && condition.any.some((c) => evaluate(c, answers, others, areas))
+    );
   }
 
   const value = answers[condition.field];

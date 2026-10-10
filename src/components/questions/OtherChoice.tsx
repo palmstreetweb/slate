@@ -12,6 +12,7 @@ import type { Option, Question } from '@/types/Question.js';
 import { CHOICE_LETTERS } from '@/utils/letters.js';
 import { OTHER_MAX, allowsOther, otherLabelOf, splitOther } from '@/logic/other.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
+import { useDraft } from '@/hooks/useRegisterFormConfirm.js';
 
 export type OtherState = {
   /** The question offers Other. */
@@ -42,9 +43,10 @@ export function useOtherChoice(
   idBase: string,
 ): OtherState {
   const enabled = allowsOther(question);
-  const [seed] = useState(() => (enabled ? splitOther(question.options, value).other : ''));
-  const [open, setOpen] = useState(seed !== '');
-  const [text, setText] = useState(seed);
+  const seed = enabled ? splitOther(question.options, value).other : '';
+  // The box and its text are kept across Back until a commit (audit 2026-10).
+  const [open, setOpen] = useDraft(`${question.id}:o`, seed !== '');
+  const [text, setText] = useDraft(`${question.id}:t`, seed);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const focusNext = useRef(false);
@@ -64,12 +66,12 @@ export function useOtherChoice(
     }
     focusNext.current = true;
     setOpen(true);
-  }, [open]);
+  }, [open, setOpen]);
 
   const close = useCallback(() => {
     setOpen(false);
     setError(null);
-  }, []);
+  }, [setOpen]);
 
   return {
     enabled,

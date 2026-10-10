@@ -189,11 +189,12 @@ export function PictureChoiceField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [multiple, other, onSelectMulti, selectedArr, error, full]);
 
-  const confirms = multiple || other.open || Boolean(skip);
-  // Skip on Enter waits until the question has been up a moment, like the
-  // other one-tap questions: a double Enter from the question before must not
-  // skip this one unseen (ENG-06, R14).
-  useRegisterFormConfirm(submit, confirms, skip ? 500 : 0);
+  // A single pick already made (a link's prefill, Back, Resume) continues on
+  // OK or Enter too (audit 2026-10). Skip or continue on Enter waits until the
+  // question has been up a moment, like the other one-tap questions: a double
+  // Enter from the question before must not pass this one unseen (ENG-06, R14).
+  const confirms = multiple || other.open || Boolean(skip) || selectedArr.length > 0;
+  useRegisterFormConfirm(submit, confirms, multiple || other.open ? 0 : 500);
   useRegisterOtherKey(onOtherTile, other.enabled);
 
   const keys = keyRange(question.options.length + (other.enabled ? 1 : 0));
@@ -241,6 +242,7 @@ export function PictureChoiceField({
                 src={opt.src || undefined}
                 alt={opt.alt ?? opt.label}
                 className="slate-picture-img"
+                referrerPolicy="no-referrer"
               />
               <span className="slate-picture-caption">
                 <ChoiceBadge letter={CHOICE_LETTERS[i] ?? ''} committed={isCommitted} />

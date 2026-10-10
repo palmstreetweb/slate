@@ -266,6 +266,7 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
         <img
           alt="Cat"
           class="slate-picture-img"
+          referrerpolicy="no-referrer"
           src="https://example.com/cat.jpg"
         />
         <span
@@ -290,6 +291,7 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
         <img
           alt="Dog"
           class="slate-picture-img"
+          referrerpolicy="no-referrer"
           src="https://example.com/dog.jpg"
         />
         <span
@@ -314,6 +316,7 @@ exports[`phase 3 question types > picture_choice renders the image grid + snapsh
         <img
           alt="Bird"
           class="slate-picture-img"
+          referrerpolicy="no-referrer"
           src="https://example.com/bird.jpg"
         />
         <span

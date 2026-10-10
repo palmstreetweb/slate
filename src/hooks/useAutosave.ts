@@ -90,6 +90,8 @@ type Opts = {
   visitedIds: string[];
   /** This fill's id (`SubmitMeta.fillId`), saved with the answers. */
   fill?: string;
+  /** The answers the form started from (a link's prefill): nothing done yet while `answers` is still this object. */
+  initial?: LooseAnswers;
 };
 
 type Api = {
@@ -103,7 +105,16 @@ type Api = {
   clear: () => void;
 };
 
-export function useAutosave({ enabled, tab, formId, answers, step, visitedIds, fill }: Opts): Api {
+export function useAutosave({
+  enabled,
+  tab,
+  formId,
+  answers,
+  step,
+  visitedIds,
+  fill,
+  initial,
+}: Opts): Api {
   const [savedSession, setSavedSession] = useState<ResumeSnapshot | null>(() => {
     if (!enabled || typeof window === 'undefined') return null;
     return readSession(formId, tab);
@@ -115,7 +126,9 @@ export function useAutosave({ enabled, tab, formId, answers, step, visitedIds, f
 
   useEffect(() => {
     if (!enabled || holdWrites.current || typeof window === 'undefined') return;
-    if (Object.keys(answers).length === 0 && step === 0) return;
+    // Nothing done yet: on the first screen with no answer given (a link's
+    // prefill alone is not one), there is nothing to pick up later.
+    if (step === 0 && (answers === initial || Object.keys(answers).length === 0)) return;
     try {
       const session: SavedSession = {
         answers: serializableAnswers(answers),
@@ -128,7 +141,7 @@ export function useAutosave({ enabled, tab, formId, answers, step, visitedIds, f
     } catch {
       // Storage full / blocked — autosave silently degrades.
     }
-  }, [enabled, tab, formId, answers, step, visitedIds, fill]);
+  }, [enabled, tab, formId, answers, step, visitedIds, fill, initial]);
 
   const clear = useCallback(() => {
     try {

@@ -58,10 +58,13 @@ export function SingleChoiceField({
     onSelect(value);
   }, [other, question.options, markCommitted, onSelect]);
 
-  // OK commits the typed Other; an optional, unanswered question can be skipped.
+  // OK commits the typed Other; an optional, unanswered question can be
+  // skipped; one already answered (a link's prefill, Back, Resume) continues
+  // with its pick on OK or Enter (audit 2026-10). Enter waits until the
+  // question has been up a moment, so a double Enter can't pass it unseen.
   const skip = !other.open && question.required === false && !selected ? onSkip : undefined;
-  const confirm = other.open ? commitOther : skip;
-  useRegisterFormConfirm(confirm!, Boolean(confirm), skip && 500);
+  const confirm = other.open ? commitOther : (skip ?? (selected ? onSkip : undefined));
+  useRegisterFormConfirm(confirm!, Boolean(confirm), other.open ? 0 : 500);
   useRegisterOtherKey(other.openBox, other.enabled);
 
   return (
@@ -127,7 +130,7 @@ export function SingleChoiceField({
               Skip
             </button>
           ) : (
-            <button type="button" className="slate-ok-btn" onClick={commitOther}>
+            <button type="button" className="slate-ok-btn" onClick={confirm}>
               OK <span aria-hidden>✓</span>
             </button>
           )}

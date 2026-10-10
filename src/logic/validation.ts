@@ -40,8 +40,13 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Availability ranges (ADR-065): `HH:MM-HH:MM`, comma separated. */
 const RANGES_RE = /^\d{2}:\d{2}-\d{2}:\d{2}(,\d{2}:\d{2}-\d{2}:\d{2})*$/;
 
-/** Loose website check — scheme optional, needs a host with a dot. */
-const URL_RE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i;
+/**
+ * Loose website check — scheme optional, needs a host with a dot (any
+ * alphabet) or an IPv4 address, then an optional port and a path, query
+ * or fragment ("instagram.com?igsh=…", "example.com#top"; audit 2026-10).
+ */
+const URL_RE =
+  /^(https?:\/\/)?(([\p{L}\p{N}-]+\.)+\p{L}{2,}|\d{1,3}(\.\d{1,3}){3})(:\d+)?([/?#]\S*)?$/iu;
 
 /**
  * The longest text a short or long text answer takes: the question's own

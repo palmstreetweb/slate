@@ -103,6 +103,19 @@
   color: var(--slate-text);
 }
 
+/*
+ * Titles, typed answers and review rows read in their own direction: an
+ * Arabic or Hebrew title, or a name typed in one, lines up on the right and
+ * its punctuation stays in place, as with dir="auto" (audit 2026-10).
+ */
+[data-slate-forms] .slate-title,
+[data-slate-forms] .slate-subtitle,
+[data-slate-forms] .slate-input,
+[data-slate-forms] .slate-review-q,
+[data-slate-forms] .slate-review-a {
+  unicode-bidi: plaintext;
+}
+
 [data-slate-forms] .slate-subtitle {
   font-size: clamp(1.05rem, 1.9vw, 1.2rem);
   line-height: 1.5;
