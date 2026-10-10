@@ -4,6 +4,7 @@
  * form before either bundle has finished downloading.
  */
 
+import './fonts.css';
 import { migrateSlateLocalStorageKeys } from '@/utils/migrateLocalStorage.js';
 import { isRespondentRoute, readRoute, syncPathFromHash } from './_admin/_router.js';
 import { isNeonConfigured } from './_admin/neon/config.js';
@@ -41,8 +42,9 @@ if (route.name === 'fill' && isNeonConfigured()) {
 }
 
 // After the form fetch is in flight. Sentry is its own chunk (ADR-069), so
-// this does not sit on the fill's first request.
-void import('./sentry.js').then((m) => m.initSentry());
+// this does not sit on the fill's first request. A respondent's page reports
+// errors only: no performance traces (ADR-071).
+void import('./sentry.js').then((m) => m.initSentry({ tracing: !respondent }));
 
 /** Cross-origin parents make `window.top` access throw — that counts as framed. */
 function isFramed(): boolean {

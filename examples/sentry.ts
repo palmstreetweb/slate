@@ -1,7 +1,8 @@
 /**
  * Browser error reporting for the deployed Vite site (ADR-069).
- * Not part of the published library. Init runs when this module loads, which
- * is after `main.tsx` has already started the public-form fetch.
+ * Not part of the published library. `main.tsx` calls `initSentry` after it
+ * has started the public-form fetch; a respondent's page passes
+ * `{ tracing: false }` so it reports errors only (ADR-071).
  */
 
 import { browserTracingIntegration, init, reactErrorHandler } from '@sentry/react';
@@ -9,7 +10,7 @@ import {
   isClientSentryEnabled,
   SENTRY_DATA_COLLECTION,
   SENTRY_TRACES_SAMPLE_RATE,
-} from '../api/sentryGate.js';
+} from '../api/_lib/sentryGate.js';
 
 declare const __SLATE_SENTRY_RELEASE__: string | undefined;
 declare const __SLATE_VERCEL_ENV__: string | undefined;
@@ -40,18 +41,19 @@ function clientEnabled(): boolean {
 
 let started = false;
 
-export function initSentry(): void {
+export function initSentry(opts: { tracing?: boolean } = {}): void {
   if (started) return;
   started = true;
   const dsn = import.meta.env.VITE_SENTRY_DSN?.trim();
   if (!dsn || !clientEnabled()) return;
   const release = releaseName();
+  const tracing = opts.tracing !== false;
   init({
     dsn,
     environment: vercelEnv() || 'production',
     ...(release ? { release } : {}),
-    integrations: [browserTracingIntegration()],
-    tracesSampleRate: SENTRY_TRACES_SAMPLE_RATE,
+    integrations: tracing ? [browserTracingIntegration()] : [],
+    tracesSampleRate: tracing ? SENTRY_TRACES_SAMPLE_RATE : 0,
     // Same-origin only. Neon and other hosts must not see sentry-trace (CORS).
     tracePropagationTargets: [/^\//],
     dataCollection: SENTRY_DATA_COLLECTION,
@@ -79,5 +81,3 @@ export function sentryRootOptions(): {
     onRecoverableError: report,
   };
 }
-
-initSentry();

@@ -250,7 +250,15 @@ function directives(csp: string): Map<string, string> {
   );
 }
 
-const PUBLIC_FILL = ['/forms/12345678', '/forms/805-seal-coating-for-brent', '/forms/newsletter'];
+const PUBLIC_FILL = [
+  '/forms/12345678',
+  '/forms/805-seal-coating-for-brent',
+  '/forms/newsletter',
+  // A trailing slash reaches the same fill page (the router strips it); an embed with one framed
+  // nothing before the header rule learned the shape (audit 2026-10 I-1).
+  '/forms/12345678/',
+  '/forms/newsletter/',
+];
 const EVERYTHING_ELSE = [
   '/',
   '/forms/f_abc/edit',
@@ -258,7 +266,6 @@ const EVERYTHING_ELSE = [
   '/forms/f_abc/submissions',
   '/forms/new',
   '/forms/new/',
-  '/forms/12345678/',
   '/forms/',
   '/forms',
   '/Forms/12345678',
@@ -281,6 +288,7 @@ describe('path-to-regexp port matches Vercel', () => {
     // Patterns inside `( )` pass through verbatim; only literal text is escaped.
     ['/((?!brand/|api/).*)', '^(?:\\/((?!brand/|api/).*))$'],
     ['/forms/((?!new$)[^/]+)', '^\\/forms(?:\\/((?!new$)[^/]+))$'],
+    ['/forms/((?!new/?$)[^/]+)/', '^\\/forms(?:\\/((?!new/?$)[^/]+))\\/$'],
   ])('%s compiles to %s', (source, expected) => {
     expect(compileSource(source)).toBe(expected);
   });
@@ -325,6 +333,36 @@ describe('vercel.json framing (ADR-054)', () => {
     expect(open.get('connect-src')).toContain('https://*.ingest.us.sentry.io');
   });
 
+  it('connect-src names the exact Neon hosts this site uses, never every Neon tenant (audit 2026-10 L-3)', () => {
+    const connect = directives(headersFor('/settings').get('content-security-policy')![0]!).get(
+      'connect-src',
+    )!;
+    const hosts = connect.split(/\s+/);
+    expect(hosts.filter((h) => h.includes('neon.tech')).every((h) => !h.includes('*'))).toBe(true);
+    // The two Functions the browser calls, the auth and Data API hosts, and the branch's Object
+    // Storage endpoint (presigned PUTs go straight to it).
+    const neon = hosts.filter((h) => h.includes('neon.tech'));
+    expect(neon).toHaveLength(5);
+    expect(neon.some((h) => /-submitresponse\.compute\./.test(h))).toBe(true);
+    expect(neon.some((h) => /-storagesign\.compute\./.test(h))).toBe(true);
+    expect(neon.some((h) => /^https:\/\/br-[a-z0-9-]+\.storage\./.test(h))).toBe(true);
+    expect(neon.some((h) => /\.neonauth\./.test(h))).toBe(true);
+    expect(neon.some((h) => /\.apirest\./.test(h))).toBe(true);
+    // The hosts index.html warms are among them.
+    const html = readFileSync(new URL('../examples/index.html', import.meta.url), 'utf8');
+    for (const m of html.matchAll(/rel="preconnect"\s+href="([^"]+)"/g)) {
+      expect(hosts, m[1]).toContain(m[1]);
+    }
+  });
+
+  it('fonts are same-origin: no Google Fonts host in style-src or font-src (audit 2026-10 F5)', () => {
+    for (const path of ['/settings', '/forms/12345678']) {
+      const d = directives(headersFor(path).get('content-security-policy')![0]!);
+      expect(d.get('style-src')).toBe("'self' 'unsafe-inline'");
+      expect(d.get('font-src')).toBe("'self' data:");
+    }
+  });
+
   it.each([...PUBLIC_FILL, ...EVERYTHING_ELSE])(
     '%s keeps nosniff, referrer, permissions and HSTS exactly once',
     (path) => {
@@ -354,9 +392,10 @@ describe('vercel.json framing (ADR-054)', () => {
     const { matchRoute } = await import('../examples/_admin/_router.js');
     for (const path of [...PUBLIC_FILL, ...EVERYTHING_ELSE]) {
       const framable = headersFor(path).get('x-frame-options') === undefined;
-      // A trailing slash or odd case can still reach fill in the router, but
-      // then it is refused a frame: fail closed, never the other way round.
-      if (framable) expect(matchRoute(path).name).toBe('fill');
+      // The router reads the path with a trailing slash stripped (normalizePath). Odd case can
+      // still reach fill there, but then it is refused a frame: fail closed, never the other way.
+      const routed = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+      if (framable) expect(matchRoute(routed).name, path).toBe('fill');
     }
   });
 });
