@@ -105,7 +105,11 @@ export function VoiceNoteAnswer({ value }: { value: unknown }) {
       }
       made = URL.createObjectURL(blob);
       setUrl(made);
-    })();
+    })().catch((err: unknown) => {
+      // A dropped connection says so instead of "Loading the recording…" forever (audit B6).
+      console.warn('[slate] voice note failed', err);
+      if (!gone) setProblem('The recording didn’t load. Use Download below.');
+    });
     return () => {
       gone = true;
       if (made) URL.revokeObjectURL(made);

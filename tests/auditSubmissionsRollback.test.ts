@@ -101,7 +101,7 @@ vi.mock('../examples/_admin/neon/client.js', () => ({
           return { data: null, error: null };
         }
         const rows = (Array.isArray(st.payload) ? st.payload : [st.payload]) as Row[];
-        db.table.push(...rows.map((r) => ({ deleted_at: null, ...r })));
+        db.table.push(...rows.map((r) => ({ ...r, deleted_at: r.deleted_at ?? null })));
         return { data: null, error: null };
       }
       return b;

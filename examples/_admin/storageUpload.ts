@@ -273,21 +273,27 @@ export async function getStorageUploadMeta(ref: string): Promise<{
   if (cached) return cached;
   if (respondentPage()) return null;
 
-  const signRes = await fetch(getStorageSignUrl(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(await authHeader()),
-    },
-    body: JSON.stringify({ op: 'meta', path }),
-  });
-  if (!signRes.ok) {
-    // Don't cache failures — a transient auth blip would poison thumbs for the session.
+  try {
+    const signRes = await fetch(getStorageSignUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(await authHeader()),
+      },
+      body: JSON.stringify({ op: 'meta', path }),
+    });
+    if (!signRes.ok) {
+      // Don't cache failures — a transient auth blip would poison thumbs for the session.
+      return null;
+    }
+    const meta = (await signRes.json()) as { name: string; size: number; mime: string };
+    metaCache.set(ref, meta);
+    return meta;
+  } catch (err) {
+    // A dropped connection is "no meta", never a loader left spinning (audit B6).
+    console.warn('[slate] file meta failed', err);
     return null;
   }
-  const meta = (await signRes.json()) as { name: string; size: number; mime: string };
-  metaCache.set(ref, meta);
-  return meta;
 }
 
 export async function getStorageDownloadUrl(ref: string): Promise<string | null> {
@@ -298,19 +304,24 @@ export async function getStorageDownloadUrl(ref: string): Promise<string | null>
   const hit = downloadUrlCache.get(ref);
   if (hit && Date.now() - hit.at < DOWNLOAD_URL_TTL_MS) return hit.url;
 
-  const signRes = await fetch(getStorageSignUrl(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(await authHeader()),
-    },
-    body: JSON.stringify({ op: 'download', path }),
-  });
-  if (!signRes.ok) return null;
-  const { url } = (await signRes.json()) as { url?: string };
-  if (!url) return null;
-  downloadUrlCache.set(ref, { url, at: Date.now() });
-  return url;
+  try {
+    const signRes = await fetch(getStorageSignUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(await authHeader()),
+      },
+      body: JSON.stringify({ op: 'download', path }),
+    });
+    if (!signRes.ok) return null;
+    const { url } = (await signRes.json()) as { url?: string };
+    if (!url) return null;
+    downloadUrlCache.set(ref, { url, at: Date.now() });
+    return url;
+  } catch (err) {
+    console.warn('[slate] file link failed', err);
+    return null;
+  }
 }
 
 /**
@@ -325,17 +336,22 @@ export async function getStorageContentBlob(ref: string): Promise<{
   const path = storagePathFromRef(ref);
   if (!path || !isNeonConfigured() || !hasStorageSignUrl()) return null;
   if (respondentPage()) return null;
-  const res = await fetch(getStorageSignUrl(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(await authHeader()),
-    },
-    body: JSON.stringify({ op: 'content', path }),
-  });
-  if (!res.ok) return null;
-  const blob = await res.blob();
-  const name = path.split('/').pop() || 'file';
-  const mime = res.headers.get('Content-Type') || blob.type || 'application/octet-stream';
-  return { blob, name, mime };
+  try {
+    const res = await fetch(getStorageSignUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(await authHeader()),
+      },
+      body: JSON.stringify({ op: 'content', path }),
+    });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const name = path.split('/').pop() || 'file';
+    const mime = res.headers.get('Content-Type') || blob.type || 'application/octet-stream';
+    return { blob, name, mime };
+  } catch (err) {
+    console.warn('[slate] file download failed', err);
+    return null;
+  }
 }
