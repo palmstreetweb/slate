@@ -5,6 +5,7 @@
 
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as OwnerState from '../examples/_admin/ownerBrowserState.js';
 
 type Listener = (event: string, session: unknown) => void;
 
@@ -86,9 +87,9 @@ afterEach(() => {
 
 describe('forgetOwnerBrowserState', () => {
   it('drops the AI prompts, the draft marker and the bell’s memory, nothing else', async () => {
-    const { forgetOwnerBrowserState } = await vi.importActual<
-      typeof import('../examples/_admin/ownerBrowserState.js')
-    >('../examples/_admin/ownerBrowserState.js');
+    const { forgetOwnerBrowserState } = await vi.importActual<typeof OwnerState>(
+      '../examples/_admin/ownerBrowserState.js',
+    );
     rememberPrompt('A quote form for Palm Street Pools, 805 area');
     window.sessionStorage.setItem(AI_DRAFT_KEY, 'f_1');
     writeKnown(['r1', 'r2']);
