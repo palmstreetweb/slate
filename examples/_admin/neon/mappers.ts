@@ -1,5 +1,6 @@
 import type { Schema } from '@/index.js';
-import { FORM_NAME_MAX, type FormRecord, type TrackedSource } from '../_formsStore.js';
+import type { FormRecord, TrackedSource } from '../_formsStore.js';
+import { FORM_NAME_MAX } from '../formName.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import type {
   SlotsLeftPayload,

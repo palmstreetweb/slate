@@ -19,7 +19,7 @@ import type { FormSound, QuestionType, Schema, ThemeMode, ThemeName } from '@/in
 import { FORM_SOUND_OPTIONS, resolveFormSound } from '@/utils/formSounds.js';
 import { safeLogoSrc } from '@/utils/brandLogo.js';
 import { ADDABLE_TYPES } from '../questionTypeMeta.js';
-import { FORM_NAME_MAX } from '../_formsStore.js';
+import { FORM_NAME_MAX } from '../formName.js';
 import { TypeIcon } from './TypeIcon.js';
 import { useOutlineDrag } from '../hooks/useOutlineDrag.js';
 import { SlateSelect } from './SlateSelect.js';
