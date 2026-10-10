@@ -37,7 +37,7 @@ and no Data API access. `get_form_by_slug` stays callable anonymously only until
 
 ## 4. Apply SQL
 
-In the Neon SQL Editor (or `psql` with the pooled connection string), run in order:
+In the Neon SQL Editor (or `psql` with the **direct** connection string — not the `-pooler` one: the Functions SET an 8 s statement timeout on their pooled sessions, and a transaction pooler may hand such a session to a migration), run in order:
 
 1. `neon/migrations/001_initial.sql`
 2. `neon/migrations/002_team_allowlist.sql`
@@ -60,6 +60,7 @@ In the Neon SQL Editor (or `psql` with the pooled connection string), run in ord
 19. `neon/migrations/019_form_close.sql` (ADR-063)
 20. `neon/migrations/020_signup_slots.sql` (ADR-066)
 21. `neon/migrations/021_storage_quotas.sql` (ADR-067): see below — it comes with a backfill and a deploy order.
+22. `neon/migrations/022_slug_server_assigned.sql` (ADR-071): the server assigns every new form's slug; size CHECKs on forms and feedback. See below.
 
 Then **Data API → Refresh schema cache**. Do this after every migration that adds a column or
 changes a function signature — 012 does both (`forms.fill_locked`, `get_form_by_slug` gains
@@ -108,6 +109,14 @@ Deploy in one sitting:
 4. Redeploy `submitresponse`, then ship the SPA.
 
 Pages loaded before the deploy keep uploading for **72 h after 021 is applied** (`storage_legacy_until()`); the SPA must be live well before then. Rollback: the SPA (optional), `submitresponse`, `storagesign`, then 021's rollback block, then refresh the schema cache. There is no new Function env. `scripts/check-storage-quotas.ts` runs the whole thing against a throwaway branch it creates and deletes.
+
+022 (ADR-071, security audit 2026-10) makes the database assign every new form's slug (a client's value is kept only when it is that account's own retired slug), caps `forms.name` at 200 characters and `schema` / `published_schema` at 1 MB of JSON text, bounds `feedback` rows and takes back its unused update/delete grants, and revokes Data API execute on pgcrypto's functions where `neondb_owner` owns them (on this project they are `cloud_admin`'s, so that block only prints a NOTICE listing them; see ADR-071). Deploy in one sitting:
+
+1. Apply 022 (direct connection string), then `npx neonctl@latest data-api refresh-schema --project-id <id> --branch production --database neondb` (nothing changes shape; this keeps the cache in step). Today's site keeps working: its insert already takes the slug the database returns.
+2. Redeploy all three Functions (`submitresponse`, `storagesign`, `authemail`, section 5): an 8 s statement / 4 s lock ceiling SET on every connection plus a 10 s client timeout, the server-computed quiz score, the `Infinity` guard, the `STORAGE_SIGN_MAX_BYTES` integer check, and the pending sign-in row deleted once its mail is sent. No new env.
+3. Ship the site: `/api` helpers moved under `api/_lib/` (the nine stray Functions disappear), the 25 s PDF deadline, `/api/auth-email` refusing unsigned or oversized posts itself, `Cache-Control: no-store` on `/api/generate`, CSP `connect-src` pinned to this project's exact Neon hosts (both Functions, auth, Data API, and the branch's Object Storage endpoint `https://<branch-id>.storage.c-4.us-east-2.aws.neon.tech`; check it against `AWS_ENDPOINT_URL_S3` on `storagesign` if a presigned PUT ever fails), `/forms/{slug}/` embeddable, fonts self-hosted, Sentry on fill pages errors-only.
+
+Rollback: the site, then the Functions (previous builds), then 022's rollback block (at the end of the file), then refresh the schema cache. `scripts/check-slug-assign.ts` runs 022 and its rollback against a throwaway branch it creates and deletes.
 
 Anyone can sign up (Google, magic link, or email code). Each account owns its own forms (ADR-036).
 Each account is capped at **50 forms** including Trash (ADR-038); permanent delete frees a slot.
