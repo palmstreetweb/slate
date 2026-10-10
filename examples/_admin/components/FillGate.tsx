@@ -12,9 +12,11 @@ type Props = {
   formName: string;
   /** Resolve with an error line to show, or null when unlocked. */
   onUnlock: (password: string) => Promise<string | null>;
+  /** Why the password is asked for again (it changed mid-fill; audit 2026-10). */
+  notice?: string | null;
 };
 
-export function FillGate({ formName, onUnlock }: Props) {
+export function FillGate({ formName, onUnlock, notice }: Props) {
   const inputId = useId();
   const errorId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +58,11 @@ export function FillGate({ formName, onUnlock }: Props) {
         }}
       >
         <h1 className="slate-fill-gate-title">{formName}</h1>
+        {notice ? (
+          <p className="slate-fill-gate-notice" role="status">
+            {notice}
+          </p>
+        ) : null}
         <label className="slate-fill-gate-label" htmlFor={inputId}>
           Enter the password to continue
         </label>

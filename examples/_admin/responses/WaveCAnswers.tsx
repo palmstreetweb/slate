@@ -152,8 +152,11 @@ export function LocationAnswer({
 }) {
   const text = locationText(question, value, form);
   const v = (value ?? {}) as Record<string, unknown>;
-  const lat = typeof v.lat === 'string' ? Number(v.lat) : null;
-  const lng = typeof v.lng === 'string' ? Number(v.lng) : null;
+  // Only real coordinates reach the map and its link (never "NaN").
+  const coord = (x: unknown) =>
+    typeof x === 'string' && Number.isFinite(Number(x)) ? Number(x) : null;
+  const lat = coord(v.lat);
+  const lng = coord(v.lng);
   const area = locationAreaOf(question, value, form);
   const c = geoCenter(question as unknown as Record<string, unknown>);
   const r = geoRadiusKm(question as unknown as Record<string, unknown>);

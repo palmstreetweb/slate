@@ -4,11 +4,14 @@
  * rest of what a hostile schema could smuggle before it renders on our origin.
  */
 
-import type { Schema, ThemeName } from '@/index.js';
+import type { Condition, LogicRule, Schema, ThemeName } from '@/index.js';
 import { themes } from '@/index.js';
 import { withoutRepeatedOptions } from './uniqueOptions.js';
 
 const MAX_TEXT = 2000;
+/** Most questions a link may carry, and most entries in any option, row or column list. */
+const MAX_QUESTIONS = 200;
+const MAX_LIST = 100;
 
 function httpsOnly(v: unknown): string | undefined {
   if (typeof v !== 'string') return undefined;
@@ -60,9 +63,15 @@ function sanitizeWaveB(next: Record<string, unknown>): void {
   for (const key of BOOLEANS) {
     if (key in next && typeof next[key] !== 'boolean') delete next[key];
   }
-  if ('format' in next && next.format !== 'us' && next.format !== 'international') {
-    delete next.format;
-  }
+  // An address is 'us' or 'international'; a date's format is its own
+  // ('DD/MM/YYYY' used to be stripped here, so links opened as MM/DD).
+  const formats =
+    next.type === 'address'
+      ? ['us', 'international']
+      : next.type === 'date'
+        ? ['MM/DD/YYYY', 'DD/MM/YYYY']
+        : [];
+  if ('format' in next && !formats.includes(next.format as string)) delete next.format;
   if ('defaultCountry' in next) {
     if (typeof next.defaultCountry === 'string' && /^[A-Za-z]{2}$/.test(next.defaultCountry)) {
       next.defaultCountry = next.defaultCountry.toUpperCase();
@@ -354,6 +363,45 @@ function sanitizeOptions(next: Record<string, unknown>): void {
 const isObject = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !Array.isArray(v);
 
+const scalar = (v: unknown): v is string | number =>
+  typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v));
+
+/**
+ * A condition in the engine's own shape, or undefined: `visibleIf: 5`,
+ * `{ all: 'x' }` or a rule with no `goTo` used to reach the engine and crash
+ * the page (audit 2026-10). Nested lists stay short and shallow.
+ */
+function parseCondition(raw: unknown, depth = 0): Condition | undefined {
+  if (!isObject(raw) || depth > 8) return undefined;
+  for (const key of ['all', 'any'] as const) {
+    if (key in raw) {
+      if (!Array.isArray(raw[key])) return undefined;
+      const list = (raw[key] as unknown[]).slice(0, 50).map((c) => parseCondition(c, depth + 1));
+      return list.every(Boolean) ? ({ [key]: list } as unknown as Condition) : undefined;
+    }
+  }
+  const { field, op, value } = raw;
+  if (typeof field !== 'string' || typeof op !== 'string') return undefined;
+  if ((op === 'equals' || op === 'not_equals') && scalar(value)) return { field, op, value };
+  if ((op === 'in' || op === 'not_in') && Array.isArray(value) && value.every(scalar)) {
+    return { field, op, value: value.slice(0, MAX_LIST) };
+  }
+  if ((op === 'gt' || op === 'lt' || op === 'gte' || op === 'lte') && scalar(value)) {
+    return typeof value === 'number' ? { field, op, value } : undefined;
+  }
+  if (op === 'is_empty' || op === 'is_not_empty') return { field, op };
+  return undefined;
+}
+
+/** Logic rules the engine can read (`if` a condition, `goTo` an id); the rest are dropped. */
+function parseLogic(raw: unknown): LogicRule[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as unknown[]).slice(0, 50).flatMap((r) => {
+    const c = isObject(r) && typeof r.goTo === 'string' ? parseCondition(r.if) : undefined;
+    return c ? [{ if: c, goTo: (r as { goTo: string }).goTo }] : [];
+  });
+}
+
 /** A question the form can show at all: an object with an id and a type (SEC-3). */
 const isQuestionLike = (q: unknown): q is Schema['questions'][number] =>
   isObject(q) && typeof q.id === 'string' && typeof q.type === 'string';
@@ -361,12 +409,28 @@ const isQuestionLike = (q: unknown): q is Schema['questions'][number] =>
 export function sanitizeUntrustedSchema(schema: Schema): Schema {
   // Anything in the list that isn't a question (null, a string, no id or type)
   // is left out: it would only crash the page (SEC-3).
-  const listed = (Array.isArray(schema.questions) ? schema.questions : []).filter(isQuestionLike);
+  const listed = (Array.isArray(schema.questions) ? schema.questions : [])
+    .filter(isQuestionLike)
+    .slice(0, MAX_QUESTIONS);
   const questions = withoutRepeatedOptions(listed).map((q) => {
     const next: Record<string, unknown> = { ...(q as Record<string, unknown>) };
     // A pattern from JSON is a string or {}, never a RegExp: the engine can't
     // test it, and a crafted one could hang the tab (NEW-01).
     delete next.pattern;
+    // Conditions and jumps only in shapes the engine reads; a malformed one is left out.
+    if ('visibleIf' in next) {
+      const c = parseCondition(next.visibleIf);
+      if (c) next.visibleIf = c;
+      else delete next.visibleIf;
+    }
+    if ('logic' in next) {
+      const rules = parseLogic(next.logic);
+      if (rules.length) next.logic = rules;
+      else delete next.logic;
+    }
+    for (const key of ['rows', 'columns']) {
+      if (Array.isArray(next[key])) next[key] = (next[key] as unknown[]).slice(0, MAX_LIST);
+    }
     for (const key of ['title', 'subtitle', 'description', 'placeholder', 'cta', 'label']) {
       if (key in next) next[key] = clampText(next[key]);
     }
@@ -381,20 +445,28 @@ export function sanitizeUntrustedSchema(schema: Schema): Schema {
       else delete next.redirectUrl;
     }
     if (Array.isArray(next.options)) {
-      next.options = (next.options as unknown[]).filter(isObject).map((opt) => {
-        const o = { ...opt };
-        if ('src' in o) {
-          const safe = httpsOnly(o.src);
-          if (safe) o.src = safe;
-          else delete o.src;
-        }
-        for (const key of ['label', 'description']) if (key in o) o[key] = clampText(o[key]);
-        sanitizeOption(o);
-        return o;
-      });
+      next.options = (next.options as unknown[])
+        .filter(isObject)
+        .slice(0, MAX_LIST)
+        .map((opt) => {
+          const o = { ...opt };
+          if ('src' in o) {
+            const safe = httpsOnly(o.src);
+            if (safe) o.src = safe;
+            else delete o.src;
+          }
+          for (const key of ['label', 'description']) if (key in o) o[key] = clampText(o[key]);
+          sanitizeOption(o);
+          return o;
+        });
     }
     return next as unknown as Schema['questions'][number];
   });
+  // Without an ending, OK on the last question would go nowhere (audit 2026-10):
+  // the studio always pins a Thank You, so only a crafted link lacks one.
+  if (questions.length && !questions.some((q) => q.type === 'thanks')) {
+    questions.push({ id: 'slate-ending', type: 'thanks', title: 'Thank you!' });
+  }
   const brand = { ...schema.brand, name: clampText(schema.brand?.name ?? '') };
   if ('logo' in brand) delete (brand as Record<string, unknown>).logo;
   const estimate = sanitizeEstimate((schema as { estimate?: unknown }).estimate);

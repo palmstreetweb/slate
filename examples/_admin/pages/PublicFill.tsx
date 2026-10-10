@@ -6,6 +6,7 @@ import type { Answers } from '@/index.js';
 import {
   FilesRejectedError,
   FormClosedError,
+  PasswordChangedError,
   SlotFullError,
   TooLongError,
   fetchPublishedFormBySlug,
@@ -112,6 +113,8 @@ export function PublicFill({ slug }: Props) {
   const [form, setForm] = useState<OpenForm | null>(null);
   /** Locked and not yet unlocked in this tab (ADR-043). */
   const [gate, setGate] = useState<LockedForm | null>(null);
+  /** Why the gate is back mid-fill (the password changed; audit 2026-10). */
+  const [gateNotice, setGateNotice] = useState<string | null>(null);
   /** Closed (ADR-063): past its closing time or at its cap. */
   const [closed, setClosed] = useState<{
     name: string;
@@ -218,6 +221,7 @@ export function PublicFill({ slug }: Props) {
       }
       if (!result.ok) return result.message;
       if (result.unlockToken) writeFillUnlockToken(result.form.id, result.unlockToken);
+      setGateNotice(null);
       setForm(result.form);
       setSlotsLeft(result.form.slotsLeft);
       slotsAt.current = Date.now();
@@ -290,7 +294,7 @@ export function PublicFill({ slug }: Props) {
         data-theme={mode}
         className={`slate-app${embedClass}`}
       >
-        <FillGate formName={gate.name} onUnlock={onUnlock} />
+        <FillGate formName={gate.name} onUnlock={onUnlock} notice={gateNotice} />
       </div>
     );
   }
@@ -386,6 +390,19 @@ export function PublicFill({ slug }: Props) {
             // instead of offering a Retry that can't work.
             if (err instanceof FormClosedError) {
               setClosed({ name: form.name, info: err.closed, duringFill: true });
+            }
+            // The password changed meanwhile (401): back to the password screen,
+            // the answers kept in this tab for Resume; Retry could only fail again.
+            if (err instanceof PasswordChangedError) {
+              setGateNotice(err.message);
+              setGate({
+                id: form.id,
+                name: form.name,
+                slug: form.slug,
+                locked: true,
+                schema: null,
+              });
+              setForm(null);
             }
             // A slot filled while they were answering (ADR-066): fresh counts, and back to
             // the question to pick again — every other answer stays.

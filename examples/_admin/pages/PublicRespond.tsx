@@ -3,6 +3,7 @@ import { Form } from '@/index.js';
 import { decodePortableSchema } from '../portableShare.js';
 import { sanitizeUntrustedSchema } from '../sanitizeUntrustedSchema.js';
 import { addSubmission } from '../_submissionStore.js';
+import { getForm } from '../_formsStore.js';
 import { asStoredAnswers } from '../storedAnswers.js';
 import { routeSearchParams } from '../_router.js';
 import { resolveUploadMeta } from '../resolveUploadMeta.js';
@@ -69,7 +70,13 @@ export function PublicRespond({ token }: Props) {
       const schema = sanitizeUntrustedSchema(decoded.schema);
       // Nothing in it is a question: the link is broken.
       if (!schema.questions.length) return null;
-      const formId = decoded.formId ?? tokenId(token);
+      // The link's own form id is kept when it can't be anyone's form here: a
+      // `portable_` id (never a studio form's), or the id of a form in this
+      // browser (the owner's device-only link). Any other id a link names
+      // would plant answers, or a resume snapshot, under someone else's form
+      // (audit 2026-10); it is replaced by a hash of the link.
+      const own = decoded.formId;
+      const formId = own && (own.startsWith('portable_') || getForm(own)) ? own : tokenId(token);
       // With an id, answers survive a reload or back / forward in this tab only (GAP-05).
       return { ...decoded, formId, schema: { ...schema, id: formId } };
     } catch (err) {
