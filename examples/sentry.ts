@@ -10,6 +10,7 @@ import {
   SENTRY_DATA_COLLECTION,
   SENTRY_TRACES_SAMPLE_RATE,
 } from '../api/sentryGate.js';
+import { scrubBreadcrumb, scrubEvent } from './sentryScrub.js';
 
 declare const __SLATE_SENTRY_RELEASE__: string | undefined;
 declare const __SLATE_VERCEL_ENV__: string | undefined;
@@ -55,6 +56,10 @@ export function initSentry(): void {
     // Same-origin only. Neon and other hosts must not see sentry-trace (CORS).
     tracePropagationTargets: [/^\//],
     dataCollection: SENTRY_DATA_COLLECTION,
+    // No query strings anywhere in an event: a fetch breadcrumb's URL can be a
+    // presigned storage link, good for an hour to anyone reading the project (audit F4).
+    beforeBreadcrumb: (crumb) => scrubBreadcrumb(crumb),
+    beforeSend: (event) => scrubEvent(event),
   });
 }
 
