@@ -76,7 +76,8 @@ export function BackupPanel() {
       <h2 className="slate-settings-heading">Backup</h2>
       <p className="slate-settings-copy">
         Forms and responses are saved in this browser only. Export a backup now and then, and import
-        it if you switch browsers or clear this site’s data.
+        it if you switch browsers or clear this site’s data. Files people uploaded aren’t in the
+        backup — they stay in the browser that received them.
       </p>
       <dl className="slate-settings-stats">
         <div>
