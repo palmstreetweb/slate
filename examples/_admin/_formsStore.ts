@@ -13,6 +13,9 @@ import { allocateNumericSlug } from './shareUrls.js';
 
 const STORAGE_KEY = 'slate-forms';
 
+/** Longest form name the database takes (migration 022); the studio's input stops there too. */
+export const FORM_NAME_MAX = 200;
+
 export type FormStatus = 'draft' | 'published';
 
 /** A named flyer link: `/forms/{slug}?src={src}` (ADR-063). */

@@ -20,7 +20,12 @@ vi.mock('../examples/_admin/neon/client.js', () => ({
         order: async () => ({ data: [ROW], error: null }),
       }),
       upsert: async () => ({ error: db.upsertError }),
-      insert: async () => ({ error: db.insertError }),
+      // 022: the insert reads the assigned slug back.
+      insert: (row: { slug?: string }) => ({
+        select: () => ({
+          single: async () => ({ data: { slug: row.slug }, error: db.insertError }),
+        }),
+      }),
       update: () => ({
         eq: async () => ({ error: db.updateError }),
       }),

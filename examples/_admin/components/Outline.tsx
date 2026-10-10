@@ -19,6 +19,7 @@ import type { FormSound, QuestionType, Schema, ThemeMode, ThemeName } from '@/in
 import { FORM_SOUND_OPTIONS, resolveFormSound } from '@/utils/formSounds.js';
 import { safeLogoSrc } from '@/utils/brandLogo.js';
 import { ADDABLE_TYPES } from '../questionTypeMeta.js';
+import { FORM_NAME_MAX } from '../_formsStore.js';
 import { TypeIcon } from './TypeIcon.js';
 import { useOutlineDrag } from '../hooks/useOutlineDrag.js';
 import { SlateSelect } from './SlateSelect.js';
@@ -320,6 +321,7 @@ export function Outline({
             className="slate-input"
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
+            maxLength={FORM_NAME_MAX}
             placeholder="Untitled Form"
           />
         </div>
