@@ -62,6 +62,19 @@ export class FormClosedError extends Error {
 }
 
 /**
+ * The password changed or was removed while the respondent was filling in
+ * (401 on submit): this tab's unlock token is dead, so a Retry could only fail
+ * again. The page asks for the new password and the answers stay in the tab
+ * (audit 2026-10).
+ */
+export class PasswordChangedError extends Error {
+  constructor() {
+    super('This form’s password changed. Enter the new one to send your answers.');
+    this.name = 'PasswordChangedError';
+  }
+}
+
+/**
  * A sign-up slot filled while the respondent was answering (ADR-066): 409 with
  * reason 'slot_full'. Nothing was stored; `slotsLeft` is every slot's fresh
  * count, and `full` names the slots to pick again.
@@ -257,7 +270,7 @@ export async function submitPublicResponse(
     if (res.status === 401) {
       // Password was changed or removed mid-fill; the old token is dead.
       clearFillUnlockToken(payload.formId);
-      throw new Error('This form’s password changed. Reload the page and enter the new one.');
+      throw new PasswordChangedError();
     }
     if (res.status === 410 || res.status === 409) {
       // Closed since the page loaded (ADR-063): the page swaps to the closed screen.

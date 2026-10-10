@@ -12,7 +12,15 @@
 
 'use client';
 
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import type { SignatureQuestion } from '@/types/Question.js';
 import { validate } from '@/logic/validation.js';
 import { encodeSignature } from '@/logic/signatureEncode.js';
@@ -26,7 +34,11 @@ import {
   signatureTypedOf,
   type Point,
 } from '@/logic/signature.js';
-import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import {
+  FormDraftsContext,
+  useDraft,
+  useRegisterFormConfirm,
+} from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { motionReduced, shakeInvalid } from '@/utils/motion.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
@@ -98,12 +110,22 @@ export default function SignatureField({
   const hintId = useId();
   const allowTyped = question.allowTyped !== false;
   const seededTyped = signatureTypedOf(value);
-  const [mode, setMode] = useState<'draw' | 'type'>(
+  // The tab, the typed name and the ink are kept across Back until OK stores
+  // them (audit 2026-10).
+  const [mode, setMode] = useDraft<'draw' | 'type'>(
+    `${question.id}:m`,
     seededTyped !== null && allowTyped ? 'type' : 'draw',
   );
-  const [typed, setTyped] = useState(seededTyped ?? '');
+  const [typed, setTyped] = useDraft(`${question.id}:t`, seededTyped ?? '');
   const [error, setError] = useState<string | null>(null);
-  const strokes = useRef<Point[][]>(parseSignaturePath(signaturePathOf(value)) ?? []);
+  const drafts = useContext(FormDraftsContext);
+  const inkKey = `${question.id}:ink`;
+  const strokes = useRef<Point[][]>(
+    (drafts?.get(inkKey) as Point[][] | undefined) ??
+      parseSignaturePath(signaturePathOf(value)) ??
+      [],
+  );
+  const rememberInk = () => drafts?.set(inkKey, strokes.current);
   const [hasInk, setHasInk] = useState(strokes.current.length > 0);
   const drawing = useRef<Point[] | null>(null);
   const strokeStart = useRef({ at: 0, touch: false });
@@ -213,6 +235,7 @@ export default function SignatureField({
       return;
     }
     strokes.current = [...strokes.current, stroke];
+    rememberInk();
     setHasInk(true);
     repaint();
   };
@@ -221,6 +244,7 @@ export default function SignatureField({
     const canvas = canvasRef.current;
     const wipe = () => {
       strokes.current = [];
+      rememberInk();
       drawing.current = null;
       setHasInk(false);
       setError(null);

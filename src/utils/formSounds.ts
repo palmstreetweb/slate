@@ -1,13 +1,15 @@
 /**
  * Form step-sound registry — ten synthesized presets plus `off`.
  *
- * Recipes run through the generic engine in `pixieMallet.ts` (Web Audio, zero
- * deps). Pixie Mallet's tuned recipe lives in that module; the other nine are
- * defined here. Volume (0–1) is the only runtime knob.
+ * The recipes and the Web Audio engine (`formSoundsSynth.ts`, `pixieMallet.ts`)
+ * load on demand: `<Form>` starts the download on mount when the form's sound
+ * is on, so the first step plays at once, and a form with its sound off never
+ * fetches them (engine budget, audit 2026-10). Volume (0–1) is the only
+ * runtime knob.
  */
 
 import type { FormSound, FormSoundId } from '@/types/Sound.js';
-import { playSound, SOUND_711_PIXIE_MALLET, type Recipe } from '@/utils/pixieMallet.js';
+import type * as Synth from './formSoundsSynth.js';
 
 /** Dropdown labels for Slate Settings panel and public docs. */
 export const FORM_SOUND_OPTIONS: ReadonlyArray<{ value: FormSound; label: string }> = [
@@ -24,217 +26,40 @@ export const FORM_SOUND_OPTIONS: ReadonlyArray<{ value: FormSound; label: string
   { value: 'laser-blip', label: 'Laser Blip' },
 ];
 
-const RECIPES: Record<FormSoundId, Recipe> = {
-  'pixie-mallet': SOUND_711_PIXIE_MALLET,
-  'soft-chime': {
-    duration: 0.5,
-    layers: [
-      {
-        wave: 'sine',
-        gain: 0.08,
-        freq: 1046.5,
-        ampEnv: { attack: 0.005, decay: 0.35, sustain: 0, release: 0.08 },
-      },
-    ],
-  },
-  'glass-tap': {
-    duration: 0.2,
-    layers: [
-      {
-        wave: 'sine',
-        gain: 0.06,
-        freq: 1318.51,
-        ampEnv: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.03 },
-        filter: { type: 'bandpass', freq: 2000, q: 8 },
-      },
-    ],
-  },
-  'wood-block': {
-    duration: 0.1,
-    layers: [
-      {
-        wave: 'triangle',
-        gain: 0.12,
-        freq: 180,
-        ampEnv: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.01 },
-      },
-    ],
-  },
-  'bubble-pop': {
-    duration: 0.14,
-    layers: [
-      {
-        wave: 'sine',
-        gain: 0.09,
-        freq: 600,
-        pitchEnv: { to: 200, time: 0.08, curve: 'exp' },
-        ampEnv: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.02 },
-      },
-    ],
-  },
-  'coin-pickup': {
-    duration: 0.18,
-    layers: [
-      {
-        wave: 'square',
-        gain: 0.05,
-        ampEnv: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.02 },
-        repeat: { count: 2, interval: 0.06, pitchSeq: [987.77, 1318.51] },
-      },
-    ],
-  },
-  'page-flip': {
-    duration: 0.28,
-    layers: [
-      {
-        wave: 'triangle',
-        gain: 0.05,
-        freq: 800,
-        pitchEnv: { to: 300, time: 0.15, curve: 'exp' },
-        ampEnv: { attack: 0.002, decay: 0.2, sustain: 0, release: 0.05 },
-      },
-    ],
-  },
-  'type-ding': {
-    duration: 0.35,
-    layers: [
-      {
-        type: 'fm',
-        wave: 'sine',
-        gain: 0.06,
-        freq: 880,
-        fm: { modWave: 'sine', ratio: 2.5, index: 3 },
-        ampEnv: { attack: 0.001, decay: 0.25, sustain: 0, release: 0.06 },
-      },
-    ],
-  },
-  marimba: {
-    duration: 0.28,
-    layers: [
-      {
-        wave: 'sine',
-        gain: 0.07,
-        ampEnv: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.03 },
-        repeat: { count: 3, interval: 0.07, pitchSeq: [523.25, 392, 293.66] },
-      },
-    ],
-  },
-  'laser-blip': {
-    duration: 0.1,
-    layers: [
-      {
-        wave: 'saw',
-        gain: 0.04,
-        freq: 220,
-        pitchEnv: { to: 1760, time: 0.06, curve: 'exp' },
-        ampEnv: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.01 },
-      },
-    ],
-  },
-};
-
 /** Normalize legacy `sound: true` (pre-dropdown) to the default preset. */
 export function resolveFormSound(raw: unknown): FormSound {
   if (raw === true) return 'pixie-mallet';
-  if (raw === false || raw == null || raw === 'off') return 'off';
-  if (typeof raw === 'string' && raw in RECIPES) return raw as FormSoundId;
+  if (raw !== 'off' && FORM_SOUND_OPTIONS.some((o) => o.value === raw)) return raw as FormSoundId;
   return 'off';
+}
+
+let synth: typeof Synth | undefined;
+let loading: Promise<typeof Synth> | undefined;
+
+/** Start loading the synth; resolves once it can play (never rejects). */
+export function preloadFormSounds(): Promise<unknown> {
+  loading ??= import('./formSoundsSynth.js').then((m) => (synth = m));
+  return loading.catch(() => {});
+}
+
+/** Play now when the synth is here, else as soon as it lands (a download that fails stays silent). */
+function withSynth(play: (m: typeof Synth) => void): void {
+  if (synth) play(synth);
+  else void preloadFormSounds().then(() => synth && play(synth));
 }
 
 /** Play a built-in step sound, or no-op when `off`. */
 export function playFormSound(sound: FormSound | boolean | undefined, volume = 0.6): void {
   const id = resolveFormSound(sound);
-  if (id === 'off') return;
-  playSound(volume, RECIPES[id]);
+  if (id !== 'off') withSynth((m) => m.playStep(id, volume));
 }
 
-/**
- * Soft mechanical key tick for text entry (ADR-034). Pitch varies slightly so
- * rapid typing doesn't sound like a single sample loop. Rate-limited so held
- * keys / autofill don't flood the AudioContext.
- */
-const TYPEWRITER_TICK: Recipe = {
-  duration: 0.045,
-  layers: [
-    {
-      wave: 'triangle',
-      gain: 0.11,
-      ampEnv: { attack: 0.0004, decay: 0.022, sustain: 0, release: 0.006 },
-      filter: { type: 'bandpass', freq: 2600, q: 3.2 },
-      repeat: {
-        count: 1,
-        interval: 0,
-        pitchPool: [860, 940, 1020, 1100, 1180, 1260],
-      },
-    },
-    {
-      wave: 'square',
-      gain: 0.028,
-      freq: 180,
-      ampEnv: { attack: 0.0003, decay: 0.012, sustain: 0, release: 0.004 },
-      filter: { type: 'lowpass', freq: 600, q: 0.7 },
-    },
-  ],
-};
-
-let _lastTypewriterMs = 0;
-const TYPEWRITER_MIN_GAP_MS = 26;
-
-/** Play one typewriter key tick (quieter than step sounds). */
+/** Play one typewriter key tick (quieter than step sounds; rate-limited in the synth). */
 export function playTypewriterTick(volume = 0.34): void {
-  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  if (now - _lastTypewriterMs < TYPEWRITER_MIN_GAP_MS) return;
-  _lastTypewriterMs = now;
-  playSound(volume, TYPEWRITER_TICK);
+  withSynth((m) => m.playTick(volume));
 }
-
-/**
- * Completion finale (ADR-059): a soft rising C-major arpeggio that rings out
- * together over a warm root — a "you're done" chord rather than a step
- * blip. Same synth engine, no assets. Played by `<Form>` once, on a
- * confirmed submit, and only when the form's sound is on.
- */
-const FINALE_CHORD: Recipe = {
-  duration: 1.6,
-  layers: [
-    {
-      wave: 'sine',
-      gain: 0.035,
-      freq: 261.63,
-      ampEnv: { attack: 0.02, decay: 1.3, sustain: 0, release: 0.2 },
-    },
-    {
-      wave: 'triangle',
-      gain: 0.05,
-      freq: 523.25,
-      ampEnv: { attack: 0.004, decay: 1.1, sustain: 0, release: 0.2 },
-    },
-    {
-      wave: 'triangle',
-      gain: 0.045,
-      freq: 659.25,
-      startOffset: 0.07,
-      ampEnv: { attack: 0.004, decay: 1.05, sustain: 0, release: 0.2 },
-    },
-    {
-      wave: 'triangle',
-      gain: 0.042,
-      freq: 783.99,
-      startOffset: 0.14,
-      ampEnv: { attack: 0.004, decay: 1.0, sustain: 0, release: 0.2 },
-    },
-    {
-      wave: 'sine',
-      gain: 0.05,
-      freq: 1046.5,
-      startOffset: 0.22,
-      ampEnv: { attack: 0.004, decay: 1.15, sustain: 0, release: 0.25 },
-    },
-  ],
-};
 
 /** Play the completion finale for a form whose sound is on; no-op when `off`. */
 export function playFormFinale(sound: FormSound | boolean | undefined, volume = 0.55): void {
-  if (resolveFormSound(sound) === 'off') return;
-  playSound(volume, FINALE_CHORD);
+  if (resolveFormSound(sound) !== 'off') withSynth((m) => m.playFinale(volume));
 }

@@ -80,10 +80,12 @@ export default function ChoiceCardsField({
   }, [other, question.options, markCommitted, onCommit]);
 
   // OK commits the typed Other; an optional, unanswered question can be skipped,
-  // by Enter once the cards have been up a moment (ENG-06, as on single choice).
+  // and one already answered (a link's prefill, Back, Resume) continues with its
+  // pick (audit 2026-10) — by Enter once the cards have been up a moment
+  // (ENG-06, as on single choice).
   const skip = !other.open && question.required === false && !selected ? onAdvance : undefined;
-  const confirm = other.open ? commitOther : skip;
-  useRegisterFormConfirm(confirm!, Boolean(confirm), skip ? 500 : 0);
+  const confirm = other.open ? commitOther : (skip ?? (selected ? onAdvance : undefined));
+  useRegisterFormConfirm(confirm!, Boolean(confirm), other.open ? 0 : 500);
   useRegisterOtherKey(other.openBox, other.enabled);
 
   const count = question.options.length + (other.enabled ? 1 : 0);
@@ -197,7 +199,7 @@ export default function ChoiceCardsField({
               Skip
             </button>
           ) : (
-            <button type="button" className="slate-ok-btn" onClick={commitOther}>
+            <button type="button" className="slate-ok-btn" onClick={confirm}>
               OK <span aria-hidden>✓</span>
             </button>
           )}

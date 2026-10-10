@@ -113,6 +113,9 @@ type Action =
   | { type: 'reset' };
 
 function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
+  // The respondent's path through `visible` with these answers (ADR-070).
+  const pathAt = (visible: Question[], answers: LooseAnswers) =>
+    pathOf(visible, answers, otherIndex(allQuestions), areaIndex(allQuestions), initial.answers);
   return function reducer(s: RawState, a: Action): RawState {
     switch (a.type) {
       case 'set_answer': {
@@ -135,13 +138,7 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
         // The respondent's path (ADR-070) is where an advance goes: logic
         // jumps (ADR-015), then any question a later answer revealed. Back
         // still works — the step left is pushed onto history like any other.
-        const path = pathOf(
-          visible,
-          s.answers,
-          otherIndex(allQuestions),
-          areaIndex(allQuestions),
-          initial.answers,
-        );
+        const path = pathAt(visible, s.answers);
         const at = path.indexOf(cur);
         // An edit from Review goes back to Review while the answers still lead
         // there — a jump past it wins — after any question the edit put on
@@ -161,11 +158,13 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
               ? (owed ?? path[back]!)
               : (path[at + 1] ?? path.next);
         if (to === s.step || !visible[to]) return s;
+        // Forward is along the path: a question an answer just revealed sits
+        // earlier in the list, but the respondent is moving on.
         return {
           ...s,
           history: [...s.history, current.id],
           step: to,
-          direction: to > s.step ? 'forward' : 'backward',
+          direction: (at < 0 ? to > s.step : path.indexOf(to) > at) ? 'forward' : 'backward',
           isAnimating: true,
           returnTo: owed === undefined ? undefined : s.returnTo,
         };
@@ -213,12 +212,18 @@ function makeReducer(allQuestions: ReadonlyArray<Question>, initial: RawState) {
         let step = Math.max(0, Math.min(a.snapshot.step, Math.max(visible.length - 1, 0)));
         // Never resume onto an ending: arriving there would send the answers again.
         if (visible[step]?.type === 'thanks' && step) step--;
+        // Back retraces the path to here, as it would have before the reload:
+        // never into a question a jump passed over (audit 2026-10).
+        const path = pathAt(visible, answers);
+        const at = path.indexOf(step);
         return {
           ...s,
           answers,
           step,
           visitedIds: a.snapshot.visitedIds,
-          history: [],
+          history: (at < 0 ? path.filter((i) => i < step) : path.slice(0, at)).map(
+            (i) => visible[i]!.id,
+          ),
           direction: 'forward',
           isAnimating: false,
           returnTo: undefined,
@@ -254,8 +259,10 @@ export type UseFormStateOptions = {
 export function useFormState(schema: Schema, opts: UseFormStateOptions = {}): UseFormStateApi {
   const startedAtRef = useRef<Date>(new Date());
   const initialRef = useRef<RawState | null>(null);
+  // The link's prefill, kept by identity: while the answers are still that very
+  // object nothing has been done, so nothing is saved for Resume (audit 2026-10).
   if (initialRef.current === null) {
-    initialRef.current = { ...INITIAL_RAW, answers: { ...(opts.initialAnswers ?? {}) } };
+    initialRef.current = { ...INITIAL_RAW, answers: opts.initialAnswers ?? {} };
   }
   const initial = initialRef.current;
   const reducer = useMemo(

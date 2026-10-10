@@ -72,7 +72,9 @@ export function useKeyboardNav({
     };
 
     const handler = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // A held key (auto-repeat) never picks, toggles or confirms anything:
+      // it would run through the form, or flip a pick thirty times a second.
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
 
       // Esc → back (opt-in only; default off to prevent accidental loss)
       if (e.key === 'Escape' && escapeBack) {
@@ -81,11 +83,22 @@ export function useKeyboardNav({
         return;
       }
 
+      // Enter on a focused button, link or option is that control's own
+      // (Back, the theme toggle, Resume, +/−, AM/PM, a tile): the browser's
+      // click does the work, so the form must not confirm or advance over it.
+      if (
+        e.key === 'Enter' &&
+        (e.target as Element | null)?.closest?.(
+          'button,a[href],[role=radio],[role=checkbox],[role=option],[role=slider],[role=switch]',
+        )
+      ) {
+        return;
+      }
+
       const typing = isTypingTarget(e.target);
 
       // Enter — chrome screens advance; OK steps confirm via the registered handler.
-      // A held Enter (key repeat) does neither: it would run through the form.
-      if (e.key === 'Enter' && !e.shiftKey && !typing && !e.repeat) {
+      if (e.key === 'Enter' && !e.shiftKey && !typing) {
         if (
           currentQ.type === 'welcome' ||
           currentQ.type === 'statement' ||
@@ -152,50 +165,40 @@ export function useKeyboardNav({
         }
       }
 
-      // Scale / NPS — single digits and composed two-digit values (e.g. 10).
+      // Scale / NPS — digits compose while another could still make a value in
+      // range ("1" of 10, "10" of 100), and commit once no more could, or when
+      // the pause ends. Not aligned together, the key stands on its own.
       if ((currentQ.type === 'scale' || currentQ.type === 'nps') && onSelectScale && !typing) {
         if (/^[0-9]$/.test(e.key)) {
           const min = currentQ.type === 'nps' ? 0 : currentQ.min;
           const max = currentQ.type === 'nps' ? 10 : currentQ.max;
           const step = currentQ.type === 'scale' ? (currentQ.step ?? 1) : 1;
           const aligned = (v: number) => isScaleStepValue(v, min, max, step);
-
-          const nextBuf = digitBufferRef.current + e.key;
-
-          if (nextBuf.length === 2) {
-            const composed = Number.parseInt(nextBuf, 10);
-            if (aligned(composed)) {
-              e.preventDefault();
-              clearDigitBuffer();
-              onSelectScale(composed);
-              return;
-            }
-          }
-
-          const single = Number.parseInt(e.key, 10);
-          const minLead = Math.max(1, Math.ceil(min / 10));
-          const maxLead = Math.floor(max / 10);
-          const couldPrefixDouble = max >= 10 && single >= minLead && single <= maxLead;
-
-          if (couldPrefixDouble && digitBufferRef.current === '') {
+          const commit = (v: number) => {
             e.preventDefault();
-            digitBufferRef.current = e.key;
-            if (digitTimerRef.current !== null) {
-              window.clearTimeout(digitTimerRef.current);
-            }
+            clearDigitBuffer();
+            onSelectScale(v);
+          };
+
+          const composed = Number.parseInt(digitBufferRef.current + e.key, 10);
+          if (composed > 0 && composed * 10 <= max) {
+            e.preventDefault();
+            clearDigitBuffer();
+            digitBufferRef.current = String(composed);
             digitTimerRef.current = window.setTimeout(() => {
               const v = Number.parseInt(digitBufferRef.current, 10);
-              digitBufferRef.current = '';
-              digitTimerRef.current = null;
+              clearDigitBuffer();
               if (aligned(v)) onSelectScale(v);
             }, DIGIT_COMPOSE_MS);
             return;
           }
-
+          if (aligned(composed)) {
+            commit(composed);
+            return;
+          }
+          const single = Number.parseInt(e.key, 10);
           if (aligned(single)) {
-            e.preventDefault();
-            clearDigitBuffer();
-            onSelectScale(single);
+            commit(single);
             return;
           }
         }

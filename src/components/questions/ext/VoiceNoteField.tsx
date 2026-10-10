@@ -110,6 +110,10 @@ export default function VoiceNoteField({
   const [phase, setPhase] = useState<Phase>(
     seededTyped !== null ? 'typed' : seededRef ? 'review' : 'idle',
   );
+  // The phase as an upload finishing later sees it: switched to typing meanwhile,
+  // the saved recording must not replace the typed answer (audit 2026-10).
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
   const [blocked, setBlocked] = useState<'denied' | 'unsupported' | 'nomic' | 'failed'>('denied');
   const [clip, setClip] = useState<Clip | null>(cached);
   const [savedRef, setSavedRef] = useState<string | null>(seededRef);
@@ -211,7 +215,7 @@ export default function VoiceNoteField({
         setSave('saved');
         setError(null);
         setSaid('Recording saved.');
-        onAnswer({ audio: ref, sec: String(c.seconds) });
+        if (phaseRef.current !== 'typed') onAnswer({ audio: ref, sec: String(c.seconds) });
       } catch (err) {
         if (!alive.current) return;
         setSave('error');
@@ -432,7 +436,9 @@ export default function VoiceNoteField({
       shakeInvalid(recordRef.current);
       return;
     }
-    if (save === 'saving') {
+    // A recording still saving holds OK — unless they switched to typing: the
+    // typed answer goes, and the upload finishing later changes nothing (audit 2026-10).
+    if (save === 'saving' && phase !== 'typed') {
       setError('Still saving your recording…');
       return;
     }

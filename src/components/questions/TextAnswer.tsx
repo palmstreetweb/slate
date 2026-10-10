@@ -25,7 +25,7 @@ import {
 import type { EmailQuestion, LongTextQuestion, ShortTextQuestion } from '@/types/Question.js';
 import type { LooseAnswers } from '@/types/Answers.js';
 import { charCount, textMax, validate } from '@/logic/validation.js';
-import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import { useDraft, useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import { focusAfter } from '@/utils/focus.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
@@ -59,7 +59,8 @@ export function TextAnswer({
   multiline,
   hint,
 }: Props) {
-  const [value, setValue] = useState(initialValue);
+  // Typed text is kept across Back until OK stores it (audit 2026-10).
+  const [value, setValue] = useDraft(question.id, initialValue);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const labelId = useId();

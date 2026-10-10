@@ -20,9 +20,11 @@ type Props = {
 export function YesNoField({ question, answers, selected, onSelect, onSkip }: Props) {
   const labelId = useId();
   const { committed, markCommitted } = useChoiceCommit(selected);
-  // Optional and unanswered: Skip (and Enter). Answered, a tap on a choice moves on.
-  const skip = question.required === false && !selected ? onSkip : undefined;
-  useRegisterFormConfirm(skip!, Boolean(skip), 500);
+  // Optional and unanswered: Skip (and Enter). Answered (a link's prefill,
+  // Back, Resume): OK or Enter keeps the pick (audit 2026-10); a tap on a
+  // choice moves on too.
+  const go = question.required === false || selected ? onSkip : undefined;
+  useRegisterFormConfirm(go!, Boolean(go), 500);
   const choices: ReadonlyArray<{ value: 'yes' | 'no'; label: string; badge: string }> = [
     { value: 'yes', label: question.yesLabel ?? 'Yes', badge: 'Y' },
     { value: 'no', label: question.noLabel ?? 'No', badge: 'N' },
@@ -60,10 +62,20 @@ export function YesNoField({ question, answers, selected, onSelect, onSkip }: Pr
           );
         })}
       </div>
-      {skip ? (
+      {go ? (
         <div className="slate-actions">
-          <button type="button" className="slate-ok-btn slate-ok-btn--skip" onClick={skip}>
-            Skip
+          <button
+            type="button"
+            className={selected ? 'slate-ok-btn' : 'slate-ok-btn slate-ok-btn--skip'}
+            onClick={go}
+          >
+            {selected ? (
+              <>
+                OK <span aria-hidden>✓</span>
+              </>
+            ) : (
+              'Skip'
+            )}
           </button>
           <span className="slate-hint slate-key-hint">press Y or N, or Enter ↵</span>
         </div>

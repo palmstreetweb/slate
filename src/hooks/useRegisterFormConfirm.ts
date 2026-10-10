@@ -1,6 +1,13 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type MutableRefObject } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type MutableRefObject,
+} from 'react';
 
 export const FormConfirmRefContext = createContext<MutableRefObject<(() => void) | null> | null>(
   null,
@@ -44,4 +51,31 @@ export function useRegisterOtherKey(fn: () => void, enabled = true): void {
       if (ref.current === fn) ref.current = null;
     };
   }, [ref, fn, enabled]);
+}
+
+/**
+ * What a respondent has typed, drawn or swiped on a question but not yet
+ * confirmed with OK, kept across Back (audit 2026-10). `<Form>` owns the map
+ * (cleared by "Submit another"); keys are the question id, with a suffix for
+ * a field's second draft. Nothing here is an answer: OK still validates.
+ */
+export const FormDraftsContext = createContext<Map<string, unknown> | null>(null);
+
+/**
+ * Field state that survives Back: seeded from this question's draft when there
+ * is one, else from `initial`; every change is remembered.
+ */
+export function useDraft<T>(key: string, initial: T): [T, (next: T) => void] {
+  const drafts = useContext(FormDraftsContext);
+  const [value, setValue] = useState<T>(() =>
+    drafts?.has(key) ? (drafts.get(key) as T) : initial,
+  );
+  const set = useCallback(
+    (next: T) => {
+      drafts?.set(key, next);
+      setValue(next);
+    },
+    [drafts, key],
+  );
+  return [value, set];
 }

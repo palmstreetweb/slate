@@ -103,7 +103,8 @@ describe('a crafted portable link with a question that isn’t one (SEC-3)', () 
       ],
     } as unknown as Schema;
     const out = sanitizeUntrustedSchema(s);
-    expect(out.questions.map((q) => q.id)).toEqual(['c']);
+    // The link named no ending, so the sanitizer adds one (audit 2026-10).
+    expect(out.questions.map((q) => q.id)).toEqual(['c', 'slate-ending']);
     expect((out.questions[0] as unknown as { options: unknown[] }).options).toEqual([
       { label: 'A', value: 'a' },
     ]);

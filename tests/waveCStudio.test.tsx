@@ -797,7 +797,9 @@ describe('locations stored as a verdict only (ADR-068)', () => {
     const { onChange } = renderInspector(loc);
     const box = screen.getByRole('checkbox', { name: 'Keep Approximate Location (About 110 m)' });
     expect(box).not.toBeChecked();
-    expect(screen.getByText(/A town they type is kept as written; where they are isn’t saved/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/A town they type is kept as written; where they are isn’t saved/),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/Always followed by “We only save whether you’re in the service area\.”/),
     ).toBeInTheDocument();
@@ -837,7 +839,9 @@ describe('locations stored as a verdict only (ADR-068)', () => {
         { ...loc, id: 'c', keepLocation: 1 },
       ],
     } as never);
-    expect(out.questions.map((q) => (q as { keepLocation?: unknown }).keepLocation)).toEqual([
+    // The sanitizer appends an ending when the link has none (audit 2026-10): only the locations here.
+    const locations = out.questions.filter((q) => q.type === 'location');
+    expect(locations.map((q) => (q as { keepLocation?: unknown }).keepLocation)).toEqual([
       true,
       undefined,
       undefined,

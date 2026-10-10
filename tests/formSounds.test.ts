@@ -1,14 +1,20 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   FORM_SOUND_OPTIONS,
+  playFormFinale,
   playFormSound,
   playTypewriterTick,
+  preloadFormSounds,
   resolveFormSound,
 } from '@/utils/formSounds.js';
 import { isTypewriterKey } from '@/utils/typewriterKey.js';
 import * as pixieMallet from '@/utils/pixieMallet.js';
 
 describe('formSounds', () => {
+  // The synth loads on demand (engine budget, audit 2026-10); `<Form>` preloads
+  // it the same way when a form's sound is on.
+  beforeAll(() => preloadFormSounds());
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -25,12 +31,15 @@ describe('formSounds', () => {
     expect(resolveFormSound(true)).toBe('pixie-mallet');
     expect(resolveFormSound('marimba')).toBe('marimba');
     expect(resolveFormSound('not-a-sound')).toBe('off');
+    expect(resolveFormSound('off')).toBe('off');
   });
 
-  it('does not call the synth engine when off', () => {
+  it('does not call the synth engine when off', async () => {
     const spy = vi.spyOn(pixieMallet, 'playSound');
     playFormSound('off');
     playFormSound(undefined);
+    playFormFinale('off');
+    await Promise.resolve();
     expect(spy).not.toHaveBeenCalled();
   });
 
@@ -41,8 +50,14 @@ describe('formSounds', () => {
     expect(spy.mock.calls[0]?.[0]).toBe(0.5);
   });
 
+  it('plays the finale through the synth engine', () => {
+    const spy = vi.spyOn(pixieMallet, 'playSound').mockImplementation(() => {});
+    playFormFinale(true);
+    expect(spy).toHaveBeenCalledOnce();
+  });
+
   it('plays a typewriter tick through the synth engine', () => {
-    let t = 10_000;
+    const t = 10_000;
     vi.spyOn(performance, 'now').mockImplementation(() => t);
     const spy = vi.spyOn(pixieMallet, 'playSound').mockImplementation(() => {});
     playTypewriterTick(0.3);
@@ -63,14 +78,27 @@ describe('formSounds', () => {
   });
 });
 
+describe('formSounds before the synth has loaded', () => {
+  it('a step asked for while the synth downloads plays once it lands', async () => {
+    // A fresh copy of the module, with nothing loaded yet.
+    vi.resetModules();
+    const fresh = await import('@/utils/formSounds.js');
+    const synth = await import('@/utils/pixieMallet.js');
+    const spy = vi.spyOn(synth, 'playSound').mockImplementation(() => {});
+    fresh.playFormSound('marimba', 0.4);
+    expect(spy).not.toHaveBeenCalled();
+    await fresh.preloadFormSounds();
+    await Promise.resolve();
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]?.[0]).toBe(0.4);
+    spy.mockRestore();
+  });
+});
+
 describe('isTypewriterKey', () => {
   it('accepts printable characters and deletes', () => {
-    expect(isTypewriterKey({ key: 'a', metaKey: false, ctrlKey: false, altKey: false })).toBe(
-      true,
-    );
-    expect(isTypewriterKey({ key: ' ', metaKey: false, ctrlKey: false, altKey: false })).toBe(
-      true,
-    );
+    expect(isTypewriterKey({ key: 'a', metaKey: false, ctrlKey: false, altKey: false })).toBe(true);
+    expect(isTypewriterKey({ key: ' ', metaKey: false, ctrlKey: false, altKey: false })).toBe(true);
     expect(
       isTypewriterKey({ key: 'Backspace', metaKey: false, ctrlKey: false, altKey: false }),
     ).toBe(true);
@@ -86,9 +114,7 @@ describe('isTypewriterKey', () => {
     expect(
       isTypewriterKey({ key: 'ArrowLeft', metaKey: false, ctrlKey: false, altKey: false }),
     ).toBe(false);
-    expect(isTypewriterKey({ key: 'a', metaKey: true, ctrlKey: false, altKey: false })).toBe(
-      false,
-    );
+    expect(isTypewriterKey({ key: 'a', metaKey: true, ctrlKey: false, altKey: false })).toBe(false);
     expect(
       isTypewriterKey({
         key: 'a',

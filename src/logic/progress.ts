@@ -19,9 +19,13 @@ export function isChrome(q: Question): boolean {
   return CHROME_TYPES.has(q.type);
 }
 
-/** `visibleIf` is the only filter; chrome questions don't carry one and pass through. */
+/**
+ * `visibleIf` is the only filter; chrome questions don't carry one and pass
+ * through, and so does a question whose `visibleIf` isn't a condition at all.
+ */
 function shows(q: Question, answers: LooseAnswers, others?: OtherIndex, areas?: AreaIndex) {
-  return !('visibleIf' in q && q.visibleIf) || evaluate(q.visibleIf, answers, others, areas);
+  const c = 'visibleIf' in q ? q.visibleIf : undefined;
+  return typeof c !== 'object' || !c || evaluate(c, answers, others, areas);
 }
 
 /**
