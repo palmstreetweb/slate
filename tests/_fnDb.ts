@@ -49,6 +49,9 @@ export type FnDbState = {
   uploads: Map<string, UploadRow>;
   /** 021's numbers and switches, so a test can pin one of them. */
   storage: StorageKnobs;
+  /** What the Function passed to `new Pool(...)` and `pool.on(...)` (ADR-071: the timeouts). */
+  poolConfig: Record<string, unknown>;
+  poolEvents: Array<{ event: string; handler: (...args: unknown[]) => unknown }>;
   now: number | null;
   fail: {
     gate?: boolean;
@@ -115,6 +118,8 @@ export function newFnDbState(): FnDbState {
     submissions: [],
     uploads: new Map(),
     storage: defaultStorage(),
+    poolConfig: {},
+    poolEvents: [],
     now: null,
     fail: {},
     tryFill: null,
@@ -609,6 +614,13 @@ function insertPublicSubmission(
 
 export function fnDbPool(s: FnDbState) {
   return class {
+    constructor(config: Record<string, unknown> = {}) {
+      s.poolConfig = config;
+    }
+    on(event: string, handler: (...args: unknown[]) => unknown) {
+      s.poolEvents.push({ event, handler });
+      return this;
+    }
     async query(sql: string, params: unknown[] = []) {
       s.log.push({ sql, params });
       if (sql.includes('consume_submit_rates')) {

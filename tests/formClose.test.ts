@@ -222,6 +222,10 @@ describe('per-type answer clamps (ADR-063)', () => {
     expect(clampForQuestion({ type: 'number' }, 'lots')).toBeUndefined();
     expect(clampForQuestion({ type: 'scale' }, Number.NaN)).toBeUndefined();
     expect(clampForQuestion({ type: 'nps' }, 7)).toBe(7);
+    // 400 digits pass the digits-only regex but read as Infinity; JSON would store null (audit 2026-10).
+    expect(clampForQuestion({ type: 'number' }, '9'.repeat(400))).toBeUndefined();
+    expect(clampForQuestion({ type: 'number' }, `-${'9'.repeat(400)}.5`)).toBeUndefined();
+    expect(clampForQuestion({ type: 'number' }, ' 12.5 ')).toBe(12.5);
     expect(clampForQuestion({ type: 'date' }, 'x'.repeat(41))).toBeUndefined();
     expect(clampForQuestion({ type: 'date' }, { start: 'a' })).toBeUndefined();
     const multi = {
