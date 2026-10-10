@@ -333,19 +333,23 @@ describe('vercel.json framing (ADR-054)', () => {
     expect(open.get('connect-src')).toContain('https://*.ingest.us.sentry.io');
   });
 
-  it('connect-src names the exact Neon hosts this site uses, never every Neon tenant (audit 2026-10 L-3)', () => {
+  it('connect-src names the exact Neon hosts this site uses, plus one pattern for Object Storage (audit 2026-10 L-3, ADR-071)', () => {
     const connect = directives(headersFor('/settings').get('content-security-policy')![0]!).get(
       'connect-src',
     )!;
     const hosts = connect.split(/\s+/);
-    expect(hosts.filter((h) => h.includes('neon.tech')).every((h) => !h.includes('*'))).toBe(true);
-    // The two Functions the browser calls, the auth and Data API hosts, and the branch's Object
-    // Storage endpoint (presigned PUTs go straight to it).
+    // The two Functions the browser calls, the auth and Data API hosts, each pinned exactly.
+    // Object Storage (presigned PUTs go straight to it) is the one pattern: its branch
+    // host could not be read without making an upload, and `https://*.aws.neon.tech` is
+    // the entry already live today and known to let those PUTs through. `*.neon.tech`
+    // (every Neon tenant) is gone.
     const neon = hosts.filter((h) => h.includes('neon.tech'));
     expect(neon).toHaveLength(5);
+    const wild = neon.filter((h) => h.includes('*'));
+    expect(wild).toEqual(['https://*.aws.neon.tech']);
+    expect(neon).not.toContain('https://*.neon.tech');
     expect(neon.some((h) => /-submitresponse\.compute\./.test(h))).toBe(true);
     expect(neon.some((h) => /-storagesign\.compute\./.test(h))).toBe(true);
-    expect(neon.some((h) => /^https:\/\/br-[a-z0-9-]+\.storage\./.test(h))).toBe(true);
     expect(neon.some((h) => /\.neonauth\./.test(h))).toBe(true);
     expect(neon.some((h) => /\.apirest\./.test(h))).toBe(true);
     // The hosts index.html warms are among them.

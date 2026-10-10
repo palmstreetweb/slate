@@ -22,8 +22,15 @@ const db = vi.hoisted(() => ({
 vi.mock('../examples/_admin/neon/client.js', () => ({
   getNeon: () => ({
     from: () => ({
-      insert: async () =>
-        db.failInserts ? { error: { message: 'TypeError: Failed to fetch' } } : { error: null },
+      // 022 (ADR-071): the insert reads the server-assigned slug back.
+      insert: (row: { slug?: string }) => ({
+        select: () => ({
+          single: async () =>
+            db.failInserts
+              ? { data: null, error: { message: 'TypeError: Failed to fetch' } }
+              : { data: { slug: row.slug }, error: null },
+        }),
+      }),
       upsert: async (row: Record<string, unknown>) => {
         db.upserts.push(row);
         return db.failUpserts ? { error: { message: 'TypeError: Failed to fetch' } } : { error: null };
