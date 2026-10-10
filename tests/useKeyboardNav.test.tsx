@@ -104,7 +104,9 @@ describe('useKeyboardNav', () => {
       id: 'towns',
       type: 'multi_choice',
       title: 'Towns?',
-      options: 'ABCDEFGHIJKLMNOP'.split('').map((letter) => ({ label: letter, value: letter.toLowerCase() })),
+      options: 'ABCDEFGHIJKLMNOP'
+        .split('')
+        .map((letter) => ({ label: letter, value: letter.toLowerCase() })),
     };
     const { onSelectChoice } = setup(towns);
     fireEvent.keyDown(window, { key: 'g' });
@@ -183,6 +185,76 @@ describe('useKeyboardNav', () => {
     expect(onSelectScale).not.toHaveBeenCalled();
     fireEvent.keyDown(window, { key: '0' });
     expect(onSelectScale).toHaveBeenCalledWith(10);
+  });
+
+  it('a 0–100 scale composes three digits: "100" is 100, not 10 then a stray 0', () => {
+    vi.useFakeTimers();
+    try {
+      const wide: Question = { id: 'pct', type: 'scale', title: 'Percent?', min: 0, max: 100 };
+      const { onSelectScale } = setup(wide);
+      fireEvent.keyDown(window, { key: '1' });
+      fireEvent.keyDown(window, { key: '0' });
+      expect(onSelectScale).not.toHaveBeenCalled();
+      fireEvent.keyDown(window, { key: '0' });
+      expect(onSelectScale).toHaveBeenCalledWith(100);
+      onSelectScale.mockClear();
+      // "10" and a pause is 10; "57" commits at once (570 is out of range).
+      fireEvent.keyDown(window, { key: '1' });
+      fireEvent.keyDown(window, { key: '0' });
+      vi.advanceTimersByTime(400);
+      expect(onSelectScale).toHaveBeenCalledWith(10);
+      onSelectScale.mockClear();
+      fireEvent.keyDown(window, { key: '5' });
+      fireEvent.keyDown(window, { key: '7' });
+      expect(onSelectScale).toHaveBeenCalledWith(57);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a held letter or digit (key repeat) does nothing', () => {
+    const { onSelectChoice } = setup(choice);
+    fireEvent.keyDown(window, { key: 'a', repeat: true });
+    expect(onSelectChoice).not.toHaveBeenCalled();
+    const { onSelectScale } = setup(scale);
+    fireEvent.keyDown(window, { key: '3', repeat: true });
+    expect(onSelectScale).not.toHaveBeenCalled();
+  });
+
+  it('Enter on a focused button is the button’s own: no confirm, no advance', () => {
+    const button = document.createElement('button');
+    document.body.appendChild(button);
+    const link = document.createElement('a');
+    link.href = '#x';
+    document.body.appendChild(link);
+    const option = document.createElement('div');
+    option.setAttribute('role', 'radio');
+    document.body.appendChild(option);
+    try {
+      const onConfirm = vi.fn(() => true);
+      const { onAdvance } = setup(multi, { onConfirm });
+      fireEvent.keyDown(button, { key: 'Enter' });
+      fireEvent.keyDown(link, { key: 'Enter' });
+      fireEvent.keyDown(option, { key: 'Enter' });
+      expect(onConfirm).not.toHaveBeenCalled();
+      // Welcome: Enter on the Resume / Back / toggle buttons must not start the form.
+      const second = setup(welcome);
+      fireEvent.keyDown(button, { key: 'Enter' });
+      expect(second.onAdvance).not.toHaveBeenCalled();
+      expect(onAdvance).not.toHaveBeenCalled();
+      // From the body, Enter still confirms and still advances.
+      fireEvent.keyDown(document.body, { key: 'Enter' });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(second.onAdvance).toHaveBeenCalledTimes(1);
+      // Letters on a focused button still pick (muscle memory, unchanged).
+      const third = setup(choice);
+      fireEvent.keyDown(button, { key: 'a' });
+      expect(third.onSelectChoice).toHaveBeenCalledWith(0);
+    } finally {
+      button.remove();
+      link.remove();
+      option.remove();
+    }
   });
 
   it('modifier keys suppress shortcuts', () => {
