@@ -104,9 +104,28 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
     openRef.current = open;
   }, [open]);
 
-  useFocusTrap(panelRef, open, () => {
-    if (!busy) onClose();
-  });
+  const lastInstructionRef = useRef<string | undefined>(undefined);
+  const genRef = useRef(0);
+  /** Ends the request in flight; a late answer is ignored by `genRef`. */
+  const abortRef = useRef<AbortController | null>(null);
+
+  /** Stop generating and go back to where the owner was (audit A2). */
+  const cancelGenerate = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    genRef.current += 1;
+    setConverting(false);
+    setPhase((current) => (current === 'generating' ? (draft ? 'review' : 'compose') : current));
+  }, [draft]);
+
+  /** Escape and the backdrop: stop a generation first; opening the editor can't be left. */
+  const dismiss = useCallback(() => {
+    if (phase === 'opening') return;
+    if (phase === 'generating') cancelGenerate();
+    onClose();
+  }, [cancelGenerate, onClose, phase]);
+
+  useFocusTrap(panelRef, open, dismiss);
 
   useEffect(() => {
     if (!open) return;
@@ -115,6 +134,8 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
 
   useEffect(() => {
     if (open) return;
+    abortRef.current?.abort();
+    abortRef.current = null;
     setError(null);
     setFileError(null);
     setRevealed([]);
@@ -127,9 +148,6 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
     window.clearTimeout(dropLandedTimer.current);
   }, [open]);
 
-  const lastInstructionRef = useRef<string | undefined>(undefined);
-  const genRef = useRef(0);
-
   const generate = useCallback(
     async (instruction?: string) => {
       const note = instruction?.trim();
@@ -138,6 +156,9 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
       if (!text && !file) return;
       lastInstructionRef.current = revising ? note : undefined;
       const token = (genRef.current += 1);
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
       setPhase('generating');
       setError(null);
       setFileError(null);
@@ -146,15 +167,18 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
       if (fromPdf) setConverting(true);
       const started = Date.now();
       try {
-        const next = await requestGeneratedForm({
-          prompt: text,
-          previous: revising ? draft?.form : undefined,
-          instruction: revising ? note : undefined,
-          document:
-            fromPdf && file
-              ? { filename: file.name, mime: file.mime, base64: file.base64 }
-              : undefined,
-        });
+        const next = await requestGeneratedForm(
+          {
+            prompt: text,
+            previous: revising ? draft?.form : undefined,
+            instruction: revising ? note : undefined,
+            document:
+              fromPdf && file
+                ? { filename: file.name, mime: file.mime, base64: file.base64 }
+                : undefined,
+          },
+          { signal: ctrl.signal },
+        );
         if (fromPdf) {
           const remaining = 3000 - (Date.now() - started);
           if (remaining > 0) {
@@ -178,6 +202,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
         setPhase('review');
       } catch (err) {
         if (token !== genRef.current) return;
+        if (err instanceof GenerateRequestError && err.cancelled) return;
         if (err instanceof GenerateRequestError) {
           setError({ message: err.message, retryable: err.retryable });
         } else {
@@ -297,13 +322,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
 
   return createPortal(
     <div data-slate-forms="" data-theme-name="slate" data-admin-ui={uiTheme} data-theme={mode}>
-      <div
-        className="slate-dialog-backdrop"
-        role="presentation"
-        onClick={() => {
-          if (!busy) onClose();
-        }}
-      >
+      <div className="slate-dialog-backdrop" role="presentation" onClick={dismiss}>
         <div
           ref={panelRef}
           className="slate-dialog slate-dialog--ai"
@@ -530,7 +549,12 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
                 Try again
               </button>
             ) : (
-              <button type="button" className="slate-btn" onClick={onClose} disabled={busy}>
+              <button
+                type="button"
+                className="slate-btn"
+                // Stops a generation in flight (audit A2); otherwise closes.
+                onClick={() => (phase === 'generating' ? cancelGenerate() : onClose())}
+              >
                 Cancel
               </button>
             )}
