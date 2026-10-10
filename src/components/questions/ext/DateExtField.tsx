@@ -155,6 +155,9 @@ function DateTimePart({
       if (!e.repeat) onEnter();
       return;
     }
+    // A plain A or P sets AM / PM; with a modifier it is the browser's own
+    // (select all, print; audit 2026-10).
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (clock12 && (e.key === 'a' || e.key === 'A' || e.key === 'p' || e.key === 'P')) {
       e.preventDefault();
       onChange({ ...state, meridiem: e.key.toUpperCase() === 'A' ? 'AM' : 'PM' });

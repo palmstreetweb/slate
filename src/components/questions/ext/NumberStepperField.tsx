@@ -73,8 +73,11 @@ export default function NumberStepperField({
   );
 
   // What you see is what you submit: the box starts on the stored answer,
-  // else on 0 (or the nearest bound).
+  // else on 0 (or the nearest bound). Until a step or a keystroke, that number
+  // is only a starting point: an optional question left untouched stores
+  // nothing, as OK is the only way past it (audit 2026-10).
   const [text, setText] = useState(() => String(typeof value === 'number' ? value : clamp(0)));
+  const [touched, setTouched] = useState(typeof value === 'number');
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const holdRef = useRef<number | null>(null);
@@ -119,6 +122,7 @@ export default function NumberStepperField({
         const from = n !== undefined && Number.isFinite(n) ? n : clamp(0);
         return String(clamp(from + dir * step));
       });
+      setTouched(true);
       setError(null);
       nudge(dir);
     },
@@ -163,7 +167,8 @@ export default function NumberStepperField({
   };
 
   const submit = useCallback(() => {
-    const n = parse(text);
+    // Untouched and optional: no answer, not the starting number.
+    const n = !touched && question.required === false ? undefined : parse(text);
     if (n !== undefined && Number.isNaN(n)) {
       setError(NOT_A_NUMBER);
       shakeInvalid(inputRef.current);
@@ -178,7 +183,7 @@ export default function NumberStepperField({
     setError(null);
     onAnswer(n);
     onAdvance();
-  }, [text, question, parse, onAnswer, onAdvance]);
+  }, [text, touched, question, parse, onAnswer, onAdvance]);
 
   useRegisterFormConfirm(submit);
 
@@ -286,6 +291,7 @@ export default function NumberStepperField({
             aria-describedby={errId}
             onChange={(e) => {
               setText(e.target.value);
+              setTouched(true);
               if (error) setError(null);
             }}
             onKeyDown={onKeyDown}

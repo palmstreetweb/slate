@@ -26,7 +26,7 @@ import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } f
 import type { PictureChoiceQuestion, YesNoQuestion } from '@/types/Question.js';
 import { pickLimits, validate } from '@/logic/validation.js';
 import { pickChoices, pickHint } from '@/logic/pickRule.js';
-import { useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
+import { useDraft, useRegisterFormConfirm } from '@/hooks/useRegisterFormConfirm.js';
 import { focusAfter } from '@/utils/focus.js';
 import { motionReduced, shakeInvalid } from '@/utils/motion.js';
 import type { ExtFieldProps } from '../lazyFields.js';
@@ -289,7 +289,10 @@ function PictureSwipe({
   const titleId = useId();
   const options = question.options;
   const seeded = Array.isArray(value) ? (value as string[]) : null;
-  const [decisions, setDecisions] = useState<Dir[]>(() =>
+  // The deck's progress is kept across Back until the last card stores the
+  // likes (audit 2026-10); a finished deck seeds from the stored answer.
+  const [decisions, setDecisions] = useDraft<Dir[]>(
+    question.id,
     seeded ? options.map((o) => (seeded.includes(o.value) ? 'like' : 'nope')) : [],
   );
   const [error, setError] = useState<string | null>(null);
@@ -327,7 +330,7 @@ function PictureSwipe({
         onAnswer(options.filter((_, i) => next[i] === 'like').map((o) => o.value));
       }
     },
-    [options, decisions, onAnswer, ping],
+    [options, decisions, setDecisions, onAnswer, ping],
   );
 
   // At the most likes, a like comes back with a word on why (ADR-070),

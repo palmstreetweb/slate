@@ -294,8 +294,9 @@ export default function AvailabilityField({
       e.preventDefault();
       const d = Math.min(grid.days.length - 1, Math.max(0, focus.d + mv[0]));
       const s = Math.min(grid.count - 1, Math.max(0, focus.s + mv[1]));
-      if (e.shiftKey)
-        setCells([here, cellKey(grid.days[d]!, s)], pickedRef.current.has(here) ? 'add' : 'remove');
+      // Shift + arrows paint as they go, as the hint says — from a busy time
+      // too (it used to clear from one; audit 2026-10). Space clears a time.
+      if (e.shiftKey) setCells([here, cellKey(grid.days[d]!, s)], 'add');
       setFocus({ d, s });
       gridRef.current
         ?.querySelector<HTMLElement>(`[data-cell="${cellKey(grid.days[d]!, s)}"]`)

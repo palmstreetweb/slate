@@ -50,7 +50,12 @@ type Phase = 'idle' | 'locating' | 'done' | 'off' | 'manual';
 /** A padlock, so the privacy line doesn't read as an empty checkbox to tick. */
 function LockIcon() {
   return (
-    <svg className="slate-loc-privacy-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg
+      className="slate-loc-privacy-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
       <rect x="5" y="11" width="14" height="10" rx="2" />
       <path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
     </svg>
@@ -118,6 +123,10 @@ export default function LocationField({
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const alive = useRef(true);
+  // Which location request is current: a position that lands after "Type it
+  // instead" (or after a newer request) is dropped, never written over a typed
+  // ZIP (audit 2026-10).
+  const request = useRef(0);
   // Set on every mount: StrictMode (and a remount) runs the cleanup in between.
   useEffect(() => {
     alive.current = true;
@@ -151,9 +160,10 @@ export default function LocationField({
     }
     setPhase('locating');
     setSaid('Finding your location…');
+    const id = ++request.current;
     geo.getCurrentPosition(
       (pos) => {
-        if (!alive.current) return;
+        if (!alive.current || request.current !== id) return;
         const next = locationAnswerCore(
           rec,
           { lat: pos.coords.latitude, lng: pos.coords.longitude },
@@ -176,7 +186,7 @@ export default function LocationField({
         );
       },
       (err) => {
-        if (!alive.current) return;
+        if (!alive.current || request.current !== id) return;
         setOffReason(err.code === 1 ? 'denied' : err.code === 3 ? 'timeout' : 'unavailable');
         setPhase('off');
         setSaid('Location is off. You can type it instead.');
@@ -355,6 +365,8 @@ export default function LocationField({
               type="button"
               className="slate-loc-link"
               onClick={() => {
+                // A position still on its way is no longer wanted.
+                request.current++;
                 setPhase('manual');
                 setError(null);
                 if (answer?.lat) store(undefined);
@@ -366,7 +378,9 @@ export default function LocationField({
 
           <p id={noteId} className="slate-loc-privacy">
             <LockIcon />
-            <span>{locationPrivacyLine(question, typing, Boolean(center && radius) || hasZipCheck)}</span>
+            <span>
+              {locationPrivacyLine(question, typing, Boolean(center && radius) || hasZipCheck)}
+            </span>
           </p>
         </div>
       </div>
