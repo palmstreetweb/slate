@@ -22,11 +22,13 @@ import { SwissDecoration } from '@/components/decorations/SwissDecoration.js';
 import { LEAVE_MAX_MS } from '@/utils/questionHandoff.js';
 import { shakeInvalid } from '@/utils/motion.js';
 import * as pixieMallet from '@/utils/pixieMallet.js';
-import { playFormFinale } from '@/utils/formSounds.js';
+import { playFormFinale, preloadFormSounds } from '@/utils/formSounds.js';
 
 function calm(children: ReactNode) {
   return (
-    <ReducedMotionOverrideContext.Provider value={true}>{children}</ReducedMotionOverrideContext.Provider>
+    <ReducedMotionOverrideContext.Provider value={true}>
+      {children}
+    </ReducedMotionOverrideContext.Provider>
   );
 }
 
@@ -368,7 +370,9 @@ describe('completion celebration', () => {
     spy.mockRestore();
   });
 
-  it('playFormFinale is a no-op when off', () => {
+  it('playFormFinale is a no-op when off', async () => {
+    // The synth loads on demand (engine budget); have it here first.
+    await preloadFormSounds();
     const spy = vi.spyOn(pixieMallet, 'playSound').mockImplementation(() => {});
     playFormFinale('off');
     playFormFinale(undefined);

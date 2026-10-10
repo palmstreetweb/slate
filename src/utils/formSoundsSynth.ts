@@ -1,0 +1,213 @@
+/**
+ * The step-sound synth: ten presets, the typewriter tick and the completion
+ * finale, as recipes for the generic engine in `pixieMallet.ts` (Web Audio,
+ * zero deps). Loaded on demand by `formSounds.ts`: a form with its sound off
+ * never downloads it, and it stays out of the engine's core budget.
+ */
+
+import type { FormSoundId } from '@/types/Sound.js';
+import { playSound, SOUND_711_PIXIE_MALLET, type Recipe } from '@/utils/pixieMallet.js';
+
+const RECIPES: Record<FormSoundId, Recipe> = {
+  'pixie-mallet': SOUND_711_PIXIE_MALLET,
+  'soft-chime': {
+    duration: 0.5,
+    layers: [
+      {
+        wave: 'sine',
+        gain: 0.08,
+        freq: 1046.5,
+        ampEnv: { attack: 0.005, decay: 0.35, sustain: 0, release: 0.08 },
+      },
+    ],
+  },
+  'glass-tap': {
+    duration: 0.2,
+    layers: [
+      {
+        wave: 'sine',
+        gain: 0.06,
+        freq: 1318.51,
+        ampEnv: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.03 },
+        filter: { type: 'bandpass', freq: 2000, q: 8 },
+      },
+    ],
+  },
+  'wood-block': {
+    duration: 0.1,
+    layers: [
+      {
+        wave: 'triangle',
+        gain: 0.12,
+        freq: 180,
+        ampEnv: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.01 },
+      },
+    ],
+  },
+  'bubble-pop': {
+    duration: 0.14,
+    layers: [
+      {
+        wave: 'sine',
+        gain: 0.09,
+        freq: 600,
+        pitchEnv: { to: 200, time: 0.08, curve: 'exp' },
+        ampEnv: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.02 },
+      },
+    ],
+  },
+  'coin-pickup': {
+    duration: 0.18,
+    layers: [
+      {
+        wave: 'square',
+        gain: 0.05,
+        ampEnv: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.02 },
+        repeat: { count: 2, interval: 0.06, pitchSeq: [987.77, 1318.51] },
+      },
+    ],
+  },
+  'page-flip': {
+    duration: 0.28,
+    layers: [
+      {
+        wave: 'triangle',
+        gain: 0.05,
+        freq: 800,
+        pitchEnv: { to: 300, time: 0.15, curve: 'exp' },
+        ampEnv: { attack: 0.002, decay: 0.2, sustain: 0, release: 0.05 },
+      },
+    ],
+  },
+  'type-ding': {
+    duration: 0.35,
+    layers: [
+      {
+        type: 'fm',
+        wave: 'sine',
+        gain: 0.06,
+        freq: 880,
+        fm: { modWave: 'sine', ratio: 2.5, index: 3 },
+        ampEnv: { attack: 0.001, decay: 0.25, sustain: 0, release: 0.06 },
+      },
+    ],
+  },
+  marimba: {
+    duration: 0.28,
+    layers: [
+      {
+        wave: 'sine',
+        gain: 0.07,
+        ampEnv: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.03 },
+        repeat: { count: 3, interval: 0.07, pitchSeq: [523.25, 392, 293.66] },
+      },
+    ],
+  },
+  'laser-blip': {
+    duration: 0.1,
+    layers: [
+      {
+        wave: 'saw',
+        gain: 0.04,
+        freq: 220,
+        pitchEnv: { to: 1760, time: 0.06, curve: 'exp' },
+        ampEnv: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.01 },
+      },
+    ],
+  },
+};
+
+/** Play a built-in step sound. */
+export function playStep(id: FormSoundId, volume: number): void {
+  playSound(volume, RECIPES[id]);
+}
+
+/**
+ * Soft mechanical key tick for text entry (ADR-034). Pitch varies slightly so
+ * rapid typing doesn't sound like a single sample loop. Rate-limited so held
+ * keys / autofill don't flood the AudioContext.
+ */
+const TYPEWRITER_TICK: Recipe = {
+  duration: 0.045,
+  layers: [
+    {
+      wave: 'triangle',
+      gain: 0.11,
+      ampEnv: { attack: 0.0004, decay: 0.022, sustain: 0, release: 0.006 },
+      filter: { type: 'bandpass', freq: 2600, q: 3.2 },
+      repeat: {
+        count: 1,
+        interval: 0,
+        pitchPool: [860, 940, 1020, 1100, 1180, 1260],
+      },
+    },
+    {
+      wave: 'square',
+      gain: 0.028,
+      freq: 180,
+      ampEnv: { attack: 0.0003, decay: 0.012, sustain: 0, release: 0.004 },
+      filter: { type: 'lowpass', freq: 600, q: 0.7 },
+    },
+  ],
+};
+
+let _lastTypewriterMs = 0;
+const TYPEWRITER_MIN_GAP_MS = 26;
+
+/** Play one typewriter key tick (quieter than step sounds). */
+export function playTick(volume: number): void {
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  if (now - _lastTypewriterMs < TYPEWRITER_MIN_GAP_MS) return;
+  _lastTypewriterMs = now;
+  playSound(volume, TYPEWRITER_TICK);
+}
+
+/**
+ * Completion finale (ADR-059): a soft rising C-major arpeggio that rings out
+ * together over a warm root — a "you're done" chord rather than a step
+ * blip. Same synth engine, no assets. Played by `<Form>` once, on a
+ * confirmed submit, and only when the form's sound is on.
+ */
+const FINALE_CHORD: Recipe = {
+  duration: 1.6,
+  layers: [
+    {
+      wave: 'sine',
+      gain: 0.035,
+      freq: 261.63,
+      ampEnv: { attack: 0.02, decay: 1.3, sustain: 0, release: 0.2 },
+    },
+    {
+      wave: 'triangle',
+      gain: 0.05,
+      freq: 523.25,
+      ampEnv: { attack: 0.004, decay: 1.1, sustain: 0, release: 0.2 },
+    },
+    {
+      wave: 'triangle',
+      gain: 0.045,
+      freq: 659.25,
+      startOffset: 0.07,
+      ampEnv: { attack: 0.004, decay: 1.05, sustain: 0, release: 0.2 },
+    },
+    {
+      wave: 'triangle',
+      gain: 0.042,
+      freq: 783.99,
+      startOffset: 0.14,
+      ampEnv: { attack: 0.004, decay: 1.0, sustain: 0, release: 0.2 },
+    },
+    {
+      wave: 'sine',
+      gain: 0.05,
+      freq: 1046.5,
+      startOffset: 0.22,
+      ampEnv: { attack: 0.004, decay: 1.15, sustain: 0, release: 0.25 },
+    },
+  ],
+};
+
+/** Play the completion finale. */
+export function playFinale(volume: number): void {
+  playSound(volume, FINALE_CHORD);
+}
