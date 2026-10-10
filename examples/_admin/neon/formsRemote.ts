@@ -7,6 +7,7 @@ import type { FormRecord } from '../_formsStore.js';
 import { allocateNumericSlug, slugify } from '../shareUrls.js';
 import { getNeon } from './client.js';
 import { afterPermanentDelete } from './storageQuotaRemote.js';
+import { dropFormSubmissionsLocal } from './submissionsRemote.js';
 import { ensureAuthForDataApi, waitForAuthReady } from './ensureAuth.js';
 import {
   FORM_QUOTA_MAX,
@@ -618,11 +619,12 @@ function enqueueFormInsert(form: FormRecord): void {
           cache = read().map((f) => (f.id === form.id ? { ...f, slug: landedSlug } : f));
           notify();
         }
-        emitPersistOk('form');
+        // Named, so an open editor on another form never takes it as its own save (audit B9).
+        emitPersistOk('form', form.id);
       } catch (err) {
         dropOptimisticForm(form.id);
         // A one-off to repeat, not an edit left unsaved: "Check your connection and try again." (R27)
-        reportFormFailure(err, 'delete', 'Couldn’t create that form');
+        reportFormFailure(err, 'delete', 'Couldn’t create that form', form.id);
         throw err;
       }
     })
@@ -648,10 +650,13 @@ function enqueueFormDelete(formId: string, onFailRestore?: FormRecord): void {
     .then(async () => {
       try {
         await deleteFormRow(formId);
-        emitPersistOk('form');
+        // Its responses went with it on the server (001's cascade): forget them here
+        // only now, so a delete that fails leaves them with the restored form (audit B10).
+        dropFormSubmissionsLocal(formId);
+        emitPersistOk('form', formId);
       } catch (err) {
         deletedFormIds.delete(formId);
-        reportFormFailure(err, 'delete', 'Couldn’t delete that form');
+        reportFormFailure(err, 'delete', 'Couldn’t delete that form', formId);
         if (onFailRestore) {
           cache = [onFailRestore, ...read().filter((f) => f.id !== onFailRestore.id)];
           notify();
@@ -665,6 +670,8 @@ function enqueueFormDelete(formId: string, onFailRestore?: FormRecord): void {
       }
     });
   formWriteChain.set(formId, next);
+  // Already reported via slate-persist-error; the chain stays rejected for awaiters.
+  next.catch(() => {});
 }
 
 export function subscribeFormsRemote(listener: Listener): () => void {
@@ -708,12 +715,15 @@ export async function createFormRemote(opts: {
   try {
     record.slug = await insertForm(record);
     cache = [record, ...read()];
+    touchLocal(record.id);
     notify();
     return record;
   } catch (err) {
     if (isQuotaExceededError(err)) {
       throw new FormQuotaError(quotaFromUnknown(err) ?? getFormQuotaRemote());
     }
+    // Logged and said, never swallowed (audit B13): the caller only learns "null".
+    reportFormFailure(err, 'delete', 'Couldn’t create that form', record.id);
     return null;
   }
 }
@@ -804,6 +814,7 @@ export async function restoreAllFormsRemote(): Promise<boolean> {
 export async function permanentlyDeleteFormRemote(formId: string): Promise<boolean> {
   try {
     await deleteFormRow(formId);
+    dropFormSubmissionsLocal(formId);
     cache = read().filter((f) => f.id !== formId);
     notify();
     return true;
@@ -817,6 +828,7 @@ export async function emptyFormTrashRemote(): Promise<boolean> {
   try {
     for (const f of trashed) {
       await deleteFormRow(f.id);
+      dropFormSubmissionsLocal(f.id);
     }
     cache = read().filter(isActive);
     notify();
@@ -903,13 +915,25 @@ export function createFormRemoteSync(opts: { name: string; schema: Schema }): Fo
   return record;
 }
 
+export type FormWriteOptions = {
+  /** Runs if the write carrying this patch fails, with the record before and after it. */
+  onFail?: (before: FormRecord, after: FormRecord) => void;
+  /** Runs once the write carrying this patch has landed. */
+  onLanded?: () => void;
+  /**
+   * A one-off setting (unpublish, closing, a tracked link), not an edit: when its
+   * write fails, put the fields the patch set back the way they were — before
+   * `onFail` — instead of leaving the panel saying something the server never
+   * took (audit B4). `failTitle` heads the shell's toast.
+   */
+  rollback?: boolean;
+  failTitle?: string;
+};
+
 export function updateFormRemoteSync(
   formId: string,
   patch: Partial<Omit<FormRecord, 'id' | 'createdAt'>>,
-  /** Runs if the write carrying this patch fails, with the record before and after it. */
-  onFail?: (before: FormRecord, after: FormRecord) => void,
-  /** Runs once the write carrying this patch has landed. */
-  onLanded?: () => void,
+  opts: FormWriteOptions = {},
 ): [FormRecord | null, boolean] {
   const idx = read().findIndex((f) => f.id === formId && isActive(f));
   if (idx === -1) return [null, false];
@@ -927,9 +951,18 @@ export function updateFormRemoteSync(
   copy[idx] = next;
   cache = copy;
   notify();
+  const { onFail, onLanded, rollback, failTitle } = opts;
+  const keys = Object.keys(patch) as Array<keyof FormRecord>;
   enqueueFormUpsert(next, {
-    onFail: onFail && (() => onFail(prev, next)),
+    onFail:
+      onFail || rollback
+        ? () => {
+            if (rollback) rollbackForm(prev, next, keys);
+            onFail?.(prev, next);
+          }
+        : undefined,
     onLanded,
+    ...(failTitle ? { failTitle } : {}),
   });
   return [next, true];
 }
@@ -1066,27 +1099,46 @@ export function publishFormRemoteSync(
       publishedName: form.name,
       status: 'published',
     },
-    (before, after) => {
-      // The publish never reached the server, so it isn't live: put the draft
-      // state back and say so (the shell's toast), instead of a "Live" that
-      // isn't (COPY-10). Runs before the save error, which the toast folds in.
-      rollbackForm(before, after, ['status', 'publishedSchema', 'publishedName']);
-      if (typeof window !== 'undefined') {
-        // A republish that fails leaves the earlier version live (STU-6, COPY-R1).
-        const wasLive = before.status === 'published' && Boolean(before.publishedSchema);
-        window.dispatchEvent(
-          new CustomEvent('slate-publish-error', { detail: { formId, wasLive } }),
-        );
-      }
-      onFail?.();
+    {
+      onFail: (before, after) => {
+        // The publish never reached the server, so it isn't live: put the draft
+        // state back and say so (the shell's toast), instead of a "Live" that
+        // isn't (COPY-10). Runs before the save error, which the toast folds in.
+        rollbackForm(before, after, ['status', 'publishedSchema', 'publishedName']);
+        if (typeof window !== 'undefined') {
+          // A republish that fails leaves the earlier version live (STU-6, COPY-R1).
+          const wasLive = before.status === 'published' && Boolean(before.publishedSchema);
+          window.dispatchEvent(
+            new CustomEvent('slate-publish-error', { detail: { formId, wasLive } }),
+          );
+        }
+        onFail?.();
+      },
+      onLanded,
     },
-    onLanded,
   );
   return updated;
 }
 
-export function unpublishFormRemoteSync(formId: string): FormRecord | null {
-  const [updated] = updateFormRemoteSync(formId, { status: 'draft' });
+/**
+ * Take the public link down. Like publish, the write lands in the background:
+ * a failure puts "published" back and the shell says so, `onLanded` runs once
+ * the server has it (audit B4).
+ */
+export function unpublishFormRemoteSync(
+  formId: string,
+  opts: { onFail?: () => void; onLanded?: () => void } = {},
+): FormRecord | null {
+  const [updated] = updateFormRemoteSync(
+    formId,
+    { status: 'draft' },
+    {
+      rollback: true,
+      failTitle: 'Couldn’t unpublish that form',
+      onFail: () => opts.onFail?.(),
+      onLanded: opts.onLanded,
+    },
+  );
   return updated;
 }
 

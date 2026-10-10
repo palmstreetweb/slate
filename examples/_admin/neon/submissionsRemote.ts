@@ -629,6 +629,21 @@ export function purgeSubmissionsRemoteSync(formId: string): void {
 }
 
 /**
+ * Forget a form's rows once the form itself was deleted: the database removed
+ * them with it (001's cascade), so there is nothing to write (audit B10).
+ */
+export function dropFormSubmissionsLocal(formId: string): void {
+  let changed = false;
+  for (const e of [...index.values()]) {
+    if (e.formId !== formId) continue;
+    removeLocal(e.id);
+    changed = true;
+  }
+  loadedForms.delete(formId);
+  if (changed) notify();
+}
+
+/**
  * Put one answer into the cached row after the database changed it (the
  * roster's move, ADR-066 — signupMove.ts makes the write through its RPC).
  */

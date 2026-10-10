@@ -327,13 +327,14 @@ function FormEditorBody({ formId }: { formId: string }) {
     const onPersistError = (event: Event) => {
       const detail = (event as CustomEvent<{ kind?: string; message?: string; formId?: string }>)
         .detail;
-      if (detail?.kind !== 'form' || (detail.formId && detail.formId !== formId)) return;
+      // Only this form's own write: every form write names its form (audit B9).
+      if (detail?.kind !== 'form' || detail.formId !== formId) return;
       // The toast comes from the shell (PersistErrorToasts); this is the inline status.
       setSaveError(detail.message || 'Couldn’t save your last change. Check your connection.');
     };
     const onPersistOk = (event: Event) => {
       const detail = (event as CustomEvent<{ kind?: string; formId?: string }>).detail;
-      if (detail?.kind !== 'form' || (detail.formId && detail.formId !== formId)) return;
+      if (detail?.kind !== 'form' || detail.formId !== formId) return;
       resendingRef.current = false;
       setSaveError(null);
       setSavedAt(new Date());
