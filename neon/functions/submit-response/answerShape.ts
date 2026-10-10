@@ -351,7 +351,11 @@ export function clampForQuestion(
     case 'scale':
     case 'nps': {
       if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
-      if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) return Number(v.trim());
+      if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) {
+        // 400 digits pass the regex and read as Infinity, which JSON would store as null.
+        const n = Number(v.trim());
+        return Number.isFinite(n) ? n : undefined;
+      }
       return undefined;
     }
     case 'date':

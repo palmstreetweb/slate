@@ -1,7 +1,7 @@
 import { APICallError, generateObject, NoObjectGeneratedError } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { GENERATE_SYSTEM_PROMPT, type GeneratedForm } from './generateFormSchema.js';
-import { fromModelForm, modelFormSchema, toModelForm } from './_modelForm.js';
+import { fromModelForm, modelFormSchema, toModelForm } from './modelForm.js';
 
 /** What the owner reads when the model's draft didn't hold together, twice. */
 export const GENERATE_VALIDATION_MESSAGE =

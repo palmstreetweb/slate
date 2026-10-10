@@ -575,3 +575,18 @@ describe('storagesign with quotas (ADR-067)', () => {
     });
   });
 });
+
+describe('the Function’s own connection has a ceiling (audit 2026-10, ADR-071)', () => {
+  it('SETs statement_timeout 8 s and lock_timeout 4 s on every new connection, with a client-side query_timeout backstop', async () => {
+    expect(db.state.poolConfig).toMatchObject({ query_timeout: 10_000 });
+    // Tests that re-import the module build another pool each time; every one registers it.
+    const connect = db.state.poolEvents.filter((e) => e.event === 'connect');
+    expect(connect.length).toBeGreaterThan(0);
+    const query = vi.fn<(sql: string) => Promise<{ rows: unknown[] }>>(async () => ({ rows: [] }));
+    await connect.at(-1)!.handler({ query });
+    expect(query).toHaveBeenCalledTimes(1);
+    const sql = String(query.mock.calls[0]![0]);
+    expect(sql).toMatch(/set statement_timeout = 8000/);
+    expect(sql).toMatch(/set lock_timeout = 4000/);
+  });
+});

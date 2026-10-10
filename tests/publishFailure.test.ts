@@ -11,7 +11,10 @@ const db = vi.hoisted(() => ({ failUpserts: false, upserts: 0 }));
 vi.mock('../examples/_admin/neon/client.js', () => ({
   getNeon: () => ({
     from: () => ({
-      insert: async () => ({ error: null }),
+      // 022: the insert reads the assigned slug back.
+      insert: (row: { slug: string }) => ({
+        select: () => ({ single: async () => ({ data: { slug: row.slug }, error: null }) }),
+      }),
       upsert: async () => {
         db.upserts += 1;
         return db.failUpserts

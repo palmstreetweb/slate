@@ -8,13 +8,13 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { captureApiException } from '../api/sentry.js';
+import { captureApiException } from '../api/_lib/sentry.js';
 import {
   isApiSentryEnabled,
   isClientSentryEnabled,
   SENTRY_DATA_COLLECTION,
   SENTRY_TRACES_SAMPLE_RATE,
-} from '../api/sentryGate.js';
+} from '../api/_lib/sentryGate.js';
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url));
 

@@ -57,6 +57,7 @@ import { clientIp } from './requestIp.js';
 import { clampForQuestion, clampText, isSafeKey, keepFileRefs } from './answerShape.js';
 import { fileClaimsOf, foreignRefQuestions } from './fileClaims.js';
 import { computeEstimateCore } from './estimate.js';
+import { computeScoreCore } from './scoring.js';
 import { signupSlotsOf } from './signup.js';
 import { formZipAreas } from './geo.js';
 import { aboutMinutes, charge, intEnv, ipMax, ownerKey, units, type Bucket } from './rateGate.js';
@@ -102,6 +103,7 @@ type SubmitMeta = {
   durationMs: number;
   questionsVisited: string[];
   hiddenFields: Record<string, unknown>;
+  /** ADR-071: computed here from the published option scores, never taken from the request. */
   score?: number;
   /** ADR-064: computed here from the published schema, never taken from the request. */
   estimate?: ReturnType<typeof computeEstimateCore>;
@@ -211,9 +213,21 @@ type TryRow = {
   published_schema: unknown;
 };
 
+// Every statement runs as the table owner, whose role has no ceiling (the Data API roles get
+// 3 s / 8 s from pg_db_role_setting). Fail fast with a 503 instead of pinning a connection behind
+// a slow plan or a stuck lock (audit 2026-10, ADR-071). Neon's proxy drops pg's statement_timeout
+// / lock_timeout startup parameters and refuses `options` on a pooled endpoint, so the ceiling is
+// SET on each new connection (checked on a branch: reaches the server on direct and pooled
+// strings). query_timeout is the client-side backstop that holds whatever the pooler does.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 5,
+  query_timeout: 10_000,
+});
+pool.on('connect', (client) => {
+  void client
+    .query('set statement_timeout = 8000; set lock_timeout = 4000')
+    .catch((err: unknown) => console.warn('[pool] timeouts not set', String(err).slice(0, 120)));
 });
 
 const app = new Hono();
@@ -257,8 +271,8 @@ function sanitizeAnswers(
 }
 
 /**
- * Only the fields below survive. In particular a client-sent `estimate` is
- * dropped: the Function computes its own (ADR-064).
+ * Only the fields below survive. In particular a client-sent `estimate`
+ * (ADR-064) and `score` (ADR-071) are dropped: the Function computes its own.
  */
 function sanitizeMeta(raw: Record<string, unknown>): SubmitMeta {
   const str = (v: unknown) => (typeof v === 'string' ? v.slice(0, 64) : '');
@@ -283,7 +297,6 @@ function sanitizeMeta(raw: Record<string, unknown>): SubmitMeta {
     durationMs: Number.isFinite(dur) && dur >= 0 ? Math.min(dur, 86_400_000) : 0,
     questionsVisited: visited,
     hiddenFields: hidden,
-    ...(typeof raw.score === 'number' && Number.isFinite(raw.score) ? { score: raw.score } : {}),
   };
 }
 
@@ -694,6 +707,8 @@ app.post(
     // prices and the answers it kept — what the owner reads can't be forged.
     const estimate = computeEstimateCore(v.schema, clean);
     if (estimate) cleanMeta.estimate = estimate;
+    // Quiz score (ADR-071): likewise the server's own sum, from the published option scores.
+    cleanMeta.score = computeScoreCore(v.schema, clean);
 
     const submissionId = `s_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
     let stored:

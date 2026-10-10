@@ -1,5 +1,6 @@
 import type { Schema } from '@/index.js';
 import type { FormRecord, TrackedSource } from '../_formsStore.js';
+import { FORM_NAME_MAX } from '../formName.js';
 import type { StoredSubmission } from '../_submissionStore.js';
 import type {
   SlotsLeftPayload,
@@ -130,7 +131,8 @@ export function formRecordToRow(
   > {
   return {
     id: form.id,
-    name: form.name,
+    // 022 caps forms.name at 200 characters (the studio's input does too).
+    name: form.name.slice(0, FORM_NAME_MAX),
     slug: form.slug ?? form.id,
     schema: form.schema,
     published_schema: form.publishedSchema ?? null,

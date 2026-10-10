@@ -59,8 +59,12 @@ import { aboutMinutes, charge, intEnv, ipMax, ownerKey, units, type Bucket } fro
 
 const BUCKET = process.env.NEON_STORAGE_BUCKET || 'form-uploads';
 
-/** Default 32 MB — matches client prepareFileForUpload non-image cap. */
-const MAX_BYTES = Number(process.env.STORAGE_SIGN_MAX_BYTES ?? 32 * 1024 * 1024);
+/**
+ * Default 32 MB — matches client prepareFileForUpload non-image cap. An integer from 1 to 1 GiB,
+ * else the default: a typo must never remove the cap (audit 2026-10; before, NaN left owner uploads
+ * bounded only by reserve_upload's 1 GiB row check).
+ */
+const MAX_BYTES = intEnv('STORAGE_SIGN_MAX_BYTES', 32 * 1024 * 1024, 1024 * 1024 * 1024);
 
 /** A sign request is a path and a few fields; nothing legitimate comes near this. */
 const MAX_BODY_BYTES = 8 * 1024;
@@ -146,9 +150,21 @@ function safeContentType(raw: string | undefined): string {
   return ALLOWED_TYPES.has(t) ? t : 'application/octet-stream';
 }
 
+// Every statement runs as the table owner, whose role has no ceiling (the Data API roles get
+// 3 s / 8 s from pg_db_role_setting). Fail fast with a 503 instead of pinning a connection behind
+// a slow plan or a stuck lock (audit 2026-10, ADR-071). Neon's proxy drops pg's statement_timeout
+// / lock_timeout startup parameters and refuses `options` on a pooled endpoint, so the ceiling is
+// SET on each new connection (checked on a branch: reaches the server on direct and pooled
+// strings). query_timeout is the client-side backstop that holds whatever the pooler does.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 5,
+  query_timeout: 10_000,
+});
+pool.on('connect', (client) => {
+  void client
+    .query('set statement_timeout = 8000; set lock_timeout = 4000')
+    .catch((err: unknown) => console.warn('[pool] timeouts not set', String(err).slice(0, 120)));
 });
 
 function s3(): S3Client {

@@ -304,7 +304,7 @@ export type GeneratedForm = z.infer<typeof generatedFormSchema>;
 export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
 
 /**
- * Written for the model's own shape (api/_modelForm.ts): 13 fields per
+ * Written for the model's own shape (api/_lib/modelForm.ts): 13 fields per
  * question, rare settings as short words, option extras in `more`.
  */
 export const GENERATE_SYSTEM_PROMPT = `You author first-draft conversational forms for Slate (Palm Street Web).

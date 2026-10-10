@@ -18,8 +18,8 @@ import {
   isSchemaCompileError,
   resetGenerateMode,
   runGenerateForm,
-} from '../api/runGenerate.js';
-import { fromModelForm, modelFormSchema, type ModelForm } from '../api/_modelForm.js';
+} from '../api/_lib/runGenerate.js';
+import { fromModelForm, modelFormSchema, type ModelForm } from '../api/_lib/modelForm.js';
 
 const blank = {
   text: '',
@@ -34,7 +34,7 @@ const blank = {
   showIfEquals: '',
 };
 
-/** What the model writes (api/_modelForm.ts). */
+/** What the model writes (api/_lib/modelForm.ts). */
 const MODEL_FORM: ModelForm = {
   title: 'RSVP',
   description: 'Who is coming.',

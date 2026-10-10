@@ -20,12 +20,8 @@
       href="https://ep-misty-snow-ax9wxjvf.neonauth.c-4.us-east-2.aws.neon.tech"
       crossorigin
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,900&family=JetBrains+Mono:wght@400;500&display=swap"
-    />
+    <!-- Inter and JetBrains Mono are self-hosted (examples/fonts.css, ADR-071): a respondent's
+         browser contacts this origin, the Function, and nothing else before the form draws. -->
     <style>
       html,
       body,

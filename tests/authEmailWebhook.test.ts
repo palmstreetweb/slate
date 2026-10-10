@@ -14,12 +14,28 @@ type Pending = {
 const store = vi.hoisted(() => ({
   pending: new Map<string, Pending>(),
   buckets: new Map<string, number>(),
+  poolConfig: {} as Record<string, unknown>,
+  poolEvents: [] as Array<{ event: string; handler: (...args: unknown[]) => unknown }>,
 }));
 
 vi.mock('pg', () => ({
   Pool: class {
+    constructor(config: Record<string, unknown> = {}) {
+      store.poolConfig = config;
+    }
+    on(event: string, handler: (...args: unknown[]) => unknown) {
+      store.poolEvents.push({ event, handler });
+      return this;
+    }
     async query(sql: string, params: unknown[] = []) {
       const q = sql.replace(/\s+/g, ' ').trim();
+      if (
+        q.startsWith('delete from public.auth_email_pending where email = $1 and sent_digest = $2')
+      ) {
+        const row = store.pending.get(params[0] as string);
+        if (row && row.sent_digest === params[1]) store.pending.delete(row.email);
+        return { rows: [] };
+      }
       if (q.startsWith('delete from public.auth_email_pending')) return { rows: [] };
       if (q.startsWith('insert into public.auth_email_pending')) {
         const [email, otp, link, exp] = params as [
@@ -148,6 +164,36 @@ describe('authemail webhook', () => {
     const mail = resend.mock.calls[0]![0] as { to: string[]; html: string };
     expect(mail.to).toEqual(['nora@example.com']);
     expect(mail.html).toContain('482913');
+  });
+
+  it('deletes the pending row once the mail is out, so no live-looking code waits for the next sweep (audit 2026-10)', async () => {
+    await Promise.all([
+      app.fetch(otp('nora@example.com', '482913', 'sign-in')),
+      app.fetch(link('nora@example.com', 'https://slateforms.vercel.app/?token=abc')),
+    ]);
+    expect(resend).toHaveBeenCalledTimes(1);
+    expect(store.pending.has('nora@example.com')).toBe(false);
+  });
+
+  it('keeps the row when Resend fails, so the retry can still send it', async () => {
+    resend.mockImplementationOnce(async () => new Response('down', { status: 500 }));
+    await Promise.all([
+      app.fetch(otp('nora@example.com', '482913', 'sign-in')),
+      app.fetch(link('nora@example.com', 'https://slateforms.vercel.app/?token=abc')),
+    ]);
+    expect(store.pending.has('nora@example.com')).toBe(true);
+    expect(store.pending.get('nora@example.com')?.sent_digest).toBeNull();
+  });
+
+  it('its connection has a ceiling: SET statement_timeout 8 s / lock_timeout 4 s on connect, query_timeout 10 s (ADR-071)', async () => {
+    expect(store.poolConfig).toMatchObject({ query_timeout: 10_000 });
+    const connect = store.poolEvents.filter((e) => e.event === 'connect');
+    expect(connect).toHaveLength(1);
+    const query = vi.fn<(sql: string) => Promise<{ rows: unknown[] }>>(async () => ({ rows: [] }));
+    await connect[0]!.handler({ query });
+    const sql = String(query.mock.calls[0]![0]);
+    expect(sql).toMatch(/set statement_timeout = 8000/);
+    expect(sql).toMatch(/set lock_timeout = 4000/);
   });
 
   it('never emails a password-reset or verification code as a sign-in code (M-AUTH-1)', async () => {

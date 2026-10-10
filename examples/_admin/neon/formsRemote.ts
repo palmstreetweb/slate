@@ -292,9 +292,11 @@ async function refreshFormQuota(): Promise<void> {
 }
 
 /**
- * The database won't take this slug for a new form: another form holds it
- * (live or trashed), a permanent delete retired it, or it isn't a valid new
- * slug (ADR-057). All of these mean "draw again".
+ * The database won't take this slug for a new form. Since 022 the server
+ * assigns every new slug itself, so this is only the race of two inserts
+ * landing on the same number at the unique index (ADR-071); before 022 it was
+ * also another form holding it or a permanent delete having retired it
+ * (ADR-057). All of these mean "send again".
  */
 function isSlugTakenError(err: unknown): boolean {
   const e = err as { code?: string; message?: string; details?: string } | null;
@@ -305,32 +307,39 @@ function isSlugTakenError(err: unknown): boolean {
 }
 
 /**
- * Insert a new row. Slugs are unique across every owner and never reused,
- * and the local cache only knows this owner's forms — so on a slug clash,
- * draw again. Returns the slug that actually landed.
+ * Insert a new row. The database picks the slug (022, ADR-071): the one we
+ * send is a placeholder it ignores, unless it is this account's own retired
+ * slug (restoring a backup), which it keeps. Returns the slug that actually
+ * landed, read back from the insert — never our own draw.
  */
 async function insertForm(form: FormRecord): Promise<string> {
   await ensureAuthForDataApi();
   let slug = form.slug ?? newFormSlug();
 
-  const writeOnce = async () => {
+  const writeOnce = async (): Promise<string> => {
     const neon = getNeon();
     const row = formRecordToRow(
       { ...form, slug },
       { publishedName: publishedNameColumn, closeColumns },
     );
-    const { error } = await neon.from('forms').insert({
-      ...row,
-      created_at: form.createdAt,
-      updated_at: form.updatedAt,
-    });
+    const { data, error } = await neon
+      .from('forms')
+      .insert({
+        ...row,
+        created_at: form.createdAt,
+        updated_at: form.updatedAt,
+      })
+      .select('slug')
+      .single();
     if (error) throw error;
+    const landed = (data as { slug?: unknown } | null)?.slug;
+    return typeof landed === 'string' && landed ? landed : slug;
   };
 
   const write = async () => {
     for (let attempt = 0; ; attempt += 1) {
       try {
-        await writeOnce();
+        slug = await writeOnce();
         return;
       } catch (err) {
         if (!isSlugTakenError(err) || attempt >= 4) throw err;

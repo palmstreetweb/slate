@@ -5,10 +5,10 @@
  * the client words what the route never saw (offline, a platform timeout).
  */
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
-import type * as RunGenerate from '../api/runGenerate.js';
+import type * as RunGenerate from '../api/_lib/runGenerate.js';
 
 const runGenerateForm = vi.hoisted(() => vi.fn());
-vi.mock('../api/runGenerate.js', async (importOriginal) => ({
+vi.mock('../api/_lib/runGenerate.js', async (importOriginal) => ({
   ...(await importOriginal<typeof RunGenerate>()),
   runGenerateForm,
 }));
@@ -21,14 +21,14 @@ import handler, {
   AI_FAILED_MESSAGE,
   classifyGenerateError,
 } from '../api/generate.js';
-import { GENERATE_VALIDATION_MESSAGE, GenerateValidationError } from '../api/runGenerate.js';
-import { resetRateLimit } from '../api/rateLimit.js';
+import { GENERATE_VALIDATION_MESSAGE, GenerateValidationError } from '../api/_lib/runGenerate.js';
+import { resetRateLimit } from '../api/_lib/rateLimit.js';
 import {
   GenerateRequestError,
   localResetPhrase,
   requestGeneratedForm,
 } from '../examples/_admin/ai/client.js';
-import { fromModelForm } from '../api/_modelForm.js';
+import { fromModelForm } from '../api/_lib/modelForm.js';
 
 const blank = {
   text: '',
@@ -155,6 +155,16 @@ describe('/api/generate words every model failure', () => {
     expect(body.error).not.toMatch(RAW);
     // The raw text stays in the server log for debugging.
     expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it('every answer is no-store: a draft and its prompt belong to one signed-in owner (audit 2026-10 L-2)', async () => {
+    runGenerateForm.mockResolvedValue(FORM);
+    const ok = await call(devPost());
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get('cache-control')).toBe('no-store');
+    runGenerateForm.mockRejectedValue(new Error('Connection error.'));
+    expect((await call(devPost())).headers.get('cache-control')).toBe('no-store');
+    expect((await call(devPost({ prompt: '' }))).headers.get('cache-control')).toBe('no-store');
   });
 
   it('a draft that never validated asks for a retry in plain words', async () => {

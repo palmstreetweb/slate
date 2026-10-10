@@ -35,9 +35,21 @@ const JWKS_TIMEOUT_MS = 5000;
 const MAX_PER_ADDRESS_PER_HOUR = Number(process.env.AUTH_EMAIL_MAX_PER_ADDRESS ?? 6);
 const MAX_TOTAL_PER_HOUR = Number(process.env.AUTH_EMAIL_MAX_TOTAL ?? 300);
 
+// Every statement runs as the table owner, whose role has no ceiling (the Data API roles get
+// 3 s / 8 s from pg_db_role_setting). Fail fast with a 503 instead of pinning a connection behind
+// a slow plan or a stuck lock (audit 2026-10, ADR-071). Neon's proxy drops pg's statement_timeout
+// / lock_timeout startup parameters and refuses `options` on a pooled endpoint, so the ceiling is
+// SET on each new connection (checked on a branch: reaches the server on direct and pooled
+// strings). query_timeout is the client-side backstop that holds whatever the pooler does.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 5,
+  query_timeout: 10_000,
+});
+pool.on('connect', (client) => {
+  void client
+    .query('set statement_timeout = 8000; set lock_timeout = 4000')
+    .catch((err: unknown) => console.warn('[pool] timeouts not set', String(err).slice(0, 120)));
 });
 
 const app = new Hono();
@@ -189,6 +201,17 @@ async function handleWebhook(c: {
     await release();
     return json({ error: sent.error }, 502);
   }
+  // The code and link are in the mail now; the table must not keep a live-looking copy until the
+  // next webhook's sweep (audit 2026-10). Only this digest's row: a newer code's webhook, which
+  // may already have upserted, keeps its own.
+  await pool
+    .query(`delete from public.auth_email_pending where email = $1 and sent_digest = $2`, [
+      email,
+      digest,
+    ])
+    .catch((err: unknown) =>
+      console.warn('[authemail] pending row not deleted', String(err).slice(0, 120)),
+    );
   return json({ ok: true, sent: true });
 }
 

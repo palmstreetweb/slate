@@ -112,7 +112,8 @@ function FillCrashFallback() {
 }
 
 export function mountPublic(root: HTMLElement): void {
-  initSentry();
+  // Errors only on a respondent's page: no browser tracing, no trace sampling (ADR-071).
+  initSentry({ tracing: false });
   createRoot(root, sentryRootOptions()).render(
     <StrictMode>
       <ErrorBoundary label="form" fallback={<FillCrashFallback />}>
