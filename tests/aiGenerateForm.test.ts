@@ -3,10 +3,10 @@ import {
   GENERATED_QUESTION_MAX,
   GENERATE_SYSTEM_PROMPT,
   generatedFormSchema,
-} from '../api/generateFormSchema.js';
-import { blankGeneratedQuestion, mapGeneratedForm } from '../api/mapGeneratedForm.js';
-import { resetRateLimit, takeRateLimit } from '../api/rateLimit.js';
-import { buildGenerateUserPrompt } from '../api/runGenerate.js';
+} from '../api/_lib/generateFormSchema.js';
+import { blankGeneratedQuestion, mapGeneratedForm } from '../api/_lib/mapGeneratedForm.js';
+import { resetRateLimit, takeRateLimit } from '../api/_lib/rateLimit.js';
+import { buildGenerateUserPrompt } from '../api/_lib/runGenerate.js';
 import { checkSchema } from '../src/logic/schemaCheck.js';
 import { validate } from '../src/logic/validation.js';
 import { AI_GOLDEN_PROMPTS } from '../examples/_admin/ai/goldenPrompts.js';

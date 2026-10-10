@@ -18,8 +18,8 @@ import { formatAnswerFor } from '@/logic/piping.js';
 import { isPublicRoute, isRespondentRoute, matchRoute } from '../examples/_admin/_router.js';
 import { PageNotFound } from '../examples/_admin/pages/PageNotFound.js';
 import { PAGE_NOT_FOUND } from '../examples/_admin/fillCopy.js';
-import { mapGeneratedForm, blankGeneratedQuestion } from '../api/mapGeneratedForm.js';
-import { generatedFormSchema } from '../api/generateFormSchema.js';
+import { mapGeneratedForm, blankGeneratedQuestion } from '../api/_lib/mapGeneratedForm.js';
+import { generatedFormSchema } from '../api/_lib/generateFormSchema.js';
 import { pictureLinkProblem, studioIssues } from '../examples/_admin/formChecks.js';
 import {
   formatAnswerForCsv,

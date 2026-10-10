@@ -15,8 +15,8 @@ vi.mock('../examples/_admin/ai/client.js', async (importOriginal) => ({
 vi.mock('../examples/_admin/uiSounds.js', () => ({ playUiSound: () => {} }));
 
 import { GenerateRequestError } from '../examples/_admin/ai/client.js';
-import { generatedFormSchema } from '../api/generateFormSchema.js';
-import { blankGeneratedQuestion, mapGeneratedForm } from '../api/mapGeneratedForm.js';
+import { generatedFormSchema } from '../api/_lib/generateFormSchema.js';
+import { blankGeneratedQuestion, mapGeneratedForm } from '../api/_lib/mapGeneratedForm.js';
 import {
   AI_PROMPT_MAX,
   AI_REVISE_MAX,

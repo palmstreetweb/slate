@@ -5,8 +5,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { generatedFormSchema } from '../api/generateFormSchema.js';
-import { blankGeneratedQuestion, mapGeneratedForm } from '../api/mapGeneratedForm.js';
+import { generatedFormSchema } from '../api/_lib/generateFormSchema.js';
+import { blankGeneratedQuestion, mapGeneratedForm } from '../api/_lib/mapGeneratedForm.js';
 import { formIssues } from '../examples/_admin/formChecks.js';
 
 const opt = (label: string, value: string) => ({

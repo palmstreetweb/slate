@@ -1,5 +1,5 @@
-import type { GeneratedForm } from '../../../api/generateFormSchema.js';
-import { mapGeneratedForm } from '../../../api/mapGeneratedForm.js';
+import type { GeneratedForm } from '../../../api/_lib/generateFormSchema.js';
+import { mapGeneratedForm } from '../../../api/_lib/mapGeneratedForm.js';
 import type { Schema } from '@/index.js';
 import { authHeader } from '../storageUpload.js';
 import { looksTechnical } from '../shell/PersistErrorToasts.js';

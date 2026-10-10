@@ -41,8 +41,8 @@ import { buildEmbedSnippet } from '../examples/_admin/shareUrls.js';
 import { decodePortableSchema, encodePortableSchema } from '../examples/_admin/portableShare.js';
 import { sanitizeUntrustedSchema } from '../examples/_admin/sanitizeUntrustedSchema.js';
 import { ADDABLE_TYPES } from '../examples/_admin/questionTypeMeta.js';
-import { mapGeneratedForm, blankGeneratedQuestion } from '../api/mapGeneratedForm.js';
-import { generatedFormSchema, withDraftDefaults } from '../api/generateFormSchema.js';
+import { mapGeneratedForm, blankGeneratedQuestion } from '../api/_lib/mapGeneratedForm.js';
+import { generatedFormSchema, withDraftDefaults } from '../api/_lib/generateFormSchema.js';
 
 beforeAll(() => {
   Element.prototype.scrollIntoView ??= vi.fn();

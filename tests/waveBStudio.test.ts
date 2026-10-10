@@ -28,8 +28,8 @@ import { normalizeEstimate, normalizeMeta } from '../examples/_admin/answerShape
 import { sanitizeUntrustedSchema } from '../examples/_admin/sanitizeUntrustedSchema.js';
 import { sampleEstimate, sampleEstimateAnswers } from '../examples/_admin/estimatePreview.js';
 import { buildBackup, parseBackup, serializeBackup } from '../examples/_admin/dataBackup.js';
-import { generatedFormSchema, withDraftDefaults } from '../api/generateFormSchema.js';
-import { blankGeneratedQuestion, mapGeneratedForm } from '../api/mapGeneratedForm.js';
+import { generatedFormSchema, withDraftDefaults } from '../api/_lib/generateFormSchema.js';
+import { blankGeneratedQuestion, mapGeneratedForm } from '../api/_lib/mapGeneratedForm.js';
 import { checkSchema } from '@/logic/schemaCheck.js';
 
 const contact: Question = { id: 'who', type: 'contact_info', title: 'How can we reach you?' };

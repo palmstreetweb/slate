@@ -8,22 +8,26 @@
  */
 
 import { APICallError, RetryError } from 'ai';
-import { GenerateTimeoutError, GenerateValidationError, runGenerateForm } from './runGenerate.js';
+import {
+  GenerateTimeoutError,
+  GenerateValidationError,
+  runGenerateForm,
+} from './_lib/runGenerate.js';
 import {
   generatedFormSchema,
   withDraftDefaults,
   type GeneratedForm,
-} from './generateFormSchema.js';
-import { clientIp, takeRateLimit } from './rateLimit.js';
-import { verifyUserJwt } from './authJwt.js';
-import { callDataApiRpc } from './neonDataApi.js';
+} from './_lib/generateFormSchema.js';
+import { clientIp, takeRateLimit } from './_lib/rateLimit.js';
+import { verifyUserJwt } from './_lib/authJwt.js';
+import { callDataApiRpc } from './_lib/neonDataApi.js';
 import {
   DocumentExtractError,
   documentToPrompt,
   extractDocumentText,
   type DocumentPayload,
-} from './extractDocument.js';
-import { captureApiException } from './sentry.js';
+} from './_lib/extractDocument.js';
+import { captureApiException } from './_lib/sentry.js';
 
 // Long PDF forms take well over a minute on Haiku. The route answers by its own
 // deadline (below), so a slow draft is a clear message, never a Vercel 504.
@@ -60,10 +64,17 @@ function parseDocument(raw: unknown): { doc?: DocumentPayload; error?: string } 
   return { doc: { filename, mime: mime ?? 'application/pdf', base64 } };
 }
 
+// Every answer is for one signed-in owner (a draft, their prompt, their quota): never cacheable.
+// Without this Vercel adds `public, max-age=0, must-revalidate`, which RFC 9111 lets a shared cache
+// store even behind Authorization (audit 2026-10 L-2).
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', ...headers },
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      ...headers,
+    },
   });
 
 /**

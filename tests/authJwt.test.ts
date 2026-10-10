@@ -53,7 +53,7 @@ const VERIFIERS: Array<[string, () => void, () => Promise<Verify>]> = [
   [
     'api/authJwt (Vercel)',
     () => vi.stubEnv('VITE_NEON_URL', NEON_URL),
-    async () => (await import('../api/authJwt.js')).verifyUserJwt,
+    async () => (await import('../api/_lib/authJwt.js')).verifyUserJwt,
   ],
   [
     'storage-sign/authJwt (Function)',

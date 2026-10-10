@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Build with AI's model shape (api/_modelForm.ts). Production failed every
+ * Build with AI's model shape (api/_lib/modelForm.ts). Production failed every
  * request with "The compiled grammar is too large…" once the flat question
  * grew to 46 fields; the model now fills a small shape that expands into the
  * full draft the studio already maps.
@@ -11,15 +11,15 @@ import {
   GENERATED_QUESTION_TYPES,
   generatedFormSchema,
   type GeneratedQuestionType,
-} from '../api/generateFormSchema.js';
+} from '../api/_lib/generateFormSchema.js';
 import {
   fromModelForm,
   modelFormSchema,
   toModelForm,
   type ModelForm,
   type ModelQuestion,
-} from '../api/_modelForm.js';
-import { mapGeneratedForm } from '../api/mapGeneratedForm.js';
+} from '../api/_lib/modelForm.js';
+import { mapGeneratedForm } from '../api/_lib/mapGeneratedForm.js';
 import { checkSchema } from '../src/logic/schemaCheck.js';
 
 type Json = Record<string, unknown>;

@@ -32,8 +32,8 @@ import { buildResponsesCsv } from '../examples/_admin/csvExport.js';
 import { sanitizeUntrustedSchema } from '../examples/_admin/sanitizeUntrustedSchema.js';
 import { slugRowToPublishedForm } from '../examples/_admin/neon/mappers.js';
 import { ConfirmProvider } from '../examples/_admin/_confirm.js';
-import { mapGeneratedForm, blankGeneratedQuestion } from '../api/mapGeneratedForm.js';
-import { generatedFormSchema, withDraftDefaults } from '../api/generateFormSchema.js';
+import { mapGeneratedForm, blankGeneratedQuestion } from '../api/_lib/mapGeneratedForm.js';
+import { generatedFormSchema, withDraftDefaults } from '../api/_lib/generateFormSchema.js';
 
 const FORM = 'local_waved_test';
 

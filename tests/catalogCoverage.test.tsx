@@ -17,7 +17,7 @@ import { TypeIcon } from '../examples/_admin/components/TypeIcon.js';
 import { formatAnswerForQuestion } from '../examples/_admin/responsesFormat.js';
 import { sanitizeUntrustedSchema } from '../examples/_admin/sanitizeUntrustedSchema.js';
 import { clampForQuestion } from '../neon/functions/submit-response/answerShape.js';
-import { GENERATED_QUESTION_TYPES } from '../api/generateFormSchema.js';
+import { GENERATED_QUESTION_TYPES } from '../api/_lib/generateFormSchema.js';
 
 const opts = [
   { label: 'A', value: 'a' },

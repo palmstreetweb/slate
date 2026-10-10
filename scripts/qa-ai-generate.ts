@@ -6,8 +6,8 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { runGenerateForm } from '../api/runGenerate.js';
-import { mapGeneratedForm } from '../api/mapGeneratedForm.js';
+import { runGenerateForm } from '../api/_lib/runGenerate.js';
+import { mapGeneratedForm } from '../api/_lib/mapGeneratedForm.js';
 import { checkSchema } from '../src/logic/schemaCheck.js';
 import { AI_GOLDEN_PROMPTS } from '../examples/_admin/ai/goldenPrompts.js';
 

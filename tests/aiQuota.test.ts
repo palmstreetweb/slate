@@ -5,7 +5,7 @@ const TOKEN = vi.hoisted(() => 'eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ1c2VyLTEifQ.c2ln
 const verifyUserJwt = vi.hoisted(() => vi.fn());
 const runGenerateForm = vi.hoisted(() => vi.fn());
 
-vi.mock('../api/authJwt.js', () => ({ verifyUserJwt }));
+vi.mock('../api/_lib/authJwt.js', () => ({ verifyUserJwt }));
 // runGenerateForm is the only path to Anthropic. If it's never called, the key never spends.
 const GenerateTimeoutError = vi.hoisted(
   () =>
@@ -15,7 +15,7 @@ const GenerateTimeoutError = vi.hoisted(
       }
     },
 );
-vi.mock('../api/runGenerate.js', () => ({
+vi.mock('../api/_lib/runGenerate.js', () => ({
   runGenerateForm,
   GenerateValidationError: class GenerateValidationError extends Error {},
   GenerateTimeoutError,
@@ -29,8 +29,8 @@ import handler, {
   AI_QUOTA_UNAVAILABLE_MESSAGE,
   AI_QUOTA_USER_MESSAGE,
 } from '../api/generate.js';
-import { neonDataApiUrl } from '../api/neonDataApi.js';
-import { resetRateLimit } from '../api/rateLimit.js';
+import { neonDataApiUrl } from '../api/_lib/neonDataApi.js';
+import { resetRateLimit } from '../api/_lib/rateLimit.js';
 import { GenerateRequestError, requestGeneratedForm } from '../examples/_admin/ai/client.js';
 import { deriveNeonServiceUrls } from '../examples/_admin/neon/config.js';
 

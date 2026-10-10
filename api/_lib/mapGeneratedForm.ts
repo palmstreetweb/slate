@@ -2,8 +2,8 @@
  * Turn a validated AI draft into a Slate Schema (ADR-039).
  */
 
-import type { Condition, Option, PictureOption, Question } from '../src/types/Question.js';
-import type { Schema } from '../src/types/Schema.js';
+import type { Condition, Option, PictureOption, Question } from '../../src/types/Question.js';
+import type { Schema } from '../../src/types/Schema.js';
 import type { GeneratedForm, GeneratedQuestion } from './generateFormSchema.js';
 
 function slugId(raw: string, used: Set<string>): string {
