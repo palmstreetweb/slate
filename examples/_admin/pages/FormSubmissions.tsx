@@ -140,6 +140,8 @@ export function FormSubmissions({ formId }: Props) {
   const [ready, setReady] = useState(() => isFormSubmissionsReady(formId));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  /** Whether the last refresh found the form's answers loaded. */
+  const readyRef = useRef(ready);
   const [view, setView] = useState<ResponsesViewName>(readView);
   const [trashMode, setTrashMode] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -158,7 +160,13 @@ export function FormSubmissions({ formId }: Props) {
     setForm(getForm(formId));
     setActiveRaw(listSubmissions(formId));
     setTrashedRaw(listTrashedSubmissions(formId));
-    setReady(isFormSubmissionsReady(formId));
+    const isReady = isFormSubmissionsReady(formId);
+    setReady(isReady);
+    // A reload found rows this form's answers lack (sent, then trashed on another
+    // device between polls): load them again, or the page sits on its skeleton
+    // with nothing asking for them (audit B7).
+    if (readyRef.current && !isReady) setLoadAttempt((n) => n + 1);
+    readyRef.current = isReady;
   }, [formId]);
 
   useEffect(() => {
@@ -303,9 +311,11 @@ export function FormSubmissions({ formId }: Props) {
         const args = { submissionId: sub.id, questionId: question.id, from, to, capacity };
         let r = await moveSignupSlot(args);
         if (!r.ok && r.reason === 'full') {
+          // How far over the slot ends up: whoever is in it now, plus this person (audit A4).
+          const over = Math.max(1, r.taken - r.capacity + 1);
           const ok = await confirm({
             title: `${toName} is full`,
-            message: `All ${r.capacity} spots are taken. Add ${who} anyway? The slot will be over by one.`,
+            message: `All ${r.capacity} ${r.capacity === 1 ? 'spot is' : 'spots are'} taken. Add ${who} anyway? The slot will be over by ${over === 1 ? 'one' : over}.`,
             confirmLabel: 'Add anyway',
           });
           if (!ok) return;
@@ -387,8 +397,8 @@ export function FormSubmissions({ formId }: Props) {
         danger: true,
       });
       if (!ok) return;
+      markRead(listTrashedSubmissions(formId).map((s) => s.id));
       emptyTrash(formId);
-      markRead(ids);
     })();
   }, [confirm, formId]);
 
@@ -411,7 +421,8 @@ export function FormSubmissions({ formId }: Props) {
 
   const published = form.status === 'published';
   const stale = hasUnpublishedChanges(form);
-  const canExport = ready && subs.length > 0;
+  // The CSV is the inbox's rows; in Trash it would export what isn't shown (audit B13).
+  const canExport = ready && !trashMode && subs.length > 0;
   const showToggle = ready && !trashMode && subs.length > 0;
   const showTrashButton = !trashMode && (!ready || subs.length > 0 || trashed.length > 0);
   const editorPath = `/forms/${formId}/edit`;
@@ -435,8 +446,9 @@ export function FormSubmissions({ formId }: Props) {
       danger: true,
     });
     if (!ok) return;
+    // Whatever is in the inbox now, not what was counted before the dialog (audit B13).
+    markRead(listSubmissions(formId).map((s) => s.id));
     trashSubmissions(formId);
-    markRead(ids);
   };
 
   // Phones: the header only fits the studio's own controls, so the page's

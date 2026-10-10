@@ -93,12 +93,15 @@ function neonNotReady(): boolean {
 }
 
 /**
- * Closing and tracked links can be offered (ADR-063). Local mode keeps them on the record.
- * In the cloud they need migration 019's columns, so they only show once a hydrate has read
+ * Closing and tracked links can be offered (ADR-063). Only in the cloud, like the
+ * password: the server enforces them on the public link. On this device alone the
+ * link the panel shares is the portable one, which carries the schema and nothing
+ * else, so "Close now" would claim a closing the link never honoured (audit A1).
+ * They also need migration 019's columns, so they only show once a hydrate has read
  * them: a database without 019 never shows a setting it would silently drop or not enforce.
  */
 export function supportsCloseSettings(): boolean {
-  return !isNeonConfigured() || (isStoresHydrated() && remote.hasCloseColumnsRemote());
+  return isNeonConfigured() && isStoresHydrated() && remote.hasCloseColumnsRemote();
 }
 
 function read(): FormRecord[] {
@@ -234,11 +237,32 @@ export async function createFormAsync(opts: {
   return createForm(opts);
 }
 
+/**
+ * What waits on a setting's write, in the cloud (audit B4): `onLanded` once the
+ * server has it, `onFail` if it never does — after the fields the patch set are
+ * put back when `rollback` is on, with `failTitle` heading the shell's toast.
+ * On this device alone the write is done at once, so `onLanded` runs now.
+ */
+export type FormWriteOptions = {
+  onFail?: () => void;
+  onLanded?: () => void;
+  rollback?: boolean;
+  failTitle?: string;
+};
+
 export function updateForm(
   formId: string,
   patch: Partial<Omit<FormRecord, 'id' | 'createdAt'>>,
+  opts: FormWriteOptions = {},
 ): [FormRecord | null, boolean] {
-  if (useRemote()) return remote.updateFormRemoteSync(formId, patch);
+  if (useRemote()) {
+    return remote.updateFormRemoteSync(formId, patch, {
+      onFail: opts.onFail ? () => opts.onFail?.() : undefined,
+      onLanded: opts.onLanded,
+      rollback: opts.rollback,
+      failTitle: opts.failTitle,
+    });
+  }
   if (neonNotReady()) return [null, false];
   const all = read();
   const idx = all.findIndex((f) => f.id === formId && isActive(f));
@@ -252,7 +276,10 @@ export function updateForm(
   };
   const copy = [...all];
   copy[idx] = next;
-  return [next, write(copy)];
+  const saved = write(copy);
+  if (saved) opts.onLanded?.();
+  else opts.onFail?.();
+  return [next, saved];
 }
 
 export function trashForm(formId: string): boolean {
@@ -297,17 +324,19 @@ export function restoreAllForms(): boolean {
 }
 
 export function permanentlyDeleteForm(formId: string): boolean {
-  purgeSubmissions(formId);
+  // Cloud: the database deletes the responses with the form (001's cascade), and the
+  // cache forgets them once the delete lands — a delete that fails keeps them with
+  // the restored form (audit B10). On this device alone they go with it now.
   if (useRemote()) return remote.permanentlyDeleteFormRemoteSync(formId);
   if (neonNotReady()) return false;
+  purgeSubmissions(formId);
   return write(read().filter((f) => f.id !== formId));
 }
 
 export function emptyFormTrash(): boolean {
-  const trashedIds = listTrashedForms().map((f) => f.id);
-  for (const formId of trashedIds) purgeSubmissions(formId);
   if (useRemote()) return remote.emptyFormTrashRemoteSync();
   if (neonNotReady()) return false;
+  for (const formId of listTrashedForms().map((f) => f.id)) purgeSubmissions(formId);
   return write(read().filter(isActive));
 }
 
@@ -361,10 +390,29 @@ export function hasUnsavedEdits(formId: string): boolean {
   return remote.hasUnsavedFormEditRemote(formId);
 }
 
-export function unpublishForm(formId: string): FormRecord | null {
-  if (useRemote()) return remote.unpublishFormRemoteSync(formId);
-  const [updated] = updateForm(formId, { status: 'draft' });
+/**
+ * Take the public link down. In the cloud the write lands in the background:
+ * `onLanded` once the server has it, `onFail` after a failure put "published"
+ * back (audit B4). On this device alone it is done at once.
+ */
+export function unpublishForm(
+  formId: string,
+  opts: { onFail?: () => void; onLanded?: () => void } = {},
+): FormRecord | null {
+  if (useRemote()) return remote.unpublishFormRemoteSync(formId, opts);
+  const [updated, saved] = updateForm(formId, { status: 'draft' });
+  if (updated && saved) opts.onLanded?.();
+  else if (updated) opts.onFail?.();
   return updated;
+}
+
+/**
+ * A form's write is queued, on the wire, or not yet accepted by the server, so
+ * leaving the page or signing out now would lose it (audit B5). Only cloud
+ * writes can be pending; this device's own are done at once.
+ */
+export function hasPendingFormWrites(): boolean {
+  return useNeon() && remote.hasPendingFormWritesRemote();
 }
 
 export function subscribe(listener: Listener): () => void {

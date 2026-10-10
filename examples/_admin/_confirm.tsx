@@ -81,6 +81,11 @@ export function useConfirm(): ConfirmFn {
   return ctx;
 }
 
+/** The dialog when a provider is above, else null: for chrome that may render without one. */
+export function useOptionalConfirm(): ConfirmFn | null {
+  return useContext(ConfirmContext);
+}
+
 /* ---------------- dialog ---------------- */
 
 function Dialog({

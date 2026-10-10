@@ -7,6 +7,7 @@ import type { FormRecord } from '../_formsStore.js';
 import { allocateNumericSlug, slugify } from '../shareUrls.js';
 import { getNeon } from './client.js';
 import { afterPermanentDelete } from './storageQuotaRemote.js';
+import { dropFormSubmissionsLocal } from './submissionsRemote.js';
 import { ensureAuthForDataApi, waitForAuthReady } from './ensureAuth.js';
 import {
   FORM_QUOTA_MAX,
@@ -69,6 +70,7 @@ export function clearFormsRemoteCache(): void {
   unsavedFormIds.clear();
   formWriteChain.clear();
   deletedFormIds.clear();
+  localWriteAt.clear();
   cache = [];
   hydrated = false;
   quotaMax = FORM_QUOTA_MAX;
@@ -123,6 +125,9 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
     return (data ?? []) as DbFormRow[];
   };
 
+  // A row the server answers with can predate a save this browser made after the
+  // request went out; the merge keeps such a form's local record (audit B1).
+  const fetchStartedAt = Date.now();
   let rows = await fetchForms();
 
   // An empty first load is where a token race shows up: the read ran as the
@@ -169,7 +174,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
   // Merge server rows with in-flight local writes. An optimistic "New form"
   // must survive a soft refresh that raced ahead of the upsert response —
   // otherwise the editor mounts on a cache miss → "Form not found".
-  cache = mergeHydratedForms(next);
+  cache = mergeHydratedForms(next, fetchStartedAt);
   hydrated = true;
   // The cap only moves on create/delete; polling it every refresh was a third request per tick.
   if (!opts?.soft) await refreshFormQuota();
@@ -233,6 +238,7 @@ export async function setFormFillPasswordRemote(
       const { fillLocked: _drop, ...rest } = f;
       return locked ? { ...rest, fillLocked: true } : rest;
     });
+    touchLocal(formId);
     // A queued editor save carries its own snapshot — keep the flag in step.
     const queued = queuedFormWrite.get(formId);
     if (queued) {
@@ -419,12 +425,29 @@ const unsavedFormIds = new Set<string>();
 const formWriteChain = new Map<string, Promise<void>>();
 /** Form ids with a pending/completed permanent delete — block resurrecting upserts. */
 const deletedFormIds = new Set<string>();
+/**
+ * When this browser last changed a form's cached record, or a write of it landed
+ * (`Date.now()`). A fetch sent before that moment can answer with an older row;
+ * the merge keeps the local record instead (audit B1).
+ */
+const localWriteAt = new Map<string, number>();
+
+function touchLocal(formId: string): void {
+  localWriteAt.set(formId, Date.now());
+}
+
+/** Any form has a write queued, on the wire, or not yet accepted by the server (audit B5). */
+export function hasPendingFormWritesRemote(): boolean {
+  return queuedFormWrite.size > 0 || formWriteChain.size > 0 || unsavedFormIds.size > 0;
+}
 
 /**
  * Server snapshot wins for settled rows; keep optimistic / in-flight locals
- * that have not appeared in the fetch yet (or are newer queued edits).
+ * that have not appeared in the fetch yet (or are newer queued edits), and any
+ * local record changed since the fetch went out (`fetchStartedAt`), because the
+ * server's answer can predate that change (audit B1).
  */
-function mergeHydratedForms(serverRows: FormRecord[]): FormRecord[] {
+function mergeHydratedForms(serverRows: FormRecord[], fetchStartedAt = Infinity): FormRecord[] {
   const byId = new Map(serverRows.map((f) => [f.id, f]));
 
   for (const [id, local] of queuedFormWrite) {
@@ -444,8 +467,9 @@ function mergeHydratedForms(serverRows: FormRecord[]): FormRecord[] {
 
   for (const local of cache) {
     if (deletedFormIds.has(local.id)) continue;
-    if (byId.has(local.id)) continue;
-    if (queuedFormWrite.has(local.id) || formWriteChain.has(local.id)) {
+    if (queuedFormWrite.has(local.id)) continue;
+    const touchedSinceFetch = (localWriteAt.get(local.id) ?? -Infinity) >= fetchStartedAt;
+    if (formWriteChain.has(local.id) || touchedSinceFetch) {
       byId.set(local.id, local);
     }
   }
@@ -503,6 +527,7 @@ function emitPersistOk(kind: 'form' | 'submission', formId?: string): void {
 function enqueueFormUpsert(form: FormRecord, waiter?: WriteWaiter): void {
   if (deletedFormIds.has(form.id)) return;
   queuedFormWrite.set(form.id, form);
+  touchLocal(form.id);
   if (waiter) queuedWaiters.set(form.id, [...(queuedWaiters.get(form.id) ?? []), waiter]);
   const prev = formWriteChain.get(form.id) ?? Promise.resolve();
   const next = prev
@@ -522,6 +547,7 @@ function enqueueFormUpsert(form: FormRecord, waiter?: WriteWaiter): void {
         queuedWaiters.delete(form.id);
         try {
           await upsertForm(latest);
+          touchLocal(form.id);
           unsavedFormIds.delete(form.id);
           emitPersistOk('form', form.id);
           for (const w of waiters) w.onLanded?.();
@@ -582,6 +608,7 @@ function dropOptimisticForm(formId: string): void {
 function enqueueFormInsert(form: FormRecord): void {
   if (deletedFormIds.has(form.id)) return;
   queuedFormWrite.set(form.id, form);
+  touchLocal(form.id);
   const prev = formWriteChain.get(form.id) ?? Promise.resolve();
   const next = prev
     .catch(() => {
@@ -596,15 +623,17 @@ function enqueueFormInsert(form: FormRecord): void {
       queuedFormWrite.delete(form.id);
       try {
         const landedSlug = await insertForm(latest);
+        touchLocal(form.id);
         if (landedSlug !== latest.slug) {
           cache = read().map((f) => (f.id === form.id ? { ...f, slug: landedSlug } : f));
           notify();
         }
-        emitPersistOk('form');
+        // Named, so an open editor on another form never takes it as its own save (audit B9).
+        emitPersistOk('form', form.id);
       } catch (err) {
         dropOptimisticForm(form.id);
         // A one-off to repeat, not an edit left unsaved: "Check your connection and try again." (R27)
-        reportFormFailure(err, 'delete', 'Couldn’t create that form');
+        reportFormFailure(err, 'delete', 'Couldn’t create that form', form.id);
         throw err;
       }
     })
@@ -630,10 +659,13 @@ function enqueueFormDelete(formId: string, onFailRestore?: FormRecord): void {
     .then(async () => {
       try {
         await deleteFormRow(formId);
-        emitPersistOk('form');
+        // Its responses went with it on the server (001's cascade): forget them here
+        // only now, so a delete that fails leaves them with the restored form (audit B10).
+        dropFormSubmissionsLocal(formId);
+        emitPersistOk('form', formId);
       } catch (err) {
         deletedFormIds.delete(formId);
-        reportFormFailure(err, 'delete', 'Couldn’t delete that form');
+        reportFormFailure(err, 'delete', 'Couldn’t delete that form', formId);
         if (onFailRestore) {
           cache = [onFailRestore, ...read().filter((f) => f.id !== onFailRestore.id)];
           notify();
@@ -647,6 +679,8 @@ function enqueueFormDelete(formId: string, onFailRestore?: FormRecord): void {
       }
     });
   formWriteChain.set(formId, next);
+  // Already reported via slate-persist-error; the chain stays rejected for awaiters.
+  next.catch(() => {});
 }
 
 export function subscribeFormsRemote(listener: Listener): () => void {
@@ -690,12 +724,15 @@ export async function createFormRemote(opts: {
   try {
     record.slug = await insertForm(record);
     cache = [record, ...read()];
+    touchLocal(record.id);
     notify();
     return record;
   } catch (err) {
     if (isQuotaExceededError(err)) {
       throw new FormQuotaError(quotaFromUnknown(err) ?? getFormQuotaRemote());
     }
+    // Logged and said, never swallowed (audit B13): the caller only learns "null".
+    reportFormFailure(err, 'delete', 'Couldn’t create that form', record.id);
     return null;
   }
 }
@@ -721,6 +758,7 @@ export async function updateFormRemote(
     const copy = [...read()];
     copy[idx] = next;
     cache = copy;
+    touchLocal(formId);
     notify();
     return [next, true];
   } catch {
@@ -738,6 +776,7 @@ export async function trashFormRemote(formId: string): Promise<boolean> {
     const copy = [...read()];
     copy[idx] = next;
     cache = copy;
+    touchLocal(formId);
     notify();
     return true;
   } catch {
@@ -755,6 +794,7 @@ export async function restoreFormRemote(formId: string): Promise<boolean> {
     const copy = [...read()];
     copy[idx] = next;
     cache = copy;
+    touchLocal(formId);
     notify();
     return true;
   } catch {
@@ -783,6 +823,7 @@ export async function restoreAllFormsRemote(): Promise<boolean> {
 export async function permanentlyDeleteFormRemote(formId: string): Promise<boolean> {
   try {
     await deleteFormRow(formId);
+    dropFormSubmissionsLocal(formId);
     cache = read().filter((f) => f.id !== formId);
     notify();
     return true;
@@ -796,6 +837,7 @@ export async function emptyFormTrashRemote(): Promise<boolean> {
   try {
     for (const f of trashed) {
       await deleteFormRow(f.id);
+      dropFormSubmissionsLocal(f.id);
     }
     cache = read().filter(isActive);
     notify();
@@ -882,13 +924,25 @@ export function createFormRemoteSync(opts: { name: string; schema: Schema }): Fo
   return record;
 }
 
+export type FormWriteOptions = {
+  /** Runs if the write carrying this patch fails, with the record before and after it. */
+  onFail?: (before: FormRecord, after: FormRecord) => void;
+  /** Runs once the write carrying this patch has landed. */
+  onLanded?: () => void;
+  /**
+   * A one-off setting (unpublish, closing, a tracked link), not an edit: when its
+   * write fails, put the fields the patch set back the way they were — before
+   * `onFail` — instead of leaving the panel saying something the server never
+   * took (audit B4). `failTitle` heads the shell's toast.
+   */
+  rollback?: boolean;
+  failTitle?: string;
+};
+
 export function updateFormRemoteSync(
   formId: string,
   patch: Partial<Omit<FormRecord, 'id' | 'createdAt'>>,
-  /** Runs if the write carrying this patch fails, with the record before and after it. */
-  onFail?: (before: FormRecord, after: FormRecord) => void,
-  /** Runs once the write carrying this patch has landed. */
-  onLanded?: () => void,
+  opts: FormWriteOptions = {},
 ): [FormRecord | null, boolean] {
   const idx = read().findIndex((f) => f.id === formId && isActive(f));
   if (idx === -1) return [null, false];
@@ -906,9 +960,18 @@ export function updateFormRemoteSync(
   copy[idx] = next;
   cache = copy;
   notify();
+  const { onFail, onLanded, rollback, failTitle } = opts;
+  const keys = Object.keys(patch) as Array<keyof FormRecord>;
   enqueueFormUpsert(next, {
-    onFail: onFail && (() => onFail(prev, next)),
+    onFail:
+      onFail || rollback
+        ? () => {
+            if (rollback) rollbackForm(prev, next, keys);
+            onFail?.(prev, next);
+          }
+        : undefined,
     onLanded,
+    ...(failTitle ? { failTitle } : {}),
   });
   return [next, true];
 }
@@ -939,6 +1002,7 @@ function rollbackForm(
   const copy = [...read()];
   copy[idx] = back;
   cache = copy;
+  touchLocal(before.id);
   notify();
 }
 
@@ -1044,27 +1108,46 @@ export function publishFormRemoteSync(
       publishedName: form.name,
       status: 'published',
     },
-    (before, after) => {
-      // The publish never reached the server, so it isn't live: put the draft
-      // state back and say so (the shell's toast), instead of a "Live" that
-      // isn't (COPY-10). Runs before the save error, which the toast folds in.
-      rollbackForm(before, after, ['status', 'publishedSchema', 'publishedName']);
-      if (typeof window !== 'undefined') {
-        // A republish that fails leaves the earlier version live (STU-6, COPY-R1).
-        const wasLive = before.status === 'published' && Boolean(before.publishedSchema);
-        window.dispatchEvent(
-          new CustomEvent('slate-publish-error', { detail: { formId, wasLive } }),
-        );
-      }
-      onFail?.();
+    {
+      onFail: (before, after) => {
+        // The publish never reached the server, so it isn't live: put the draft
+        // state back and say so (the shell's toast), instead of a "Live" that
+        // isn't (COPY-10). Runs before the save error, which the toast folds in.
+        rollbackForm(before, after, ['status', 'publishedSchema', 'publishedName']);
+        if (typeof window !== 'undefined') {
+          // A republish that fails leaves the earlier version live (STU-6, COPY-R1).
+          const wasLive = before.status === 'published' && Boolean(before.publishedSchema);
+          window.dispatchEvent(
+            new CustomEvent('slate-publish-error', { detail: { formId, wasLive } }),
+          );
+        }
+        onFail?.();
+      },
+      onLanded,
     },
-    onLanded,
   );
   return updated;
 }
 
-export function unpublishFormRemoteSync(formId: string): FormRecord | null {
-  const [updated] = updateFormRemoteSync(formId, { status: 'draft' });
+/**
+ * Take the public link down. Like publish, the write lands in the background:
+ * a failure puts "published" back and the shell says so, `onLanded` runs once
+ * the server has it (audit B4).
+ */
+export function unpublishFormRemoteSync(
+  formId: string,
+  opts: { onFail?: () => void; onLanded?: () => void } = {},
+): FormRecord | null {
+  const [updated] = updateFormRemoteSync(
+    formId,
+    { status: 'draft' },
+    {
+      rollback: true,
+      failTitle: 'Couldn’t unpublish that form',
+      onFail: () => opts.onFail?.(),
+      onLanded: opts.onLanded,
+    },
+  );
   return updated;
 }
 

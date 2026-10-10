@@ -255,16 +255,18 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
 
   const onUnpublish = () => {
     setPublishing(true);
-    const next = unpublishForm(formId);
+    // "Unpublished" waits for the write to land; a failure puts "published" back
+    // and the shell's toast says so (audit B4).
+    unpublishForm(formId, {
+      onLanded: () =>
+        toast.push({
+          title: 'Unpublished',
+          detail: 'Public fill link is off. Draft stays in your library.',
+          tone: 'info',
+          sound: 'tap',
+        }),
+    });
     setPublishing(false);
-    if (next) {
-      toast.push({
-        title: 'Unpublished',
-        detail: 'Public fill link is off. Draft stays in your library.',
-        tone: 'info',
-        sound: 'tap',
-      });
-    }
   };
 
   const fillLocked = Boolean(form?.fillLocked);
@@ -321,14 +323,19 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
         form={form}
         liveResponses={liveResponses}
         onSave={(patch, note) => {
-          const [, ok] = updateForm(formId, patch);
-          if (ok)
-            toast.push({
-              title: note.title,
-              detail: note.detail,
-              tone: 'success',
-              sound: 'success',
-            });
+          // Said once the server has it; a write that fails puts the settings
+          // back and the shell's toast says so (audit B4).
+          const [, ok] = updateForm(formId, patch, {
+            rollback: true,
+            failTitle: 'Couldn’t save the closing',
+            onLanded: () =>
+              toast.push({
+                title: note.title,
+                detail: note.detail,
+                tone: 'success',
+                sound: 'success',
+              }),
+          });
           return ok;
         }}
       />
@@ -341,7 +348,11 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
         selected={trackedUrl ? trackSrc : null}
         onSelect={setTrackSrc}
         onChange={(next) => {
-          const [, ok] = updateForm(formId, { trackedSources: next.length ? next : undefined });
+          const [, ok] = updateForm(
+            formId,
+            { trackedSources: next.length ? next : undefined },
+            { rollback: true, failTitle: 'Couldn’t save that link' },
+          );
           return ok;
         }}
       />

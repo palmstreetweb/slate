@@ -28,15 +28,25 @@ export type GenerateRequest = {
  */
 export class GenerateRequestError extends Error {
   readonly retryable: boolean;
+  /** The owner cancelled it; nothing to show. */
+  readonly cancelled: boolean;
 
-  constructor(message: string, retryable: boolean) {
+  constructor(message: string, retryable: boolean, cancelled = false) {
     super(message);
     this.name = 'GenerateRequestError';
     this.retryable = retryable;
+    this.cancelled = cancelled;
   }
 }
 
+/**
+ * How long one generation may take before the modal gives up (audit A2). The
+ * route's own limit is shorter; this catches a request that never answers.
+ */
+export const GENERATE_TIMEOUT_MS = 60_000;
+
 const OFFLINE = 'Can’t reach Slate. Check your connection and try again.';
+const CANCELLED = 'Stopped.';
 const TOO_SLOW = 'That took too long. Try a shorter description or a smaller PDF.';
 const NOT_WORKING = 'Build with AI isn’t working right now. Try again in a minute.';
 
@@ -64,30 +74,52 @@ export function localResetPhrase(resetsAt: unknown, now = new Date()): string | 
 
 export async function requestGeneratedForm(
   input: GenerateRequest,
+  opts: { signal?: AbortSignal } = {},
 ): Promise<GeneratedDraft & { sourcePrompt: string }> {
+  // One controller ends the request on the owner's Cancel or after the timeout,
+  // so a stalled connection never pins the modal (audit A2).
+  const ctrl = new AbortController();
+  const onCancel = () => ctrl.abort();
+  opts.signal?.addEventListener('abort', onCancel, { once: true });
+  if (opts.signal?.aborted) ctrl.abort();
+  const timer = setTimeout(() => ctrl.abort(), GENERATE_TIMEOUT_MS);
+  const cancelled = () => Boolean(opts.signal?.aborted);
   let res: Response;
-  try {
-    res = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...(await authHeader()) },
-      body: JSON.stringify({
-        prompt: input.prompt,
-        previous: input.previous,
-        instruction: input.instruction,
-        document: input.document,
-      }),
-    });
-  } catch (err) {
-    console.error('[slate] Build with AI request failed', err);
-    throw new GenerateRequestError(OFFLINE, true);
-  }
-  const data = (await res.json().catch(() => null)) as {
+  let data: {
     form?: GeneratedForm;
     prompt?: string;
     error?: unknown;
     retry?: unknown;
     resetsAt?: unknown;
   } | null;
+  try {
+    try {
+      res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({
+          prompt: input.prompt,
+          previous: input.previous,
+          instruction: input.instruction,
+          document: input.document,
+        }),
+        signal: ctrl.signal,
+      });
+    } catch (err) {
+      if (cancelled()) throw new GenerateRequestError(CANCELLED, false, true);
+      if (ctrl.signal.aborted) {
+        console.error('[slate] Build with AI request timed out');
+        throw new GenerateRequestError(TOO_SLOW, true);
+      }
+      console.error('[slate] Build with AI request failed', err);
+      throw new GenerateRequestError(OFFLINE, true);
+    }
+    data = (await res.json().catch(() => null)) as typeof data;
+    if (cancelled()) throw new GenerateRequestError(CANCELLED, false, true);
+  } finally {
+    clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', onCancel);
+  }
   if (!res.ok) {
     // Our route always words its `error` for owners (api/generate.ts).
     const raw = typeof data?.error === 'string' ? data.error.trim() : '';

@@ -15,6 +15,7 @@ import {
   storagePathFromRef,
 } from '../storageUpload.js';
 import { lockBodyScroll } from '../lockBodyScroll.js';
+import { useFocusTrap } from '../useFocusTrap.js';
 
 function asFileItems(value: unknown): Array<File | string> {
   if (value === undefined || value === null || value === '') return [];
@@ -93,14 +94,8 @@ async function resolveFileAccess(item: File | string): Promise<{
   }
   if (typeof item !== 'string') return null;
 
-  if (/^https?:\/\//i.test(item)) {
-    return {
-      url: item,
-      revoke: false,
-      meta: { name: item.split('/').pop() ?? item, size: 0, mime: '' },
-    };
-  }
-
+  // Only a stored file's own ref. A bare URL in a file answer (local or legacy
+  // data, a restored backup) would make the owner's browser fetch it (audit F1).
   if (!isFileUploadRef(item)) return null;
 
   const resolved =
@@ -316,31 +311,23 @@ function FileLightbox({
   onClose: () => void;
 }) {
   const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const openedAt = useRef(Date.now());
   const resolvedMime = previewMime(mime, name);
   const isPdf = resolvedMime === 'application/pdf';
   const isVideo = resolvedMime.startsWith('video/');
 
+  // Tab stays inside, Escape closes, and focus goes back to the button that
+  // opened it (audit B13) — `aria-modal` alone promised that without doing it.
+  useFocusTrap(dialogRef, true, onClose);
+
   useEffect(() => {
     openedAt.current = Date.now();
     closeBtnRef.current?.focus({ preventScroll: true });
   }, [url]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    const unlock = lockBodyScroll();
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      unlock();
-    };
-  }, [onClose]);
+  useEffect(() => lockBodyScroll(), []);
 
   const dismissBackdrop = (e: React.MouseEvent) => {
     if (e.target !== e.currentTarget) return;
@@ -350,6 +337,7 @@ function FileLightbox({
 
   return createPortal(
     <div
+      ref={dialogRef}
       className="slate-file-lightbox"
       role="dialog"
       aria-modal="true"
@@ -458,7 +446,11 @@ function FileRow({ item }: { item: File | string }) {
         URL.revokeObjectURL(access.url);
       }
       if (!cancelled) setThumbLoading(false);
-    })();
+    })().catch((err: unknown) => {
+      // A dropped connection leaves the plain file badge, not a loading one (audit B6).
+      console.warn('[slate] file thumb failed', err);
+      if (!cancelled) setThumbLoading(false);
+    });
 
     return () => {
       cancelled = true;

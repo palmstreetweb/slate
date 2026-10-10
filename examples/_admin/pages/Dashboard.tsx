@@ -639,8 +639,9 @@ function FormCard({
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {form.status === 'published' && closedReason(form, subCount) ? (
-              // Closed (ADR-063): past its closing time or at its cap.
+            {closedReason(form, subCount) ? (
+              // Closed (ADR-063): past its closing time or at its cap. Said whatever
+              // the status, so a closing never hides behind "Draft" (audit A1).
               <span className="slate-badge slate-badge--closed">Closed</span>
             ) : form.status === 'published' ? (
               <span

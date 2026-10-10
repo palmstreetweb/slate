@@ -246,8 +246,10 @@ describe('form saves report plain words', () => {
     expect(copy).not.toBeNull();
     await vi.waitFor(() => expect(events).toHaveLength(1));
     // Not the editor's "Your last change isn't saved yet": nothing was being edited.
+    // Named after the copy, so an editor open on another form ignores it (audit B9).
     expect(events[0]).toEqual({
       kind: 'form',
+      formId: copy!.id,
       title: 'Couldn’t create that form',
       message: 'Check your connection and try again.',
     });

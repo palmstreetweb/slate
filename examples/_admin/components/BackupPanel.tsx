@@ -11,6 +11,7 @@ import {
   pickBackupFile,
 } from '../dataBackup.js';
 import { safeThemeName } from '../sanitizeUntrustedSchema.js';
+import { localDateStamp } from '../dateStamp.js';
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -26,8 +27,7 @@ export function BackupPanel() {
 
   const onExportBackup = () => {
     const backup = buildBackup(listAllForms(), listAllSubmissions());
-    const stamp = new Date().toISOString().slice(0, 10);
-    downloadBackupJson(backup, `slate-backup-${stamp}.json`);
+    downloadBackupJson(backup, `slate-backup-${localDateStamp()}.json`);
   };
 
   const onImportBackup = async () => {
@@ -76,7 +76,8 @@ export function BackupPanel() {
       <h2 className="slate-settings-heading">Backup</h2>
       <p className="slate-settings-copy">
         Forms and responses are saved in this browser only. Export a backup now and then, and import
-        it if you switch browsers or clear this site’s data.
+        it if you switch browsers or clear this site’s data. Files people uploaded aren’t in the
+        backup — they stay in the browser that received them.
       </p>
       <dl className="slate-settings-stats">
         <div>

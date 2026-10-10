@@ -29,6 +29,7 @@ import {
 import { openFeedback } from './FeedbackButton.js';
 import { rememberSettingsReturn } from './settingsNav.js';
 import { useSignOutFlow } from './useSignOutFlow.js';
+import { usePendingWritesGuard } from './usePendingWritesGuard.js';
 import { ErrorBoundary, PageCrashFallback } from '../components/ErrorBoundary.js';
 import {
   ADMIN_UI_THEME_STORAGE_KEY,
@@ -67,6 +68,7 @@ type Props = {
 
 export function AdminShell({ crumbs, rightSlot, children, fullBleed, phone: phoneChrome }: Props) {
   const isPhone = usePhone();
+  usePendingWritesGuard();
   const [mode, setMode] = useState<ResolvedThemeMode>(() => detectInitial());
   const [uiTheme, setUiTheme] = useState<AdminUiTheme>(() => detectAdminUiTheme());
   const wrapperRef = useRef<HTMLDivElement>(null);

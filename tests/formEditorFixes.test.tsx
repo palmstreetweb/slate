@@ -274,7 +274,8 @@ describe('opening and saving (COPY-X2, COPY-X1)', () => {
     const message = 'Couldn’t save — check your connection. Your last change isn’t saved yet.';
     act(() => {
       window.dispatchEvent(
-        new CustomEvent('slate-persist-error', { detail: { kind: 'form', message } }),
+        // Every form write names its form; the editor listens for its own only (audit B9).
+        new CustomEvent('slate-persist-error', { detail: { kind: 'form', formId: 'f_1', message } }),
       );
     });
     const status = document.querySelector('.slate-save-status')!;
@@ -459,7 +460,7 @@ describe('Publish (S10, COPY-10)', () => {
         opts?.onFail?.();
         window.dispatchEvent(
           new CustomEvent('slate-persist-error', {
-            detail: { kind: 'form', message: 'Couldn’t save — check your connection.' },
+            detail: { kind: 'form', formId: id, message: 'Couldn’t save — check your connection.' },
           }),
         );
       }, 50);

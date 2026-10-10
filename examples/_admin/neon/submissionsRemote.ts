@@ -142,16 +142,41 @@ function stampDeleted(id: string, at: string | undefined): void {
   }
 }
 
-type Snapshot = { index: Map<string, SubmissionIndexEntry>; full: Map<string, StoredSubmission> };
+/**
+ * Rows with a write on the wire, and how many. A poll, a reload or a form load
+ * that answers meanwhile reads the row as it was before the write, so the
+ * server's copy of these rows is left alone until the write settles (audit B8).
+ */
+const pendingWrites = new Map<string, number>();
 
-function snapshot(): Snapshot {
-  return { index: new Map(index), full: new Map(full) };
+function hasPendingWrite(id: string): boolean {
+  return pendingWrites.has(id);
 }
 
-function restoreSnapshot(s: Snapshot): void {
-  index = s.index;
-  full = s.full;
-  notify();
+function holdPending(ids: ReadonlyArray<string>): void {
+  for (const id of ids) pendingWrites.set(id, (pendingWrites.get(id) ?? 0) + 1);
+}
+
+function releasePending(ids: ReadonlyArray<string>): void {
+  for (const id of ids) {
+    const n = (pendingWrites.get(id) ?? 1) - 1;
+    if (n <= 0) pendingWrites.delete(id);
+    else pendingWrites.set(id, n);
+  }
+}
+
+/** One row's state in both layers, for a rollback (audit B3). */
+type RowState = { index: SubmissionIndexEntry | undefined; full: StoredSubmission | undefined };
+
+function rowState(id: string): RowState {
+  return { index: index.get(id), full: full.get(id) };
+}
+
+function setRowState(id: string, s: RowState): void {
+  if (s.index) index.set(id, s.index);
+  else index.delete(id);
+  if (s.full) full.set(id, s.full);
+  else full.delete(id);
 }
 
 function newestSeen(): string | null {
@@ -169,6 +194,7 @@ export function clearSubmissionsRemoteCache(): void {
   full = new Map();
   loadedForms.clear();
   formLoads.clear();
+  pendingWrites.clear();
   hydrated = false;
   notify();
 }
@@ -261,6 +287,8 @@ export async function hydrateSubmissionsRemote(opts?: { soft?: boolean }): Promi
     return;
   }
 
+  const prevIndex = index;
+  const prevFull = full;
   index = new Map(idx.map((e) => [e.id, e]));
   // Keep full rows we already hold for loaded forms; drop ones that vanished.
   const nextFull = new Map<string, StoredSubmission>();
@@ -270,6 +298,10 @@ export async function hydrateSubmissionsRemote(opts?: { soft?: boolean }): Promi
   }
   for (const sub of recent) nextFull.set(sub.id, sub);
   full = nextFull;
+  // A row with a write on the wire stays as this browser has it (audit B8).
+  for (const id of pendingWrites.keys()) {
+    setRowState(id, { index: prevIndex.get(id), full: prevFull.get(id) });
+  }
   // A loaded form must hold every one of its rows. If the index shows rows we
   // don't have answers for (sent from another device meanwhile), refetch it.
   for (const formId of [...loadedForms]) {
@@ -319,6 +351,8 @@ export async function refreshSubmissionsRemote(opts?: { full?: boolean }): Promi
   }
   let changed = false;
   for (const sub of rows) {
+    // Its write is still out; the server answered with the row before it (audit B8).
+    if (hasPendingWrite(sub.id)) continue;
     if (!full.has(sub.id)) changed = true;
     putFull(sub);
   }
@@ -350,11 +384,12 @@ export function loadFormSubmissionsRemote(
     for (const row of rows) {
       const sub = rowToSubmission(row);
       seen.add(sub.id);
+      if (hasPendingWrite(sub.id)) continue;
       putFull(sub);
     }
     // Rows of this form that no longer exist server-side.
     for (const e of [...index.values()]) {
-      if (e.formId === formId && !seen.has(e.id)) removeLocal(e.id);
+      if (e.formId === formId && !seen.has(e.id) && !hasPendingWrite(e.id)) removeLocal(e.id);
     }
     loadedForms.add(formId);
     notify();
@@ -403,26 +438,40 @@ async function withAuthRetry(write: () => PromiseLike<{ error: unknown }>): Prom
 }
 
 /**
- * Optimistic local change, then the server write; roll back on failure.
- * `failTitle` heads the toast ("Couldn’t empty Trash"). Resolves true once the
- * write landed, false once it was rolled back (and said).
+ * Optimistic local change to the rows `ids`, then the server write; on failure
+ * put back only those rows, and only the ones nothing else has changed since
+ * (a later write that landed, a poll) — never every newer local change (audit
+ * B3). `failTitle` heads the toast ("Couldn’t empty Trash"). Resolves true once
+ * the write landed, false once it was rolled back (and said).
  */
 function optimistic(
+  ids: ReadonlyArray<string>,
   apply: () => void,
   write: () => Promise<void>,
   failTitle: string,
 ): Promise<boolean> {
-  const prev = snapshot();
+  const touched = [...new Set(ids)];
+  const before = new Map(touched.map((id) => [id, rowState(id)]));
   apply();
+  const after = new Map(touched.map((id) => [id, rowState(id)]));
   notify();
-  return write().then(
-    () => true,
-    (err: unknown) => {
-      emitPersistError(err, failTitle);
-      restoreSnapshot(prev);
-      return false;
-    },
-  );
+  holdPending(touched);
+  return write()
+    .then(
+      () => true,
+      (err: unknown) => {
+        emitPersistError(err, failTitle);
+        for (const id of touched) {
+          const now = rowState(id);
+          const was = after.get(id)!;
+          if (now.index !== was.index || now.full !== was.full) continue;
+          setRowState(id, before.get(id)!);
+        }
+        notify();
+        return false;
+      },
+    )
+    .finally(() => releasePending(touched));
 }
 
 function chunks<T>(list: T[], size = BATCH): T[][] {
@@ -457,6 +506,7 @@ export function addSubmissionRemoteSync(
 ): StoredSubmission {
   const sub = makeSubmission(formId, answers, meta);
   optimistic(
+    [sub.id],
     () => putFull(sub),
     () => withAuthRetry(() => getNeon().from('submissions').insert(submissionToRow(sub))),
     'Couldn’t save that test response',
@@ -466,11 +516,13 @@ export function addSubmissionRemoteSync(
 
 export function trashSubmissionsRemoteSync(formId?: string): void {
   const now = new Date().toISOString();
+  const ids = [...index.values()]
+    .filter((e) => !e.deletedAt && (!formId || e.formId === formId))
+    .map((e) => e.id);
   optimistic(
+    ids,
     () => {
-      for (const e of [...index.values()]) {
-        if (!e.deletedAt && (!formId || e.formId === formId)) stampDeleted(e.id, now);
-      }
+      for (const id of ids) stampDeleted(id, now);
     },
     () =>
       withAuthRetry(() => {
@@ -485,6 +537,7 @@ export function trashSubmissionsRemoteSync(formId?: string): void {
 export function trashSubmissionRemoteSync(submissionId: string): void {
   const now = new Date().toISOString();
   optimistic(
+    [submissionId],
     () => stampDeleted(submissionId, now),
     () =>
       withAuthRetry(() =>
@@ -496,6 +549,7 @@ export function trashSubmissionRemoteSync(submissionId: string): void {
 
 export function restoreSubmissionRemoteSync(submissionId: string): void {
   optimistic(
+    [submissionId],
     () => stampDeleted(submissionId, undefined),
     () =>
       withAuthRetry(() =>
@@ -507,11 +561,13 @@ export function restoreSubmissionRemoteSync(submissionId: string): void {
 
 /** Restore all of a form's trash; resolves true once the server has it (QA leftover). */
 export function restoreSubmissionsRemoteSync(formId: string): Promise<boolean> {
+  const ids = [...index.values()]
+    .filter((e) => e.deletedAt && e.formId === formId)
+    .map((e) => e.id);
   return optimistic(
+    ids,
     () => {
-      for (const e of [...index.values()]) {
-        if (e.deletedAt && e.formId === formId) stampDeleted(e.id, undefined);
-      }
+      for (const id of ids) stampDeleted(id, undefined);
     },
     () =>
       withAuthRetry(() =>
@@ -527,6 +583,7 @@ export function restoreSubmissionsRemoteSync(formId: string): Promise<boolean> {
 
 export function permanentlyDeleteSubmissionRemoteSync(submissionId: string): void {
   optimistic(
+    [submissionId],
     () => removeLocal(submissionId),
     () =>
       withAuthRetry(() => getNeon().from('submissions').delete().eq('id', submissionId)).then(
@@ -537,11 +594,13 @@ export function permanentlyDeleteSubmissionRemoteSync(submissionId: string): voi
 }
 
 export function emptyTrashRemoteSync(formId?: string): void {
+  const ids = [...index.values()]
+    .filter((e) => e.deletedAt && (!formId || e.formId === formId))
+    .map((e) => e.id);
   optimistic(
+    ids,
     () => {
-      for (const e of [...index.values()]) {
-        if (e.deletedAt && (!formId || e.formId === formId)) removeLocal(e.id);
-      }
+      for (const id of ids) removeLocal(id);
     },
     () =>
       withAuthRetry(() => {
@@ -554,9 +613,11 @@ export function emptyTrashRemoteSync(formId?: string): void {
 }
 
 export function purgeSubmissionsRemoteSync(formId: string): void {
+  const ids = [...index.values()].filter((e) => e.formId === formId).map((e) => e.id);
   optimistic(
+    ids,
     () => {
-      for (const e of [...index.values()]) if (e.formId === formId) removeLocal(e.id);
+      for (const id of ids) removeLocal(id);
       loadedForms.delete(formId);
     },
     () =>
@@ -565,6 +626,21 @@ export function purgeSubmissionsRemoteSync(formId: string): void {
       ),
     'Couldn’t delete those responses',
   );
+}
+
+/**
+ * Forget a form's rows once the form itself was deleted: the database removed
+ * them with it (001's cascade), so there is nothing to write (audit B10).
+ */
+export function dropFormSubmissionsLocal(formId: string): void {
+  let changed = false;
+  for (const e of [...index.values()]) {
+    if (e.formId !== formId) continue;
+    removeLocal(e.id);
+    changed = true;
+  }
+  loadedForms.delete(formId);
+  if (changed) notify();
 }
 
 /**
@@ -585,6 +661,7 @@ export function patchAnswerRemote(submissionId: string, questionId: string, valu
 export function replaceAllSubmissionsRemoteSync(subs: StoredSubmission[]): void {
   const existing = [...index.keys()];
   optimistic(
+    [...existing, ...subs.map((s) => s.id)],
     () => {
       index = new Map();
       full = new Map();
