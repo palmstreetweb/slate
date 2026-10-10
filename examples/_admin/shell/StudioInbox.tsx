@@ -23,13 +23,15 @@ import { useToast } from '../toast.js';
 import { detectAdminUiTheme } from '../adminUiTheme.js';
 import { readSlateMode } from '../slateMode.js';
 import {
+  addKnown,
+  freshIds,
   hasKnown,
   markRead,
   readKnown,
+  readKnownFloor,
   readUnread,
   setUnread,
   useUnread,
-  writeKnown,
 } from '../responses/unreadStore.js';
 import { LoadingScreen } from './LoadingScreen.js';
 import { isArrival, noteArrivals, useArrivalsVersion } from '../delight/arrivals.js';
@@ -93,24 +95,28 @@ export function StudioInbox() {
     (announce: boolean) => {
       // The slim index is complete in cloud mode; answers may not be loaded yet.
       const active = listSubmissionIndex();
-      const ids = active.map((s) => s.id);
       const known = readKnown();
       if (!seeded.current && known.length === 0 && !hasKnown()) {
-        writeKnown(ids);
+        addKnown(
+          active.map((s) => s.id),
+          active,
+        );
         seeded.current = true;
         setTick((n) => n + 1);
         return;
       }
       seeded.current = true;
-      const knownSet = new Set(known);
-      const fresh = ids.filter((id) => !knownSet.has(id));
+      // Not listed as known and newer than the floor the capped list left
+      // behind: an account past 2,000 responses never re-announces the rest (audit B2).
+      const fresh = freshIds(active, known, readKnownFloor());
       if (fresh.length === 0) {
         setTick((n) => n + 1);
         return;
       }
-      // Store caps unread at 200 and known at 2000.
-      writeKnown([...fresh, ...known]);
-      setUnread([...fresh, ...readUnread().filter((id) => !fresh.includes(id))]);
+      // Store caps unread at 200 and known at 2000 (older ones by the floor).
+      addKnown(fresh, active);
+      const freshSet = new Set(fresh);
+      setUnread([...fresh, ...readUnread().filter((id) => !freshSet.has(id))]);
       setTick((n) => n + 1);
 
       // Live arrivals (not the batch that loads with the page): rows wash in
