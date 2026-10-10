@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { deriveNeonServiceUrls, getNeon, getNeonUrl, isNeonConfigured } from './env.js';
 import { clearRemoteStores } from './hydrate.js';
+import { forgetOwnerBrowserState } from '../ownerBrowserState.js';
 import { playUiSound } from '../uiSounds.js';
 
 type AuthUser = {
@@ -240,7 +241,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applySession = useCallback((next: AuthSession | null) => {
     if (next && signingOutRef.current) return;
     const nextId = next?.user.id ?? null;
-    if (userIdRef.current !== null && userIdRef.current !== nextId) clearRemoteStores();
+    if (userIdRef.current !== null && userIdRef.current !== nextId) {
+      clearRemoteStores();
+      // Their Build with AI prompts and read state go too (audit F6).
+      forgetOwnerBrowserState();
+    }
     userIdRef.current = nextId;
     setSession(next);
   }, []);
