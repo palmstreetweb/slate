@@ -11,6 +11,7 @@ import { shakeInvalid } from '@/utils/motion.js';
 import {
   describeFileUploadAnswer,
   isFileUploadRef,
+  SLATE_FILE_REF_PREFIX,
   type FileUploadMeta,
 } from '@/utils/fileUploadRef.js';
 import type { FileUploadHandler } from '@/utils/createFileUploadHandler.js';
@@ -256,7 +257,7 @@ export function FileUploadField({
   const [metaByKey, setMetaByKey] = useState<Record<string, FileUploadMeta>>({});
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadPhase, setUploadPhase] = useState<'optimize' | 'upload' | null>(null);
+  const [, setUploadPhase] = useState<'optimize' | 'upload' | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [screenDrop, setScreenDrop] = useState(false);
   const [portalHost, setPortalHost] = useState<Element | null>(null);
@@ -633,12 +634,7 @@ export function FileUploadField({
   const zoneHint = multiple ? 'or drag and drop them here' : 'or drag and drop it here';
   const totalShown = items.length + pending.length;
 
-  const renderThumb = (
-    previewUrl: string | null | undefined,
-    label: string,
-    badge: string,
-    busy?: boolean,
-  ) => (
+  const renderThumb = (previewUrl: string | null | undefined, badge: string, busy?: boolean) => (
     <span className={`slate-upload-thumb${busy ? ' slate-upload-thumb--busy' : ''}`}>
       {previewUrl ? (
         <img src={previewUrl} alt="" className="slate-upload-thumb-img" />
@@ -690,7 +686,9 @@ export function FileUploadField({
               const name =
                 typeof item === 'string'
                   ? (meta?.name ??
-                    (isFileUploadRef(item) ? 'File' : (item.split('/').pop() ?? 'File')))
+                    (item.startsWith(SLATE_FILE_REF_PREFIX)
+                      ? 'File'
+                      : (item.split('/').pop() ?? 'File')))
                   : item.name;
               const preview =
                 previewByKey[key] ??
@@ -706,7 +704,7 @@ export function FileUploadField({
                   (typeof item !== 'string' && isHeicLike(item)));
               return (
                 <li key={key} className="slate-upload-file">
-                  {renderThumb(canImg ? preview : null, label, extBadge(name))}
+                  {renderThumb(canImg ? preview : null, extBadge(name))}
                   <span className="slate-upload-name">{label}</span>
                   <button
                     type="button"
@@ -724,7 +722,7 @@ export function FileUploadField({
               const label = `${entry.file.name} (${entry.phase === 'optimize' ? 'optimizing…' : 'uploading…'})`;
               return (
                 <li key={entry.id} className="slate-upload-file slate-upload-file--pending">
-                  {renderThumb(entry.previewUrl, label, extBadge(entry.file.name), true)}
+                  {renderThumb(entry.previewUrl, extBadge(entry.file.name), true)}
                   <span className="slate-upload-name">{label}</span>
                 </li>
               );

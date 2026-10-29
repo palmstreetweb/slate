@@ -27,7 +27,7 @@ const meta = {
   completedAt: new Date('2026-01-01T00:01:00Z'),
   durationMs: 60_000,
   questionsVisited: ['q1'],
-  hiddenFields: [],
+  hiddenFields: {},
   score: 1,
 };
 

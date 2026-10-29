@@ -6,7 +6,7 @@ import {
   formQuotaUserMessage,
   isFormQuotaError,
   quotaFromUnknown,
-} from '../examples/_admin/formQuota.ts';
+} from '../examples/_admin/formQuota.js';
 
 describe('form quota errors', () => {
   it('parses PostgREST raise exception payloads', () => {

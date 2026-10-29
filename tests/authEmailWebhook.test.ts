@@ -110,7 +110,7 @@ beforeAll(async () => {
       throw new Error(`unexpected fetch ${url}`);
     }),
   );
-  app = (await import('../neon/functions/auth-email/index.ts')).default as never;
+  app = (await import('../neon/functions/auth-email/index.js')).default as never;
 });
 
 afterAll(() => {

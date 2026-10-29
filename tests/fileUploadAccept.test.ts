@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type * as PrepareFileForUpload from '../src/utils/prepareFileForUpload.js';
 import {
   formatFileUploadError,
   isFileSizeError,
@@ -7,7 +8,7 @@ import {
 import { createFileUploadHandler } from '../src/utils/createFileUploadHandler.js';
 
 vi.mock('../src/utils/prepareFileForUpload.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/utils/prepareFileForUpload.js')>();
+  const actual = await importOriginal<typeof PrepareFileForUpload>();
   return {
     ...actual,
     prepareFileForUpload: vi.fn(actual.prepareFileForUpload),

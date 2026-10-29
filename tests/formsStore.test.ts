@@ -19,6 +19,7 @@ import {
 const schema = defineSchema({
   brand: { name: 'Test' },
   theme: 'classic',
+  themeMode: 'light',
   questions: [
     { id: 'welcome', type: 'welcome', title: 'Hi', cta: 'Go' },
     { id: 'done', type: 'thanks', title: 'Done' },

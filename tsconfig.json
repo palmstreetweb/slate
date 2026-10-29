@@ -26,7 +26,8 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@palmstreetweb/slate": ["src/index.ts"]
     },
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },

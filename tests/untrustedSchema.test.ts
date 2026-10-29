@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Schema } from '../src/index.js';
+import type { Question, Schema } from '../src/index.js';
 import { sanitizeUntrustedSchema } from '../examples/_admin/sanitizeUntrustedSchema.js';
 
 const base = {
@@ -38,7 +38,7 @@ describe('sanitizeUntrustedSchema (portable links, ADR-046)', () => {
         },
       ],
     } as unknown as Schema);
-    const opts = (s.questions[0] as { options: { src?: string }[] }).options;
+    const opts = (s.questions[0] as Extract<Question, { type: 'picture_choice' }>).options;
     expect(opts[0]!.src).toBeUndefined();
     expect(opts[1]!.src).toBe('https://cdn.example/b.jpg');
     expect((s.brand as { logo?: string }).logo).toBeUndefined();

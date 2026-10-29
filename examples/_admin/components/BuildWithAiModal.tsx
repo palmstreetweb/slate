@@ -247,7 +247,7 @@ export function BuildWithAiModal({ open, onClose, onReady }: Props) {
   );
 
   useEffect(() => {
-    if (!open || busy || phase === 'review' || phase === 'opening') {
+    if (!open || busy || phase === 'review') {
       setDropWash((w) => (w === 'hover' ? 'off' : w));
       return;
     }
