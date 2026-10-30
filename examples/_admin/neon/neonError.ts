@@ -122,6 +122,8 @@ export type NeonAction =
   | 'delete'
   | 'load'
   | 'password'
+  /** Share → Email me new responses (ADR-072). Stands alone, like password. */
+  | 'emails'
   | 'response'
   | 'move'
   | 'feedback'
@@ -133,13 +135,14 @@ const SERVER = 'Slate is having trouble right now. Try again in a minute.';
 /**
  * save, delete, response, move and restore-backup appear under a toast title
  * that already says what failed ("Couldn’t save your form"), so they say what
- * to do. load, password and feedback stand alone, so they say both.
+ * to do. load, password, emails and feedback stand alone, so they say both.
  */
 const OFFLINE: Record<NeonAction, string> = {
   save: 'Check your connection. Your last change isn’t saved yet.',
   delete: 'Check your connection and try again.',
   load: 'Couldn’t load your forms — check your connection, then try again.',
   password: 'Couldn’t change the password — check your connection and try again.',
+  emails: 'Couldn’t change emails — check your connection and try again.',
   response: 'Check your connection and try again.',
   move: 'Check your connection and try again.',
   feedback: 'Couldn’t send — check your connection and try again.',
@@ -151,6 +154,7 @@ const OTHER: Record<NeonAction, string> = {
   delete: 'Try again in a moment.',
   load: 'Couldn’t load your forms. Try again in a moment.',
   password: 'Couldn’t change the password. Try again in a moment.',
+  emails: 'Couldn’t change emails. Try again in a moment.',
   response: 'Try again in a moment.',
   move: 'Try again in a moment.',
   feedback: 'Couldn’t send your note. Try again in a moment.',

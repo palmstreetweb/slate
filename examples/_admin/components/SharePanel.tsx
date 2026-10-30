@@ -27,7 +27,9 @@ import {
   subscribe,
   hasUnpublishedChanges,
   setFormFillPassword,
+  setFormNotifyEmail,
   supportsCloseSettings,
+  supportsNotifyEmail,
   updateForm,
 } from '../_formsStore.js';
 import { countSubmissions, subscribe as subscribeSubmissions } from '../_submissionStore.js';
@@ -79,6 +81,8 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
   const [lockDraft, setLockDraft] = useState('');
   const [lockBusy, setLockBusy] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
+  const [notifyBusy, setNotifyBusy] = useState(false);
+  const [notifyError, setNotifyError] = useState<string | null>(null);
   /** Tracked link on show (ADR-063): its `src`, or null for the main link. */
   const [trackSrc, setTrackSrc] = useState<string | null>(null);
   const [, setTick] = useState(0);
@@ -308,6 +312,35 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
     );
   };
 
+  const notifyOn = Boolean(form?.notifyEmail);
+
+  const applyNotify = async (on: boolean) => {
+    if (notifyBusy) return;
+    setNotifyBusy(true);
+    setNotifyError(null);
+    const result = await setFormNotifyEmail(formId, on);
+    setNotifyBusy(false);
+    if (!result.ok) {
+      setNotifyError(result.message);
+      return;
+    }
+    toast.push(
+      result.on
+        ? {
+            title: 'Emails on',
+            detail: 'New responses go to your sign-in email, at most one email every 15 minutes.',
+            tone: 'success',
+            sound: 'success',
+          }
+        : {
+            title: 'Emails off',
+            detail: 'Responses still arrive here in Slate.',
+            tone: 'info',
+            sound: 'tap',
+          },
+    );
+  };
+
   if (!open || typeof document === 'undefined') return null;
 
   const liveResponses = countSubmissions(formId);
@@ -496,6 +529,36 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
     </section>
   ) : null;
 
+  // ADR-072: needs 023 in the cloud; without it the switch would do nothing.
+  const notifyRow =
+    cloud && form && supportsNotifyEmail() ? (
+      <section className="slate-share-lock slate-share-notify" aria-label="Email">
+        <div className="slate-share-lock-row">
+          <span className="slate-share-lock-label" id={`${titleId}-notify-label`}>
+            <MailGlyph />
+            Email me new responses
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={notifyOn}
+            aria-labelledby={`${titleId}-notify-label`}
+            aria-describedby={notifyError ? `${titleId}-notify-hint` : undefined}
+            className="slate-share-lock-switch"
+            disabled={notifyBusy}
+            onClick={() => void applyNotify(!notifyOn)}
+          >
+            <span aria-hidden />
+          </button>
+        </div>
+        {notifyError ? (
+          <p className="slate-share-lock-error" role="alert" id={`${titleId}-notify-hint`}>
+            {notifyError}
+          </p>
+        ) : null}
+      </section>
+    ) : null;
+
   return createPortal(
     <div data-slate-forms="" data-theme-name="slate" data-admin-ui={uiTheme} data-theme={mode}>
       <div
@@ -602,6 +665,8 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
 
                 {lockRow}
 
+                {notifyRow}
+
                 {closeRow}
 
                 <section className="slate-share-scan" aria-label="QR code">
@@ -681,6 +746,7 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
                 </div>
                 {blockNotice}
                 {lockRow}
+                {notifyRow}
                 {closeRow}
               </>
             )}
@@ -689,6 +755,21 @@ export function SharePanel({ open, onClose, formId, formName, schema, onShowQues
       </div>
     </div>,
     document.body,
+  );
+}
+
+function MailGlyph() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="2" y="3.5" width="12" height="9" rx="1.75" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="m2.75 4.75 5.25 4 5.25-4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

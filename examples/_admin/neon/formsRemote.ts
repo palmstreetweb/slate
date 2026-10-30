@@ -47,11 +47,18 @@ let quotaMax = FORM_QUOTA_MAX;
 let publishedNameColumn = false;
 /** The last hydrate read 019's close columns (ADR-063); until then writes never carry them. */
 let closeColumns = false;
+/** The last hydrate read 023's `notify_email` (ADR-072); until then the Share switch is hidden. */
+let notifyColumn = false;
 const listeners = new Set<Listener>();
 
 /** The database has 019's columns, as of the last hydrate (ADR-063). */
 export function hasCloseColumnsRemote(): boolean {
   return closeColumns;
+}
+
+/** The database has 023's `notify_email`, as of the last hydrate (ADR-072). */
+export function hasNotifyColumnRemote(): boolean {
+  return notifyColumn;
 }
 
 function notify(): void {
@@ -76,6 +83,7 @@ export function clearFormsRemoteCache(): void {
   quotaMax = FORM_QUOTA_MAX;
   publishedNameColumn = false;
   closeColumns = false;
+  notifyColumn = false;
   notify();
 }
 
@@ -104,6 +112,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
   // Explicit columns, never `*` — `fill_password_hash` must not reach the browser (ADR-043).
   let hasPublishedName = true;
   let hasCloseColumns = true;
+  let hasNotifyColumn = true;
   const fetchForms = async (): Promise<DbFormRow[]> => {
     const run = (columns: readonly string[]) =>
       neon.from('forms').select(columns.join(',')).order('updated_at', { ascending: false });
@@ -122,6 +131,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
     if (error) throw error;
     hasPublishedName = columns.includes('published_name');
     hasCloseColumns = FORM_CLOSE_COLUMNS.every((c) => columns.includes(c));
+    hasNotifyColumn = columns.includes('notify_email');
     return (data ?? []) as DbFormRow[];
   };
 
@@ -159,6 +169,7 @@ export async function hydrateFormsRemote(opts?: { soft?: boolean }): Promise<voi
 
   publishedNameColumn = hasPublishedName;
   closeColumns = hasCloseColumns;
+  notifyColumn = hasNotifyColumn;
   const next = rows.map(rowToFormRecord);
 
   // Soft refresh / race: do not replace a known library with a flaky empty read.
@@ -204,7 +215,7 @@ function isMissingColumnError(err: unknown): boolean {
   return (
     e?.code === '42703' ||
     e?.code === 'PGRST204' ||
-    /fill_locked|published_name|closes_at|max_responses|closed_message|tracked_sources/.test(
+    /fill_locked|published_name|closes_at|max_responses|closed_message|tracked_sources|notify_email/.test(
       e?.message ?? '',
     )
   );
@@ -259,6 +270,42 @@ export async function setFormFillPasswordRemote(
     }
     console.error('[slate] fill password failed:', formatNeonError(err, 'unknown error'));
     return { ok: false, message: userNeonError(err, 'password') };
+  }
+}
+
+/**
+ * Turn new-response emails on or off for one form (ADR-072). Goes through the owner-checked
+ * RPC, so the database stamps `notify_since` and a form save never touches the switch.
+ */
+export async function setFormNotifyEmailRemote(
+  formId: string,
+  on: boolean,
+): Promise<{ ok: true; on: boolean } | { ok: false; message: string }> {
+  try {
+    await ensureAuthForDataApi();
+    const { data, error } = await getNeon().rpc('set_form_notify_email', {
+      p_form_id: formId,
+      p_on: on,
+    });
+    if (error) throw error;
+    const now = data === true;
+    const apply = (f: FormRecord): FormRecord => {
+      const { notifyEmail: _drop, ...rest } = f;
+      return now ? { ...rest, notifyEmail: true } : rest;
+    };
+    cache = read().map((f) => (f.id === formId ? apply(f) : f));
+    // A queued editor save carries its own snapshot — keep the flag in step.
+    const queued = queuedFormWrite.get(formId);
+    if (queued) queuedFormWrite.set(formId, apply(queued));
+    notify();
+    return { ok: true, on: now };
+  } catch (err) {
+    if ((err as { code?: string } | null)?.code === 'PGRST202') {
+      console.error('[slate] notify email RPC missing:', formatNeonError(err, 'PGRST202'));
+      return { ok: false, message: 'Emails aren’t available yet. Try again later.' };
+    }
+    console.error('[slate] notify email failed:', formatNeonError(err, 'unknown error'));
+    return { ok: false, message: userNeonError(err, 'emails') };
   }
 }
 
@@ -872,10 +919,11 @@ export async function unpublishFormRemote(formId: string): Promise<FormRecord | 
 
 /**
  * Restore re-creates rows, so the cache mirrors what the database keeps: no password
- * survives it, and a published row's title is its own name (017's insert trigger).
+ * survives it, emails start off (023's default), and a published row's title is its own name
+ * (017's insert trigger).
  */
 function asRestored(forms: FormRecord[]): FormRecord[] {
-  return forms.map(({ fillLocked: _drop, publishedName: _title, ...rest }) =>
+  return forms.map(({ fillLocked: _drop, publishedName: _title, notifyEmail: _mail, ...rest }) =>
     rest.publishedSchema ? { ...rest, publishedName: rest.name } : rest,
   );
 }

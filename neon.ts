@@ -26,6 +26,19 @@ export default defineConfig({
         name: 'Slate branded auth email',
         source: './neon/functions/auth-email/index.ts',
       },
+      notifysend: {
+        name: 'Slate new-response emails',
+        source: './neon/functions/notify-send/index.ts',
+        // ADR-072: every 5 minutes (UTC). Disable it to stop every response email at once.
+        triggers: [
+          {
+            type: 'schedule',
+            name: 'response-emails',
+            cron: '*/5 * * * *',
+            functionPath: '/run',
+          },
+        ],
+      },
     },
   },
 });

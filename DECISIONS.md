@@ -640,6 +640,7 @@ Alternatives:
 - Keep the single-address email for PSW's own forms only. Rejected — one code path that leaks under the wrong env value is not worth the convenience.
 Consequences: An owner learns about a response when they open Slate. Submit no longer waits on Resend. The thanks-screen chip now reads “response received” instead of the prototype's “confirmation sent” — nothing is sent, and the engine shouldn't promise it on a host's behalf. `PSW_NOTIFY_EMAIL` and `PUBLIC_FORM_BASE` are no longer read by any Function; remove them from the deployed env.
 Revisit when: owners ask for email or push, or a daily digest.
+Addendum (ADR-072): owners asked. Per-owner email is back as an opt-in per form, sent by a scheduled Function to the owner's verified sign-in address only, never on the submit path and never with answers in it. The rest of this ADR stands: there is still no single notify address and no email from `submitresponse`.
 
 ## ADR-048 — Respondent bundle split + SDK-free form fetch
 Date: 2026-09-23
@@ -1590,6 +1591,35 @@ Consequences:
 - Fonts: ≈ 0 extra bytes on a cold visit (the same woff2 subsets, now from `/assets` with a one-year cache) and two fewer third-party connections.
 - Unit tests: 2,361 (2,305 before): `slugLock` (the returned slug wins; resend on the race), `scoreServer`, `apiLayout`, `storageSignEnv`, `extractDocument`, `authEmailProxy`, `respondentPrivacy`, and new cases in `submitResponse` / `storageQuota` / `authEmailWebhook` (the ceiling), `formClose` (Infinity), `generateErrors` (no-store), `vercelHeaders` (pinned hosts and the one storage pattern, fonts, trailing slash).
 Revisit when: Neon hands pgcrypto to `neondb_owner` or exposes per-function Data API settings; a dedicated Function role lands; `AWS_ENDPOINT_URL_S3` on `storagesign` has been read (then pin the Object Storage host in `vercel.json` and drop `*.aws.neon.tech`).
+
+## ADR-072 — Owners can turn on new-response emails, per form
+Date: 2026-10-30
+Status: proposed
+Context: ADR-047 took email off submit: one address got every owner's respondents, and Resend sat on the hot path. Owners now learn about a response only when they open Slate, which is the gap local-business owners feel most (a quote request that waits a day is a lost job). ADR-047 deferred per-owner email until three things existed: a verified address per owner, unsubscribe handling, and a sending reputation to protect. Neon Functions can now run on a schedule (Function Triggers), so sending can live entirely off the submit path.
+Decision:
+1. **Off by default, per form.** Share → *Email me new responses* (a switch under the password row) calls `set_form_notify_email` (023), owner-checked like `set_form_fill_password`. `forms.notify_email` is readable through the Data API with the other owner columns; a form save never sends it (it is not in `formRecordToRow`), a duplicate starts off, and a restored backup starts off.
+2. **Only to the owner's own sign-in address.** The address is `neon_auth."user".email` for `forms.owner_id`, and only while `emailVerified` is true and the account is not banned. Neon Auth verified it (Google, or the sign-in code). There is no field for another address in v1, so Slate can't be pointed at a stranger's inbox.
+3. **Nothing on the submit path.** `submitresponse` is unchanged and not redeployed. A new Function, `notifysend`, runs every 5 minutes (`*/5 * * * *` UTC, `POST /run`; only Neon's trigger can start it: the invocation-id header, which Neon strips from client requests). It takes a session advisory lock (87123005) so two runs never overlap, asks `response_emails_due(25)` for the forms that are due, sends each one email, and records the outcome.
+4. **Counted, not queued.** There is no outbox. Per form, `response_email_state.notified_upto` is how far the last email counted; a run counts live responses after it (and after `notify_since`) and up to `now() − 10 s`, so a response that commits late with an earlier `received_at` is counted by the next email rather than skipped. Trashing a response before the email goes out takes it out of the count.
+5. **Grouped.** At most one email per form every 15 minutes: 300 people filling a flyer at an event make "300 new responses", not 300 emails. The count stops at 1,000 ("1,000+").
+6. **Caps.** 50 emails per owner per UTC day, 300 for everyone per day. Response emails share one Resend account with sign-in mail, and a sign-in code that can't be sent locks everyone out, so response emails must never use up the quota. Over a cap the cursor stays put: the next email (tomorrow) counts those responses too. The numbers are SQL functions in 023, changed with `create or replace`.
+7. **Failure.** A failed or timed-out send keeps the cursor and backs the form off 5, 10, 20 … minutes, at most 6 hours; a later success resets it. Each send carries an `Idempotency-Key` (`resp-{form}-{upto}`), so a retry after a timeout that did go through is not a second email.
+8. **No answers in the email.** Subject `3 new responses on “Roof estimate”`, one button to `/forms/{id}/submissions`, the unsubscribe link. Respondents' names, emails and free text never leave Slate, so a forwarded or leaked email says nothing about anyone, and there is nothing in it worth faking. The form name is the owner's own (published name first), flattened to one line of at most 80 characters and HTML-escaped.
+9. **Unsubscribe.** Every email has a visible link and the RFC 8058 headers (`List-Unsubscribe`, `List-Unsubscribe-Post: List-Unsubscribe=One-Click`). The token is `{formId}.{HMAC-SHA256(UNSUB_SECRET, "unsub:v1:" + formId)}`, checked before any database work; a forged or cut token is a 400 that touches nothing. `GET /unsubscribe` only shows a confirm button (mail scanners open links); `POST` (the button, or the mail app's one-click) turns that form's emails off. The token only ever turns emails off.
+10. **Storage.** 023 adds `forms.notify_email` and `forms.notify_since` (set by a trigger when emails go on, cleared when they go off, never movable by a client), `response_email_state` and `response_email_owner_day` (RLS forced, no Data API grants), and the job's functions (no Data API grants).
+Alternatives:
+- Answers (or a preview) in the email. Rejected for v1: it puts respondents' personal information in a third-party mailbox on every response. If owners ask, an opt-in that shows only the owner's own question titles could come later.
+- Send from `submitresponse` right after the insert. Rejected: Resend back on every submit, and a crowd floods the inbox.
+- An outbox table filled by a trigger on `submissions`. Rejected: one more write per submit and one more table to sweep, for what a count already gives.
+- A custom recipient address. Deferred: it needs its own confirmation email first.
+- Push notifications. Deferred: no service worker or app today.
+Consequences:
+- New Function `notifysend` with `RESEND_API_KEY`, `UNSUB_SECRET` (≥ 32 characters) and `NOTIFY_PUBLIC_URL` (its own URL, for the links); optional `STUDIO_URL`, `NOTIFY_EMAIL_FROM`. Missing any of the three: the run sends nothing and logs which.
+- Deploy order: 023 → refresh the Data API schema cache → deploy `notifysend` → create the trigger → ship the site. Before 023 (or on a stale cache) the switch is hidden. Rollback: disable the trigger (stops every email at once), then the site, then 023's rollback block.
+- An email arrives 0–20 minutes after a response (the 10 s settle, the 5-minute schedule, the 15-minute window).
+- The unsubscribe endpoint is anonymous but does no database work for a bad token and one idempotent update for a good one; it is not rate-limited.
+- Tests: `responseEmail` (token, email, the run: caps across one owner's forms, the day cap, failure and timeout, the run lock, unsubscribe GET/POST/forged), `sharePanelNotify` (the switch). `scripts/check-response-email.ts` runs 023 and the real Function against a throwaway branch: 22/22.
+Revisit when: owners ask for answers in the email, another address, a daily digest, or push; or Resend's limits change.
 
 ## Deferred to V2
 

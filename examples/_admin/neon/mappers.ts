@@ -34,6 +34,7 @@ export function rowToFormRecord(row: DbFormRow): FormRecord {
     ...(Array.isArray(row.tracked_sources)
       ? { trackedSources: cleanTrackedSources(row.tracked_sources) }
       : {}),
+    ...(row.notify_email === true ? { notifyEmail: true } : {}),
   };
 }
 

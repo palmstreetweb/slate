@@ -25,6 +25,8 @@ vi.mock('../examples/_admin/_formsStore.js', () => ({
   hasUnpublishedChanges: () => false,
   setFormFillPassword: vi.fn(),
   supportsCloseSettings: () => state.closeSettings,
+  supportsNotifyEmail: () => false,
+  setFormNotifyEmail: vi.fn(),
   updateForm: (_id: string, patch: Record<string, unknown>) => {
     state.updates.push(patch);
     state.form = { ...state.form, ...patch };

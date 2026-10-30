@@ -270,6 +270,8 @@ describe('Share panel offers Republish after a rename', () => {
         hasUnpublishedChanges: real.hasUnpublishedChanges,
         setFormFillPassword: vi.fn(),
         supportsCloseSettings: () => true,
+        supportsNotifyEmail: () => false,
+        setFormNotifyEmail: vi.fn(),
       };
     });
     vi.doMock('../examples/_admin/neon/env.js', () => ({ isNeonConfigured: () => true }));

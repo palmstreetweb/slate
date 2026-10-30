@@ -26,6 +26,8 @@ vi.mock('../examples/_admin/_formsStore.js', () => ({
   hasUnpublishedChanges: () => false,
   setFormFillPassword: vi.fn(),
   supportsCloseSettings: () => false,
+  supportsNotifyEmail: () => false,
+  setFormNotifyEmail: vi.fn(),
 }));
 vi.mock('../examples/_admin/neon/env.js', () => ({ isNeonConfigured: () => true }));
 vi.mock('../examples/_admin/neon/publicApi.js', () => ({

@@ -61,6 +61,7 @@ In the Neon SQL Editor (or `psql` with the **direct** connection string — not 
 20. `neon/migrations/020_signup_slots.sql` (ADR-066)
 21. `neon/migrations/021_storage_quotas.sql` (ADR-067): see below — it comes with a backfill and a deploy order.
 22. `neon/migrations/022_slug_server_assigned.sql` (ADR-071): the server assigns every new form's slug; size CHECKs on forms and feedback. See below.
+23. `neon/migrations/023_response_email.sql` (ADR-072): owners can turn on new-response emails per form. Comes with the `notifysend` Function and its schedule. See below.
 
 Then **Data API → Refresh schema cache**. Do this after every migration that adds a column or
 changes a function signature — 012 does both (`forms.fill_locked`, `get_form_by_slug` gains
@@ -118,6 +119,15 @@ Pages loaded before the deploy keep uploading for **72 h after 021 is applied** 
 
 Rollback: the site, then the Functions (previous builds), then 022's rollback block (at the end of the file), then refresh the schema cache. `scripts/check-slug-assign.ts` runs 022 and its rollback against a throwaway branch it creates and deletes.
 
+023 (ADR-072) lets an owner get an email when responses arrive: Share → **Email me new responses**, per form, off by default, sent only to the account's verified sign-in address, at most one email per form every 15 minutes, with a count and a link (never an answer). Nothing on the submit path changes; `submitresponse` is not redeployed.
+
+1. Apply 023 (direct connection string), then `npx neonctl@latest data-api refresh-schema --project-id <id> --branch production --database neondb`. Until the cache is refreshed the switch stays hidden.
+2. Deploy `notifysend` (section 5) with `RESEND_API_KEY` (the same key as `authemail`), `UNSUB_SECRET` (`openssl rand -base64 48`; at least 32 characters, never shown to anyone) and `NOTIFY_PUBLIC_URL` (the Function's own https URL, printed by the deploy; the unsubscribe links point at it). Optional: `STUDIO_URL` (default `https://slateforms.vercel.app`), `NOTIFY_EMAIL_FROM`. A run with any of the three missing sends nothing and logs which.
+3. Schedule it: `npx neonctl@latest triggers create --function-slug notifysend --name response-emails --cron '*/5 * * * *' --function-path /run --project-id <id> --branch production`. Confirm one run in `npx neonctl@latest logs query --source function` (a `[notifysend] run` line).
+4. Ship the site (the Share switch).
+
+Caps live in 023 as functions (`response_email_window`, `response_email_owner_day_max` 50, `response_email_day_max` 300 for everyone: response emails share one Resend account with sign-in mail and must never use up its quota). Rollback: `npx neonctl@latest triggers disable <id>` stops every email at once; then the site, then 023's rollback block, then refresh the schema cache. `scripts/check-response-email.ts` runs 023, the real Function and the rollback against a throwaway branch it creates and deletes.
+
 Anyone can sign up (Google, magic link, or email code). Each account owns its own forms (ADR-036).
 Each account is capped at **50 forms** including Trash (ADR-038); permanent delete frees a slot.
 Public fill links (`#/f/{slug}`) still work without login.
@@ -133,13 +143,15 @@ npx neonctl@latest auth   # once
 npx neonctl@latest functions deploy submitresponse --src neon/functions/submit-response --project-id <id>
 npx neonctl@latest functions deploy storagesign --src neon/functions/storage-sign --project-id <id> --env NEON_AUTH_URL=https://<ep>.neonauth.<region>.aws.neon.tech/neondb/auth
 npx neonctl@latest functions deploy authemail --src neon/functions/auth-email --project-id <id>
+npx neonctl@latest functions deploy notifysend --src neon/functions/notify-send --project-id <id> --env RESEND_API_KEY=… --env UNSUB_SECRET=… --env NOTIFY_PUBLIC_URL=https://…
 ```
 
 Or use `neon.ts` + `npx neonctl@latest deploy` when the project is linked.
 
 Set function env (repeatable `--env KEY=VALUE`):
 
-- `RESEND_API_KEY` — **required** on `authemail` only. `submitresponse` sends no email: responses live in the app (ADR-047).
+- `RESEND_API_KEY` — **required** on `authemail` and `notifysend`. `submitresponse` sends no email; owners who turn emails on get them from the `notifysend` schedule (ADR-072).
+- `notifysend`: `UNSUB_SECRET` and `NOTIFY_PUBLIC_URL` (required, ADR-072), `STUDIO_URL` and `NOTIFY_EMAIL_FROM` (optional)
 - `authemail` and `storagesign`: `NEON_AUTH_URL` (Auth base, for JWKS — storagesign verifies owner JWTs with it, ADR-046)
 - Optional rate limits (ADR-058). Integers only; anything else keeps the default, and each Function logs its effective limits on start. Windows are fixed.
   - `submitresponse`: `SUBMIT_RATE_IP_OWNER_MAX` (2000 units of 4 KiB per hour, IP + form owner), `SUBMIT_RATE_IP_MAX` (10000 units per hour, IP), `UNLOCK_RATE_PW_MAX` (2000 password attempts per 10 min, IP + owner), `UNLOCK_RATE_PW_IP_MAX` (10000 per 10 min, IP), `UNLOCK_RATE_FAIL_IP_MAX` (500 misses per hour, IP), `UNLOCK_RATE_FAIL_FORM_MAX` (300 misses per hour, form), `FORM_LOOKUP_MISS_MAX` (300 distinct unknown slugs per 10 min, IP; form loads and unlocks, ADR-061)

@@ -35,11 +35,16 @@ export type DbFormRow = {
   max_responses?: number | null;
   closed_message?: string | null;
   tracked_sources?: Array<{ name: string; src: string; createdAt: string }> | null;
+  /**
+   * New-response emails to the owner (migration 023, ADR-072). Missing before 023. Written only
+   * through `set_form_notify_email`; a form save never sends it.
+   */
+  notify_email?: boolean;
 };
 
 /** Explicit owner-hydrate column list. Never `*` — that would pull `fill_password_hash`. */
 export const FORM_OWNER_COLUMNS =
-  'id,name,slug,schema,published_schema,status,owner_id,created_at,updated_at,deleted_at,fill_locked,published_name,closes_at,max_responses,closed_message,tracked_sources';
+  'id,name,slug,schema,published_schema,status,owner_id,created_at,updated_at,deleted_at,fill_locked,published_name,closes_at,max_responses,closed_message,tracked_sources,notify_email';
 
 /** 019's columns: written only when a hydrate has read all four (ADR-063). */
 export const FORM_CLOSE_COLUMNS = [
@@ -49,8 +54,9 @@ export const FORM_CLOSE_COLUMNS = [
   'tracked_sources',
 ] as const;
 
-/** Owner columns a database may not have yet (012, 017, 019). Hydrate drops them one by one if missing. */
+/** Owner columns a database may not have yet (012, 017, 019, 023). Hydrate drops them one by one if missing. */
 export const FORM_OPTIONAL_COLUMNS = [
+  'notify_email',
   'tracked_sources',
   'closed_message',
   'max_responses',

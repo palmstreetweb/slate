@@ -80,6 +80,8 @@ vi.mock('../examples/_admin/_formsStore.js', () => {
     permanentlyDeleteForm: vi.fn(),
     setFormFillPassword: vi.fn(),
     supportsCloseSettings: () => false,
+    supportsNotifyEmail: () => false,
+    setFormNotifyEmail: vi.fn(),
   };
 });
 

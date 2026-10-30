@@ -56,6 +56,11 @@ export type FormRecord = {
   closedMessage?: string;
   /** Share → Tracked links (ADR-063). Studio-only; never served to respondents. */
   trackedSources?: TrackedSource[];
+  /**
+   * Email the owner when responses arrive (ADR-072, migration 023). Cloud only; set through
+   * `setFormNotifyEmail`, never by a form save.
+   */
+  notifyEmail?: boolean;
 };
 
 /**
@@ -102,6 +107,11 @@ function neonNotReady(): boolean {
  */
 export function supportsCloseSettings(): boolean {
   return isNeonConfigured() && isStoresHydrated() && remote.hasCloseColumnsRemote();
+}
+
+/** New-response emails need 023 in the cloud (ADR-072); without it the switch is hidden. */
+export function supportsNotifyEmail(): boolean {
+  return isNeonConfigured() && isStoresHydrated() && remote.hasNotifyColumnRemote();
 }
 
 function read(): FormRecord[] {
@@ -356,6 +366,17 @@ export async function setFormFillPassword(
     return { ok: false, message: 'Passwords work once you’re signed in to Slate.' };
   }
   return remote.setFormFillPasswordRemote(formId, password);
+}
+
+/** Email the owner when responses arrive on this form (ADR-072). Cloud only. */
+export async function setFormNotifyEmail(
+  formId: string,
+  on: boolean,
+): Promise<{ ok: true; on: boolean } | { ok: false; message: string }> {
+  if (!useRemote()) {
+    return { ok: false, message: 'Emails work once you’re signed in to Slate.' };
+  }
+  return remote.setFormNotifyEmailRemote(formId, on);
 }
 
 /**

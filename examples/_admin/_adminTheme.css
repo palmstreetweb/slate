@@ -4985,6 +4985,33 @@ body.slate-editor-resizing * {
   border-color: color-mix(in srgb, var(--slate-text) 24%, var(--slate-border-md));
 }
 
+/* On (ADR-072: Email me new responses). The password switch only ever shows off. */
+[data-slate-forms][data-theme-name='slate'] .slate-share-lock-switch[aria-checked='true'] {
+  background: var(--slate-accent);
+  border-color: var(--slate-accent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-lock-switch[aria-checked='true'] span {
+  background: var(--slate-bg);
+  transform: translateX(14px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-lock-switch:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-lock-switch:focus-visible {
+  outline: 2px solid var(--slate-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slate-forms][data-theme-name='slate'] .slate-share-lock-switch span {
+    transition: none;
+  }
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-share-lock-error {
   margin: 0;
   font-size: var(--slate-fs-xs);
