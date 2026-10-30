@@ -55,6 +55,13 @@ describe('the email', () => {
     expect(e.html).toContain('See responses');
   });
 
+  it('one response is “it”, more are “them”, in the body and the preview line', () => {
+    const one = buildResponseEmail({ ...base, newCount: 1 });
+    expect(one.html).toContain('Open Slate to read it.');
+    expect(one.html).not.toContain('read them');
+    expect(buildResponseEmail(base).html).not.toContain('read it.');
+  });
+
   it('counts in plain words', () => {
     expect(countPhrase(1)).toBe('1 new response');
     expect(countPhrase(1200 - 201)).toBe('999 new responses');

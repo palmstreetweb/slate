@@ -59,7 +59,8 @@ export function buildResponseEmail(input: ResponseEmailInput): {
   const responses = safeHttpsLink(input.responsesUrl);
   const unsubscribe = safeHttpsLink(input.unsubscribeUrl);
   if (!responses || !unsubscribe) throw new Error('response email links must be https');
-  const preheader = `${capitalize(phrase)} on ${name}. Open Slate to read them.`;
+  const them = input.newCount === 1 ? 'it' : 'them';
+  const preheader = `${capitalize(phrase)} on ${name}. Open Slate to read ${them}.`;
 
   const html = `<!doctype html>
 <html lang="en">
@@ -86,7 +87,7 @@ export function buildResponseEmail(input: ResponseEmailInput): {
                   <td style="padding:36px 36px 40px;">
                     <p style="margin:0 0 12px;font:700 11px/1 ${SANS};letter-spacing:.2em;text-transform:uppercase;color:${MUTED};">Slate</p>
                     <h1 style="margin:0 0 12px;font:600 28px/1.2 ${SANS};color:${INK};letter-spacing:-0.03em;">${escapeHtml(capitalize(phrase))}.</h1>
-                    <p style="margin:0 0 32px;font:400 15px/1.6 ${SANS};color:${MUTED};">On <span style="color:${INK};">${escapeHtml(name)}</span>. Open Slate to read ${input.newCount === 1 ? 'it' : 'them'}.</p>
+                    <p style="margin:0 0 32px;font:400 15px/1.6 ${SANS};color:${MUTED};">On <span style="color:${INK};">${escapeHtml(name)}</span>. Open Slate to read ${them}.</p>
                     <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto;">
                       <tr>
                         <td align="center" bgcolor="${RED}" style="background:${RED};border-radius:999px;">
