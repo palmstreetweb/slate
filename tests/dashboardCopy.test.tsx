@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { storageWith } from './_storage.js';
 
 vi.mock('../examples/_admin/shell/AdminShell.js', () => ({
   AdminShell: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -88,7 +89,7 @@ describe('Dashboard words', () => {
   it('an AI draft that can’t be saved gets a plain sentence, not the error', async () => {
     show();
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+    const setItem = vi.spyOn(storageWith('setItem'), 'setItem').mockImplementation(() => {
       throw new DOMException(
         'QuotaExceededError: the quota has been exceeded',
         'QuotaExceededError',

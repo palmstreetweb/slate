@@ -3,7 +3,7 @@ import {
   AUTH_LOGO_CID,
   buildSignInEmail,
   digestSignInEmail,
-} from '../neon/functions/auth-email/emailHtml.ts';
+} from '../neon/functions/auth-email/emailHtml.js';
 
 describe('buildSignInEmail', () => {
   it('includes the Slate lockup CID, magic link, and code in one message', () => {

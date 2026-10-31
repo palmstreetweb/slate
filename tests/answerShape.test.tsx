@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Question } from '../src/index.js';
-import { clampValue } from '../neon/functions/submit-response/answerShape.ts';
+import { clampValue } from '../neon/functions/submit-response/answerShape.js';
 import { normalizeAnswers, normalizeMeta, safeText } from '../examples/_admin/answerShape.js';
 import { rowToSubmission } from '../examples/_admin/neon/mappers.js';
 import {

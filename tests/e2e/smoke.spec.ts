@@ -15,15 +15,19 @@ test.describe('Slate admin smoke', () => {
   test('portable share route renders welcome', async ({ page }) => {
     await page.goto('/forms/new');
     await page.getByRole('button', { name: 'Share' }).click();
+    // An untitled form asks for a name before sharing (promptFormTitle).
+    await page.getByLabel('Form title').fill('Smoke test');
+    await page.getByRole('button', { name: 'Continue to share' }).click();
     const portableUrl = await page.locator('input.slate-share-url').first().inputValue();
     expect(portableUrl).toContain('/r?d=');
-    await page.goto(portableUrl);
+    // The field shows the link without its scheme.
+    await page.goto(/^https?:\/\//.test(portableUrl) ? portableUrl : `http://${portableUrl}`);
     await expect(page.getByRole('button', { name: 'Start' })).toBeVisible();
   });
 
   test('form can be filled and submitted in preview', async ({ page }) => {
     await page.goto('/forms/new');
-    await page.waitForURL(/#\/forms\/[^/]+\/edit/);
+    await page.waitForURL(/\/forms\/[^/]+\/edit/);
     const formId = page.url().match(/forms\/([^/]+)\/edit/)?.[1];
     expect(formId).toBeTruthy();
     await page.goto(`/forms/${formId}/preview`);

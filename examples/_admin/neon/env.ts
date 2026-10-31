@@ -2,7 +2,11 @@
  * Neon client for Slate admin (ADR-029). Pure config lives in config.ts.
  */
 
-import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
+import {
+  createClient,
+  SupabaseAuthAdapter,
+  type SupabaseAuthAdapterInstance,
+} from '@neondatabase/neon-js';
 import type { Database } from './database.types.js';
 import { getNeonUrl } from './config.js';
 
@@ -38,7 +42,11 @@ export function getNeon(): NeonClient {
     // caller signs in first; the public fill app does not use the SDK.
     client = createClient<Database>(url, {
       auth: {
-        adapter: SupabaseAuthAdapter(),
+        // The runtime wants the builder SupabaseAuthAdapter() returns (it calls
+        // it with the auth URL), but neon-js 0.7.0-beta's string overload types
+        // `adapter` as builder & instance. Type-only cast; the value is unchanged.
+        adapter: SupabaseAuthAdapter() as ReturnType<typeof SupabaseAuthAdapter> &
+          SupabaseAuthAdapterInstance,
       },
     });
   }

@@ -190,7 +190,7 @@ async function resolveListThumb(item: File | string): Promise<{
     const mime = previewMime(resolved.mime || content.mime, resolved.name);
 
     let url: string;
-    let revoke = false;
+    const revoke = false;
     if (isHeicNameOrMime(mime, resolved.name)) {
       try {
         const file = new File([content.blob], resolved.name, {

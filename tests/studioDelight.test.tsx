@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, renderHook, screen } from '@testing-library/react';
 import { useState } from 'react';
+import { storageWith } from './_storage.js';
 
 const sounds = vi.hoisted(() => ({ play: vi.fn() }));
 
@@ -434,10 +435,10 @@ describe('first response', () => {
   it('survives storage that throws or holds junk', () => {
     window.localStorage.setItem(FIRST_RESPONSE_KEY, '{not json');
     expect(hasCelebratedFirst('f1')).toBe(false);
-    const get = vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
+    const get = vi.spyOn(storageWith('getItem'), 'getItem').mockImplementation(() => {
       throw new Error('blocked');
     });
-    const set = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+    const set = vi.spyOn(storageWith('setItem'), 'setItem').mockImplementation(() => {
       throw new Error('quota');
     });
     try {

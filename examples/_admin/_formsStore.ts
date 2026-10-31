@@ -83,12 +83,12 @@ type Listener = (forms: FormRecord[]) => void;
 const listeners = new Set<Listener>();
 
 /** Neon is the source of truth once configured — never fall back to localStorage mid-boot. */
-function useNeon(): boolean {
+function neonOn(): boolean {
   return isNeonConfigured();
 }
 
 /** Mutations require a finished hydrate so we don't write into an empty cache. */
-function useRemote(): boolean {
+function remoteOn(): boolean {
   return isNeonConfigured() && isStoresHydrated();
 }
 
@@ -136,7 +136,7 @@ function isTrashed(form: FormRecord): boolean {
 
 /** Probe whether stored forms JSON is unreadable (without mutating). */
 export function probeFormsStorage(): 'ok' | 'corrupt' {
-  if (useRemote()) return remote.probeFormsRemote();
+  if (remoteOn()) return remote.probeFormsRemote();
   if (typeof window === 'undefined') return 'ok';
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -160,7 +160,7 @@ export function resetFormsStorage(): void {
 
 /** Replace all stored forms (backup restore). Returns false on write failure. */
 export function replaceAllForms(forms: FormRecord[]): boolean {
-  if (useRemote()) return remote.replaceAllFormsRemoteSync(forms);
+  if (remoteOn()) return remote.replaceAllFormsRemoteSync(forms);
   if (neonNotReady()) return false;
   return write(forms);
 }
@@ -185,19 +185,19 @@ function trashAt(): string {
 
 /** Active forms only (not in trash). */
 export function listForms(): FormRecord[] {
-  if (useNeon()) return remote.listFormsRemote();
+  if (neonOn()) return remote.listFormsRemote();
   return read().filter(isActive);
 }
 
 /** All forms including trash (backup export). */
 export function listAllForms(): FormRecord[] {
-  if (useNeon()) return remote.listAllFormsRemote();
+  if (neonOn()) return remote.listAllFormsRemote();
   return read();
 }
 
 /** Trashed forms only. */
 export function listTrashedForms(): FormRecord[] {
-  if (useNeon()) return remote.listTrashedFormsRemote();
+  if (neonOn()) return remote.listTrashedFormsRemote();
   return read().filter(isTrashed);
 }
 
@@ -206,13 +206,13 @@ export function countTrashedForms(): number {
 }
 
 export function getForm(formId: string): FormRecord | null {
-  if (useNeon()) return remote.getFormRemote(formId);
+  if (neonOn()) return remote.getFormRemote(formId);
   return read().find((f) => f.id === formId && isActive(f)) ?? null;
 }
 
 /** Cloud quota (ADR-038). `null` in localStorage-only mode (uncapped). */
 export function getFormQuota(): FormQuota | null {
-  if (!useNeon()) return null;
+  if (!neonOn()) return null;
   return remote.getFormQuotaRemote();
 }
 
@@ -222,7 +222,7 @@ export function isAtFormQuota(): boolean {
 }
 
 export function createForm(opts: { name: string; schema: Schema }): FormRecord | null {
-  if (useRemote()) return remote.createFormRemoteSync(opts);
+  if (remoteOn()) return remote.createFormRemoteSync(opts);
   if (neonNotReady()) return null;
   const now = new Date().toISOString();
   const existing = read();
@@ -243,7 +243,7 @@ export async function createFormAsync(opts: {
   name: string;
   schema: Schema;
 }): Promise<FormRecord | null> {
-  if (useRemote()) return remote.createFormRemote(opts);
+  if (remoteOn()) return remote.createFormRemote(opts);
   return createForm(opts);
 }
 
@@ -265,7 +265,7 @@ export function updateForm(
   patch: Partial<Omit<FormRecord, 'id' | 'createdAt'>>,
   opts: FormWriteOptions = {},
 ): [FormRecord | null, boolean] {
-  if (useRemote()) {
+  if (remoteOn()) {
     return remote.updateFormRemoteSync(formId, patch, {
       onFail: opts.onFail ? () => opts.onFail?.() : undefined,
       onLanded: opts.onLanded,
@@ -293,7 +293,7 @@ export function updateForm(
 }
 
 export function trashForm(formId: string): boolean {
-  if (useRemote()) return remote.trashFormRemoteSync(formId);
+  if (remoteOn()) return remote.trashFormRemoteSync(formId);
   if (neonNotReady()) return false;
   const now = trashAt();
   const all = read();
@@ -310,7 +310,7 @@ export function deleteForm(formId: string): boolean {
 }
 
 export function restoreForm(formId: string): boolean {
-  if (useRemote()) return remote.restoreFormRemoteSync(formId);
+  if (remoteOn()) return remote.restoreFormRemoteSync(formId);
   if (neonNotReady()) return false;
   const all = read();
   const idx = all.findIndex((f) => f.id === formId && isTrashed(f));
@@ -322,7 +322,7 @@ export function restoreForm(formId: string): boolean {
 }
 
 export function restoreAllForms(): boolean {
-  if (useRemote()) return remote.restoreAllFormsRemoteSync();
+  if (remoteOn()) return remote.restoreAllFormsRemoteSync();
   if (neonNotReady()) return false;
   return write(
     read().map((f) => {
@@ -337,21 +337,21 @@ export function permanentlyDeleteForm(formId: string): boolean {
   // Cloud: the database deletes the responses with the form (001's cascade), and the
   // cache forgets them once the delete lands — a delete that fails keeps them with
   // the restored form (audit B10). On this device alone they go with it now.
-  if (useRemote()) return remote.permanentlyDeleteFormRemoteSync(formId);
+  if (remoteOn()) return remote.permanentlyDeleteFormRemoteSync(formId);
   if (neonNotReady()) return false;
   purgeSubmissions(formId);
   return write(read().filter((f) => f.id !== formId));
 }
 
 export function emptyFormTrash(): boolean {
-  if (useRemote()) return remote.emptyFormTrashRemoteSync();
+  if (remoteOn()) return remote.emptyFormTrashRemoteSync();
   if (neonNotReady()) return false;
   for (const formId of listTrashedForms().map((f) => f.id)) purgeSubmissions(formId);
   return write(read().filter(isActive));
 }
 
 export function duplicateForm(formId: string): FormRecord | null {
-  if (useRemote()) return remote.duplicateFormRemoteSync(formId);
+  if (remoteOn()) return remote.duplicateFormRemoteSync(formId);
   const src = getForm(formId);
   if (!src) return null;
   return createForm({ name: `${src.name} (Copy)`, schema: src.schema });
@@ -362,7 +362,7 @@ export async function setFormFillPassword(
   formId: string,
   password: string,
 ): Promise<{ ok: true; locked: boolean } | { ok: false; message: string }> {
-  if (!useRemote()) {
+  if (!remoteOn()) {
     return { ok: false, message: 'Passwords work once you’re signed in to Slate.' };
   }
   return remote.setFormFillPasswordRemote(formId, password);
@@ -389,7 +389,7 @@ export function publishForm(
   formId: string,
   opts: { onFail?: () => void; onLanded?: () => void } = {},
 ): FormRecord | null {
-  if (useRemote()) return remote.publishFormRemoteSync(formId, opts.onFail, opts.onLanded);
+  if (remoteOn()) return remote.publishFormRemoteSync(formId, opts.onFail, opts.onLanded);
   const form = getForm(formId);
   if (!form) return null;
   const [updated, saved] = updateForm(formId, {
@@ -420,7 +420,7 @@ export function unpublishForm(
   formId: string,
   opts: { onFail?: () => void; onLanded?: () => void } = {},
 ): FormRecord | null {
-  if (useRemote()) return remote.unpublishFormRemoteSync(formId, opts);
+  if (remoteOn()) return remote.unpublishFormRemoteSync(formId, opts);
   const [updated, saved] = updateForm(formId, { status: 'draft' });
   if (updated && saved) opts.onLanded?.();
   else if (updated) opts.onFail?.();
@@ -433,14 +433,14 @@ export function unpublishForm(
  * writes can be pending; this device's own are done at once.
  */
 export function hasPendingFormWrites(): boolean {
-  return useNeon() && remote.hasPendingFormWritesRemote();
+  return neonOn() && remote.hasPendingFormWritesRemote();
 }
 
 export function subscribe(listener: Listener): () => void {
   // Always attach to the Neon cache when configured — hydrate notifies these
   // listeners. Gating on isStoresHydrated() caused a sticky empty dashboard:
   // UI subscribed to localStorage, hydrate filled the remote cache, nobody updated.
-  if (useNeon()) return remote.subscribeFormsRemote(listener);
+  if (neonOn()) return remote.subscribeFormsRemote(listener);
   listeners.add(listener);
   const onStorage = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY) listener(read());
@@ -471,7 +471,7 @@ export function seedIfEmpty(seeds: ReadonlyArray<{ name: string; schema: Schema 
     schema: s.schema,
     status: 'draft' as const,
   }));
-  if (useRemote()) {
+  if (remoteOn()) {
     remote.replaceAllFormsRemoteSync(records);
     return;
   }

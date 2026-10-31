@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fillUnlockToken, isValidUnlockToken } from '../neon/functions/submit-response/fillLock.ts';
-import * as signCopy from '../neon/functions/storage-sign/fillLock.ts';
+import { fillUnlockToken, isValidUnlockToken } from '../neon/functions/submit-response/fillLock.js';
+import * as signCopy from '../neon/functions/storage-sign/fillLock.js';
 import { rowToFormRecord, slugRowToPublishedForm } from '../examples/_admin/neon/mappers.js';
 import { FORM_OWNER_COLUMNS, type DbFormRow } from '../examples/_admin/neon/database.types.js';
 import {

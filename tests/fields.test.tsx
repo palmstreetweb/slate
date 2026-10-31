@@ -4,7 +4,7 @@
  * is exercised too.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useRef } from 'react';
@@ -23,8 +23,8 @@ function QuestionHarness({
 }: {
   question: Question;
   answers: LooseAnswers;
-  setAnswer: ReturnType<typeof vi.fn>;
-  advance: ReturnType<typeof vi.fn>;
+  setAnswer: Mock<(...args: unknown[]) => void>;
+  advance: Mock<(...args: unknown[]) => void>;
   onFileUpload?: (file: File, questionId: string) => Promise<string>;
 }) {
   const confirmRef = useRef<(() => void) | null>(null);
@@ -62,8 +62,8 @@ function renderQuestion(
   answers: LooseAnswers = {},
   onFileUpload?: (file: File, questionId: string) => Promise<string>,
 ) {
-  const setAnswer = vi.fn();
-  const advance = vi.fn();
+  const setAnswer = vi.fn<(...args: unknown[]) => void>();
+  const advance = vi.fn<(...args: unknown[]) => void>();
   const utils = render(
     <QuestionHarness
       question={question}

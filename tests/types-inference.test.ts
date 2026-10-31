@@ -109,7 +109,13 @@ describe('defineSchema → AnswersOf inference', () => {
     expectTypeOf<Answers>().toEqualTypeOf<
       Record<
         string,
-        string | string[] | number | File | Record<string, string | string[]> | undefined
+        | string
+        | string[]
+        | number
+        | File
+        | (File | string)[]
+        | Record<string, string | string[]>
+        | undefined
       >
     >();
   });
