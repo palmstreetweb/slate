@@ -62,6 +62,7 @@ In the Neon SQL Editor (or `psql` with the **direct** connection string — not 
 21. `neon/migrations/021_storage_quotas.sql` (ADR-067): see below — it comes with a backfill and a deploy order.
 22. `neon/migrations/022_slug_server_assigned.sql` (ADR-071): the server assigns every new form's slug; size CHECKs on forms and feedback. See below.
 23. `neon/migrations/023_response_email.sql` (ADR-072): owners can turn on new-response emails per form. Comes with the `notifysend` Function and its schedule. See below.
+24. `neon/migrations/024_owner_settings.sql` (ADR-073): studio settings (color mode, UI theme, size, sounds) follow the account. No Function; apply before or after the site, then refresh the schema cache.
 
 Then **Data API → Refresh schema cache**. Do this after every migration that adds a column or
 changes a function signature — 012 does both (`forms.fill_locked`, `get_form_by_slug` gains
