@@ -15,6 +15,7 @@ import {
   clearSubmissionsRemoteCache,
   hydrateSubmissionsRemote,
 } from './submissionsRemote.js';
+import { stopOwnerSettingsSync, syncOwnerSettings } from './settingsRemote.js';
 
 const HYDRATE_TIMEOUT_MS = 25_000;
 
@@ -65,6 +66,7 @@ export function clearAdminSessionHydrated(): void {
 export function clearRemoteStores(): void {
   clearFormsRemoteCache();
   clearSubmissionsRemoteCache();
+  stopOwnerSettingsSync();
   hydrated = false;
   hydrating = null;
   hydrateGeneration += 1;
@@ -102,7 +104,12 @@ export function hydrateStores(opts?: { force?: boolean }): Promise<void> {
         throw new SessionNotReadyError('Slate couldn’t confirm it’s you yet.');
       }
       await withTimeout(
-        Promise.all([hydrateFormsRemote({ soft: true }), hydrateSubmissionsRemote({ soft: true })]),
+        Promise.all([
+          hydrateFormsRemote({ soft: true }),
+          hydrateSubmissionsRemote({ soft: true }),
+          // Under the splash, so the studio opens in the account's look (ADR-074). Never rejects.
+          auth.authUid ? syncOwnerSettings(auth.authUid) : undefined,
+        ]),
         HYDRATE_TIMEOUT_MS,
         'Neon store hydrate',
       );

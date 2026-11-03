@@ -1634,6 +1634,26 @@ Consequences:
 - Embedders who set `--slate-title-size` themselves are unaffected. A `cqi` read outside any container falls back to the small-viewport size, which is the old behavior.
 - Checked in the studio preview: Swiss "Welcome." at 260, 300, 375 and 554 px stays on one line (40 px). With the container removed, 67 px on two lines.
 
+## ADR-074 — Studio settings follow the account
+Date: 2026-11-03
+Status: proposed
+Context: Color mode, UI theme, studio size and studio sounds lived only in each browser's localStorage. An owner who signs in with Google on a second computer or their phone got the defaults again, and had to set everything twice. Caleb asked that sign-in "remembers user and settings."
+Decision:
+1. **One row per owner.** Migration 024 adds `owner_settings (owner_id, prefs jsonb, updated_at)`, RLS forced, no Data API grants on the table. The only doors are `get_owner_settings()` and `set_owner_settings(p_prefs)`, SECURITY DEFINER and keyed on `auth_uid()`, executable by `authenticated` only. An owner can only reach their own row.
+2. **Four known keys, nothing else.** `mode` (light/dark), `uiTheme` (warm/neutral/cool), `scale` (1/2/3), `sounds` (boolean). `set_owner_settings` drops unknown keys and bad values and merges what is left into the row, with a 1 KiB CHECK on top. The client sanitizes the same way (`ownerPrefs.ts`).
+3. **The account wins at sign-in.** During the boot hydrate (under the splash, so the studio opens in the account's look) the studio pulls the account's settings and writes them to the existing localStorage keys (`slate-theme`, `slate-ui-theme`, `slate-admin-ui-scale`, `slate-admin-ui-sounds`; unchanged, so every reader is unchanged). If the account has none, this device's settings become the account's.
+4. **Owner changes upload.** Changing a setting in Settings or the header toggle uploads the full set, debounced 600 ms, and only when it differs from what the account holds. Applying account settings never echoes back.
+5. **Cosmetic, so never blocking.** A pull that fails, times out (4 s), or meets a database without 024 leaves the device as it was and boot carries on; a failed upload is retried on the next change. Signing out or switching account stops syncing and leaves the device's settings in place, and the next account's settings replace them at its sign-in.
+Alternatives:
+- Store settings in Neon Auth user metadata. Rejected: the beta SDK's update-user path refreshes the session and fires auth events, and the field has no shape check.
+- A Data API table with owner-scoped RLS policies. Rejected: two RPCs are a smaller surface than a writable table, and they validate values server-side.
+- Live sync between open devices. Deferred: settings change rarely; the next sign-in or reload picks them up.
+Consequences:
+- Deploy order: apply 024 → refresh the Data API schema cache → ship the site. A site shipped first just keeps settings on the device until 024 is in.
+- On a shared computer, an account with no saved settings inherits whatever the browser last used, and saves it as its own.
+- Tests: `ownerSettingsSync` (sanitize, read/apply local keys, pull applies, empty account uploads, owner change uploads once, no echo, failures don't throw).
+Revisit when: settings grow beyond appearance (e.g. per-owner defaults for new forms), or owners want two devices to differ.
+
 ## Deferred to V2
 
 Per brief §14, V1 explicitly does **not** include the items below. Each gets a stub ADR when the work is actually scheduled.

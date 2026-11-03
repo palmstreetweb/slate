@@ -36,8 +36,13 @@ import {
   detectAdminUiTheme,
   type AdminUiTheme,
 } from '../adminUiTheme.js';
+import {
+  ADMIN_MODE_STORAGE_KEY,
+  PREFS_APPLIED_EVENT,
+  notifyPrefsChanged,
+} from '../ownerPrefs.js';
 
-const STORAGE_KEY = 'slate-theme';
+const STORAGE_KEY = ADMIN_MODE_STORAGE_KEY;
 
 function detectInitial(): ResolvedThemeMode {
   if (typeof window === 'undefined') return 'dark';
@@ -69,8 +74,8 @@ type Props = {
 export function AdminShell({ crumbs, rightSlot, children, fullBleed, phone: phoneChrome }: Props) {
   const isPhone = usePhone();
   usePendingWritesGuard();
-  const [mode, setMode] = useState<ResolvedThemeMode>(() => detectInitial());
-  const [uiTheme, setUiTheme] = useState<AdminUiTheme>(() => detectAdminUiTheme());
+  const [mode, setModeState] = useState<ResolvedThemeMode>(() => detectInitial());
+  const [uiTheme, setUiThemeState] = useState<AdminUiTheme>(() => detectAdminUiTheme());
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,7 +94,26 @@ export function AdminShell({ crumbs, rightSlot, children, fullBleed, phone: phon
     }
   }, [uiTheme]);
 
-  const toggle = () => setMode((m) => (m === 'dark' ? 'light' : 'dark'));
+  // Account settings arrived (ADR-074): show them without a reload.
+  useEffect(() => {
+    const reread = () => {
+      setModeState(detectInitial());
+      setUiThemeState(detectAdminUiTheme());
+    };
+    window.addEventListener(PREFS_APPLIED_EVENT, reread);
+    return () => window.removeEventListener(PREFS_APPLIED_EVENT, reread);
+  }, []);
+
+  // Only an owner's own choice is uploaded; the effects above store it first.
+  const setMode = (next: ResolvedThemeMode) => {
+    setModeState(next);
+    notifyPrefsChanged();
+  };
+  const setUiTheme = (next: AdminUiTheme) => {
+    setUiThemeState(next);
+    notifyPrefsChanged();
+  };
+  const toggle = () => setMode(mode === 'dark' ? 'light' : 'dark');
 
   return (
     <AdminThemeProvider value={{ mode, setMode, toggle, uiTheme, setUiTheme }}>
