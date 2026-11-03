@@ -23,7 +23,7 @@ export const terminal: Theme = {
     titleWeight: 600,
     titleTracking: '0em',
     titleLineHeight: 1.25,
-    titleSize: 'clamp(1.5rem, 3.4vw, 2.3rem)',
+    titleSize: 'clamp(1.5rem, 3.4cqi, 2.3rem)',
     transform: 'none',
   },
   light: {

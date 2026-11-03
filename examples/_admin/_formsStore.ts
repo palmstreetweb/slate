@@ -373,7 +373,7 @@ export async function setFormNotifyEmail(
   formId: string,
   on: boolean,
 ): Promise<{ ok: true; on: boolean } | { ok: false; message: string }> {
-  if (!useRemote()) {
+  if (!remoteOn()) {
     return { ok: false, message: 'Emails work once you’re signed in to Slate.' };
   }
   return remote.setFormNotifyEmailRemote(formId, on);

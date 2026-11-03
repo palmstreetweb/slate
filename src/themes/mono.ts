@@ -23,7 +23,7 @@ export const mono: Theme = {
     titleWeight: 800,
     titleTracking: '-0.03em',
     titleLineHeight: 1.0,
-    titleSize: 'clamp(2.2rem, 5.6vw, 3.8rem)',
+    titleSize: 'clamp(2.2rem, 5.6cqi, 3.8rem)',
     transform: 'none',
   },
   light: {

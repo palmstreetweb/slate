@@ -61,6 +61,10 @@
   padding: clamp(48px, 8vh, 120px) 24px clamp(96px, 18vh, 220px);
   position: relative;
   z-index: 5;
+  /* Titles size to the form, not the window (`cqi` in --slate-title-size):
+     in a narrow embed or the studio preview a big title kept its desktop
+     size and split "welcome." mid-word. */
+  container-type: inline-size;
 }
 
 [data-slate-forms] .slate-stage-content {
@@ -152,6 +156,15 @@
 [data-slate-forms][data-theme-name='swiss'] .slate-brand {
   font-weight: 700;
   font-size: 13px;
+}
+
+/* A decoration shape can sit behind the name in its own color (Swiss's cream
+   bar on a phone's thank-you screen hid it). A patch of page color keeps it
+   readable over any shape; the negative margin keeps the text where it was. */
+[data-slate-forms][data-has-decoration] .slate-brand {
+  background: var(--slate-bg);
+  padding: 3px 6px;
+  margin: -3px -6px;
 }
 
 /* brand.logo — sits left of the name, capped to the chrome row so tall or
