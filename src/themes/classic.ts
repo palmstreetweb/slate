@@ -29,7 +29,7 @@ export const classic: Theme = {
     titleWeight: 500,
     titleTracking: '-0.01em',
     titleLineHeight: 1.3,
-    titleSize: 'clamp(1.6rem, 3.6vw, 2.4rem)',
+    titleSize: 'clamp(1.6rem, 3.6cqi, 2.4rem)',
     transform: 'none',
   },
   light: {

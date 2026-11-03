@@ -22,7 +22,7 @@ export const riso: Theme = {
     titleWeight: 800,
     titleTracking: '-0.03em',
     titleLineHeight: 1.1,
-    titleSize: 'clamp(1.9rem, 4.4vw, 3rem)',
+    titleSize: 'clamp(1.9rem, 4.4cqi, 3rem)',
     transform: 'none',
   },
   light: {
