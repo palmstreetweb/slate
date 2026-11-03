@@ -22,7 +22,7 @@ export const bloom: Theme = {
     titleWeight: 500,
     titleTracking: '-0.01em',
     titleLineHeight: 1.15,
-    titleSize: 'clamp(1.9rem, 4.2vw, 3rem)',
+    titleSize: 'clamp(1.9rem, 4.2cqi, 3rem)',
     transform: 'none',
   },
   light: {

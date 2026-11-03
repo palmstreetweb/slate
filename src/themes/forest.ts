@@ -23,7 +23,7 @@ export const forest: Theme = {
     titleWeight: 500,
     titleTracking: '-0.02em',
     titleLineHeight: 1.15,
-    titleSize: 'clamp(1.9rem, 4.4vw, 3rem)',
+    titleSize: 'clamp(1.9rem, 4.4cqi, 3rem)',
     transform: 'none',
   },
   light: {
