@@ -94,7 +94,7 @@ export function AdminShell({ crumbs, rightSlot, children, fullBleed, phone: phon
     }
   }, [uiTheme]);
 
-  // Account settings arrived (ADR-073): show them without a reload.
+  // Account settings arrived (ADR-074): show them without a reload.
   useEffect(() => {
     const reread = () => {
       setModeState(detectInitial());

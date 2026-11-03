@@ -22,7 +22,7 @@ export const midnight: Theme = {
     titleWeight: 600,
     titleTracking: '-0.02em',
     titleLineHeight: 1.2,
-    titleSize: 'clamp(1.8rem, 4vw, 2.8rem)',
+    titleSize: 'clamp(1.8rem, 4cqi, 2.8rem)',
     transform: 'none',
   },
   light: {

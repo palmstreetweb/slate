@@ -90,7 +90,7 @@ describe('before migration 019', () => {
     state.closeSettings = false;
     open();
     expect(screen.queryByRole('region', { name: 'Closing' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /track a flyer/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /tracked link/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Share URL')).toHaveValue('slate.test/forms/48210377');
   });
 });
@@ -100,7 +100,7 @@ describe('tracked links', () => {
     const user = userEvent.setup();
     open();
     expect(screen.getByLabelText('Share URL')).toHaveValue('slate.test/forms/48210377');
-    await user.click(screen.getByRole('button', { name: /track a flyer/i }));
+    await user.click(screen.getByRole('button', { name: /tracked link/i }));
     await user.type(
       screen.getByRole('textbox', { name: /name this link/i }),
       'Mailbox flyer{Enter}',
@@ -123,6 +123,13 @@ describe('tracked links', () => {
     expect(screen.getByLabelText('Share URL')).toHaveValue('slate.test/forms/48210377');
   });
 
+  it('explains itself until the first tracked link exists', () => {
+    open();
+    expect(screen.getByRole('button', { name: /tracked link/i })).toHaveAccessibleDescription(
+      'See where people found it',
+    );
+  });
+
   it('removing one only takes it off the list', async () => {
     state.form = {
       ...state.form,
@@ -138,7 +145,7 @@ describe('tracked links', () => {
   it('a draft (unpublished) form has no tracked links yet', () => {
     state.form = { ...state.form, status: 'draft' };
     open();
-    expect(screen.queryByRole('button', { name: /track a flyer/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /tracked link/i })).not.toBeInTheDocument();
   });
 });
 

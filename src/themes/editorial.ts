@@ -22,7 +22,7 @@ export const editorial: Theme = {
     titleWeight: 500,
     titleTracking: '-0.025em',
     titleLineHeight: 1.08,
-    titleSize: 'clamp(2rem, 5.2vw, 3.4rem)',
+    titleSize: 'clamp(2rem, 5.2cqi, 3.4rem)',
     transform: 'none',
   },
   light: {

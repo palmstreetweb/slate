@@ -1,5 +1,5 @@
 /**
- * ADR-073: studio settings follow the account. The account's settings win at
+ * ADR-074: studio settings follow the account. The account's settings win at
  * sign-in, an empty account takes this device's, owner changes upload once
  * (debounced), applying account settings never echoes back, and failures
  * leave the device alone without throwing.

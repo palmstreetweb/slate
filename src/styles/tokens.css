@@ -48,7 +48,7 @@
   --slate-title-weight: 500;
   --slate-title-tracking: -0.01em;
   --slate-title-line-height: 1.3;
-  --slate-title-size: clamp(1.6rem, 3.6vw, 2.4rem);
+  --slate-title-size: clamp(1.6rem, 3.6cqi, 2.4rem);
   --slate-transform: none;
 }
 
@@ -100,7 +100,7 @@
   --slate-title-weight: 500;
   --slate-title-tracking: -0.025em;
   --slate-title-line-height: 1.08;
-  --slate-title-size: clamp(2rem, 5.2vw, 3.4rem);
+  --slate-title-size: clamp(2rem, 5.2cqi, 3.4rem);
   --slate-transform: none;
 }
 
@@ -154,7 +154,7 @@
   --slate-title-weight: 900;
   --slate-title-tracking: -0.035em;
   --slate-title-line-height: 0.95;
-  --slate-title-size: clamp(2.5rem, 6.2vw, 4.2rem);
+  --slate-title-size: clamp(2.5rem, 6.2cqi, 4.2rem);
   --slate-transform: lowercase;
 }
 
@@ -217,7 +217,7 @@
   --slate-title-weight: 600;
   --slate-title-tracking: -0.02em;
   --slate-title-line-height: 1.2;
-  --slate-title-size: clamp(1.8rem, 4vw, 2.8rem);
+  --slate-title-size: clamp(1.8rem, 4cqi, 2.8rem);
   --slate-transform: none;
 }
 
@@ -276,7 +276,7 @@
   --slate-title-weight: 600;
   --slate-title-tracking: -0.02em;
   --slate-title-line-height: 1.2;
-  --slate-title-size: clamp(1.8rem, 4vw, 2.8rem);
+  --slate-title-size: clamp(1.8rem, 4cqi, 2.8rem);
   --slate-transform: none;
 }
 
@@ -334,7 +334,7 @@
   --slate-title-weight: 600;
   --slate-title-tracking: 0em;
   --slate-title-line-height: 1.25;
-  --slate-title-size: clamp(1.5rem, 3.4vw, 2.3rem);
+  --slate-title-size: clamp(1.5rem, 3.4cqi, 2.3rem);
   --slate-transform: none;
 }
 
@@ -388,7 +388,7 @@
   --slate-title-weight: 500;
   --slate-title-tracking: -0.02em;
   --slate-title-line-height: 1.15;
-  --slate-title-size: clamp(1.9rem, 4.4vw, 3rem);
+  --slate-title-size: clamp(1.9rem, 4.4cqi, 3rem);
   --slate-transform: none;
 }
 
@@ -442,7 +442,7 @@
   --slate-title-weight: 800;
   --slate-title-tracking: -0.03em;
   --slate-title-line-height: 1;
-  --slate-title-size: clamp(2.2rem, 5.6vw, 3.8rem);
+  --slate-title-size: clamp(2.2rem, 5.6cqi, 3.8rem);
   --slate-transform: none;
 }
 
@@ -503,7 +503,7 @@
   --slate-title-weight: 600;
   --slate-title-tracking: -0.02em;
   --slate-title-line-height: 1.2;
-  --slate-title-size: clamp(1.8rem, 4vw, 2.8rem);
+  --slate-title-size: clamp(1.8rem, 4cqi, 2.8rem);
   --slate-transform: none;
 }
 
@@ -560,7 +560,7 @@
   --slate-title-weight: 500;
   --slate-title-tracking: -0.01em;
   --slate-title-line-height: 1.15;
-  --slate-title-size: clamp(1.9rem, 4.2vw, 3rem);
+  --slate-title-size: clamp(1.9rem, 4.2cqi, 3rem);
   --slate-transform: none;
 }
 
@@ -621,7 +621,7 @@
   --slate-title-weight: 800;
   --slate-title-tracking: -0.03em;
   --slate-title-line-height: 1.1;
-  --slate-title-size: clamp(1.9rem, 4.4vw, 3rem);
+  --slate-title-size: clamp(1.9rem, 4.4cqi, 3rem);
   --slate-transform: none;
 }
 
@@ -680,7 +680,7 @@
   --slate-title-weight: 800;
   --slate-title-tracking: -0.02em;
   --slate-title-line-height: 1.12;
-  --slate-title-size: clamp(1.9rem, 4.4vw, 3rem);
+  --slate-title-size: clamp(1.9rem, 4.4cqi, 3rem);
   --slate-transform: none;
 }
 

@@ -1,4 +1,4 @@
--- 024_owner_settings.sql (ADR-073). Apply, then refresh the Data API schema cache
+-- 024_owner_settings.sql (ADR-074). Apply, then refresh the Data API schema cache
 -- (`neonctl data-api refresh-schema`): the studio calls get_owner_settings / set_owner_settings.
 -- Before 024 (or on a stale cache) both calls fail and the studio keeps settings on the device, as before.
 --

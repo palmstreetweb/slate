@@ -21,7 +21,7 @@ export const memphis: Theme = {
     titleWeight: 800,
     titleTracking: '-0.02em',
     titleLineHeight: 1.12,
-    titleSize: 'clamp(1.9rem, 4.4vw, 3rem)',
+    titleSize: 'clamp(1.9rem, 4.4cqi, 3rem)',
     transform: 'none',
   },
   light: {

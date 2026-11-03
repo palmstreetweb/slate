@@ -107,7 +107,7 @@ export function hydrateStores(opts?: { force?: boolean }): Promise<void> {
         Promise.all([
           hydrateFormsRemote({ soft: true }),
           hydrateSubmissionsRemote({ soft: true }),
-          // Under the splash, so the studio opens in the account's look (ADR-073). Never rejects.
+          // Under the splash, so the studio opens in the account's look (ADR-074). Never rejects.
           auth.authUid ? syncOwnerSettings(auth.authUid) : undefined,
         ]),
         HYDRATE_TIMEOUT_MS,

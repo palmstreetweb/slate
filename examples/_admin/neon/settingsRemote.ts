@@ -1,5 +1,5 @@
 /**
- * Studio settings that follow the account (ADR-073). On sign-in the account's
+ * Studio settings that follow the account (ADR-074). On sign-in the account's
  * saved settings replace this device's; a device whose account has none
  * uploads its own. After that, every change the owner makes is uploaded
  * (debounced). Settings are cosmetic: any failure leaves the device as it is

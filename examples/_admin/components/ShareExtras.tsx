@@ -315,7 +315,7 @@ export function TrackedLinks({
               setName(e.target.value);
               setError(null);
             }}
-            placeholder="Name a flyer, e.g. Mailbox flyer"
+            placeholder="Where it’s posted, e.g. Mailbox flyer"
             aria-label="Name this link"
             maxLength={80}
             autoFocus
@@ -385,16 +385,25 @@ export function TrackedLinks({
           </span>
         ))}
       </ChipRow>
-      <button
-        type="button"
-        className="slate-share-track-add"
-        onClick={() => {
-          setAdding(true);
-          setName('');
-        }}
-      >
-        + Track a flyer
-      </button>
+      <span className="slate-share-track-add-wrap">
+        <button
+          type="button"
+          className="slate-share-track-add"
+          aria-describedby={sources.length === 0 ? 'slate-share-track-hint' : undefined}
+          onClick={() => {
+            setAdding(true);
+            setName('');
+          }}
+        >
+          + Tracked link
+        </button>
+        {/* Only until the first one exists: after that the chips explain themselves. */}
+        {sources.length === 0 ? (
+          <span id="slate-share-track-hint" className="slate-share-track-hint">
+            See where people found it
+          </span>
+        ) : null}
+      </span>
     </section>
   );
 }

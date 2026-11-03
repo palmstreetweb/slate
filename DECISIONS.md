@@ -1621,7 +1621,20 @@ Consequences:
 - Tests: `responseEmail` (token, email, the run: caps across one owner's forms, the day cap, failure and timeout, the run lock, unsubscribe GET/POST/forged), `sharePanelNotify` (the switch). `scripts/check-response-email.ts` runs 023 and the real Function against a throwaway branch: 22/22.
 Revisit when: owners ask for answers in the email, another address, a daily digest, or push; or Resend's limits change.
 
-## ADR-073 — Studio settings follow the account
+## ADR-073 — Titles size to the form, not the window
+Date: 2026-11-03
+Status: accepted
+Context: Every theme's `--slate-title-size` (and `titleSize` in `src/themes/*.ts`) was `clamp(min, N vw, max)`. The form doesn't always fill the window: the studio's editor preview, or a host page that embeds Slate in a column. There the title kept the window's size and a single word didn't fit its line. "Welcome." in Swiss was 67 px in a 300 px preview and broke "welcom / e." (the wrapper's `overflow-wrap: anywhere`, GAP-12, lets it break mid-word).
+Decision: `.slate-stage` is a size container (`container-type: inline-size`), and the middle term of every title clamp is `cqi` instead of `vw`, with the same numbers. Where the form fills the window nothing changes: the stage is the window's width. In a narrower box the title shrinks toward its `min`.
+Alternatives:
+- `overflow-wrap: break-word` on titles. Rejected: a word wider than the line still breaks.
+- Fit the title with JavaScript. Rejected: measurement drifts while the title animates in, and CSS can do it.
+Consequences:
+- The stage can't take its width from its content. It is block-level and full-width everywhere today, so this costs nothing.
+- Embedders who set `--slate-title-size` themselves are unaffected. A `cqi` read outside any container falls back to the small-viewport size, which is the old behavior.
+- Checked in the studio preview: Swiss "Welcome." at 260, 300, 375 and 554 px stays on one line (40 px). With the container removed, 67 px on two lines.
+
+## ADR-074 — Studio settings follow the account
 Date: 2026-11-03
 Status: proposed
 Context: Color mode, UI theme, studio size and studio sounds lived only in each browser's localStorage. An owner who signs in with Google on a second computer or their phone got the defaults again, and had to set everything twice. Caleb asked that sign-in "remembers user and settings."

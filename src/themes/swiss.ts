@@ -28,7 +28,7 @@ export const swiss: Theme = {
     titleWeight: 900,
     titleTracking: '-0.035em',
     titleLineHeight: 0.95,
-    titleSize: 'clamp(2.5rem, 6.2vw, 4.2rem)',
+    titleSize: 'clamp(2.5rem, 6.2cqi, 4.2rem)',
     transform: 'lowercase',
   },
   light: {

@@ -5232,6 +5232,20 @@ body.slate-editor-resizing * {
   border-style: dashed;
 }
 
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-add-wrap {
+  flex: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-share-track-hint {
+  font-size: var(--slate-fs-2xs);
+  color: var(--slate-muted);
+  white-space: nowrap;
+}
+
 [data-slate-forms][data-theme-name='slate'] .slate-share-track-remove {
   width: 24px;
   height: 24px;

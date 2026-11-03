@@ -244,11 +244,21 @@
   }
 }
 
-/* Class is on the same node as data-slate-forms — use .slate-loading, not a descendant. */
+/* Class is on the same node as data-slate-forms — use .slate-loading, not a descendant.
+   Sized to the small viewport (100svh), not inset: 0. On iOS a fixed inset: 0
+   box is the large viewport and runs under the browser's toolbars, so the
+   splash centered well below the middle of what's visible. The spread
+   box-shadow paints the background out under the toolbars. Divides out studio zoom
+   (ADR-045) since StudioInbox portals this to body. */
 .slate-loading {
   box-sizing: border-box;
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(100vh / var(--slate-zoom, 1));
+  height: calc(100svh / var(--slate-zoom, 1));
+  box-shadow: 0 0 0 100vh var(--chrome-bg, #f2efe8);
   z-index: 9999;
   display: flex;
   flex-direction: column;
@@ -258,7 +268,6 @@
   margin: 0;
   padding: 24px;
   width: auto;
-  height: auto;
   min-height: 0;
   background: var(--chrome-bg, #f2efe8);
   color: var(--chrome-ink, #20242b);

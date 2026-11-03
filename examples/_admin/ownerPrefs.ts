@@ -1,5 +1,5 @@
 /**
- * The studio appearance settings that follow an owner's account (ADR-073):
+ * The studio appearance settings that follow an owner's account (ADR-074):
  * color mode, UI theme, studio size, sounds. Each one still lives under its
  * own localStorage key (every reader stays as it was); this module reads them
  * as one object and writes a synced copy back. No SDK here.
