@@ -16,6 +16,7 @@ import {
   hydrateSubmissionsRemote,
 } from './submissionsRemote.js';
 import { stopOwnerSettingsSync, syncOwnerSettings } from './settingsRemote.js';
+import { clearQrStore } from '../qr/qrStore.js';
 
 const HYDRATE_TIMEOUT_MS = 25_000;
 
@@ -67,6 +68,7 @@ export function clearRemoteStores(): void {
   clearFormsRemoteCache();
   clearSubmissionsRemoteCache();
   stopOwnerSettingsSync();
+  clearQrStore();
   hydrated = false;
   hydrating = null;
   hydrateGeneration += 1;

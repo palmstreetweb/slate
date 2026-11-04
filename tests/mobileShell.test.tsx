@@ -111,8 +111,10 @@ describe('AdminShell on a phone', () => {
     const labels = within(sheet)
       .getAllByRole('button')
       .map((b) => b.textContent);
-    expect(labels.slice(0, 4)).toEqual([
+    // The other tool comes right after the page's items (ADR-075 §1).
+    expect(labels.slice(0, 5)).toEqual([
       'Page item',
+      'QR codes',
       'Settings',
       expect.stringMatching(/mode$/),
       'Send feedback',
@@ -127,6 +129,10 @@ describe('AdminShell on a phone', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
     await userEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(state.navigate).toHaveBeenCalledWith('/settings');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    await userEvent.click(screen.getByRole('button', { name: 'QR codes' }));
+    expect(state.navigate).toHaveBeenCalledWith('/qr');
   });
 
   it('opens the feedback dialog from the sheet', async () => {

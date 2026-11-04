@@ -55,6 +55,7 @@ import { markAiDraft, type GeneratedDraft } from '../ai/client.js';
 import { closedReason, formatCloseTime } from '../formClose.js';
 import { Odometer } from '../delight/Odometer.js';
 import { StorageBanner, StorageMeter, useStorageQuota } from '../components/StorageMeter.js';
+import { ToolSwitcher } from '../qr/ToolSwitcher.js';
 
 const DRAFT_NOT_SAVED = 'Couldn’t save the draft. Check your connection and try again.';
 
@@ -266,7 +267,7 @@ export function Dashboard() {
 
   return (
     <AdminShell
-      crumbs={<span className="slate-crumb">Forms</span>}
+      crumbs={<ToolSwitcher current="forms" />}
       phone={{
         actions: (
           <>
