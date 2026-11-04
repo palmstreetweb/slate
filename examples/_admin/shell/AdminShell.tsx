@@ -31,16 +31,13 @@ import { rememberSettingsReturn } from './settingsNav.js';
 import { useSignOutFlow } from './useSignOutFlow.js';
 import { usePendingWritesGuard } from './usePendingWritesGuard.js';
 import { ErrorBoundary, PageCrashFallback } from '../components/ErrorBoundary.js';
+import { IconForms, IconQr } from '../qr/ToolSwitcher.js';
 import {
   ADMIN_UI_THEME_STORAGE_KEY,
   detectAdminUiTheme,
   type AdminUiTheme,
 } from '../adminUiTheme.js';
-import {
-  ADMIN_MODE_STORAGE_KEY,
-  PREFS_APPLIED_EVENT,
-  notifyPrefsChanged,
-} from '../ownerPrefs.js';
+import { ADMIN_MODE_STORAGE_KEY, PREFS_APPLIED_EVENT, notifyPrefsChanged } from '../ownerPrefs.js';
 
 const STORAGE_KEY = ADMIN_MODE_STORAGE_KEY;
 
@@ -171,8 +168,25 @@ function PhoneShellHeader({
   const cloud = isNeonConfigured();
   const { runSignOut, leaving, overlay } = useSignOutFlow();
   const onSettings = route.name === 'settings';
+  const inQr = route.name === 'qrList' || route.name === 'qrEditor';
 
   const shellItems: PhoneMenuItem[] = [
+    // The other tool (ADR-075 §1).
+    inQr
+      ? {
+          id: 'tool-forms',
+          label: 'Forms',
+          icon: <IconForms />,
+          separatorBefore: Boolean(chrome?.menu?.length),
+          onSelect: () => navigate('/'),
+        }
+      : {
+          id: 'tool-qr',
+          label: 'QR codes',
+          icon: <IconQr />,
+          separatorBefore: Boolean(chrome?.menu?.length),
+          onSelect: () => navigate('/qr'),
+        },
     ...(onSettings
       ? []
       : [
@@ -180,7 +194,6 @@ function PhoneShellHeader({
             id: 'settings',
             label: 'Settings',
             icon: <IconGear />,
-            separatorBefore: Boolean(chrome?.menu?.length),
             onSelect: () => {
               rememberSettingsReturn(routeKey(route));
               navigate('/settings');
@@ -191,7 +204,6 @@ function PhoneShellHeader({
       id: 'theme',
       label: mode === 'dark' ? 'Light mode' : 'Dark mode',
       icon: mode === 'dark' ? <IconSun /> : <IconMoon />,
-      separatorBefore: onSettings && Boolean(chrome?.menu?.length),
       onSelect: onToggle,
     },
     { id: 'feedback', label: 'Send feedback', icon: <IconMessage />, onSelect: openFeedback },

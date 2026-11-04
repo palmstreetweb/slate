@@ -23,6 +23,8 @@ import { PageNotFound } from './_admin/pages/PageNotFound.js';
 import { Login } from './_admin/pages/Login.js';
 import { Settings } from './_admin/pages/Settings.js';
 import { DropLab } from './_admin/pages/DropLab.js';
+import { QrCodes } from './_admin/pages/QrCodes.js';
+import { QrEditor } from './_admin/pages/QrEditor.js';
 import { LoadingScreen, useMinBootMs } from './_admin/shell/LoadingScreen.js';
 import { PageTransition } from './_admin/shell/PageTransition.js';
 import { AuthProvider, useAuth, useRequiresAuth } from './_admin/neon/AuthProvider.js';
@@ -54,6 +56,7 @@ import './_admin/_adminTheme.css';
 import './_admin/slateMotion.css';
 import './_admin/delight/delight.css';
 import './_admin/mobile/mobile.css';
+import './_admin/qr/qr.css';
 
 /** The gallery lives in its own bundle (ADR-059); the entry picks it on a full load. */
 function ReloadForBundle() {
@@ -129,6 +132,12 @@ function AppRoutes() {
       break;
     case 'submissions':
       page = <FormSubmissions formId={route.formId} />;
+      break;
+    case 'qrList':
+      page = <QrCodes />;
+      break;
+    case 'qrEditor':
+      page = <QrEditor qrId={route.qrId} />;
       break;
     case 'motion':
       // Reached by in-app navigation: reload so the entry loads the gallery bundle.

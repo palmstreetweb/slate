@@ -403,3 +403,20 @@ describe('vercel.json framing (ADR-054)', () => {
     }
   });
 });
+
+describe('vercel.json /q/ short links (ADR-075)', () => {
+  /** Vercel applies the first rewrite whose source matches. */
+  const firstRewrite = (path: string) =>
+    vercel.rewrites.find((r) => sourceToRegex(r.source).test(path))?.destination;
+
+  it.each(['/q/abcdefgh', '/q/abcdefgh/'])('%s goes to the edge redirect', (path) => {
+    expect(firstRewrite(path)).toBe('/api/q?code=:code');
+  });
+
+  it.each(['/q', '/q/', '/q/a/b', '/qr', '/qr/new', '/forms/12345678'])(
+    '%s is not a short link',
+    (path) => {
+      expect(firstRewrite(path)).not.toBe('/api/q?code=:code');
+    },
+  );
+});

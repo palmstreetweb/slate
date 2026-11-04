@@ -1,0 +1,326 @@
+/* Slate · QR codes (ADR-075): the tool switch, the library cards, the editor. */
+
+[data-slate-forms][data-theme-name='slate'] .slate-tool-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--slate-bg-3);
+  border: 1px solid var(--slate-border);
+  flex: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-tool-switch-btn {
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: var(--slate-fs-sm, 13px);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--chrome-muted);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-tool-switch-btn:hover {
+  color: var(--chrome-ink);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-tool-switch-btn--on {
+  color: var(--chrome-ink);
+  background: var(--chrome-panel);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-tool-switch-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── library ─────────────────────────────────────────────────────────── */
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-trash-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-card-body {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-thumb {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--slate-bg-3);
+  box-shadow: inset 0 0 0 1px var(--chrome-hair);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-card-link {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+/* ── editor ──────────────────────────────────────────────────────────── */
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 32px;
+  align-items: start;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-fields {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-field .slate-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-kind {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--slate-border);
+  background: var(--chrome-panel);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-kind input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-kind:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-kind--on {
+  border-color: var(--slate-accent);
+  box-shadow: 0 0 0 1px var(--slate-accent);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-kind-title {
+  font-weight: 600;
+  color: var(--slate-text);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-kind-copy {
+  font-size: var(--slate-fs-xs, 12px);
+  line-height: 1.45;
+  color: var(--slate-muted);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-kind-fixed {
+  margin: 0;
+  font-size: var(--slate-fs-sm, 13px);
+  line-height: 1.5;
+  color: var(--slate-text);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-colors {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-color {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-color input[type='color'] {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--slate-border);
+  border-radius: 10px;
+  background: none;
+  cursor: pointer;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-color-label {
+  display: block;
+  font-size: var(--slate-fs-xs, 12px);
+  color: var(--slate-muted);
+  margin-bottom: 2px;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-hex {
+  width: 96px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  text-transform: lowercase;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-logo-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-logo-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--slate-bg-3);
+  box-shadow: inset 0 0 0 1px var(--chrome-hair);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-error {
+  margin: 6px 0 0;
+  font-size: var(--slate-fs-xs, 12px);
+  line-height: 1.45;
+  color: var(--slate-error);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-warn {
+  color: var(--slate-warn);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-dim {
+  color: var(--slate-dim);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-center {
+  margin: 0;
+  font-size: var(--slate-fs-xs, 12px);
+  line-height: 1.45;
+  text-align: center;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-preview {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-preview-frame {
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.06),
+    0 10px 28px -8px rgb(0 0 0 / 0.28);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-preview-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-preview-sample {
+  opacity: 0.28;
+  filter: blur(1.5px);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-preview-empty {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  padding: 24px;
+  text-align: center;
+  font-size: var(--slate-fs-sm, 13px);
+  color: var(--slate-muted);
+  background: var(--slate-bg-3);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-short {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  max-width: 100%;
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-short code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--slate-fs-sm, 13px);
+  color: var(--slate-text);
+}
+
+[data-slate-forms][data-theme-name='slate'] .slate-qr-downloads {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@media (max-width: 760px) {
+  [data-slate-forms][data-theme-name='slate'] .slate-qr-editor {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  /* On a phone the preview comes first: it's what the owner is making. */
+  [data-slate-forms][data-theme-name='slate'] .slate-qr-preview {
+    position: static;
+    order: -1;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
+  [data-slate-forms][data-theme-name='slate'] .slate-qr-kinds {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

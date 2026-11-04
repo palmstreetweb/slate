@@ -11,6 +11,9 @@
  *   /forms/:id/preview           → admin preview
  *   /forms/:id/edit              → editor (editing)
  *   /forms/:id/submissions       → submissions list
+ *   /qr                          → QR codes list (ADR-075)
+ *   /qr/new                      → QR code editor (creating)
+ *   /qr/:id/edit                 → QR code editor (editing)
  *   /r?d=…                       → portable (schema-in-URL) respond
  *   /motion                      → motion gallery (dev demo, own bundle, no sign-in; ADR-059)
  *   anything else                → "We couldn’t find that page" (respondent words, public
@@ -26,6 +29,8 @@ export type Route =
   | { name: 'editor'; formId: string | null }
   | { name: 'preview'; formId: string }
   | { name: 'submissions'; formId: string }
+  | { name: 'qrList' }
+  | { name: 'qrEditor'; qrId: string | null }
   | { name: 'respond'; token: string }
   | { name: 'fill'; slug: string }
   | { name: 'dropLab' }
@@ -74,6 +79,13 @@ export function matchRoute(path: string): Route {
   if (path === '/lab/drop') return { name: 'dropLab' };
   if (path === '/motion') return { name: 'motion' };
   if (path === '/forms/new') return { name: 'editor', formId: null };
+  if (path === '/qr') return { name: 'qrList' };
+  if (path === '/qr/new') return { name: 'qrEditor', qrId: null };
+
+  const qrEditMatch = /^\/qr\/([^/]+)\/edit$/.exec(path);
+  if (qrEditMatch && qrEditMatch[1]) {
+    return { name: 'qrEditor', qrId: decodeURIComponent(qrEditMatch[1]) };
+  }
 
   if (path === '/r') {
     // A link cut short before `d` is still a respondent's link: the portable
@@ -142,6 +154,10 @@ export function routeKey(route: Route): string {
       return `/forms/${route.formId}/preview`;
     case 'submissions':
       return `/forms/${route.formId}/submissions`;
+    case 'qrList':
+      return '/qr';
+    case 'qrEditor':
+      return route.qrId ? `/qr/${route.qrId}/edit` : '/qr/new';
     case 'respond':
       return '/r';
     case 'fill':

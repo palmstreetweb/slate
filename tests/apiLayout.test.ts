@@ -18,14 +18,15 @@ describe('api/ layout (ADR-071)', () => {
   const files = entries.filter((n) => statSync(join(apiDir, n)).isFile());
   const dirs = entries.filter((n) => statSync(join(apiDir, n)).isDirectory());
 
-  it('the only top-level files are the two route handlers', () => {
-    expect(files.sort()).toEqual(['auth-email.ts', 'generate.ts']);
+  it('the only top-level files are the route handlers', () => {
+    // q.ts: the /q/{code} QR short-link redirect; qr-target.ts: the destination check (ADR-075).
+    expect(files.sort()).toEqual(['auth-email.ts', 'generate.ts', 'q.ts', 'qr-target.ts']);
   });
 
   it('every top-level file exports a default request handler', () => {
     for (const name of files) {
       const src = readFileSync(join(apiDir, name), 'utf8');
-      expect(src, name).toMatch(/export default (async )?function handler\(/);
+      expect(src, name).toMatch(/export default ((async )?function handler\(|nodeOrWeb\()/);
     }
   });
 
@@ -40,10 +41,12 @@ describe('api/ layout (ADR-071)', () => {
       'mapGeneratedForm.ts',
       'modelForm.ts',
       'neonDataApi.ts',
+      'qrTarget.ts',
       'rateLimit.ts',
       'runGenerate.ts',
       'sentry.ts',
       'sentryGate.ts',
+      'webHandler.ts',
     ]);
   });
 
