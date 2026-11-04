@@ -1,7 +1,9 @@
 /**
  * Neon Function: public form submit (ADR-029, limits ADR-058)
  * + password-locked form unlock (ADR-043, `{ op: 'unlock' }` on the same URL)
- * + the public form lookup (ADR-061, `GET ?op=form&slug=`).
+ * + the public form lookup (ADR-061, `GET ?op=form&slug=`)
+ * + the dynamic QR code lookup for the edge redirect (ADR-075, `GET ?op=qr&code=`;
+ *   needs migration 025 and QR_EDGE_KEY, see qrScan.ts).
  * Deploy: neon functions deploy submitresponse --src neon/functions/submit-response
  * DATABASE_URL is injected by Neon. Needs migrations 016 (consume_submit_rates,
  * try_fill_password), 017 (lookup_public_form), 019 (close settings,
@@ -61,6 +63,7 @@ import { computeScoreCore } from './scoring.js';
 import { signupSlotsOf } from './signup.js';
 import { formZipAreas } from './geo.js';
 import { aboutMinutes, charge, intEnv, ipMax, ownerKey, units, type Bucket } from './rateGate.js';
+import { qrScan } from './qrScan.js';
 
 /** Hard caps on what one submission may carry (ADR-046, ADR-058). */
 const MAX_BODY_BYTES = 64 * 1024;
@@ -410,6 +413,7 @@ const notFound = (c: Context) => {
  * get_form_by_slug answered, with the published title instead of the live name.
  */
 app.get('/', async (c) => {
+  if (c.req.query('op') === 'qr') return handleQrScan(c);
   if (c.req.query('op') !== 'form') return c.text('Not found', 404);
   // `part=slots`: only the spots left (ADR-066), for a page refreshing its counts. Same statement.
   const slotsOnly = c.req.query('part') === 'slots';
@@ -454,6 +458,21 @@ app.get('/', async (c) => {
     ...(slotsLeft ? { slotsLeft } : {}),
   });
 });
+
+/** `GET ?op=qr` (ADR-075): the edge redirect's lookup. JSON for the edge only, never cached. */
+async function handleQrScan(c: Context) {
+  c.header('Cache-Control', 'no-store');
+  if (!process.env.DATABASE_URL) return c.text('Server misconfigured', 500);
+  const r = await qrScan(pool, {
+    code: c.req.query('code') ?? '',
+    count: c.req.query('count') === '1',
+    edgeKey: c.req.header('x-slate-edge-key'),
+    clientIp: c.req.header('x-slate-client-ip'),
+  });
+  if (r.kind === 'forbidden') return c.json({ error: 'forbidden' }, 403);
+  if (r.kind === 'unavailable') return c.text('Temporarily unavailable', 503);
+  return c.json({ status: r.status, target: r.target, counted: r.counted });
+}
 
 const UNLOCK_COPY: Record<'pw' | 'fail_ip' | 'fail_form', (wait: string) => string> = {
   pw: (w) =>

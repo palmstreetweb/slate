@@ -4,7 +4,8 @@
  * PostgREST runs) that owners only ever reach their own codes, that the database owns owner_id /
  * kind / code, that a dynamic destination can only move through set_qr_target with the server key,
  * the 100-code quota (trash included, serialized under parallel inserts), the scan function's
- * answers and counting cap, and retiring on permanent delete. Runs 025's rollback block and
+ * answers and counting cap, submitresponse's op=qr lookup (qrScan.ts) against the real function,
+ * and retiring on permanent delete. Runs 025's rollback block and
  * re-applies 025 twice. Not part of `npm test`.
  *
  *   npx vite-node scripts/check-qr-codes.ts
@@ -21,6 +22,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import pg from 'pg';
+import { qrScan } from '../neon/functions/submit-response/qrScan.js';
 
 const PROJECT = process.env.NEON_PROJECT_ID || 'odd-voice-53972178';
 const PROD_ENDPOINT = process.env.PROD_ENDPOINT || 'ep-misty-snow-ax9wxjvf';
@@ -501,6 +503,53 @@ async function scans() {
   check('a dynamic code with no destination yet is inactive', unset?.status === 'inactive');
 }
 
+/** submitresponse's `GET ?op=qr` code path (qrScan.ts), against the real record_qr_scan. */
+async function edgeLookup() {
+  const key = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+  process.env.QR_EDGE_KEY = key;
+  const made = await insertAs(OWNER, { kind: 'dynamic', name: 'Edge lookup' });
+  const id = made.rows[0]?.id as string;
+  const code = made.rows[0]?.code as string;
+  await q(`update public.qr_codes set target_url = 'https://example.com/edge' where id = $1`, [id]);
+  const ask = (over: Partial<Parameters<typeof qrScan>[1]> = {}) =>
+    qrScan(db, { code, count: true, edgeKey: key, clientIp: '198.51.100.9', ...over });
+
+  const hit = await ask({ code: code.toUpperCase() });
+  check(
+    'op=qr: a live code resolves and is counted',
+    hit.kind === 'answer' &&
+      hit.status === 'ok' &&
+      hit.target === 'https://example.com/edge' &&
+      hit.counted,
+    JSON.stringify(hit),
+  );
+  const uncounted = await ask({ count: false });
+  check(
+    'op=qr: an uncounted scan still resolves',
+    uncounted.kind === 'answer' && uncounted.status === 'ok' && !uncounted.counted,
+  );
+  const [n] = await q<{ n: number }>(
+    `select coalesce(sum(scans), 0)::int as n from public.qr_scan_days where code_id = $1`,
+    [id],
+  );
+  check('op=qr: exactly one scan recorded', n!.n === 1, String(n!.n));
+  check(
+    'op=qr: a wrong edge key is forbidden',
+    (await ask({ edgeKey: 'x'.repeat(64) })).kind === 'forbidden',
+  );
+  const miss = await ask({ code: 'zzzzzzzz' });
+  check(
+    'op=qr: an unknown code is not_found',
+    miss.kind === 'answer' && miss.status === 'not_found',
+  );
+  await q(`update public.qr_codes set deleted_at = now() where id = $1`, [id]);
+  const trashed = await ask();
+  check(
+    'op=qr: a trashed code is inactive',
+    trashed.kind === 'answer' && trashed.status === 'inactive',
+  );
+}
+
 async function retire() {
   const r = await asRole(
     'authenticated',
@@ -627,6 +676,7 @@ async function main() {
     await pinning();
     await targetDoor();
     await scans();
+    await edgeLookup();
     await retire();
     await quota();
     await rollbackAndReapply();

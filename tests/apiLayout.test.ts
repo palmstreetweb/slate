@@ -18,8 +18,9 @@ describe('api/ layout (ADR-071)', () => {
   const files = entries.filter((n) => statSync(join(apiDir, n)).isFile());
   const dirs = entries.filter((n) => statSync(join(apiDir, n)).isDirectory());
 
-  it('the only top-level files are the two route handlers', () => {
-    expect(files.sort()).toEqual(['auth-email.ts', 'generate.ts']);
+  it('the only top-level files are the route handlers', () => {
+    // q.ts: the /q/{code} QR short-link redirect (ADR-075).
+    expect(files.sort()).toEqual(['auth-email.ts', 'generate.ts', 'q.ts']);
   });
 
   it('every top-level file exports a default request handler', () => {
