@@ -6,7 +6,7 @@
  *
  * A dynamic code's destination is never written over the Data API (the
  * database pins it). It goes through POST /api/qr-target, which runs the
- * Safe Browsing check first (ADR-075 §7).
+ * Web Risk check first (ADR-075 §7).
  */
 
 import { isNeonConfigured } from '../neon/env.js';
@@ -389,7 +389,7 @@ export async function updateQrCode(id: string, patch: QrPatch): Promise<QrRecord
   return record;
 }
 
-/** A dynamic code's destination, through the Safe Browsing door (phase 4 builds the door). */
+/** A dynamic code's destination, through the Web Risk check in /api/qr-target (ADR-075 §7). */
 export async function setQrDestination(id: string, url: string): Promise<QrRecord> {
   const current = getQrCode(id);
   if (!current || current.kind !== 'dynamic') throw new Error('That QR code isn’t here anymore.');
@@ -431,11 +431,15 @@ export async function setQrDestination(id: string, url: string): Promise<QrRecor
     if (res.status === 400) {
       throw new QrTargetError('invalid', message || 'That link can’t be used.');
     }
-    if (res.status === 404 || res.status === 503) {
+    if (res.status === 503) {
       throw new QrTargetError(
         'unavailable',
         message || 'Slate can’t check links right now. Try again in a minute.',
       );
+    }
+    // 401 signed out, 404 gone or in Trash, 429 too many changes: the server's sentence says which.
+    if (res.status === 401 || res.status === 404 || res.status === 429) {
+      throw new QrTargetError('failed', message || 'Couldn’t save the link. Try again.');
     }
     throw new QrTargetError('failed', 'Couldn’t save the link. Try again.');
   }

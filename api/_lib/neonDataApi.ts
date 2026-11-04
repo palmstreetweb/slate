@@ -26,6 +26,18 @@ export function neonDataApiUrl(): string | null {
 
 const RPC_TIMEOUT_MS = 8000;
 
+/** A non-2xx answer: the HTTP status and, when the body had one, the Postgres error code. */
+export class DataApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+  constructor(message: string, status: number, code: string | null) {
+    super(message);
+    this.name = 'DataApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 /**
  * POST `/rpc/{fn}` with the user's bearer and return the parsed JSON body.
  * Throws on anything else — no URL, network, timeout, non-2xx, non-JSON — and
@@ -57,8 +69,19 @@ export async function callDataApiRpc(
     throw new Error(scrub(`${fn}: ${why}`));
   }
   if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 200);
-    throw new Error(scrub(`${fn}: HTTP ${res.status} ${detail}`.trim()));
+    const text = await res.text().catch(() => '');
+    let code: string | null = null;
+    try {
+      const parsed = JSON.parse(text) as { code?: unknown };
+      if (typeof parsed.code === 'string') code = parsed.code;
+    } catch {
+      // Not JSON: no code.
+    }
+    throw new DataApiError(
+      scrub(`${fn}: HTTP ${res.status} ${text.slice(0, 200)}`.trim()),
+      res.status,
+      code,
+    );
   }
   try {
     return await res.json();

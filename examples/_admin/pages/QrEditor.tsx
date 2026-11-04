@@ -13,6 +13,7 @@ import {
   createQrCode,
   getQrCode,
   isQrLoaded,
+  qrScanCount,
   isQrQuotaError,
   loadQrCodes,
   QrTargetError,
@@ -528,6 +529,12 @@ function QrEditorBody({ record }: { record: QrRecord | null }) {
               <p className="slate-qr-dim slate-qr-center">Your short link appears when you save.</p>
             )
           ) : null}
+          {record?.kind === 'dynamic' && record.targetUrl ? (
+            <p className="slate-qr-dim slate-qr-center">
+              {scanLabel(qrScanCount(record.id))} · repeat scans from one phone count once per 30
+              minutes
+            </p>
+          ) : null}
           {record?.kind === 'dynamic' && !record.targetUrl ? (
             <p className="slate-qr-warn slate-qr-center">
               No link yet: scans show “This code isn’t active right now”.
@@ -569,6 +576,10 @@ function QrEditorBody({ record }: { record: QrRecord | null }) {
       </div>
     </AdminShell>
   );
+}
+
+function scanLabel(n: number): string {
+  return n === 0 ? 'No scans yet' : `${n.toLocaleString()} ${n === 1 ? 'scan' : 'scans'}`;
 }
 
 function sameStyle(a: QrStyle, b: QrStyle): boolean {
