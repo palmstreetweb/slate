@@ -20,6 +20,7 @@ import { clientIp, takeRateLimit } from './_lib/rateLimit.js';
 import { verifyUserJwt } from './_lib/authJwt.js';
 import { callDataApiRpc, DataApiError, neonDataApiUrl } from './_lib/neonDataApi.js';
 import { checkTargetShape, webRiskLookup } from './_lib/qrTarget.js';
+import { nodeOrWeb } from './_lib/webHandler.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_BODY_CHARS = 8 * 1024;
@@ -60,7 +61,7 @@ async function ownCode(id: string, token: string): Promise<CodeRow | null> {
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handleQrTarget(request: Request): Promise<Response> {
   const method = request.method.toUpperCase();
   if (method === 'OPTIONS') return new Response(null, { status: 204 });
   if (method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -143,3 +144,6 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ error: QR_TARGET_COPY.failed }, 502);
   }
 }
+
+/** Vercel calls Node functions with (req, res); tests call with a Request (GS-026). */
+export default nodeOrWeb(handleQrTarget, '/api/qr-target');

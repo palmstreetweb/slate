@@ -63,8 +63,11 @@ beforeEach(() => {
   state.rpcBody = null;
 });
 
+/** A Web Request always gets a Response back (only the Node call writes to `res`). */
+const web = async (request: Request) => (await handler(request)) as Response;
+
 const post = (body: unknown, token = 'good', ip = '203.0.113.7') =>
-  handler(
+  web(
     new Request('https://slateforms.vercel.app/api/qr-target', {
       method: 'POST',
       headers: {
@@ -177,8 +180,41 @@ describe('/api/qr-target', () => {
     expect(last).toBe(429);
   });
 
+  it('answers Vercel’s Node (req, res) call, not only a Web Request (GS-026)', async () => {
+    const body = Buffer.from(JSON.stringify(ok));
+    const req = Object.assign(
+      (async function* () {
+        yield body;
+      })(),
+      {
+        method: 'POST',
+        url: '/api/qr-target',
+        headers: { host: 'slateforms.vercel.app', 'content-type': 'application/json' },
+      },
+    );
+    const out = { statusCode: 0, headers: {} as Record<string, string>, body: '' };
+    await handler(req, {
+      set statusCode(v: number) {
+        out.statusCode = v;
+      },
+      get statusCode() {
+        return out.statusCode;
+      },
+      setHeader: (k: string, v: string) => {
+        out.headers[k] = v;
+      },
+      end: (chunk?: unknown) => {
+        out.body = Buffer.from(chunk as Buffer).toString('utf8');
+      },
+    });
+    // No bearer: a clean 401 written to the Node response, not a crash.
+    expect(out.statusCode).toBe(401);
+    expect(JSON.parse(out.body).error).toBe(QR_TARGET_COPY.signedOut);
+    expect(out.headers['content-type']).toBe('application/json');
+  });
+
   it('only takes POST', async () => {
-    const res = await handler(new Request('https://x/api/qr-target', { method: 'GET' }));
+    const res = await web(new Request('https://x/api/qr-target', { method: 'GET' }));
     expect(res.status).toBe(405);
   });
 });

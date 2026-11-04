@@ -26,7 +26,7 @@ describe('api/ layout (ADR-071)', () => {
   it('every top-level file exports a default request handler', () => {
     for (const name of files) {
       const src = readFileSync(join(apiDir, name), 'utf8');
-      expect(src, name).toMatch(/export default (async )?function handler\(/);
+      expect(src, name).toMatch(/export default ((async )?function handler\(|nodeOrWeb\()/);
     }
   });
 
@@ -46,6 +46,7 @@ describe('api/ layout (ADR-071)', () => {
       'runGenerate.ts',
       'sentry.ts',
       'sentryGate.ts',
+      'webHandler.ts',
     ]);
   });
 

@@ -8,7 +8,7 @@
 --   qr_codes          one row per QR code. Owner-scoped RLS like forms (008). kind / code / owner_id
 --                     never change after insert. A dynamic code's target_url is pinned for the Data
 --                     API roles: the only door is set_qr_target, which needs the server key that only
---                     /api/qr-target holds (it runs the Safe Browsing check first).
+--                     /api/qr-target holds (it runs the Web Risk check first).
 --   qr_scan_days      scans per code per UTC day. No IP, no device, nothing personal. Owners select.
 --   retired_qr_codes  codes of permanently deleted rows, never drawn again.
 --   qr_server_key     the 64-hex key for set_qr_target (the ADR-051 pattern).
